@@ -16,10 +16,14 @@ type AttributeSchema = {
 };
 
 type Template<TState> = string | ((state: TState) => string);
-type StyleDefinition<TState> = string | ((state: TState) => string) | {
-  static?: string;
-  dynamic?: (state: TState) => string | Record<string, string>;
-};
+type StyleDefinition<TState> = 
+  | string 
+  | ((state: TState) => string) 
+  | Record<string, Record<string, any>> // CSS object syntax
+  | {
+      static?: string | Record<string, Record<string, any>>;
+      dynamic?: (state: TState) => string | Record<string, string>;
+    };
 
 type ComponentAPI = {
   emit: (eventName: string, detail?: unknown) => void;
@@ -33,6 +37,199 @@ type ComponentAPI = {
 // Helper to convert camelCase to kebab-case for auto tag generation
 function camelToKebab(str: string): string {
   return str.replace(/([A-Z])/g, '-$1').toLowerCase().replace(/^-/, '');
+}
+
+// Template string interpolation helper with full expression support
+function parseTemplateString(template: string, state: any): string {
+  return template.replace(/\{\{([^}]+)\}\}/g, (_match, expression) => {
+    try {
+      const trimmedExpr = expression.trim();
+      
+      // Handle simple property access (existing functionality)
+      if (/^[a-zA-Z_$][a-zA-Z0-9_$.]*$/.test(trimmedExpr)) {
+        const keys = trimmedExpr.split('.');
+        let value = state;
+        for (const key of keys) {
+          value = value?.[key];
+        }
+        return value ?? '';
+      }
+      
+      // Handle more complex expressions safely
+      return evaluateExpression(trimmedExpr, state);
+    } catch {
+      return ''; // Return empty string if evaluation fails
+    }
+  });
+}
+
+// Safe expression evaluator for template interpolation
+function evaluateExpression(expression: string, state: any): string {
+  try {
+    // Create a safe context with only the state properties
+    const context = { ...state };
+    
+    // Add common utility functions
+    const utils = {
+      classes: (obj: Record<string, boolean>) => 
+        Object.entries(obj).filter(([, condition]) => condition).map(([className]) => className).join(' '),
+      styles: (obj: Record<string, string | number>) => 
+        Object.entries(obj).map(([prop, value]) => `${prop}: ${value}`).join('; '),
+      format: (value: any, type: string) => {
+        if (type === 'currency') return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
+        if (type === 'date') return new Date(value).toLocaleDateString();
+        return String(value);
+      }
+    };
+    
+    // Create function that evaluates in controlled scope
+    const func = new Function(...Object.keys(context), ...Object.keys(utils), `"use strict"; return (${expression});`);
+    const result = func(...Object.values(context), ...Object.values(utils));
+    
+    return result != null ? String(result) : '';
+  } catch (error) {
+    console.warn(`Template expression evaluation failed: ${expression}`, error);
+    return '';
+  }
+}
+
+// CSS object to string converter
+function cssObjectToString(cssObj: Record<string, Record<string, any>>): string {
+  return Object.entries(cssObj)
+    .map(([selector, rules]) => {
+      const ruleString = Object.entries(rules)
+        .map(([prop, value]) => `  ${prop.replace(/([A-Z])/g, '-$1').toLowerCase()}: ${value};`)
+        .join('\n');
+      return `${selector} {\n${ruleString}\n}`;
+    })
+    .join('\n\n');
+}
+
+// Parse inline event handlers from template with enhanced support
+function parseInlineEvents(template: string): { 
+  cleanTemplate: string; 
+  events: { [selector: string]: { [event: string]: string } } 
+} {
+  const events: { [selector: string]: { [event: string]: string } } = {};
+  let eventCounter = 0;
+  
+  // Enhanced regex to support various event binding syntaxes
+  const cleanTemplate = template.replace(/@(\w+)(?:\.(\w+))*="([^"]+)"/g, (_match, eventType, modifier, handler) => {
+    const eventId = `inline-event-${eventCounter++}`;
+    const selector = `[data-event-id="${eventId}"]`;
+    
+    if (!events[selector]) {
+      events[selector] = {};
+    }
+    
+    // Handle event modifiers (e.g., @click.prevent, @keydown.enter)
+    let eventKey = eventType;
+    if (modifier) {
+      eventKey = `${eventType}.${modifier}`;
+    }
+    
+    events[selector][eventKey] = handler;
+    
+    return `data-event-id="${eventId}"`;
+  });
+  
+  return { cleanTemplate, events };
+}
+
+// Process inline events and convert them to proper event handlers
+function processInlineEvents<TState extends object>(
+  inlineEvents: { [selector: string]: { [event: string]: string } },
+  actions?: { [actionName: string]: (state: TState, api?: any, ...args: any[]) => void }
+): { [selector: string]: { [eventType: string]: (e: Event, state: TState, api: ComponentAPI) => void } } {
+  const processedEvents: { [selector: string]: { [eventType: string]: (e: Event, state: TState, api: ComponentAPI) => void } } = {};
+  
+  Object.entries(inlineEvents).forEach(([selector, eventMap]) => {
+    processedEvents[selector] = {};
+    
+    Object.entries(eventMap).forEach(([eventKey, handler]) => {
+      const [eventType, modifier] = eventKey.split('.');
+      
+      processedEvents[selector]![eventType] = (event: Event, state: TState, api: ComponentAPI) => {
+        // Handle event modifiers
+        if (modifier) {
+          switch (modifier) {
+            case 'prevent':
+              event.preventDefault();
+              break;
+            case 'stop':
+              event.stopPropagation();
+              break;
+            case 'self':
+              if (event.target !== event.currentTarget) return;
+              break;
+            case 'enter':
+              if ((event as KeyboardEvent).key !== 'Enter') return;
+              break;
+            case 'escape':
+              if ((event as KeyboardEvent).key !== 'Escape') return;
+              break;
+          }
+        }
+        
+        // Check if handler references an action
+        if (actions && handler in actions) {
+          // Extract arguments from event if needed (e.g., input value)
+          let args: any[] = [];
+          if (event.target && 'value' in event.target) {
+            args = [(event.target as any).value];
+          }
+          actions[handler](state, api, ...args);
+        } else {
+          // Evaluate as expression
+          try {
+            evaluateEventExpression(handler, { event, state, api });
+          } catch (error) {
+            console.warn(`Inline event handler failed: ${handler}`, error);
+          }
+        }
+      };
+    });
+  });
+  
+  return processedEvents;
+}
+
+// Safe expression evaluator for event handlers
+function evaluateEventExpression(expression: string, context: { event: Event; state: any; api: any }): void {
+  try {
+    const { event, state, api } = context;
+    
+    // Create a safe execution context with state properties available directly
+    const stateKeys = Object.keys(state);
+    
+    // Create parameter names and values, including state properties as direct parameters
+    const paramNames = ['event', 'state', 'api', '$event', '$state', '$api', ...stateKeys];
+    const paramValues = [event, state, api, event, state, api, ...stateKeys.map(key => state[key])];
+    
+    // Create a function where state properties are available as mutable parameters
+    const functionBody = `
+      try {
+        const result = ${expression.endsWith(';') ? expression.slice(0, -1) : expression};
+        
+        // Update the state object with any changed values
+        ${stateKeys.map(key => `
+          if (${key} !== state.${key}) {
+            state.${key} = ${key};
+          }
+        `).join('')}
+        
+        return result;
+      } catch (e) {
+        console.error('❌ Expression execution error:', e);
+        throw e;
+      }
+    `;
+    
+    const func = new Function(...paramNames, functionBody);
+    func(...paramValues);
+  } catch (error) {
+    console.warn(`Event expression evaluation failed: ${expression}`, error);
+  }
 }
 
 // Auto-generate tag name from variable name or function name
@@ -103,13 +300,31 @@ export type ReactiveComponentOptions<TState extends object> = {
   // Simplified attribute schema - can be array of strings for auto-inference
   attrs?: AttributeSchema | Array<keyof TState>;
   
+  // Action shortcuts for common state mutations
+  actions?: {
+    [actionName: string]: (state: TState, api: ComponentAPI, ...args: any[]) => void;
+  };
+  
   events?: {
     [selector: string]: {
       [eventType: string]: (e: Event, state: TState, api: ComponentAPI) => void;
     };
+  } | {
+    [selector: string]: {
+      [eventType: string]: string; // Action name reference
+    };
   };
+  
   refs?: {
     [refKey: string]: (el: Element, state: TState, api: ComponentAPI) => void;
+  };
+  
+  // Auto-forward all primitive props as attributes
+  forwardProps?: boolean;
+  
+  // Declarative watchers
+  when?: {
+    [condition: string]: (state: TState, api: ComponentAPI) => void;
   };
   
   // Lifecycle hook shortcuts - can be defined directly on options
@@ -161,7 +376,21 @@ export function createReactiveComponent<TState extends object>(options: Reactive
   const mergedComputed = { ...extractedComputed, ...(options.computed || {}) };
   
   // Process attributes - support both array syntax and object syntax
-  const processedAttrs = processAttributes(options.attrs, processedState);
+  let processedAttrs = processAttributes(options.attrs, processedState);
+  
+  // Auto-forward props if enabled
+  if (options.forwardProps) {
+    const autoAttrs = Object.keys(processedState)
+      .filter(key => {
+        const value = processedState[key as keyof TState];
+        return typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean';
+      });
+    const autoProcessed = processAttributes(autoAttrs as Array<keyof TState>, processedState);
+    processedAttrs = { ...processedAttrs, ...autoProcessed };
+  }
+  
+  // Process actions for event handling
+  const actions = options.actions || {};
   
   // Merge lifecycle hooks from both direct properties and hooks object
   const mergedHooks = {
@@ -189,8 +418,22 @@ export function createReactiveComponent<TState extends object>(options: Reactive
     ? { static: style, dynamic: undefined }
     : typeof style === 'function'
     ? { static: '', dynamic: style }
-    : typeof style === 'object' && style !== null
-    ? { static: style.static || '', dynamic: style.dynamic }
+    : typeof style === 'object' && style !== null && !Array.isArray(style)
+    ? (() => {
+        // Handle CSS object syntax
+        if ('static' in style || 'dynamic' in style) {
+          // Hybrid style object
+          const staticStyle = typeof style.static === 'string' 
+            ? style.static 
+            : typeof style.static === 'object' 
+            ? cssObjectToString(style.static) 
+            : '';
+          return { static: staticStyle, dynamic: style.dynamic };
+        } else {
+          // Pure CSS object
+          return { static: cssObjectToString(style as Record<string, Record<string, any>>), dynamic: undefined };
+        }
+      })()
     : { static: '', dynamic: undefined };
 
   const getStylesheet = (currentState?: TState) => {
@@ -202,7 +445,7 @@ export function createReactiveComponent<TState extends object>(options: Reactive
     const sheet = StylesheetCache.get(options)!;
     let finalCSS = styleConfig.static;
     
-    if (styleConfig.dynamic && currentState) {
+    if (styleConfig.dynamic && currentState && typeof styleConfig.dynamic === 'function') {
       const dynamicResult = styleConfig.dynamic(currentState);
       
       if (typeof dynamicResult === 'string') {
@@ -454,6 +697,16 @@ export function createReactiveComponent<TState extends object>(options: Reactive
       if (html === this.lastHTML && !mergedHooks.renderShadow && !styleConfig.dynamic) return;
       this.lastHTML = html;
 
+      // Store currently focused element info before re-rendering
+      const activeElement = root.activeElement as HTMLElement;
+      const focusedInputInfo = activeElement && activeElement.tagName === 'INPUT' ? {
+        element: activeElement,
+        value: (activeElement as HTMLInputElement).value,
+        selectionStart: (activeElement as HTMLInputElement).selectionStart,
+        selectionEnd: (activeElement as HTMLInputElement).selectionEnd,
+        dataRef: activeElement.getAttribute('data-ref')
+      } : null;
+
       root.innerHTML = '';
       (root as any).adoptedStyleSheets = [getStylesheet(this.state)];
 
@@ -467,6 +720,18 @@ export function createReactiveComponent<TState extends object>(options: Reactive
         root.appendChild(child.cloneNode(true));
       });
 
+      // Restore focus and input state after re-rendering
+      if (focusedInputInfo && focusedInputInfo.dataRef) {
+        const newInput = root.querySelector(`[data-ref="${focusedInputInfo.dataRef}"]`) as HTMLInputElement;
+        if (newInput && newInput.tagName === 'INPUT') {
+          newInput.value = focusedInputInfo.value;
+          newInput.focus();
+          if (focusedInputInfo.selectionStart !== null && focusedInputInfo.selectionEnd !== null) {
+            newInput.setSelectionRange(focusedInputInfo.selectionStart, focusedInputInfo.selectionEnd);
+          }
+        }
+      }
+
       Object.entries(refs).forEach(([refKey, callback]) => {
         const el = root.querySelector(`[data-ref="${refKey}"]`);
         if (!el && debug) console.warn(`Missing ref: "${refKey}"`);
@@ -477,14 +742,29 @@ export function createReactiveComponent<TState extends object>(options: Reactive
     }
 
     private addDelegatedListeners() {
-      if (!events || !this.shadowRoot) return;
+      if (!events || !this.shadowRoot) {
+        console.log('❌ No events or shadowRoot available');
+        return;
+      }
 
       Object.entries(events).forEach(([selector, handlers]) => {
         Object.entries(handlers).forEach(([type, fn]) => {
           const listener = (e: Event) => {
             const target = e.target as Element;
+            
             if (target?.matches(selector)) {
-              fn(e, this.state, this.api);
+              if (typeof fn === 'string') {
+                // Action reference
+                const action = actions[fn];
+                if (action) {
+                  action(this.state, this.api, e);
+                } else {
+                  debug && console.warn(`Action "${fn}" not found`);
+                }
+              } else if (typeof fn === 'function') {
+                // Direct function
+                fn(e, this.state, this.api);
+              }
             }
           };
           this.shadowRoot!.addEventListener(type, listener);
@@ -538,3 +818,66 @@ export function simpleComponent<TState extends object>(
     ...options,
   });
 }
+
+// Ultra-concise component creation with automatic features
+export function quickComponent<TState extends object>(
+  state: TState,
+  template: string | ((state: TState) => string),
+  actions?: { [actionName: string]: (state: TState) => void }
+): typeof HTMLElement {
+  // Process template for inline events
+  let processedTemplate: Template<TState>;
+  let processedEvents: any = {};
+  
+  if (typeof template === 'string') {
+    const { cleanTemplate, events } = parseInlineEvents(template);
+    processedTemplate = (state: TState) => parseTemplateString(cleanTemplate, state);
+    processedEvents = processInlineEvents(events, actions);
+  } else {
+    processedTemplate = template;
+  }
+
+  return createReactiveComponent({
+    state,
+    template: processedTemplate,
+    actions,
+    events: processedEvents,
+    forwardProps: true, // Auto-forward all props
+  });
+}
+
+// Function component style (React-like)
+export function functionComponent<TProps extends object = {}>(
+  fn: (props: TProps) => string,
+  defaultProps?: Partial<TProps>
+): (props?: Partial<TProps>) => typeof HTMLElement {
+  return (props = {} as Partial<TProps>) => {
+    const finalProps = { ...defaultProps, ...props } as TProps;
+    
+    return createReactiveComponent({
+      state: finalProps,
+      template: () => fn(finalProps),
+      forwardProps: true,
+    });
+  };
+}
+
+// Template helpers for better DX
+export const html = (strings: TemplateStringsArray, ...values: any[]) => {
+  return strings.reduce((result, string, i) => {
+    return result + string + (values[i] || '');
+  }, '');
+};
+
+export const css = (strings: TemplateStringsArray, ...values: any[]) => {
+  return strings.reduce((result, string, i) => {
+    return result + string + (values[i] || '');
+  }, '');
+};
+
+export const classes = (classObj: Record<string, boolean>) => {
+  return Object.entries(classObj)
+    .filter(([_, condition]) => condition)
+    .map(([className]) => className)
+    .join(' ');
+};

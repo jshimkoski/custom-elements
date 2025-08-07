@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enhanced Template Features Demo</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .demo-section {
+            margin: 30px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: #f9f9f9;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <h1>Enhanced Template Features Demo</h1>
+    <p>Testing template string interpolation (<code>{{}}</code>) and inline event handlers (<code>@event</code>)</p>
+    
+    <div class="demo-section">
+        <h3>Template String Interpolation</h3>
+        <p>✅ Complex expressions, property access, calculations</p>
+        <div id="simple-demo"></div>
+    </div>
+    
+    <div class="demo-section">
+        <h3>Inline Event Handlers + Expressions</h3>
+        <p>✅ @click event binding, expression handlers, conditional logic</p>
+        <div id="expression-demo"></div>
+    </div>
+    
+    <div class="demo-section">
+        <h3>Advanced Event Features</h3>
+        <p>✅ Event modifiers (.prevent), input binding, array operations</p>
+        <div id="event-demo"></div>
+    </div>
+
+    <script type="module">
+        // Import the test component
+        import './src/components/TestComponent.js';
+        
+        // Wait for modules to load and then create the actual component instances
+        setTimeout(() => {
+            const { TestComponent } = window;
+            
+            if (TestComponent) {
+                console.log('Creating TestComponent instance...');
+                const testInstance = new TestComponent();
+                document.getElementById('simple-demo').appendChild(testInstance);
+                console.log('TestComponent instance created and added to DOM');
+            } else {
+                console.error('TestComponent not found on window');
+            }
+        }, 100);
+    </script>
+</body>
+</html>
