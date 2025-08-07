@@ -53,7 +53,7 @@ const Counter = quickComponent(
 ### Component Builder API
 
 ```typescript
-import { define } from './lib/easy.js';
+import { define } from './lib/runtime.js';
 
 const TodoApp = define('todo-app')
   .state({ 

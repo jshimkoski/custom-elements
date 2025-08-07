@@ -1,4 +1,8 @@
 import { eventBus } from './event-bus.js';
+import { html, css, classes, styles, ref, on } from './template-helpers.js';
+
+// Re-export template helpers for easy access
+export { html, css, classes, styles, ref, on };
 
 const StylesheetCache = new WeakMap<object, CSSStyleSheet>();
 
@@ -32,6 +36,9 @@ type ComponentAPI = {
   onceGlobal: <T = any>(eventName: string, handler: (data: T) => void) => Promise<T>;
   listenGlobal: <T = any>(eventName: string, handler: (event: CustomEvent<T>) => void, options?: AddEventListenerOptions) => () => void;
   offGlobal: <T = any>(eventName: string, handler: (data: T) => void) => void;
+  // Enhanced API for actions and computed values
+  actions?: { [actionName: string]: (...args: any[]) => void };
+  getComputedValue?: (key: string) => any;
 };
 
 // Helper to convert camelCase to kebab-case for auto tag generation
@@ -41,26 +48,72 @@ function camelToKebab(str: string): string {
 
 // Template string interpolation helper with full expression support
 function parseTemplateString(template: string, state: any): string {
-  return template.replace(/\{\{([^}]+)\}\}/g, (_match, expression) => {
-    try {
-      const trimmedExpr = expression.trim();
-      
-      // Handle simple property access (existing functionality)
-      if (/^[a-zA-Z_$][a-zA-Z0-9_$.]*$/.test(trimmedExpr)) {
-        const keys = trimmedExpr.split('.');
-        let value = state;
-        for (const key of keys) {
-          value = value?.[key];
-        }
-        return value ?? '';
-      }
-      
-      // Handle more complex expressions safely
-      return evaluateExpression(trimmedExpr, state);
-    } catch {
-      return ''; // Return empty string if evaluation fails
+  let result = '';
+  let i = 0;
+  
+  while (i < template.length) {
+    // Look for opening {{
+    const openIndex = template.indexOf('{{', i);
+    if (openIndex === -1) {
+      // No more expressions, append rest of template
+      result += template.slice(i);
+      break;
     }
-  });
+    
+    // Append text before expression
+    result += template.slice(i, openIndex);
+    
+    // Find matching closing }}
+    let braceCount = 0;
+    let j = openIndex + 2;
+    let expressionStart = j;
+    
+    while (j < template.length) {
+      if (template.slice(j, j + 2) === '{{') {
+        braceCount++;
+        j += 2;
+      } else if (template.slice(j, j + 2) === '}}') {
+        if (braceCount === 0) {
+          // Found matching closing braces
+          const expression = template.slice(expressionStart, j);
+          try {
+            const trimmedExpr = expression.trim();
+            
+            // Handle simple property access (existing functionality)
+            if (/^[a-zA-Z_$][a-zA-Z0-9_$.]*$/.test(trimmedExpr)) {
+              const keys = trimmedExpr.split('.');
+              let value = state;
+              for (const key of keys) {
+                value = value?.[key];
+              }
+              result += value ?? '';
+            } else {
+              // Handle more complex expressions safely
+              result += evaluateExpression(trimmedExpr, state);
+            }
+          } catch {
+            result += ''; // Return empty string if evaluation fails
+          }
+          
+          i = j + 2;
+          break;
+        } else {
+          braceCount--;
+          j += 2;
+        }
+      } else {
+        j++;
+      }
+    }
+    
+    // If we didn't find a matching }}, treat as literal text
+    if (j >= template.length) {
+      result += template.slice(openIndex);
+      break;
+    }
+  }
+  
+  return result;
 }
 
 // Safe expression evaluator for template interpolation
@@ -513,7 +566,15 @@ export function createReactiveComponent<TState extends object>(options: Reactive
         },
         offGlobal: <T = any>(eventName: string, handler: (data: T) => void) => {
           eventBus.off(eventName, handler);
-        }
+        },
+        // Enhanced API for actions and computed values
+        actions: actions ? Object.fromEntries(
+          Object.entries(actions).map(([name, actionFn]) => [
+            name,
+            (...args: any[]) => actionFn(this.state, this.api, ...args)
+          ])
+        ) : undefined,
+        getComputedValue: (key: string) => this.getComputedValue(key)
       };
     }
 
@@ -789,20 +850,23 @@ export function createReactiveComponent<TState extends object>(options: Reactive
   return ReactiveElement;
 }
 
-// Convenience function with even better defaults and automatic features
+// Convenience function with better defaults and automatic features
 export function component<TState extends object>(
   tagOrOptions: string | ReactiveComponentOptions<TState>,
   optionsIfString?: Omit<ReactiveComponentOptions<TState>, 'tag'>
 ): typeof HTMLElement {
-  if (typeof tagOrOptions === 'string') {
+  if (typeof tagOrOptions === 'string' && optionsIfString !== undefined) {
     // Called as component('my-tag', { ... })
     return createReactiveComponent({
       tag: tagOrOptions,
-      ...optionsIfString!,
+      ...optionsIfString,
     });
-  } else {
+  } else if (typeof tagOrOptions === 'object') {
     // Called as component({ ... }) - auto-generate tag
     return createReactiveComponent(tagOrOptions);
+  } else {
+    // This should not happen in practice but satisfies TypeScript
+    throw new Error('Invalid arguments to component function');
   }
 }
 
@@ -863,22 +927,154 @@ export function functionComponent<TProps extends object = {}>(
   };
 }
 
-// Template helpers for better DX
-export const html = (strings: TemplateStringsArray, ...values: any[]) => {
-  return strings.reduce((result, string, i) => {
-    return result + string + (values[i] || '');
-  }, '');
-};
+/**
+ * Even simpler component creation with automatic tag generation
+ */
+export function autoComponent<TState extends object>(
+  name: string,
+  options: Omit<ReactiveComponentOptions<TState>, 'tag'>
+) {
+  // Convert camelCase to kebab-case
+  const tag = name.replace(/([A-Z])/g, '-$1').toLowerCase().replace(/^-/, '');
+  
+  return createReactiveComponent({
+    tag,
+    ...options,
+  });
+}
 
-export const css = (strings: TemplateStringsArray, ...values: any[]) => {
-  return strings.reduce((result, string, i) => {
-    return result + string + (values[i] || '');
-  }, '');
-};
+/**
+ * Create a component with chaining API
+ */
+export class ComponentBuilder<TState extends object = {}> {
+  private _tag: string;
+  private _state?: TState;
+  private _template?: ReactiveComponentOptions<TState>['template'];
+  private _style?: ReactiveComponentOptions<TState>['style'];
+  private _options: Partial<ReactiveComponentOptions<TState>> = {};
 
-export const classes = (classObj: Record<string, boolean>) => {
-  return Object.entries(classObj)
-    .filter(([_, condition]) => condition)
-    .map(([className]) => className)
-    .join(' ');
-};
+  constructor(tag: string) {
+    this._tag = tag;
+  }
+
+  state<T extends object>(state: T): ComponentBuilder<T> {
+    return Object.assign(new ComponentBuilder<T>(this._tag), this, { _state: state });
+  }
+
+  template(template: ReactiveComponentOptions<TState>['template']): ComponentBuilder<TState> {
+    this._template = template;
+    return this;
+  }
+
+  style(style: ReactiveComponentOptions<TState>['style']): ComponentBuilder<TState> {
+    this._style = style;
+    return this;
+  }
+
+  events(events: ReactiveComponentOptions<TState>['events']): ComponentBuilder<TState> {
+    this._options.events = events;
+    return this;
+  }
+
+  attrs(attrs: ReactiveComponentOptions<TState>['attrs']): ComponentBuilder<TState> {
+    this._options.attrs = attrs;
+    return this;
+  }
+
+  hooks(hooks: ReactiveComponentOptions<TState>['hooks']): ComponentBuilder<TState> {
+    this._options.hooks = hooks;
+    return this;
+  }
+
+  computed(computed: ReactiveComponentOptions<TState>['computed']): ComponentBuilder<TState> {
+    this._options.computed = computed;
+    return this;
+  }
+
+  build() {
+    if (!this._state || !this._template) {
+      throw new Error('State and template are required');
+    }
+    
+    return createReactiveComponent({
+      tag: this._tag,
+      state: this._state,
+      template: this._template,
+      style: this._style,
+      ...this._options,
+    });
+  }
+}
+
+/**
+ * Create a component with fluent API
+ */
+export function define(tag: string): ComponentBuilder {
+  return new ComponentBuilder(tag);
+}
+
+/**
+ * Utility type for better state inference
+ */
+export type StateOf<T> = T extends { state: infer S } ? S : never;
+
+/**
+ * Create reactive state outside of components
+ */
+export function state<T extends object>(initialState: T): T {
+  return new Proxy(initialState, {
+    set(target, prop, value) {
+      target[prop as keyof T] = value;
+      // Emit global state change event
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('state-change', {
+          detail: { prop, value, state: target }
+        }));
+      }
+      return true;
+    }
+  });
+}
+
+/**
+ * Connect external state to components
+ */
+export function connect<T extends object>(
+  externalState: T,
+  selector?: (state: T) => Partial<T>
+) {
+  return function<TState extends object>(
+    componentOptions: ReactiveComponentOptions<TState>
+  ): ReactiveComponentOptions<TState> {
+    const originalHooks = componentOptions.hooks || {};
+    
+    return {
+      ...componentOptions,
+      hooks: {
+        ...originalHooks,
+        onMounted(state, api) {
+          // Connect external state changes to component
+          const handler = (e: CustomEvent) => {
+            const { prop, value } = e.detail;
+            const selected = selector ? selector(externalState) : externalState;
+            if (prop in selected) {
+              (state as any)[prop] = value;
+            }
+          };
+          
+          window.addEventListener('state-change', handler as EventListener);
+          
+          // Initial sync
+          const selected = selector ? selector(externalState) : externalState;
+          Object.assign(state, selected);
+          
+          originalHooks.onMounted?.(state, api);
+        },
+        onUnmounted(state, api) {
+          // Clean up listeners
+          originalHooks.onUnmounted?.(state, api);
+        }
+      }
+    };
+  };
+}

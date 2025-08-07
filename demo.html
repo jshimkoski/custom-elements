@@ -185,45 +185,79 @@
         );
 
         // 3. Advanced Event Handling
-        const EventsDemo = quickComponent(
-            { 
+        const EventsDemo = createReactiveComponent({
+            tag: 'events-demo',
+            state: { 
                 message: '',
                 items: [],
                 newItem: ''
             },
-            `
+            template: (state) => `
                 <div style="padding: 20px;">
                     <h4>Event Handling</h4>
                     <div style="margin-bottom: 15px;">
                         <input 
                             type="text" 
-                            value="{{newItem}}" 
-                            @input="newItem = event.target.value"
-                            @keydown.enter="items.push(newItem); newItem = ''"
-                            placeholder="Add item (press Enter)"
+                            value="${state.newItem}" 
                             data-ref="new-item-input"
+                            placeholder="Add item (press Enter)"
                             style="padding: 8px; border: 1px solid #d1d5db; border-radius: 4px; margin-right: 10px;">
                         <button 
-                            @click="items.push(newItem); newItem = ''"
-                            @click.prevent
+                            data-ref="add-button"
                             style="padding: 8px 16px; background: #10b981; color: white; border: none; border-radius: 4px; cursor: pointer;">
                             Add Item
                         </button>
                     </div>
                     <div>
-                        <strong>Items ({{items.length}}):</strong>
-                        {{items.length === 0 ? 'No items yet' : items.map((item, i) => \`<span style="display: inline-block; margin: 2px; padding: 4px 8px; background: #e5e7eb; border-radius: 4px;">\${item} <button onclick="this.parentElement.remove()" style="background: none; border: none; color: #ef4444; cursor: pointer;">×</button></span>\`).join('')}}
+                        <strong>Items (${state.items.length}):</strong>
+                        ${state.items.length === 0 ? 'No items yet' : state.items.map((item, i) => `<span style="display: inline-block; margin: 2px; padding: 4px 8px; background: #e5e7eb; border-radius: 4px;">${item} <button data-remove-index="${i}" style="background: none; border: none; color: #ef4444; cursor: pointer;">×</button></span>`).join('')}
                     </div>
                     <div style="margin-top: 15px;">
                         <button 
-                            @click="items = []"
+                            data-ref="clear-button"
                             style="padding: 8px 16px; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer;">
                             Clear All
                         </button>
                     </div>
                 </div>
-            `
-        );
+            `,
+            events: {
+                '[data-ref="new-item-input"]': {
+                    input: (e, state) => {
+                        state.newItem = e.target.value;
+                    },
+                    keydown: (e, state) => {
+                        if (e.key === 'Enter') {
+                            if (state.newItem.trim()) {
+                                state.items = [...state.items, state.newItem.trim()];
+                                state.newItem = '';
+                            }
+                        }
+                    }
+                },
+                '[data-ref="add-button"]': {
+                    click: (e, state) => {
+                        if (state.newItem.trim()) {
+                            state.items = [...state.items, state.newItem.trim()];
+                            state.newItem = '';
+                        }
+                    }
+                },
+                '[data-remove-index]': {
+                    click: (e, state) => {
+                        const removeIndex = e.target.getAttribute('data-remove-index');
+                        if (removeIndex !== null) {
+                            state.items = state.items.filter((_, i) => i !== parseInt(removeIndex));
+                        }
+                    }
+                },
+                '[data-ref="clear-button"]': {
+                    click: (e, state) => {
+                        state.items = [];
+                    }
+                }
+            }
+        });
 
         // 4. Advanced Shopping Cart with Actions and Computed Properties
         const ShoppingCart = createReactiveComponent({
@@ -238,17 +272,20 @@
             },
             computed: {
                 subtotal: (state) => state.items.reduce((sum, item) => sum + (item.price * item.quantity), 0),
-                discountAmount: (state, api) => api.getComputedValue ? api.getComputedValue('subtotal') * state.discount : 0,
-                taxAmount: (state, api) => {
-                    const subtotal = api.getComputedValue ? api.getComputedValue('subtotal') : 0;
-                    const discount = api.getComputedValue ? api.getComputedValue('discountAmount') : 0;
-                    return (subtotal - discount) * state.tax;
+                discountAmount: (state) => {
+                    const subtotal = state.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+                    return subtotal * state.discount;
                 },
-                total: (state, api) => {
-                    const subtotal = api.getComputedValue ? api.getComputedValue('subtotal') : 0;
-                    const discount = api.getComputedValue ? api.getComputedValue('discountAmount') : 0;
-                    const tax = api.getComputedValue ? api.getComputedValue('taxAmount') : 0;
-                    return subtotal - discount + tax;
+                taxAmount: (state) => {
+                    const subtotal = state.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+                    const discountAmount = subtotal * state.discount;
+                    return (subtotal - discountAmount) * state.tax;
+                },
+                total: (state) => {
+                    const subtotal = state.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+                    const discountAmount = subtotal * state.discount;
+                    const taxAmount = (subtotal - discountAmount) * state.tax;
+                    return subtotal - discountAmount + taxAmount;
                 }
             },
             actions: {
@@ -257,17 +294,16 @@
                     api.emitGlobal('cart-updated', { action: 'remove', itemId: id });
                 },
                 updateQuantity: (state, api, id, quantity) => {
-                    const item = state.items.find(item => item.id === id);
-                    if (item) {
-                        item.quantity = Math.max(0, quantity);
-                        if (item.quantity === 0) {
-                            state.items = state.items.filter(item => item.id !== id);
-                        }
-                    }
+                    state.items = state.items.map(item => 
+                        item.id === id 
+                            ? { ...item, quantity: Math.max(0, quantity) }
+                            : item
+                    ).filter(item => item.quantity > 0);
                 },
                 checkout: (state, api) => {
-                    alert(`Checkout: $${(state.total || 0).toFixed(2)}`);
-                    api.emitGlobal('checkout', { total: state.total, items: state.items });
+                    const total = state.total || 0;
+                    alert(`Checkout: $${total.toFixed(2)}`);
+                    api.emitGlobal('checkout', { total: total, items: state.items });
                 }
             },
             template: (state) => `
@@ -330,7 +366,7 @@
                         const args = e.target.getAttribute('data-args');
                         if (action && api.actions && api.actions[action]) {
                             const parsedArgs = args ? args.split(',').map(arg => isNaN(arg) ? arg : Number(arg)) : [];
-                            api.actions[action](state, api, ...parsedArgs);
+                            api.actions[action](...parsedArgs);
                         }
                     }
                 }

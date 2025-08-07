@@ -1,12 +1,12 @@
 // Ultra-simple examples showing the new ergonomic API
-import { component, html, css, classes } from '../lib/easy.js';
+import { autoComponent, html, css, classes } from '../lib/runtime.js';
 
 // 1. Dead simple counter - easier than React
 type CounterState = {
   count: number;
 };
 
-const Counter = component<CounterState>('simple-counter')({
+const Counter = autoComponent<CounterState>('simpleCounter', {
   state: { count: 0 },
   
   template: (state) => html`
@@ -37,7 +37,7 @@ const Counter = component<CounterState>('simple-counter')({
   `
 });
 
-// 2. Todo app - simpler than Vue or Svelte
+// 2. Todo App with computed properties and complex state
 type TodoState = {
   todos: Array<{ id: number; text: string; done: boolean }>;
   newTodo: string;
@@ -47,7 +47,7 @@ type TodoState = {
   todoCount?: number;
 };
 
-const TodoApp = component<TodoState>('todo-app')({
+const TodoApp = autoComponent<TodoState>('todoApp', {
   state: {
     todos: [],
     newTodo: '',
@@ -300,7 +300,7 @@ type ThemeState = {
   primaryColor: string;
 };
 
-const ThemeProvider = component<ThemeState>('theme-provider')({
+const ThemeProvider = autoComponent<ThemeState>('themeProvider', {
   state: {
     mode: 'light',
     primaryColor: '#007bff'
