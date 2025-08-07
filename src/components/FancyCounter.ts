@@ -5,6 +5,7 @@ type CounterState = {
   label: string;
   count: number;
   theme: 'light' | 'dark';
+  isDark?: boolean;
 };
 
 createReactiveComponent<CounterState>({
@@ -13,6 +14,9 @@ createReactiveComponent<CounterState>({
     label: 'Clicks',
     count: 0,
     theme: 'light'
+  },
+  computed: {
+    isDark: (state) => state.theme === 'dark'
   },
   attrs: {
     label: { type: 'string' },
@@ -26,6 +30,7 @@ createReactiveComponent<CounterState>({
   template: (state) => `
     <div class="container ${state.theme}">
       <h2>${state.label}: <span data-ref="count">${state.count}</span></h2>
+      ${state.isDark ? '<p>Dark mode is enabled</p>' : ''}
       <button data-ref="btn">+</button>
       <slot></slot>
     </div>
