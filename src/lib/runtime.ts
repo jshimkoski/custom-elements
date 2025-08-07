@@ -699,12 +699,13 @@ export function createReactiveComponent<TState extends object>(options: Reactive
 
       // Store currently focused element info before re-rendering
       const activeElement = root.activeElement as HTMLElement;
-      const focusedInputInfo = activeElement && activeElement.tagName === 'INPUT' ? {
+      const focusedInputInfo = activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'SELECT' || activeElement.tagName === 'TEXTAREA') ? {
         element: activeElement,
         value: (activeElement as HTMLInputElement).value,
         selectionStart: (activeElement as HTMLInputElement).selectionStart,
         selectionEnd: (activeElement as HTMLInputElement).selectionEnd,
-        dataRef: activeElement.getAttribute('data-ref')
+        dataRef: activeElement.getAttribute('data-ref'),
+        tagName: activeElement.tagName
       } : null;
 
       root.innerHTML = '';
@@ -723,10 +724,10 @@ export function createReactiveComponent<TState extends object>(options: Reactive
       // Restore focus and input state after re-rendering
       if (focusedInputInfo && focusedInputInfo.dataRef) {
         const newInput = root.querySelector(`[data-ref="${focusedInputInfo.dataRef}"]`) as HTMLInputElement;
-        if (newInput && newInput.tagName === 'INPUT') {
+        if (newInput && newInput.tagName === focusedInputInfo.tagName) {
           newInput.value = focusedInputInfo.value;
           newInput.focus();
-          if (focusedInputInfo.selectionStart !== null && focusedInputInfo.selectionEnd !== null) {
+          if (focusedInputInfo.selectionStart !== null && focusedInputInfo.selectionEnd !== null && focusedInputInfo.tagName === 'INPUT') {
             newInput.setSelectionRange(focusedInputInfo.selectionStart, focusedInputInfo.selectionEnd);
           }
         }

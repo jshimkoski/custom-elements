@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Custom Elements Runtime Demo</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+            background: #f8fafc;
+            color: #334155;
+        }
+        
+        .demo-section {
+            margin: 30px 0;
+            padding: 30px;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            background: white;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+        }
+        
+        .demo-section h3 {
+            color: #1e293b;
+            margin-top: 0;
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        
+        .demo-section p {
+            color: #64748b;
+            margin-bottom: 1.5rem;
+        }
+        
+        h1 {
+            color: #1e293b;
+            text-align: center;
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #64748b;
+            font-size: 1.2rem;
+            margin-bottom: 3rem;
+        }
+        
+        .demo-container {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        
+        .nav-bar {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            padding: 1rem;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .nav-bar a {
+            color: #3b82f6;
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            transition: background 0.2s;
+        }
+        
+        .nav-bar a:hover {
+            background: #f1f5f9;
+        }
+        
+        code {
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+            background: #f1f5f9;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="nav-bar">
+        <a href="/">← Back to Home</a>
+        <a href="https://github.com/jshimkoski/custom-elements">GitHub</a>
+        <a href="https://github.com/jshimkoski/custom-elements/blob/main/README.md">Documentation</a>
+    </div>
+    
+    <h1>Custom Elements Runtime Demo</h1>
+    <p class="subtitle">Interactive examples showcasing reactive components, template interpolation, event handling, and more</p>
+    
+    <div class="demo-section">
+        <h3>🚀 Ultra-Simple API</h3>
+        <p>Create reactive components with just state and template. The <code>quickComponent</code> function handles everything automatically.</p>
+        <div id="simple-demo" class="demo-container"></div>
+    </div>
+    
+    <div class="demo-section">
+        <h3>🎯 Template Interpolation</h3>
+        <p>Use <code>{{}}</code> syntax with full expression support, including calculations, conditionals, and utility functions.</p>
+        <div id="interpolation-demo" class="demo-container"></div>
+    </div>
+    
+    <div class="demo-section">
+        <h3>⚡ Event Handling</h3>
+        <p>Inline event handlers with <code>@click</code>, <code>@input</code>, and event modifiers like <code>.prevent</code> and <code>.enter</code>.</p>
+        <div id="events-demo" class="demo-container"></div>
+    </div>
+    
+    <div class="demo-section">
+        <h3>💫 Advanced Features</h3>
+        <p>Shopping cart example with computed properties, actions, global events, and complex state management.</p>
+        <div id="advanced-demo" class="demo-container"></div>
+    </div>
+    
+    <div class="demo-section">
+        <h3>🎨 Dynamic Styling</h3>
+        <p>CSS-in-JS with static and dynamic styles, CSS object syntax, and theme switching.</p>
+        <div id="styling-demo" class="demo-container"></div>
+    </div>
+
+    <script type="module">
+        import { quickComponent } from './src/lib/runtime.js';
+        import { createReactiveComponent } from './src/lib/runtime.js';
+        import { eventBus } from './src/lib/event-bus.js';
+
+        // 1. Ultra-Simple Counter Example
+        const SimpleCounter = quickComponent(
+            { count: 0 },
+            `
+                <div style="text-align: center; padding: 20px;">
+                    <h4>Simple Counter</h4>
+                    <p style="font-size: 24px; color: #3b82f6;">Count: {{count}}</p>
+                    <button @click="count++" style="margin: 5px; padding: 10px 20px; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer;">+</button>
+                    <button @click="count--" style="margin: 5px; padding: 10px 20px; background: #ef4444; color: white; border: none; border-radius: 6px; cursor: pointer;">-</button>
+                    <button @click="count = 0" style="margin: 5px; padding: 10px 20px; background: #6b7280; color: white; border: none; border-radius: 6px; cursor: pointer;">Reset</button>
+                </div>
+            `
+        );
+
+        // 2. Template Interpolation Example
+        const InterpolationDemo = quickComponent(
+            { 
+                name: 'John', 
+                age: 25, 
+                score: 85,
+                items: ['apple', 'banana', 'orange'],
+                theme: 'light'
+            },
+            `
+                <div style="padding: 20px;">
+                    <h4>Template Interpolation</h4>
+                    <p><strong>Name:</strong> {{name}} ({{name.length}} characters)</p>
+                    <p><strong>Age:</strong> {{age}} years old</p>
+                    <p><strong>Score:</strong> {{score}}/100 ({{score >= 80 ? 'Excellent' : score >= 60 ? 'Good' : 'Needs Improvement'}})</p>
+                    <p><strong>Items:</strong> {{items.join(', ')}} ({{items.length}} total)</p>
+                    <p><strong>Calculation:</strong> {{age * 2}} (age × 2)</p>
+                    <div style="margin-top: 15px;">
+                        <input 
+                            type="text" 
+                            value="{{name}}" 
+                            @input="name = event.target.value"
+                            placeholder="Enter name"
+                            data-ref="name-input"
+                            style="padding: 8px; border: 1px solid #d1d5db; border-radius: 4px; margin-right: 10px;">
+                        <input 
+                            type="number" 
+                            value="{{age}}" 
+                            @input="age = parseInt(event.target.value)"
+                            data-ref="age-input"
+                            style="padding: 8px; border: 1px solid #d1d5db; border-radius: 4px; width: 60px;">
+                    </div>
+                </div>
+            `
+        );
+
+        // 3. Advanced Event Handling
+        const EventsDemo = quickComponent(
+            { 
+                message: '',
+                items: [],
+                newItem: ''
+            },
+            `
+                <div style="padding: 20px;">
+                    <h4>Event Handling</h4>
+                    <div style="margin-bottom: 15px;">
+                        <input 
+                            type="text" 
+                            value="{{newItem}}" 
+                            @input="newItem = event.target.value"
+                            @keydown.enter="items.push(newItem); newItem = ''"
+                            placeholder="Add item (press Enter)"
+                            data-ref="new-item-input"
+                            style="padding: 8px; border: 1px solid #d1d5db; border-radius: 4px; margin-right: 10px;">
+                        <button 
+                            @click="items.push(newItem); newItem = ''"
+                            @click.prevent
+                            style="padding: 8px 16px; background: #10b981; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                            Add Item
+                        </button>
+                    </div>
+                    <div>
+                        <strong>Items ({{items.length}}):</strong>
+                        {{items.length === 0 ? 'No items yet' : items.map((item, i) => \`<span style="display: inline-block; margin: 2px; padding: 4px 8px; background: #e5e7eb; border-radius: 4px;">\${item} <button onclick="this.parentElement.remove()" style="background: none; border: none; color: #ef4444; cursor: pointer;">×</button></span>\`).join('')}}
+                    </div>
+                    <div style="margin-top: 15px;">
+                        <button 
+                            @click="items = []"
+                            style="padding: 8px 16px; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                            Clear All
+                        </button>
+                    </div>
+                </div>
+            `
+        );
+
+        // 4. Advanced Shopping Cart with Actions and Computed Properties
+        const ShoppingCart = createReactiveComponent({
+            tag: 'shopping-cart-demo',
+            state: {
+                items: [
+                    { id: 1, name: 'Coffee', price: 4.50, quantity: 2 },
+                    { id: 2, name: 'Sandwich', price: 8.00, quantity: 1 }
+                ],
+                discount: 0.1,
+                tax: 0.08
+            },
+            computed: {
+                subtotal: (state) => state.items.reduce((sum, item) => sum + (item.price * item.quantity), 0),
+                discountAmount: (state, api) => api.getComputedValue ? api.getComputedValue('subtotal') * state.discount : 0,
+                taxAmount: (state, api) => {
+                    const subtotal = api.getComputedValue ? api.getComputedValue('subtotal') : 0;
+                    const discount = api.getComputedValue ? api.getComputedValue('discountAmount') : 0;
+                    return (subtotal - discount) * state.tax;
+                },
+                total: (state, api) => {
+                    const subtotal = api.getComputedValue ? api.getComputedValue('subtotal') : 0;
+                    const discount = api.getComputedValue ? api.getComputedValue('discountAmount') : 0;
+                    const tax = api.getComputedValue ? api.getComputedValue('taxAmount') : 0;
+                    return subtotal - discount + tax;
+                }
+            },
+            actions: {
+                removeItem: (state, api, id) => {
+                    state.items = state.items.filter(item => item.id !== id);
+                    api.emitGlobal('cart-updated', { action: 'remove', itemId: id });
+                },
+                updateQuantity: (state, api, id, quantity) => {
+                    const item = state.items.find(item => item.id === id);
+                    if (item) {
+                        item.quantity = Math.max(0, quantity);
+                        if (item.quantity === 0) {
+                            state.items = state.items.filter(item => item.id !== id);
+                        }
+                    }
+                },
+                checkout: (state, api) => {
+                    alert(`Checkout: $${(state.total || 0).toFixed(2)}`);
+                    api.emitGlobal('checkout', { total: state.total, items: state.items });
+                }
+            },
+            template: (state) => `
+                <div style="padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px;">
+                    <h4>Shopping Cart</h4>
+                    <div style="margin-bottom: 15px;">
+                        ${state.items.map(item => `
+                            <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #f3f4f6;">
+                                <div>
+                                    <strong>${item.name}</strong><br>
+                                    <small>$${item.price.toFixed(2)} each</small>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <button 
+                                        data-action="updateQuantity" 
+                                        data-args="${item.id},${item.quantity - 1}"
+                                        style="padding: 4px 8px; background: #f3f4f6; border: none; border-radius: 4px; cursor: pointer;">-</button>
+                                    <span>${item.quantity}</span>
+                                    <button 
+                                        data-action="updateQuantity" 
+                                        data-args="${item.id},${item.quantity + 1}"
+                                        style="padding: 4px 8px; background: #f3f4f6; border: none; border-radius: 4px; cursor: pointer;">+</button>
+                                    <button 
+                                        data-action="removeItem" 
+                                        data-args="${item.id}"
+                                        style="padding: 4px 8px; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer;">Remove</button>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                    <div style="border-top: 2px solid #e5e7eb; padding-top: 15px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                            <span>Subtotal:</span>
+                            <span>$${(state.subtotal || 0).toFixed(2)}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                            <span>Discount (10%):</span>
+                            <span style="color: #10b981;">-$${(state.discountAmount || 0).toFixed(2)}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                            <span>Tax (8%):</span>
+                            <span>$${(state.taxAmount || 0).toFixed(2)}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 18px; border-top: 1px solid #d1d5db; padding-top: 10px;">
+                            <span>Total:</span>
+                            <span>$${(state.total || 0).toFixed(2)}</span>
+                        </div>
+                        <button 
+                            data-action="checkout"
+                            style="width: 100%; margin-top: 15px; padding: 12px; background: #3b82f6; color: white; border: none; border-radius: 6px; font-size: 16px; cursor: pointer;">
+                            Checkout
+                        </button>
+                    </div>
+                </div>
+            `,
+            events: {
+                '[data-action]': {
+                    click: (e, state, api) => {
+                        const action = e.target.getAttribute('data-action');
+                        const args = e.target.getAttribute('data-args');
+                        if (action && api.actions && api.actions[action]) {
+                            const parsedArgs = args ? args.split(',').map(arg => isNaN(arg) ? arg : Number(arg)) : [];
+                            api.actions[action](state, api, ...parsedArgs);
+                        }
+                    }
+                }
+            }
+        });
+
+        // 5. Dynamic Styling Example
+        const StylingDemo = quickComponent(
+            { 
+                theme: 'light',
+                size: 'medium',
+                color: '#3b82f6'
+            },
+            `
+                <div style="padding: 20px;">
+                    <h4>Dynamic Styling</h4>
+                    <div style="margin-bottom: 20px;">
+                        <label style="margin-right: 15px;">
+                            <strong>Theme:</strong>
+                            <select @change="theme = event.target.value" data-ref="theme-select" style="margin-left: 5px; padding: 4px;">
+                                <option value="light" {{theme === 'light' ? 'selected' : ''}}>Light</option>
+                                <option value="dark" {{theme === 'dark' ? 'selected' : ''}}>Dark</option>
+                            </select>
+                        </label>
+                        <label style="margin-right: 15px;">
+                            <strong>Size:</strong>
+                            <select @change="size = event.target.value" data-ref="size-select" style="margin-left: 5px; padding: 4px;">
+                                <option value="small" {{size === 'small' ? 'selected' : ''}}>Small</option>
+                                <option value="medium" {{size === 'medium' ? 'selected' : ''}}>Medium</option>
+                                <option value="large" {{size === 'large' ? 'selected' : ''}}>Large</option>
+                            </select>
+                        </label>
+                        <label>
+                            <strong>Color:</strong>
+                            <input type="color" value="{{color}}" @input="color = event.target.value" data-ref="color-input" style="margin-left: 5px;">
+                        </label>
+                    </div>
+                    <div style="
+                        padding: {{size === 'small' ? '10px' : size === 'large' ? '30px' : '20px'}};
+                        background: {{theme === 'dark' ? '#1f2937' : '#ffffff'}};
+                        color: {{theme === 'dark' ? '#f9fafb' : '#111827'}};
+                        border: 2px solid {{color}};
+                        border-radius: 8px;
+                        text-align: center;
+                        font-size: {{size === 'small' ? '14px' : size === 'large' ? '20px' : '16px'}};
+                        transition: all 0.3s ease;
+                    ">
+                        <p>🎨 Dynamic styling in action!</p>
+                        <p>Theme: {{theme}} | Size: {{size}} | Color: {{color}}</p>
+                        <button 
+                            @click="theme = theme === 'light' ? 'dark' : 'light'"
+                            style="
+                                padding: 8px 16px; 
+                                background: {{color}}; 
+                                color: white; 
+                                border: none; 
+                                border-radius: 4px; 
+                                cursor: pointer;
+                                margin-top: 10px;
+                            ">
+                            Toggle Theme
+                        </button>
+                    </div>
+                </div>
+            `
+        );
+
+        // Add components to the page
+        document.getElementById('simple-demo').appendChild(new SimpleCounter());
+        document.getElementById('interpolation-demo').appendChild(new InterpolationDemo());
+        document.getElementById('events-demo').appendChild(new EventsDemo());
+        document.getElementById('advanced-demo').appendChild(new ShoppingCart());
+        document.getElementById('styling-demo').appendChild(new StylingDemo());
+
+        // Listen for global events
+        eventBus.on('cart-updated', (data) => {
+            console.log('Cart updated:', data);
+        });
+
+        eventBus.on('checkout', (data) => {
+            console.log('Checkout completed:', data);
+        });
+    </script>
+</body>
+</html>
