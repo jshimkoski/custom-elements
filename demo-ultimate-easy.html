@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ultimate Easy API Demo</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            margin: 0;
+            padding: 2rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .demo-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+        .demo-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+        .demo-section {
+            padding: 1rem;
+            border: 1px solid #e1e1e1;
+            border-radius: 8px;
+            background: #f8f9fa;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 0.5rem;
+        }
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 2rem;
+        }
+        h2 {
+            color: #444;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="demo-container">
+        <h1>🚀 Ultimate Easy API Demo</h1>
+        <p class="subtitle">Simpler than React, Vue, and Svelte - No build step required!</p>
+        
+        <div class="demo-grid">
+            <div class="demo-section">
+                <h2>Simple Counter</h2>
+                <simple-counter></simple-counter>
+            </div>
+            
+            <div class="demo-section">
+                <h2>Todo App</h2>
+                <todo-app></todo-app>
+            </div>
+            
+            <div class="demo-section">
+                <h2>Theme Provider</h2>
+                <theme-provider>
+                    <themed-card></themed-card>
+                </theme-provider>
+            </div>
+            
+            <div class="demo-section">
+                <h2>Data Dashboard</h2>
+                <data-dashboard></data-dashboard>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // Import our easy API
+        import { component, html, css, classes } from './src/lib/easy.js';
+
+        // 1. Simple Counter - Easier than React useState
+        const Counter = component('simple-counter')({
+            state: { count: 0, step: 1 },
+            
+            template: (state) => html`
+                <div class="counter">
+                    <h3>Count: ${state.count}</h3>
+                    <div class="controls">
+                        <button data-action="decrement">-${state.step}</button>
+                        <input type="number" value="${state.step}" data-ref="stepInput" min="1" max="10">
+                        <button data-action="increment">+${state.step}</button>
+                    </div>
+                    <button data-action="reset">Reset</button>
+                </div>
+            `,
+            
+            events: {
+                '[data-action="increment"]': {
+                    click: (_e, state) => state.count += state.step
+                },
+                '[data-action="decrement"]': {
+                    click: (_e, state) => state.count -= state.step
+                },
+                '[data-action="reset"]': {
+                    click: (_e, state) => state.count = 0
+                },
+                '[data-ref="stepInput"]': {
+                    input: (e, state) => {
+                        state.step = Math.max(1, parseInt(e.target.value) || 1);
+                    }
+                }
+            },
+            
+            style: css`
+                .counter {
+                    text-align: center;
+                    padding: 1rem;
+                }
+                .controls {
+                    display: flex;
+                    gap: 0.5rem;
+                    align-items: center;
+                    justify-content: center;
+                    margin: 1rem 0;
+                }
+                button {
+                    padding: 0.5rem 1rem;
+                    background: #007bff;
+                    color: white;
+                    border: none;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                }
+                button:hover {
+                    background: #0056b3;
+                    transform: translateY(-1px);
+                }
+                input {
+                    width: 60px;
+                    padding: 0.5rem;
+                    text-align: center;
+                    border: 1px solid #ddd;
+                    border-radius: 4px;
+                }
+                h3 {
+                    font-size: 1.5rem;
+                    color: #333;
+                    margin: 0.5rem 0;
+                }
+            `
+        });
+
+        // 2. Todo App - More features, same simplicity
+        const TodoApp = component('todo-app')({
+            state: {
+                todos: [
+                    { id: 1, text: 'Learn the new API', done: true },
+                    { id: 2, text: 'Build something awesome', done: false }
+                ],
+                newTodo: '',
+                filter: 'all'
+            },
+            
+            computed: {
+                filteredTodos: (state) => {
+                    switch (state.filter) {
+                        case 'active': return state.todos.filter(t => !t.done);
+                        case 'completed': return state.todos.filter(t => t.done);
+                        default: return state.todos;
+                    }
+                },
+                stats: (state) => ({
+                    total: state.todos.length,
+                    active: state.todos.filter(t => !t.done).length,
+                    completed: state.todos.filter(t => t.done).length
+                })
+            },
+
+            template: (state) => html`
+                <div class="todo-app">
+                    <form data-ref="form">
+                        <input 
+                            type="text" 
+                            placeholder="Add a new todo..."
+                            value="${state.newTodo}"
+                            data-ref="input"
+                        />
+                        <button type="submit">Add</button>
+                    </form>
+
+                    <div class="filters">
+                        ${['all', 'active', 'completed'].map(filter => 
+                            `<button 
+                                class="${classes({ active: state.filter === filter })}"
+                                data-filter="${filter}"
+                            >${filter}</button>`
+                        ).join('')}
+                    </div>
+
+                    <div class="stats">
+                        Total: ${state.stats?.total || 0} | 
+                        Active: ${state.stats?.active || 0} | 
+                        Done: ${state.stats?.completed || 0}
+                    </div>
+
+                    <ul class="todo-list">
+                        ${(state.filteredTodos || []).map(todo => 
+                            `<li class="${classes({ done: todo.done })}">
+                                <input 
+                                    type="checkbox" 
+                                    ${todo.done ? 'checked' : ''}
+                                    data-todo-id="${todo.id}"
+                                />
+                                <span>${todo.text}</span>
+                                <button data-delete="${todo.id}">×</button>
+                            </li>`
+                        ).join('')}
+                    </ul>
+                </div>
+            `,
+
+            events: {
+                '[data-ref="form"]': {
+                    submit: (e, state) => {
+                        e.preventDefault();
+                        if (state.newTodo.trim()) {
+                            state.todos.push({
+                                id: Date.now(),
+                                text: state.newTodo.trim(),
+                                done: false
+                            });
+                            state.newTodo = '';
+                        }
+                    }
+                },
+                '[data-ref="input"]': {
+                    input: (e, state) => {
+                        state.newTodo = e.target.value;
+                    }
+                },
+                '[data-filter]': {
+                    click: (e, state) => {
+                        state.filter = e.target.dataset.filter;
+                    }
+                },
+                '[data-todo-id]': {
+                    change: (e, state) => {
+                        const id = Number(e.target.dataset.todoId);
+                        const todo = state.todos.find(t => t.id === id);
+                        if (todo) todo.done = !todo.done;
+                    }
+                },
+                '[data-delete]': {
+                    click: (e, state) => {
+                        const id = Number(e.target.dataset.delete);
+                        state.todos = state.todos.filter(t => t.id !== id);
+                    }
+                }
+            },
+
+            style: css`
+                .todo-app {
+                    max-width: 100%;
+                }
+                form {
+                    display: flex;
+                    gap: 0.5rem;
+                    margin-bottom: 1rem;
+                }
+                input[type="text"] {
+                    flex: 1;
+                    padding: 0.5rem;
+                    border: 1px solid #ddd;
+                    border-radius: 4px;
+                }
+                .filters {
+                    display: flex;
+                    gap: 0.25rem;
+                    margin-bottom: 1rem;
+                }
+                .filters button {
+                    padding: 0.25rem 0.5rem;
+                    background: white;
+                    border: 1px solid #ddd;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    font-size: 0.8rem;
+                }
+                .filters button.active {
+                    background: #007bff;
+                    color: white;
+                    border-color: #007bff;
+                }
+                .stats {
+                    font-size: 0.8rem;
+                    color: #666;
+                    margin-bottom: 1rem;
+                }
+                .todo-list {
+                    list-style: none;
+                    padding: 0;
+                    margin: 0;
+                }
+                .todo-list li {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    padding: 0.5rem;
+                    background: #f9f9f9;
+                    margin-bottom: 0.25rem;
+                    border-radius: 4px;
+                }
+                .todo-list li.done {
+                    opacity: 0.6;
+                }
+                .todo-list li.done span {
+                    text-decoration: line-through;
+                }
+                .todo-list span {
+                    flex: 1;
+                    font-size: 0.9rem;
+                }
+                .todo-list button {
+                    background: #dc3545;
+                    color: white;
+                    border: none;
+                    border-radius: 50%;
+                    width: 1.5rem;
+                    height: 1.5rem;
+                    font-size: 0.8rem;
+                    line-height: 1;
+                    padding: 0;
+                }
+            `
+        });
+
+        // 3. Theme Provider with Global State
+        const ThemeProvider = component('theme-provider')({
+            state: {
+                mode: 'light',
+                primaryColor: '#007bff',
+                fontSize: 'medium'
+            },
+
+            template: (state) => html`
+                <div class="theme-controls">
+                    <div class="control-group">
+                        <label>Theme:</label>
+                        <button data-action="toggleTheme">
+                            ${state.mode === 'light' ? '🌙 Dark' : '☀️ Light'}
+                        </button>
+                    </div>
+                    
+                    <div class="control-group">
+                        <label>Color:</label>
+                        <input 
+                            type="color" 
+                            value="${state.primaryColor}"
+                            data-ref="colorPicker"
+                        />
+                    </div>
+                    
+                    <div class="control-group">
+                        <label>Size:</label>
+                        <select data-ref="fontSize">
+                            <option value="small" ${state.fontSize === 'small' ? 'selected' : ''}>Small</option>
+                            <option value="medium" ${state.fontSize === 'medium' ? 'selected' : ''}>Medium</option>
+                            <option value="large" ${state.fontSize === 'large' ? 'selected' : ''}>Large</option>
+                        </select>
+                    </div>
+                </div>
+                <slot></slot>
+            `,
+
+            events: {
+                '[data-action="toggleTheme"]': {
+                    click: (_e, state, api) => {
+                        state.mode = state.mode === 'light' ? 'dark' : 'light';
+                        api.emitGlobal('theme-changed', state);
+                    }
+                },
+                '[data-ref="colorPicker"]': {
+                    input: (e, state, api) => {
+                        state.primaryColor = e.target.value;
+                        api.emitGlobal('theme-changed', state);
+                    }
+                },
+                '[data-ref="fontSize"]': {
+                    change: (e, state, api) => {
+                        state.fontSize = e.target.value;
+                        api.emitGlobal('theme-changed', state);
+                    }
+                }
+            },
+
+            hooks: {
+                onMounted: (state, api) => {
+                    api.emitGlobal('theme-changed', state);
+                }
+            },
+
+            style: css`
+                :host {
+                    display: block;
+                }
+                .theme-controls {
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 1rem;
+                    padding: 1rem;
+                    background: var(--bg-secondary, #f1f3f4);
+                    border-radius: 6px;
+                    margin-bottom: 1rem;
+                }
+                .control-group {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    font-size: 0.9rem;
+                }
+                label {
+                    font-weight: 500;
+                }
+                select, input[type="color"] {
+                    padding: 0.25rem;
+                    border: 1px solid #ddd;
+                    border-radius: 4px;
+                }
+            `
+        });
+
+        // Themed Card Component
+        const ThemedCard = component('themed-card')({
+            state: {
+                theme: { mode: 'light', primaryColor: '#007bff', fontSize: 'medium' }
+            },
+
+            template: (state) => html`
+                <div class="card">
+                    <h3>🎨 Themed Component</h3>
+                    <p>This card responds to global theme changes!</p>
+                    <p>Current theme: <strong>${state.theme.mode}</strong></p>
+                    <p>Font size: <strong>${state.theme.fontSize}</strong></p>
+                    <button>Themed Button</button>
+                </div>
+            `,
+
+            hooks: {
+                onMounted: (_state, api) => {
+                    api.onGlobal('theme-changed', (theme) => {
+                        _state.theme = theme;
+                    });
+                }
+            },
+
+            style: {
+                static: css`
+                    .card {
+                        padding: 1rem;
+                        border-radius: 8px;
+                        border: 2px solid var(--primary-color);
+                        background: var(--bg-primary);
+                        color: var(--text-primary);
+                        transition: all 0.3s ease;
+                    }
+                    button {
+                        background: var(--primary-color);
+                        color: white;
+                        border: none;
+                        padding: 0.5rem 1rem;
+                        border-radius: 4px;
+                        cursor: pointer;
+                        font-size: var(--font-size);
+                    }
+                    h3 {
+                        margin-top: 0;
+                        font-size: var(--font-size-lg);
+                    }
+                    p {
+                        font-size: var(--font-size);
+                    }
+                `,
+                dynamic: (state) => {
+                    const { mode, primaryColor, fontSize } = state.theme;
+                    const fontSizes = {
+                        small: { base: '0.8rem', lg: '1.1rem' },
+                        medium: { base: '1rem', lg: '1.3rem' },
+                        large: { base: '1.2rem', lg: '1.5rem' }
+                    };
+                    
+                    return {
+                        '--primary-color': primaryColor,
+                        '--bg-primary': mode === 'light' ? '#ffffff' : '#2d3748',
+                        '--text-primary': mode === 'light' ? '#2d3748' : '#f7fafc',
+                        '--font-size': fontSizes[fontSize].base,
+                        '--font-size-lg': fontSizes[fontSize].lg
+                    };
+                }
+            }
+        });
+
+        // 4. Data Dashboard with Real-time Updates
+        const DataDashboard = component('data-dashboard')({
+            state: {
+                data: [],
+                isLoading: false,
+                lastUpdate: null,
+                autoRefresh: true
+            },
+
+            computed: {
+                stats: (state) => {
+                    if (!state.data.length) return null;
+                    return {
+                        count: state.data.length,
+                        average: Math.round(state.data.reduce((sum, item) => sum + item.value, 0) / state.data.length),
+                        max: Math.max(...state.data.map(item => item.value)),
+                        min: Math.min(...state.data.map(item => item.value))
+                    };
+                }
+            },
+
+            template: (state) => html`
+                <div class="dashboard">
+                    <div class="header">
+                        <h3>📊 Data Dashboard</h3>
+                        <div class="controls">
+                            <button data-action="refresh" ${state.isLoading ? 'disabled' : ''}>
+                                ${state.isLoading ? '⟳ Loading...' : '🔄 Refresh'}
+                            </button>
+                            <label>
+                                <input 
+                                    type="checkbox" 
+                                    ${state.autoRefresh ? 'checked' : ''}
+                                    data-ref="autoRefresh"
+                                />
+                                Auto-refresh
+                            </label>
+                        </div>
+                    </div>
+
+                    ${state.stats ? html`
+                        <div class="stats">
+                            <div class="stat">
+                                <span class="label">Count:</span>
+                                <span class="value">${state.stats.count}</span>
+                            </div>
+                            <div class="stat">
+                                <span class="label">Average:</span>
+                                <span class="value">${state.stats.average}</span>
+                            </div>
+                            <div class="stat">
+                                <span class="label">Max:</span>
+                                <span class="value">${state.stats.max}</span>
+                            </div>
+                            <div class="stat">
+                                <span class="label">Min:</span>
+                                <span class="value">${state.stats.min}</span>
+                            </div>
+                        </div>
+                    ` : ''}
+
+                    <div class="data-list">
+                        ${state.data.map(item => 
+                            `<div class="data-item" style="--intensity: ${item.value / 100};">
+                                <span class="name">${item.name}</span>
+                                <span class="value">${item.value}</span>
+                                <div class="bar" style="width: ${item.value}%"></div>
+                            </div>`
+                        ).join('')}
+                    </div>
+
+                    ${state.lastUpdate ? html`
+                        <div class="footer">
+                            Last updated: ${new Date(state.lastUpdate).toLocaleTimeString()}
+                        </div>
+                    ` : ''}
+                </div>
+            `,
+
+            events: {
+                '[data-action="refresh"]': {
+                    click: (_e, state) => {
+                        state.isLoading = true;
+                        
+                        // Simulate API call
+                        setTimeout(() => {
+                            state.data = Array.from({ length: 5 }, (_, i) => ({
+                                name: `Item ${i + 1}`,
+                                value: Math.floor(Math.random() * 100)
+                            }));
+                            state.lastUpdate = Date.now();
+                            state.isLoading = false;
+                        }, 1000);
+                    }
+                },
+                '[data-ref="autoRefresh"]': {
+                    change: (e, state) => {
+                        state.autoRefresh = e.target.checked;
+                    }
+                }
+            },
+
+            disposables: [
+                (state, _api) => {
+                    const interval = setInterval(() => {
+                        if (state.autoRefresh && !state.isLoading) {
+                            // Trigger refresh
+                            const refreshBtn = document.querySelector('data-dashboard [data-action="refresh"]');
+                            if (refreshBtn) refreshBtn.click();
+                        }
+                    }, 5000);
+                    
+                    return { dispose: () => clearInterval(interval) };
+                }
+            ],
+
+            hooks: {
+                onMounted: (state) => {
+                    // Initial data load
+                    state.data = Array.from({ length: 5 }, (_, i) => ({
+                        name: `Item ${i + 1}`,
+                        value: Math.floor(Math.random() * 100)
+                    }));
+                    state.lastUpdate = Date.now();
+                }
+            },
+
+            style: css`
+                .dashboard {
+                    border: 1px solid #e1e1e1;
+                    border-radius: 8px;
+                    overflow: hidden;
+                }
+                .header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    padding: 1rem;
+                    background: #f8f9fa;
+                    border-bottom: 1px solid #e1e1e1;
+                }
+                .header h3 {
+                    margin: 0;
+                }
+                .controls {
+                    display: flex;
+                    gap: 1rem;
+                    align-items: center;
+                    font-size: 0.9rem;
+                }
+                .stats {
+                    display: grid;
+                    grid-template-columns: repeat(4, 1fr);
+                    gap: 1rem;
+                    padding: 1rem;
+                    background: #f1f3f4;
+                }
+                .stat {
+                    text-align: center;
+                }
+                .stat .label {
+                    display: block;
+                    font-size: 0.8rem;
+                    color: #666;
+                }
+                .stat .value {
+                    display: block;
+                    font-size: 1.2rem;
+                    font-weight: bold;
+                    color: #333;
+                }
+                .data-list {
+                    padding: 1rem;
+                }
+                .data-item {
+                    position: relative;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    padding: 0.5rem;
+                    margin-bottom: 0.5rem;
+                    background: #f9f9f9;
+                    border-radius: 4px;
+                    overflow: hidden;
+                }
+                .bar {
+                    position: absolute;
+                    left: 0;
+                    top: 0;
+                    height: 100%;
+                    background: linear-gradient(90deg, 
+                        rgba(0, 123, 255, 0.1), 
+                        rgba(0, 123, 255, calc(0.3 + var(--intensity, 0) * 0.4))
+                    );
+                    transition: width 0.3s ease;
+                    z-index: 0;
+                }
+                .data-item span {
+                    position: relative;
+                    z-index: 1;
+                }
+                .footer {
+                    padding: 0.5rem 1rem;
+                    background: #f8f9fa;
+                    border-top: 1px solid #e1e1e1;
+                    font-size: 0.8rem;
+                    color: #666;
+                    text-align: center;
+                }
+                button:disabled {
+                    opacity: 0.6;
+                    cursor: not-allowed;
+                }
+            `
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Template Helpers Showcase</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      font-family: system-ui, -apple-system, sans-serif;
+    }
+
+    .header {
+      text-align: center;
+      padding: 2rem;
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      color: white;
+      margin-bottom: 2rem;
+    }
+
+    .header h1 {
+      margin: 0 0 1rem 0;
+      font-size: 3rem;
+      font-weight: 700;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+
+    .header p {
+      margin: 0;
+      font-size: 1.2rem;
+      opacity: 0.9;
+    }
+
+    .demo-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 2rem 2rem 2rem;
+    }
+
+    .intro-section {
+      background: white;
+      border-radius: 12px;
+      padding: 2rem;
+      margin-bottom: 2rem;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    }
+
+    .intro-section h2 {
+      color: #333;
+      margin-top: 0;
+    }
+
+    .helper-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .helper-card {
+      background: white;
+      border-radius: 8px;
+      padding: 1.5rem;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      border-left: 4px solid #667eea;
+    }
+
+    .helper-card h3 {
+      margin-top: 0;
+      color: #333;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .helper-card code {
+      background: #f8f9fa;
+      padding: 0.2rem 0.4rem;
+      border-radius: 3px;
+      font-family: 'Monaco', 'Consolas', monospace;
+      color: #e83e8c;
+    }
+
+    .helper-card p {
+      color: #666;
+      line-height: 1.6;
+    }
+
+    .showcase-wrapper {
+      background: white;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+      margin-bottom: 2rem;
+    }
+
+    .showcase-header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 1.5rem;
+      text-align: center;
+    }
+
+    .showcase-header h2 {
+      margin: 0;
+      font-size: 1.8rem;
+    }
+
+    @media (max-width: 768px) {
+      .header h1 {
+        font-size: 2rem;
+      }
+      
+      .header p {
+        font-size: 1rem;
+      }
+      
+      .demo-container {
+        padding: 0 1rem 1rem 1rem;
+      }
+      
+      .helper-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>🎨 Template Helpers Showcase</h1>
+    <p>Discover the power of our template helper functions for enhanced developer experience</p>
+  </div>
+
+  <div class="demo-container">
+    <div class="intro-section">
+      <h2>📚 About Template Helpers</h2>
+      <p>
+        Template helpers are utility functions that make writing component templates easier, more readable, and more powerful. 
+        They provide enhanced syntax highlighting, better IDE support, and convenient utilities for common template tasks.
+      </p>
+      <p>
+        This showcase demonstrates all available template helpers with real-world examples that you can interact with and learn from.
+      </p>
+    </div>
+
+    <div class="helper-grid">
+      <div class="helper-card">
+        <h3>🏷️ <code>html``</code></h3>
+        <p>Enhanced template literal for HTML with better IDE support and syntax highlighting. Handles dynamic values and provides a clean API for building templates.</p>
+      </div>
+
+      <div class="helper-card">
+        <h3>🎨 <code>css``</code></h3>
+        <p>Template literal for CSS with syntax highlighting support. Perfect for writing CSS strings within your JavaScript/TypeScript code.</p>
+      </div>
+
+      <div class="helper-card">
+        <h3>📋 <code>classes()</code></h3>
+        <p>Conditionally apply CSS classes based on object properties. Similar to popular libraries like clsx or classnames but optimized for our runtime.</p>
+      </div>
+
+      <div class="helper-card">
+        <h3>🎯 <code>styles()</code></h3>
+        <p>Generate inline style strings from JavaScript objects. Converts property-value pairs into CSS style declarations.</p>
+      </div>
+
+      <div class="helper-card">
+        <h3>🔗 <code>ref()</code></h3>
+        <p>Create typed element references with better TypeScript support. Simplifies DOM element access within component callbacks.</p>
+      </div>
+
+      <div class="helper-card">
+        <h3>⚡ <code>on()</code></h3>
+        <p>Create event handlers with enhanced typing and better development experience. Provides clear event handler definitions.</p>
+      </div>
+    </div>
+
+    <div class="showcase-wrapper">
+      <div class="showcase-header">
+        <h2>🚀 Interactive Examples</h2>
+      </div>
+      
+      <!-- The main showcase component -->
+      <template-helpers-showcase></template-helpers-showcase>
+    </div>
+
+    <div class="intro-section">
+      <h2>🎯 Key Benefits</h2>
+      <ul style="line-height: 1.8; color: #555;">
+        <li><strong>Enhanced IDE Support:</strong> Better autocomplete, syntax highlighting, and error detection</li>
+        <li><strong>Type Safety:</strong> Full TypeScript support with proper type inference</li>
+        <li><strong>Performance:</strong> Optimized functions that integrate seamlessly with the runtime</li>
+        <li><strong>Developer Experience:</strong> Intuitive APIs that make common tasks easier</li>
+        <li><strong>Consistency:</strong> Unified approach to template creation across your application</li>
+        <li><strong>Maintainability:</strong> Cleaner, more readable template code</li>
+      </ul>
+    </div>
+
+    <div class="intro-section">
+      <h2>💡 Usage Tips</h2>
+      <ul style="line-height: 1.8; color: #555;">
+        <li>Use <code>html``</code> for all template strings to get better IDE support</li>
+        <li>Combine <code>classes()</code> with state properties for dynamic styling</li>
+        <li>Use <code>styles()</code> for dynamic inline styles instead of string concatenation</li>
+        <li>Import helpers from <code>'../lib/template-helpers.js'</code> in your components</li>
+        <li>Take advantage of TypeScript types for better development experience</li>
+        <li>Combine multiple helpers for complex UI scenarios</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Import the component -->
+  <script type="module">
+    import './src/components/TemplateHelpersShowcase.js';
+  </script>
+</body>
+</html>

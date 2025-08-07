@@ -51,6 +51,8 @@ export type ReactiveComponentOptions<TState extends object> = {
     renderShadow?: (root: ShadowRoot, state: TState, api: ComponentAPI) => void;
     onAccessibleRender?: (root: ShadowRoot, state: TState, api: ComponentAPI) => void;
     setupGlobalEvents?: (state: TState, api: ComponentAPI) => void;
+    onStateChange?: (changes: Partial<TState>, state: TState, api: ComponentAPI) => void;
+    onError?: (error: Error, state: TState, api: ComponentAPI) => void;
   };
   disposables?: Array<(state: TState, api: ComponentAPI) => Disposable>;
   watch?: Partial<{
@@ -61,6 +63,11 @@ export type ReactiveComponentOptions<TState extends object> = {
   };
   reflectAttributes?: boolean;
   debug?: boolean;
+  // Enhanced DX options
+  devtools?: boolean;
+  hotReload?: boolean;
+  strictMode?: boolean;
+  errorBoundary?: boolean;
 };
 
 export function createReactiveComponent<TState extends object>(options: ReactiveComponentOptions<TState>) {
