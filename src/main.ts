@@ -1,7 +1,6 @@
 import './style.css'
 import typescriptLogo from './typescript.svg'
 import viteLogo from '/vite.svg'
-import { setupCounter } from './counter.ts'
 
 import './components/FancyCounter';
 import './components/ShoppingCart';
@@ -66,5 +65,3 @@ on('cart:item-added', (data) => {
 };
 
 console.log('Debug function available: window.debugCart()');
-
-setupCounter(document.querySelector<HTMLButtonElement>('#counter')!)
