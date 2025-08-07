@@ -16,6 +16,10 @@ type AttributeSchema = {
 };
 
 type Template<TState> = string | ((state: TState) => string);
+type StyleDefinition<TState> = string | ((state: TState) => string) | {
+  static?: string;
+  dynamic?: (state: TState) => string | Record<string, string>;
+};
 
 type ComponentAPI = {
   emit: (eventName: string, detail?: unknown) => void;
@@ -29,7 +33,7 @@ type ComponentAPI = {
 export type ReactiveComponentOptions<TState extends object> = {
   tag: string;
   template: Template<TState>;
-  style?: string;
+  style?: StyleDefinition<TState>;
   state: TState;
   attrs?: AttributeSchema;
   events?: {
@@ -74,13 +78,40 @@ export function createReactiveComponent<TState extends object>(options: Reactive
     debug = false,
   } = options;
 
-  const getStylesheet = () => {
+  // Parse style definition
+  const styleConfig = typeof style === 'string' 
+    ? { static: style, dynamic: undefined }
+    : typeof style === 'function'
+    ? { static: '', dynamic: style }
+    : typeof style === 'object' && style !== null
+    ? { static: style.static || '', dynamic: style.dynamic }
+    : { static: '', dynamic: undefined };
+
+  const getStylesheet = (currentState?: TState) => {
     if (!StylesheetCache.has(options)) {
       const sheet = new CSSStyleSheet();
-      sheet.replaceSync(style);
       StylesheetCache.set(options, sheet);
     }
-    return StylesheetCache.get(options)!;
+    
+    const sheet = StylesheetCache.get(options)!;
+    let finalCSS = styleConfig.static;
+    
+    if (styleConfig.dynamic && currentState) {
+      const dynamicResult = styleConfig.dynamic(currentState);
+      
+      if (typeof dynamicResult === 'string') {
+        finalCSS += '\n' + dynamicResult;
+      } else if (typeof dynamicResult === 'object') {
+        // Convert CSS custom properties object to CSS
+        const customProps = Object.entries(dynamicResult)
+          .map(([key, value]) => `${key.startsWith('--') ? key : '--' + key}: ${value};`)
+          .join(' ');
+        finalCSS += `\n:host { ${customProps} }`;
+      }
+    }
+    
+    sheet.replaceSync(finalCSS);
+    return sheet;
   };
 
   class ReactiveElement extends HTMLElement {
@@ -314,11 +345,11 @@ export function createReactiveComponent<TState extends object>(options: Reactive
       const root = this.shadowRoot!;
       const html = typeof template === 'function' ? template(this.state) : template;
 
-      if (html === this.lastHTML && !hooks.renderShadow) return;
+      if (html === this.lastHTML && !hooks.renderShadow && !styleConfig.dynamic) return;
       this.lastHTML = html;
 
       root.innerHTML = '';
-      (root as any).adoptedStyleSheets = [getStylesheet()];
+      (root as any).adoptedStyleSheets = [getStylesheet(this.state)];
 
       if (hooks.renderShadow) {
         hooks.renderShadow(root, this.state, this.api);
