@@ -30,12 +30,79 @@ type ComponentAPI = {
   offGlobal: <T = any>(eventName: string, handler: (data: T) => void) => void;
 };
 
+// Helper to convert camelCase to kebab-case for auto tag generation
+function camelToKebab(str: string): string {
+  return str.replace(/([A-Z])/g, '-$1').toLowerCase().replace(/^-/, '');
+}
+
+// Auto-generate tag name from variable name or function name
+function autoGenerateTag(name?: string): string {
+  if (name) {
+    return camelToKebab(name);
+  }
+  // Fallback to a unique identifier
+  return `auto-component-${Math.random().toString(36).substr(2, 9)}`;
+}
+
+// Process state to extract getter-based computed properties
+function processStateForGetters<T extends object>(state: T): {
+  processedState: T;
+  extractedComputed: { [key: string]: () => any };
+} {
+  const processedState = { ...state };
+  const extractedComputed: { [key: string]: () => any } = {};
+
+  // Extract getters from state object
+  Object.getOwnPropertyNames(state).forEach(key => {
+    const descriptor = Object.getOwnPropertyDescriptor(state, key);
+    if (descriptor && descriptor.get) {
+      // Move getter to computed properties
+      extractedComputed[key] = descriptor.get;
+      // Remove the getter from state (it will be handled as computed)
+      delete (processedState as any)[key];
+    }
+  });
+
+  return { processedState, extractedComputed };
+}
+
+// Process attributes to support both array and object syntax
+function processAttributes<T extends object>(
+  attrs: AttributeSchema | Array<keyof T> | undefined,
+  state: T
+): AttributeSchema {
+  if (!attrs) return {};
+  
+  if (Array.isArray(attrs)) {
+    // Auto-infer attribute types from state
+    const inferredAttrs: AttributeSchema = {};
+    attrs.forEach(key => {
+      const value = state[key];
+      const type = typeof value === 'string' ? 'string' :
+                  typeof value === 'number' ? 'number' :
+                  typeof value === 'boolean' ? 'boolean' : 'string';
+      
+      inferredAttrs[key as string] = {
+        type: type as AttributeType,
+        reflect: true
+      };
+    });
+    return inferredAttrs;
+  }
+  
+  return attrs;
+}
+
 export type ReactiveComponentOptions<TState extends object> = {
-  tag: string;
+  // Tag can now be optional for auto-generation
+  tag?: string;
   template: Template<TState>;
   style?: StyleDefinition<TState>;
   state: TState;
-  attrs?: AttributeSchema;
+  
+  // Simplified attribute schema - can be array of strings for auto-inference
+  attrs?: AttributeSchema | Array<keyof TState>;
+  
   events?: {
     [selector: string]: {
       [eventType: string]: (e: Event, state: TState, api: ComponentAPI) => void;
@@ -44,6 +111,18 @@ export type ReactiveComponentOptions<TState extends object> = {
   refs?: {
     [refKey: string]: (el: Element, state: TState, api: ComponentAPI) => void;
   };
+  
+  // Lifecycle hook shortcuts - can be defined directly on options
+  onMounted?: (state: TState, api: ComponentAPI) => void;
+  onUnmounted?: (state: TState, api: ComponentAPI) => void;
+  beforeRender?: (state: TState, api: ComponentAPI) => boolean | void;
+  renderShadow?: (root: ShadowRoot, state: TState, api: ComponentAPI) => void;
+  onAccessibleRender?: (root: ShadowRoot, state: TState, api: ComponentAPI) => void;
+  setupGlobalEvents?: (state: TState, api: ComponentAPI) => void;
+  onStateChange?: (changes: Partial<TState>, state: TState, api: ComponentAPI) => void;
+  onError?: (error: Error, state: TState, api: ComponentAPI) => void;
+  
+  // Legacy hooks object for backward compatibility
   hooks?: {
     onMounted?: (state: TState, api: ComponentAPI) => void;
     onUnmounted?: (state: TState, api: ComponentAPI) => void;
@@ -54,6 +133,7 @@ export type ReactiveComponentOptions<TState extends object> = {
     onStateChange?: (changes: Partial<TState>, state: TState, api: ComponentAPI) => void;
     onError?: (error: Error, state: TState, api: ComponentAPI) => void;
   };
+  
   disposables?: Array<(state: TState, api: ComponentAPI) => Disposable>;
   watch?: Partial<{
     [K in keyof TState]: (value: TState[K], oldValue: TState[K], state: TState, api: ComponentAPI) => void;
@@ -71,17 +151,36 @@ export type ReactiveComponentOptions<TState extends object> = {
 };
 
 export function createReactiveComponent<TState extends object>(options: ReactiveComponentOptions<TState>) {
+  // Auto-generate tag if not provided
+  const tag = options.tag || autoGenerateTag();
+  
+  // Extract computed properties from state getters
+  const { processedState, extractedComputed } = processStateForGetters(options.state);
+  
+  // Merge extracted computed with explicitly defined computed
+  const mergedComputed = { ...extractedComputed, ...(options.computed || {}) };
+  
+  // Process attributes - support both array syntax and object syntax
+  const processedAttrs = processAttributes(options.attrs, processedState);
+  
+  // Merge lifecycle hooks from both direct properties and hooks object
+  const mergedHooks = {
+    onMounted: options.onMounted || options.hooks?.onMounted,
+    onUnmounted: options.onUnmounted || options.hooks?.onUnmounted,
+    beforeRender: options.beforeRender || options.hooks?.beforeRender,
+    renderShadow: options.renderShadow || options.hooks?.renderShadow,
+    onAccessibleRender: options.onAccessibleRender || options.hooks?.onAccessibleRender,
+    setupGlobalEvents: options.setupGlobalEvents || options.hooks?.setupGlobalEvents,
+    onStateChange: options.onStateChange || options.hooks?.onStateChange,
+    onError: options.onError || options.hooks?.onError,
+  };
+
   const {
-    tag,
     template,
     style = '',
-    state,
-    attrs = {},
-    events,
+    events = {},
     refs = {},
-    hooks = {},
     disposables = [],
-    computed = {},
     debug = false,
   } = options;
 
@@ -135,12 +234,12 @@ export function createReactiveComponent<TState extends object>(options: Reactive
     private api: ComponentAPI;
 
     static get observedAttributes(): string[] {
-      return Object.keys(attrs);
+      return Object.keys(processedAttrs);
     }
 
     constructor() {
       super();
-      this.state = this.makeReactive(state);
+      this.state = this.makeReactive(processedState);
       this.attachShadow({ mode: 'open' });
       
       // Create the component API
@@ -180,8 +279,8 @@ export function createReactiveComponent<TState extends object>(options: Reactive
       this.render();
       this.addDelegatedListeners();
       this.disposables = disposables.map(fn => fn(this.state, this.api));
-      hooks.setupGlobalEvents?.(this.state, this.api);
-      hooks.onMounted?.(this.state, this.api);
+      mergedHooks.setupGlobalEvents?.(this.state, this.api);
+      mergedHooks.onMounted?.(this.state, this.api);
     }
 
     disconnectedCallback() {
@@ -200,12 +299,12 @@ export function createReactiveComponent<TState extends object>(options: Reactive
       this.globalEventUnsubscribers.forEach(unsubscribe => unsubscribe());
       this.globalEventUnsubscribers = [];
       
-      hooks.onUnmounted?.(this.state, this.api);
+      mergedHooks.onUnmounted?.(this.state, this.api);
     }
 
     attributeChangedCallback(name: string, oldValue: string | null, newValue: string | null) {
-      if (oldValue === newValue || !(name in attrs)) return;
-      const schema = attrs[name];
+      if (oldValue === newValue || !(name in processedAttrs)) return;
+      const schema = processedAttrs[name];
       const transform =
         schema?.deserialize ??
         schema?.transform ??
@@ -233,7 +332,7 @@ export function createReactiveComponent<TState extends object>(options: Reactive
       const handler = {
         get: (t: any, prop: string) => {
           // Check if this is a computed property
-          if (computed[prop]) {
+          if (mergedComputed[prop]) {
             return this.getComputedValue(prop);
           }
           
@@ -242,7 +341,7 @@ export function createReactiveComponent<TState extends object>(options: Reactive
         },
         set: (t: any, prop: string, value: any) => {
           // Don't allow setting computed properties
-          if (computed[prop]) {
+          if (mergedComputed[prop]) {
             debug && console.warn(`Cannot set computed property "${prop}"`);
             return false;
           }
@@ -255,7 +354,7 @@ export function createReactiveComponent<TState extends object>(options: Reactive
           t[prop] = value;
           this.batchedUpdates.add(prop);
 
-          const schema = attrs[prop];
+          const schema = processedAttrs[prop];
           const shouldReflect = schema?.reflect ?? options.reflectAttributes === true;
 
           if (shouldReflect) {
@@ -309,7 +408,7 @@ export function createReactiveComponent<TState extends object>(options: Reactive
       });
 
       // Compute the value with dependency tracking
-      const computeFunc = computed[prop];
+      const computeFunc = mergedComputed[prop];
       const computedValue = computeFunc(trackingProxy, this.api);
 
       // Cache the result and dependencies
@@ -337,7 +436,7 @@ export function createReactiveComponent<TState extends object>(options: Reactive
       
       if (this.renderFrame === null) {
         this.renderFrame = requestAnimationFrame(() => {
-          if (hooks.beforeRender?.(this.state, this.api) === false) {
+          if (mergedHooks.beforeRender?.(this.state, this.api) === false) {
             this.renderFrame = null;
             return;
           }
@@ -352,14 +451,14 @@ export function createReactiveComponent<TState extends object>(options: Reactive
       const root = this.shadowRoot!;
       const html = typeof template === 'function' ? template(this.state) : template;
 
-      if (html === this.lastHTML && !hooks.renderShadow && !styleConfig.dynamic) return;
+      if (html === this.lastHTML && !mergedHooks.renderShadow && !styleConfig.dynamic) return;
       this.lastHTML = html;
 
       root.innerHTML = '';
       (root as any).adoptedStyleSheets = [getStylesheet(this.state)];
 
-      if (hooks.renderShadow) {
-        hooks.renderShadow(root, this.state, this.api);
+      if (mergedHooks.renderShadow) {
+        mergedHooks.renderShadow(root, this.state, this.api);
       } else {
         root.innerHTML = html;
       }
@@ -374,7 +473,7 @@ export function createReactiveComponent<TState extends object>(options: Reactive
         if (el) callback(el, this.state, this.api);
       });
 
-      hooks.onAccessibleRender?.(root, this.state, this.api);
+      mergedHooks.onAccessibleRender?.(root, this.state, this.api);
     }
 
     private addDelegatedListeners() {
@@ -407,4 +506,35 @@ export function createReactiveComponent<TState extends object>(options: Reactive
   }
 
   return ReactiveElement;
+}
+
+// Convenience function with even better defaults and automatic features
+export function component<TState extends object>(
+  tagOrOptions: string | ReactiveComponentOptions<TState>,
+  optionsIfString?: Omit<ReactiveComponentOptions<TState>, 'tag'>
+): typeof HTMLElement {
+  if (typeof tagOrOptions === 'string') {
+    // Called as component('my-tag', { ... })
+    return createReactiveComponent({
+      tag: tagOrOptions,
+      ...optionsIfString!,
+    });
+  } else {
+    // Called as component({ ... }) - auto-generate tag
+    return createReactiveComponent(tagOrOptions);
+  }
+}
+
+// Super simplified component creation for common cases
+export function simpleComponent<TState extends object>(
+  state: TState,
+  template: Template<TState>,
+  options?: Partial<ReactiveComponentOptions<TState>>
+): typeof HTMLElement {
+  return createReactiveComponent({
+    state,
+    template,
+    attrs: Object.keys(state) as Array<keyof TState>, // Auto-infer all state props as attributes
+    ...options,
+  });
 }
