@@ -21,6 +21,7 @@
     ".": "./src/lib/runtime.ts",
     "./event-bus": "./src/lib/event-bus.ts",
     "./store": "./src/lib/store.ts",
-    "./template-helpers": "./src/lib/template-helpers.ts"
+    "./template-helpers": "./src/lib/template-helpers.ts",
+    "./ssr": "./src/lib/runtime.ts"
   }
 }
