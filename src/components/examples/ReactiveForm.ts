@@ -1,4 +1,4 @@
-import { component, html, css, type ComponentState, Store } from '../../lib/runtime.ts';
+import { component, html, css, type ComponentState, Store } from '../../lib/runtime';
 
 // ============================================================================
 // REACTIVE FORM EXAMPLE - Comprehensive form field reactivity
@@ -58,60 +58,87 @@ const externalFormStore = new Store({
 
 component<FormState>({
   tag: 'reactive-form',
-  
-  state: {
-    firstName: '',
-    lastName: '',
-    email: '',
-    password: '',
-    phone: '',
-    url: '',
-    search: '',
-    age: 18,
-    salary: 50000,
-    rating: 5,
-    birthDate: '',
-    appointmentTime: '',
-    meetingDateTime: '',
-    country: '',
-    favoriteColors: [],
-    gender: '',
-    newsletter: false,
-    terms: false,
-    bio: '',
-    comments: '',
-    profilePicture: '',
-    isValid: false,
-    errors: {},
-    submitCount: 0
-  },
 
-  computed: {
-    fullName: (state) => `${state.firstName} ${state.lastName}`.trim(),
-    formProgress: (state) => {
-      const fields = [
-        state.firstName, state.lastName, state.email, state.password,
-        state.phone, state.birthDate, state.country, state.bio
-      ];
-      const filled = fields.filter(f => f && f.toString().length > 0).length;
-      return Math.round((filled / fields.length) * 100);
-    },
-    estimatedSalary: (state) => new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD'
-    }).format(state.salary),
-    canSubmit: (state) => {
-      return state.firstName.length > 0 && 
-             state.lastName.length > 0 && 
-             state.email.includes('@') && 
-             state.terms;
-    },
-    validationSummary: (state) => {
-      const errorCount = Object.keys(state.errors).length;
-      if (errorCount === 0) return 'All fields are valid ✓';
-      return `${errorCount} validation error${errorCount === 1 ? '' : 's'}`;
-    }
-  },
+  state: (() => {
+    const firstName = '';
+    const lastName = '';
+    const email = '';
+    const password = '';
+    const phone = '';
+    const url = '';
+    const search = '';
+    const age = 18;
+    const salary = 50000;
+    const rating = 5;
+    const birthDate = '';
+    const appointmentTime = '';
+    const meetingDateTime = '';
+    const country = '';
+    const favoriteColors = [] as string[];
+    const gender = '';
+    const newsletter = false;
+    const terms = false;
+    const bio = '';
+    const comments = '';
+    const profilePicture = '';
+    const isValid = false;
+    const errors = {};
+    const submitCount = 0;
+    return {
+      firstName,
+      lastName,
+      email,
+      password,
+      phone,
+      url,
+      search,
+      age,
+      salary,
+      rating,
+      birthDate,
+      appointmentTime,
+      meetingDateTime,
+      country,
+      favoriteColors,
+      gender,
+      newsletter,
+      terms,
+      bio,
+      comments,
+      profilePicture,
+      isValid,
+      errors,
+      submitCount,
+      get fullName() {
+        return `${this.firstName} ${this.lastName}`.trim();
+      },
+      get formProgress() {
+        const fields = [
+          this.firstName, this.lastName, this.email, this.password,
+          this.phone, this.birthDate, this.country, this.bio
+        ];
+        const filled = fields.filter(f => f && f.toString().length > 0).length;
+        return Math.round((filled / fields.length) * 100);
+      },
+      get estimatedSalary() {
+        return new Intl.NumberFormat('en-US', {
+          style: 'currency',
+          currency: 'USD'
+        }).format(this.salary);
+      },
+      canSubmit: () => {
+        return firstName.length > 0 && 
+              lastName.length > 0 && 
+              email.includes('@') && 
+              terms;
+      },
+      validationSummary: () => {
+        const errorCount = Object.keys(errors).length;
+        if (errorCount === 0) return 'All fields are valid ✓';
+        return `${errorCount} validation error${errorCount === 1 ? '' : 's'}`;
+      }
+    };
+  })(),
 
   refs: {
     // Text inputs with validation

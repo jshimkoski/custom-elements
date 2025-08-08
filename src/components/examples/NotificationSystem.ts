@@ -1,4 +1,4 @@
-import { component, html, css, type ComponentState, eventBus, Store } from '../../lib/runtime.ts';
+import { component, html, css, type ComponentState, eventBus, Store } from '../../lib/runtime';
 
 // ============================================================================
 // SHARED STORE FOR NOTIFICATION DATA
@@ -59,24 +59,28 @@ interface NotificationPanelState extends ComponentState {
 component<NotificationPanelState>({
   tag: 'notification-panel',
 
-  state: {
-    localNotifications: [],
-    localUnreadCount: 0,
-    localIsVisible: false,
-    localFilter: 'all'
-  },
-
-  computed: {
-    filteredNotifications: (state) => {
-      switch (state.localFilter) {
-        case 'unread': return state.localNotifications.filter(n => !n.read);
-        case 'read': return state.localNotifications.filter(n => n.read);
-        default: return state.localNotifications;
+  state: (() => {
+    const localNotifications = [] as Notification[];
+    const localUnreadCount = 0;
+    const localIsVisible = false;
+    const localFilter = 'all';
+    return {
+      localNotifications,
+      localUnreadCount,
+      localIsVisible,
+      localFilter,
+      get filteredNotifications() {
+        switch (localFilter as 'all' | 'unread' | 'read') {
+          case 'unread': return localNotifications.filter(n => !n.read);
+          case 'read': return localNotifications.filter(n => n.read);
+          default: return localNotifications;
+        }
+      },
+      get hasNotifications() {
+        return localNotifications.length > 0;
       }
-    },
-    
-    hasNotifications: (state) => state.localNotifications.length > 0
-  },
+    };
+  })(),
 
   template: (state) => {
     const filteredNotifications = (state as any).filteredNotifications;
@@ -179,7 +183,7 @@ component<NotificationPanelState>({
     }
   },
 
-  onMount: (_state, api) => {
+  onMounted: (_state, api) => {
     // Subscribe to store changes
     notificationStore.subscribe((globalState) => {
       api.update({
@@ -388,7 +392,7 @@ component<NotificationButtonState>({
     isVisible: false
   },
 
-  onMount: (_state, api) => {
+  onMounted: (_state, api) => {
     // Subscribe to store changes
     notificationStore.subscribe((globalState) => {
       api.update({
@@ -570,7 +574,7 @@ component<NotificationCreatorState>({
     }
   },
 
-  onMount: (_state, _api) => {
+  onMounted: (_state, _api) => {
     // Listen for notification creation events
     eventBus.on('notification:create', (data: { type: string; title: string; message: string }) => {
       const globalState = notificationStore.getState();

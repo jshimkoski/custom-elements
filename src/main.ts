@@ -1,10 +1,11 @@
 import './style.css';
-import './components/examples/Examples.js';
-import './components/examples/TodoApp.ts';
-import './components/examples/ShoppingCart.ts';
-import './components/examples/NotificationSystem.ts';
-import './components/examples/TemplateCompilationDemo.ts';
-import './components/examples/SimpleTest.ts';
+import './components/examples/Examples';
+import './components/examples/TodoApp';
+import './components/examples/TodoAppCompiled';
+import './components/examples/ShoppingCart';
+import './components/examples/NotificationSystem';
+import './components/examples/TemplateCompilationDemo';
+import './components/examples/SimpleTest';
 
 // The new runtime is completely self-contained
 // Components automatically register themselves when imported
@@ -18,6 +19,7 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
     
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 2rem; margin: 2rem 0;">
       <todo-app></todo-app>
+      <todo-app-compiled></todo-app-compiled>
       <perf-counter></perf-counter>
     </div>
     

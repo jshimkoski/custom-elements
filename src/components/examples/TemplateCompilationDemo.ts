@@ -1,4 +1,4 @@
-import { component, html, compile } from '../../lib/runtime.ts';
+import { component, html, compile } from '../../lib/runtime';
 
 // Minimal test versions first
 // Define the state shape for better typing

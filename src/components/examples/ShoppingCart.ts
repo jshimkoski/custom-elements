@@ -1,4 +1,4 @@
-import { component, html, css, type ComponentState } from '../../lib/runtime.ts';
+import { component, html, css, type ComponentState } from '../../lib/runtime';
 
 interface CartItem {
   id: number;
@@ -15,43 +15,41 @@ interface ShoppingCartState extends ComponentState {
 
 component<ShoppingCartState>({
   tag: 'shopping-cart-demo',
-  
-  state: {
-    items: [
+
+  state: (() => {
+    const items = [
       { id: 1, name: 'Wireless Headphones', price: 99.99, quantity: 1 },
       { id: 2, name: 'Smartphone Case', price: 24.99, quantity: 2 },
       { id: 3, name: 'USB-C Cable', price: 12.99, quantity: 1 }
-    ],
-    couponCode: '',
-    isCartOpen: true
-  },
-
-  computed: {
-    subtotal: (state) => 
-      state.items.reduce((sum, item) => sum + (item.price * item.quantity), 0),
-    
-    tax: (state) => {
-      const subtotal = (state as any).subtotal;
+    ];
+    const couponCode = '';
+    const isCartOpen = true;
+    const subtotal = (() => {
+      return items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    })();
+    const tax = (() => {
       return subtotal * 0.08; // 8% tax
-    },
-    
-    discount: (state) => {
-      const subtotal = (state as any).subtotal;
-      if (state.couponCode.toLowerCase() === 'save10') return subtotal * 0.1;
-      if (state.couponCode.toLowerCase() === 'save20') return subtotal * 0.2;
+    })();
+    const discount = (() => {
+      if (couponCode.toLowerCase() === 'save10') return subtotal * 0.1;
+      if (couponCode.toLowerCase() === 'save20') return subtotal * 0.2;
       return 0;
-    },
-    
-    total: (state) => {
-      const subtotal = (state as any).subtotal;
-      const tax = (state as any).tax;
-      const discount = (state as any).discount;
-      return Math.max(0, subtotal + tax - discount);
-    },
-    
-    itemCount: (state) => 
-      state.items.reduce((sum, item) => sum + item.quantity, 0)
-  },
+    })();
+    return {
+      items,
+      couponCode,
+      isCartOpen,
+      subtotal,
+      tax,
+      discount,
+      get total() {
+        return Math.max(0, subtotal + tax - discount);
+      },
+      get itemCount() {
+        return this.items.reduce((sum, item) => sum + item.quantity, 0);
+      },
+    }
+  })(),
 
   template: (state) => {
     const subtotal = (state as any).subtotal;
@@ -530,7 +528,7 @@ component<ShoppingCartState>({
     }
   },
 
-  onMount: () => {
+  onMounted: () => {
     console.log('🛒 Shopping Cart Demo mounted');
   }
 });

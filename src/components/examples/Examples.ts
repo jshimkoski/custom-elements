@@ -1,9 +1,9 @@
-import { component, html, css, type ComponentState } from '../../lib/runtime.ts';
+import { component, html, css, type ComponentState } from '../../lib/runtime';
 
 // Import the notification system demo
-import './NotificationSystem.ts';
+import './NotificationSystem';
 // Import the reactive form demo
-import './ReactiveForm.ts';
+import './ReactiveForm';
 
 // ============================================================================
 // COUNTER EXAMPLE - Shows basic reactivity and performance
@@ -17,16 +17,23 @@ interface CounterState extends ComponentState {
 component<CounterState>({
   tag: 'perf-counter',
   
-  state: {
-    count: 0,
-    step: 1
-  },
-
-  computed: {
-    isEven: (state) => state.count % 2 === 0,
-    doubled: (state) => state.count * 2,
-    message: (state) => `Count is ${state.count} (${(state as any).isEven ? 'even' : 'odd'})`
-  },
+  state: (() => {
+    const count = 0,
+      step = 1;
+    return {
+      count,
+      step,
+      get isEven() {
+        return count % 2 === 0;
+      },
+      get doubled() {
+        return count * 2;
+      },
+      get message() {
+        return `Count is ${count} (${count % 2 === 0 ? 'even' : 'odd'})`;
+      }
+    };
+  })(),
 
   template: (state) => html`
     <div class="counter">
@@ -207,26 +214,30 @@ interface FormState extends ComponentState {
 component<FormState>({
   tag: 'smart-form',
   
-  state: {
-    name: '',
-    email: '',
-    age: 18,
-    newsletter: false,
-    errors: {}
-  },
+  state: (() => {
+    const name = '',
+      email = '',
+      age = 18,
+      newsletter = false;
 
-  computed: {
-    isValid: (state) => {
-      return state.name.length > 0 && 
-             state.email.includes('@') && 
-             state.age >= 13;
-    },
-    
-    summary: (state) => {
-      if (!(state as any).isValid) return 'Please complete the form';
-      return `${state.name} (${state.age}) - ${state.email}${state.newsletter ? ' + newsletter' : ''}`;
-    }
-  },
+    const isValid = (() => {
+      return name.length > 0 && 
+            email.includes('@') && 
+            age >= 13;
+    })();
+    return {
+      name,
+      email,
+      age,
+      newsletter,
+      errors: {},
+      isValid,
+      get summary() {
+        if (!isValid) return 'Please complete the form';
+        return `${name} (${age}) - ${email}${newsletter ? ' + newsletter' : ''}`;
+      }
+    };
+  })(),
 
   template: (state) => html`
     <form class="smart-form">

@@ -1,8 +1,8 @@
-export { Store } from './store.js';
-export { eventBus } from './event-bus.js';
-export { html, css, classes, styles, ref, on } from './template-helpers.js';
-export { compileTemplate, compile, renderCompiledTemplate, updateCompiledTemplate } from './template-compiler.js';
-export type { CompiledTemplate, UpdateFunction, UpdateType } from './template-compiler.js';
+export { Store } from './store';
+export { eventBus } from './event-bus';
+export { html, css, classes, styles, ref, on } from './template-helpers';
+export { compileTemplate, compile, renderCompiledTemplate, updateCompiledTemplate } from './template-compiler';
+export type { CompiledTemplate, UpdateFunction, UpdateType } from './template-compiler';
 
 /**
  * Modern Web Component Runtime - v2.0
@@ -34,12 +34,19 @@ export interface ComponentAPI<T extends ComponentState = ComponentState> {
 export interface ComponentConfig<T extends ComponentState = ComponentState> {
   readonly tag: string;
   readonly template: (state: T, api: ComponentAPI<T>) => string | CompiledTemplate<T>;
+  /**
+   * State object can include computed properties as getter functions that accept state as a parameter.
+   * Example:
+   * state: {
+   *   count: 0,
+   *   doubled(state) { return state.count * 2 }
+   * }
+   */
   readonly state: T;
   readonly style?: string | ((state: T) => string);
   readonly refs?: Record<string, RefHandler<T>>;
-  readonly computed?: Record<string, ComputedHandler<T>>;
-  readonly onMount?: LifecycleHandler<T>;
-  readonly onUnmount?: LifecycleHandler<T>;
+  readonly onMounted?: LifecycleHandler<T>;
+  readonly onUnmounted?: LifecycleHandler<T>;
 }
 
 export type RefHandler<T extends ComponentState> = (
@@ -62,9 +69,11 @@ export type LifecycleHandler<T extends ComponentState> = (
 export interface SSRComponentConfig<T extends ComponentState = ComponentState> {
   readonly tag: string;
   readonly template: (state: T, api: ComponentAPI<T>) => string;
+  /**
+   * State object can include computed properties as getter functions that accept state as a parameter.
+   */
   readonly state: T;
   readonly style?: string | ((state: T) => string);
-  readonly computed?: Record<string, ComputedHandler<T>>;
   readonly attrs?: Record<string, string>;
 }
 
@@ -116,23 +125,18 @@ export function renderToString<T extends ComponentState>(
   }
 
   try {
-    // Create computed state for SSR
-    const computedState = { ...config.state };
-    if (config.computed) {
-      Object.entries(config.computed).forEach(([key, handler]) => {
-        (computedState as any)[key] = handler(computedState);
-      });
-    }
+    // Use state directly (getters will be available)
+    const state = config.state;
 
     // Create API and render template
-    const api = createSSRAPI(computedState);
-    const innerHTML = config.template(computedState, api);
+    const api = createSSRAPI(state);
+    const innerHTML = config.template(state, api);
     
     // Generate component styles if needed
     let styleContent = '';
     if (options.includeStyles && config.style) {
       const css = typeof config.style === 'function' 
-        ? config.style(computedState) 
+        ? config.style(state) 
         : config.style;
       styleContent = `<style>${css}</style>`;
     }
@@ -206,7 +210,6 @@ export function generateHydrationScript(context: SSRContext): string {
   const componentConfigs = Array.from(context.components.entries()).map(([tag, config]) => ({
     tag,
     state: config.state,
-    computed: config.computed ? Object.keys(config.computed) : [],
   }));
 
   return `
@@ -655,30 +658,16 @@ class DOMDiffer {
 // ============================================================================
 
 function createReactiveState<T extends ComponentState>(
-  initialState: T,
-  computedHandlers: Record<string, ComputedHandler<T>> = {}
+  initialState: T
 ): {
   state: T;
   onUpdate: (listener: (key: keyof T, value: T[keyof T]) => void) => () => void;
   update: (changes: Partial<T>) => void;
 } {
   const listeners = new Set<(key: keyof T, value: T[keyof T]) => void>();
-  const computedCache = new Map<string, unknown>();
-  
+
   // We'll reference this later
   let proxyState: T;
-
-  const getComputed = (key: string): unknown => {
-    if (!computedCache.has(key)) {
-      const value = computedHandlers[key](proxyState);
-      computedCache.set(key, value);
-    }
-    return computedCache.get(key);
-  };
-
-  const invalidateComputed = (): void => {
-    computedCache.clear();
-  };
 
   const notifyListeners = (key: keyof T, value: T[keyof T]): void => {
     listeners.forEach(listener => {
@@ -693,9 +682,6 @@ function createReactiveState<T extends ComponentState>(
   // Create state with proper reference
   proxyState = new Proxy(safeClone(initialState), {
     get: (target, key) => {
-      if (typeof key === 'string' && key in computedHandlers) {
-        return getComputed(key);
-      }
       return target[key as keyof T];
     },
     
@@ -704,7 +690,6 @@ function createReactiveState<T extends ComponentState>(
       if (oldValue === value) return true;
 
       target[key as keyof T] = value;
-      invalidateComputed();
       notifyListeners(key as keyof T, value);
       return true;
     }
@@ -717,8 +702,6 @@ function createReactiveState<T extends ComponentState>(
 
   const update = (changes: Partial<T>): void => {
     Object.assign(proxyState, changes);
-    invalidateComputed();
-    
     Object.entries(changes).forEach(([key, value]) => {
       notifyListeners(key as keyof T, value as T[keyof T]);
     });
@@ -748,8 +731,7 @@ class ComponentElement<T extends ComponentState> extends HTMLElement {
     
     // Create reactive state
     this.reactiveSystem = createReactiveState(
-      config.state,
-      config.computed || {}
+      config.state
     );
 
     // Create API
@@ -808,7 +790,7 @@ class ComponentElement<T extends ComponentState> extends HTMLElement {
     }
     
     // Call lifecycle hook
-    this.config.onMount?.(this.api.state, this.api);
+    this.config.onMounted?.(this.api.state, this.api);
   }
 
   disconnectedCallback(): void {
@@ -817,7 +799,7 @@ class ComponentElement<T extends ComponentState> extends HTMLElement {
     this.unsubscribes = [];
     
     // Call lifecycle hook
-    this.config.onUnmount?.(this.api.state, this.api);
+    this.config.onUnmounted?.(this.api.state, this.api);
   }
 
   private render(): void {

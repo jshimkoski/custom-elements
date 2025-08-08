@@ -1,4 +1,4 @@
-import { component, html, css, type ComponentState } from '../../lib/runtime';
+import { component, compile, html, css, type ComponentState } from '../../lib/runtime';
 
 interface Todo {
   id: number;
@@ -16,7 +16,7 @@ interface TodoAppState extends ComponentState {
 }
 
 component<TodoAppState>({
-  tag: 'todo-app',
+  tag: 'todo-app-compiled',
   
   state: (() => {
     const todos: Todo[] = [
@@ -45,14 +45,14 @@ component<TodoAppState>({
     };
   })(),
 
-  template: (state) => html`
+  template: () => compile`
     <div class="todo-app">
       <header>
         <h1>📝 Todo App</h1>
         <input 
           data-ref="newTodoInput"
           type="text" 
-          value="${state.newTodo}"
+          value="${state => state.newTodo}"
           placeholder="What needs to be done?"
           class="new-todo"
         >
@@ -62,26 +62,26 @@ component<TodoAppState>({
         <div class="filters">
           <button 
             data-ref="allFilter"
-            class="${state.filter === 'all' ? 'active' : ''}"
+            class="${state => state.filter === 'all' ? 'active' : ''}"
           >
-            All (${state.todos.length})
+            All (${state => state.todos.length})
           </button>
           <button 
             data-ref="activeFilter"
-            class="${state.filter === 'active' ? 'active' : ''}"
+            class="${state => state.filter === 'active' ? 'active' : ''}"
           >
-            Active (${state.activeTodos?.length})
+            Active (${state => state.activeTodos?.length})
           </button>
           <button 
             data-ref="completedFilter"
-            class="${state.filter === 'completed' ? 'active' : ''}"
+            class="${state => state.filter === 'completed' ? 'active' : ''}"
           >
-            Completed (${state.completedCount})
+            Completed (${state => state.completedCount})
           </button>
         </div>
 
         <ul class="todo-list" data-ref="todoList">
-          ${state.filteredTodos?.map((todo: Todo) => html`
+          ${state => state.filteredTodos?.map((todo: Todo) => html`
             <li key="${todo.id}" class="${todo.completed ? 'completed' : ''}">
               <input 
                 type="checkbox" 
@@ -104,7 +104,7 @@ component<TodoAppState>({
 
       <footer>
         <small>
-          ${state.activeTodos?.length} item${state.activeTodos?.length !== 1 ? 's' : ''} left
+          ${state => state.activeTodos?.length} item${state => state.activeTodos?.length !== 1 ? 's' : ''} left
         </small>
       </footer>
     </div>
@@ -291,6 +291,6 @@ component<TodoAppState>({
   },
 
   onMounted: () => {
-    console.log('📝 Todo App mounted');
+    console.log('📝 Todo App Compiled mounted');
   }
 });
