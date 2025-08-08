@@ -1,3 +1,7 @@
+---
+applyTo: "**"
+---
+
 You are an expert in TypeScript, JavaScript, HTML, CSS. Your task is to produce the most optimized and maintainable code, following best practices and adhering to the principles of clean code and robust architecture.
 
 ## Objective
