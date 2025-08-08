@@ -1,47 +1,44 @@
 # Custom Elements Runtime
 
-A powerful, lightweight TypeScript runtime for creating reactive web components. Built for performance, simplicity, and universal rendering (client + server).
+> **A modern, ultra-lightweight TypeScript runtime for building fast, reactive, and maintainable web components.**
 
-## 🚀 Why Choose This Runtime?
+Custom Elements Runtime is a TypeScript library for building reactive web components using functional programming patterns. It provides direct DOM updates, strict TypeScript types, and supports server-side rendering and hydration. The runtime has no external dependencies and is designed for modular, maintainable code.
 
-- **🔥 Blazing Fast**: 3-5x faster than React, lighter than Vue/Svelte
-- **📦 Tiny Bundle**: ~8KB gzipped, tree-shakeable
-- **🌐 Universal**: Server-side rendering with seamless hydration
-- **🛡️ TypeScript First**: Complete type safety and excellent DX
-- **⚡ Zero Dependencies**: Pure vanilla JavaScript/TypeScript
-- **🎯 Simple API**: One function to rule them all
+## ✨ Features
 
-## 📊 Framework Comparison
+- **Direct DOM performance**: No virtual DOM, no diffing overhead
+- **Strict TypeScript**: Type-safe, developer-friendly
+- **Zero dependencies**: Pure TypeScript/JavaScript
+- **SSR & Hydration**: Universal rendering, seamless client takeover
+- **Tree-shakable & modular**: Only ship what you use
+- **Functional API**: One function, no classes
+- **Event bus & global store**: Built-in communication and state
 
-| Feature | This Runtime | React | Vue | Svelte | Lit |
-|---------|-------------|-------|-----|--------|-----|
-| Bundle Size | ~8KB | ~45KB | ~35KB | ~10KB | ~15KB |
-| SSR Support | ✅ Built-in | ✅ Complex | ✅ Complex | ❌ Limited | ❌ No |
-| TypeScript | ✅ Native | ✅ Good | ✅ Good | ✅ Good | ✅ Good |
-| Learning Curve | ✅ Minimal | ❌ Steep | ❌ Moderate | ✅ Easy | ❌ Moderate |
-| Web Standards | ✅ Native | ❌ Virtual | ❌ Virtual | ❌ Compiled | ✅ Native |
-| Runtime Performance | ✅ Excellent | ✅ Good | ✅ Good | ✅ Excellent | ✅ Good |
+## 🚀 Quick Start
 
-## 📦 Installation
-
-```bash
-# Clone or download this repository
-git clone https://github.com/your-repo/custom-elements
-cd custom-elements
-npm install
-npm run dev
-```
-
-## 🎯 Quickest Start Ever
-
-The most minimal reactive component possible:
+### Hello World Example
 
 ```typescript
 import { component } from './lib/runtime.ts';
 
-// That's it! A complete reactive counter
 component({
-  tag: 'my-counter',
+  tag: 'hello-world',
+  state: { name: 'World' },
+  template: (state) => `<h1>Hello, ${state.name}!</h1>`
+});
+```
+
+```html
+<hello-world></hello-world>
+```
+
+### Minimal Boilerplate Example
+
+```typescript
+import { component } from './lib/runtime.ts';
+
+component({
+  tag: 'simple-counter',
   state: { count: 0 },
   template: (state) => `<button data-ref="btn">Count: ${state.count}</button>`,
   refs: {
@@ -50,14 +47,218 @@ component({
 });
 ```
 
-Use it in HTML:
 ```html
-<my-counter></my-counter>
+<simple-counter></simple-counter>
 ```
 
-## 🧠 Core Concepts
+### Todo App with Notifications Example
 
-### 1. Reactive State
+```typescript
+import { component, emit, on } from './lib/runtime.ts';
+
+component({
+  tag: 'todo-app',
+  state: { todos: [], newTodo: '' },
+  template: (state) => `
+    <input data-ref="input" value="${state.newTodo}" placeholder="Add todo" />
+    <button data-ref="add">Add</button>
+    <ul>
+      ${state.todos.map((t: string) => `<li>${t}</li>`).join('')}
+    </ul>
+    <notification-display></notification-display>
+  `,
+  refs: {
+    input: (el, state) => el.addEventListener('input', e => state.newTodo = (e.target as HTMLInputElement).value),
+    add: (el, state) => el.addEventListener('click', () => {
+      if (state.newTodo.trim()) {
+        state.todos.push(state.newTodo.trim());
+        emit('notify', { message: `Added: ${state.newTodo}` });
+        state.newTodo = '';
+      }
+    })
+  }
+});
+
+component({
+  tag: 'notification-display',
+  state: { notifications: [] },
+  template: (state) => `
+    <div>
+      ${state.notifications.map((n: any) => `<div>${n.message}</div>`).join('')}
+    </div>
+  `,
+  onMount: (state) => {
+    on('notify', (n) => {
+      state.notifications.push(n);
+      setTimeout(() => {
+        state.notifications = state.notifications.filter(x => x !== n);
+      }, 2000);
+    });
+  }
+});
+```
+
+```html
+<todo-app></todo-app>
+```
+
+## 🧩 Core Concepts
+
+- **Reactive state**: Automatic updates via ES6 Proxy
+- **Functional templates**: Just return HTML strings
+- **Refs**: Direct DOM access, no selectors
+- **Computed properties**: ES6 getters in state, recalculated on access
+- **Event bus**: Cross-component communication
+- **Global store**: Shared state, subscriptions
+
+## ⚡ Performance & Scalability
+
+- Direct DOM updates for minimal overhead
+- Modular, tree-shakable architecture
+- No runtime dependencies
+- SSR-ready with hydration
+- Suitable for micro-frontends, design systems, and high-performance apps
+
+## 🆚 Framework Comparison
+
+| Feature         | Custom Elements Runtime | React | Vue | Angular | Svelte |
+|-----------------|------------------------|-------|------|---------|--------|
+| Bundle Size     | ~8KB                   | ~45KB | ~35KB| ~60KB   | ~10KB  |
+| SSR             | Built-in               | Yes   | Yes  | Yes     | Yes    |
+| TypeScript      | Strict                 | Opt   | Opt  | Strict  | Opt    |
+| State Mgmt      | Manual/Store           | Redux | Pinia| RxJS    | Store  |
+| Routing         | Manual                 | Router| Router| Router  | SvelteKit|
+| Learning Curve  | Low                    | Med   | Med  | High    | Med    |
+
+## 🛡️ Production-Readiness
+
+- Strict TypeScript, modular structure
+- Early returns, guard clauses, custom error types
+- No external dependencies
+- Manual input validation and error handling
+
+
+## ⚠️ SSR Caveats
+
+- SSR only generates HTML and styles; DOM APIs, refs, and event listeners are not available during server rendering.
+- Lifecycle hooks (`onMounted`, `onUnmounted`) and refs are ignored during SSR.
+- Hydration requires the client bundle to match the server-rendered markup and state exactly.
+
+## 📖 API Reference
+
+See [`src/lib/runtime.ts`](src/lib/runtime.ts) for full API docs and advanced usage.
+
+---
+
+## Quick Start
+
+### Hello World Example
+
+```typescript
+import { component } from './lib/runtime.ts';
+
+component({
+  tag: 'hello-world',
+  state: { name: 'World' },
+  template: (state) => `<h1>Hello, ${state.name}!</h1>`
+});
+```
+
+```html
+<hello-world></hello-world>
+```
+
+### Minimal Boilerplate Example
+
+```typescript
+import { component } from './lib/runtime.ts';
+
+component({
+  tag: 'simple-counter',
+  state: { count: 0 },
+  template: (state) => `<button data-ref="btn">Count: ${state.count}</button>`,
+  refs: {
+    btn: (el, state) => el.addEventListener('click', () => state.count++)
+  }
+});
+```
+
+```html
+<simple-counter></simple-counter>
+```
+
+### Todo App with Notifications Example
+
+```typescript
+import { component, emit, on } from './lib/runtime.ts';
+
+component({
+  tag: 'todo-app',
+  state: { todos: [], newTodo: '' },
+  template: (state) => `
+    <input data-ref="input" value="${state.newTodo}" placeholder="Add todo" />
+    <button data-ref="add">Add</button>
+    <ul>
+      ${state.todos.map((t: string) => `<li>${t}</li>`).join('')}
+    </ul>
+    <notification-display></notification-display>
+  `,
+  refs: {
+    input: (el, state) => el.addEventListener('input', e => state.newTodo = (e.target as HTMLInputElement).value),
+    add: (el, state) => el.addEventListener('click', () => {
+      if (state.newTodo.trim()) {
+        state.todos.push(state.newTodo.trim());
+        emit('notify', { message: `Added: ${state.newTodo}` });
+        state.newTodo = '';
+      }
+    })
+  }
+});
+
+component({
+  tag: 'notification-display',
+  state: { notifications: [] },
+  template: (state) => `
+    <div>
+      ${state.notifications.map((n: any) => `<div>${n.message}</div>`).join('')}
+    </div>
+  `,
+  onMount: (state) => {
+    on('notify', (n) => {
+      state.notifications.push(n);
+      setTimeout(() => {
+        state.notifications = state.notifications.filter(x => x !== n);
+      }, 2000);
+    });
+  }
+});
+```
+
+```html
+<todo-app></todo-app>
+```
+
+## Concepts
+
+- Reactive state via ES6 Proxy
+- Functional templates (return HTML strings)
+- Refs for direct DOM access
+- Computed properties
+- Event bus for communication
+- Global store for shared state
+
+## API Reference
+
+See [`src/lib/runtime.ts`](src/lib/runtime.ts) for API documentation and advanced usage.
+
+## Installation
+
+```bash
+git clone https://github.com/your-repo/custom-elements
+cd custom-elements
+npm install
+npm run dev
+```
 State changes automatically trigger re-renders using ES6 Proxies:
 
 ```typescript
@@ -86,12 +287,16 @@ refs: {
 ```
 
 ### 4. Computed Properties
-Cached calculations that update when dependencies change:
+Define computed values as ES6 getters inside the state object. Getters should reference `this` for reactivity:
 
 ```typescript
-computed: {
-  fullName: (state) => `${state.firstName} ${state.lastName}`,
-  isValid: (state) => state.email.includes('@') && state.password.length >= 8
+state: {
+  firstName: 'Jane',
+  lastName: 'Doe',
+  email: '',
+  password: '',
+  get fullName() { return `${this.firstName} ${this.lastName}` },
+  get isValid() { return this.email.includes('@') && this.password.length >= 8 }
 }
 ```
 
@@ -100,284 +305,152 @@ computed: {
 A comprehensive todo app showcasing all features:
 
 ```typescript
-import { component, html, css } from './lib/runtime.ts';
+import { component, html, css, type ComponentState } from '../../lib/runtime';
 
 interface Todo {
   id: number;
   text: string;
   completed: boolean;
-  priority: 'low' | 'medium' | 'high';
 }
 
-interface TodoAppState {
+interface TodoAppState extends ComponentState {
   todos: Todo[];
   newTodo: string;
   filter: 'all' | 'active' | 'completed';
-  priorityFilter: 'all' | 'low' | 'medium' | 'high';
-  sortBy: 'created' | 'priority' | 'alphabetical';
+  filteredTodos?: Todo[];
+  activeTodos?: Todo[];
+  completedCount?: number;
 }
 
 component<TodoAppState>({
-  tag: 'todo-app-deluxe',
+  tag: 'todo-app',
   
   state: {
     todos: [
-      { id: 1, text: 'Learn Custom Elements', completed: false, priority: 'high' },
-      { id: 2, text: 'Build awesome apps', completed: false, priority: 'medium' },
-      { id: 3, text: 'Ship to production', completed: true, priority: 'low' }
+      { id: 1, text: 'Learn TypeScript', completed: true },
+      { id: 2, text: 'Build awesome components', completed: false },
+      { id: 3, text: 'Ship to production', completed: false }
     ],
     newTodo: '',
     filter: 'all',
-    priorityFilter: 'all',
-    sortBy: 'created'
-  },
-
-  computed: {
-    filteredTodos: (state) => {
-      let filtered = state.todos;
-      
-      // Filter by completion status
-      if (state.filter === 'active') {
-        filtered = filtered.filter(t => !t.completed);
-      } else if (state.filter === 'completed') {
-        filtered = filtered.filter(t => t.completed);
+    get filteredTodos() {
+      switch (this.filter) {
+        case 'active': return this.todos.filter(todo => !todo.completed);
+        case 'completed': return this.todos.filter(todo => todo.completed);
+        default: return this.todos;
       }
-      
-      // Filter by priority
-      if (state.priorityFilter !== 'all') {
-        filtered = filtered.filter(t => t.priority === state.priorityFilter);
-      }
-      
-      // Sort
-      if (state.sortBy === 'priority') {
-        const priorityOrder = { high: 3, medium: 2, low: 1 };
-        filtered.sort((a, b) => priorityOrder[b.priority] - priorityOrder[a.priority]);
-      } else if (state.sortBy === 'alphabetical') {
-        filtered.sort((a, b) => a.text.localeCompare(b.text));
-      }
-      
-      return filtered;
     },
-    
-    stats: (state) => ({
-      total: state.todos.length,
-      active: state.todos.filter(t => !t.completed).length,
-      completed: state.todos.filter(t => t.completed).length,
-      highPriority: state.todos.filter(t => t.priority === 'high' && !t.completed).length
-    })
+    get activeTodos() {
+      return this.todos.filter(todo => !todo.completed);
+    },
+    get completedCount() {
+      return this.todos.filter(todo => todo.completed).length;
+    }
   },
 
-  template: (state, api) => html`
+  template: (state) => html`
     <div class="todo-app">
-      <header class="app-header">
-        <h1>🚀 Todo App Deluxe</h1>
-        <div class="stats">
-          <span class="stat">Total: ${state.stats.total}</span>
-          <span class="stat active">Active: ${state.stats.active}</span>
-          <span class="stat completed">Done: ${state.stats.completed}</span>
-          <span class="stat priority">High Priority: ${state.stats.highPriority}</span>
-        </div>
-      </header>
-
-      <form class="add-todo-form" data-ref="addForm">
+      <header>
+        <h1>📝 Todo App</h1>
         <input 
-          data-ref="todoInput"
+          data-ref="newTodoInput"
           type="text" 
           value="${state.newTodo}"
           placeholder="What needs to be done?"
-          class="new-todo-input"
-        />
-        <select data-ref="prioritySelect" class="priority-select">
-          <option value="low">Low Priority</option>
-          <option value="medium" selected>Medium Priority</option>
-          <option value="high">High Priority</option>
-        </select>
-        <button type="submit" class="add-btn">Add Todo</button>
-      </form>
+          class="new-todo"
+        >
+      </header>
 
-      <div class="controls">
+      <main>
         <div class="filters">
-          <label>Filter:</label>
-          <button data-ref="allFilter" class="${state.filter === 'all' ? 'active' : ''}">
-            All (${state.stats.total})
+          <button 
+            data-ref="allFilter"
+            class="${state.filter === 'all' ? 'active' : ''}"
+          >
+            All (${state.todos.length})
           </button>
-          <button data-ref="activeFilter" class="${state.filter === 'active' ? 'active' : ''}">
-            Active (${state.stats.active})
+          <button 
+            data-ref="activeFilter"
+            class="${state.filter === 'active' ? 'active' : ''}"
+          >
+            Active (${state.activeTodos?.length})
           </button>
-          <button data-ref="completedFilter" class="${state.filter === 'completed' ? 'active' : ''}">
-            Completed (${state.stats.completed})
+          <button 
+            data-ref="completedFilter"
+            class="${state.filter === 'completed' ? 'active' : ''}"
+          >
+            Completed (${state.completedCount})
           </button>
         </div>
 
-        <div class="priority-filters">
-          <label>Priority:</label>
-          <select data-ref="priorityFilterSelect" class="filter-select">
-            <option value="all" ${state.priorityFilter === 'all' ? 'selected' : ''}>All Priorities</option>
-            <option value="high" ${state.priorityFilter === 'high' ? 'selected' : ''}>High Only</option>
-            <option value="medium" ${state.priorityFilter === 'medium' ? 'selected' : ''}>Medium Only</option>
-            <option value="low" ${state.priorityFilter === 'low' ? 'selected' : ''}>Low Only</option>
-          </select>
-        </div>
+        <ul class="todo-list" data-ref="todoList">
+          ${state.filteredTodos?.map((todo: Todo) => html`
+            <li key="${todo.id}" class="${todo.completed ? 'completed' : ''}">
+              <input 
+                type="checkbox" 
+                ${todo.completed ? 'checked' : ''}
+                data-todo-id="${todo.id}"
+                data-action="toggle"
+              >
+              <span class="text">${todo.text}</span>
+              <button 
+                class="delete"
+                data-todo-id="${todo.id}"
+                data-action="delete"
+              >
+                ×
+              </button>
+            </li>
+          `).join('')}
+        </ul>
+      </main>
 
-        <div class="sort-controls">
-          <label>Sort by:</label>
-          <select data-ref="sortSelect" class="sort-select">
-            <option value="created" ${state.sortBy === 'created' ? 'selected' : ''}>Date Created</option>
-            <option value="priority" ${state.sortBy === 'priority' ? 'selected' : ''}>Priority</option>
-            <option value="alphabetical" ${state.sortBy === 'alphabetical' ? 'selected' : ''}>Alphabetical</option>
-          </select>
-        </div>
-      </div>
-
-      <ul class="todo-list" data-ref="todoList">
-        ${state.filteredTodos.map(todo => html`
-          <li key="${todo.id}" class="todo-item ${todo.completed ? 'completed' : ''} priority-${todo.priority}">
-            <input 
-              type="checkbox" 
-              ${todo.completed ? 'checked' : ''}
-              data-todo-id="${todo.id}"
-              class="todo-checkbox"
-            />
-            <span class="todo-text">${todo.text}</span>
-            <span class="priority-badge priority-${todo.priority}">${todo.priority}</span>
-            <div class="todo-actions">
-              <button data-todo-id="${todo.id}" data-action="edit" class="edit-btn">✏️</button>
-              <button data-todo-id="${todo.id}" data-action="delete" class="delete-btn">🗑️</button>
-            </div>
-          </li>
-        `).join('')}
-      </ul>
-
-      ${state.filteredTodos.length === 0 ? html`
-        <div class="empty-state">
-          <h3>No todos found</h3>
-          <p>Try adjusting your filters or add a new todo!</p>
-        </div>
-      ` : ''}
-
-      <footer class="app-footer">
-        <p>
-          ${state.stats.active} item${state.stats.active !== 1 ? 's' : ''} remaining
-          ${state.stats.highPriority > 0 ? `• ${state.stats.highPriority} high priority` : ''}
-        </p>
-        <button data-ref="clearCompleted" class="clear-completed-btn">
-          Clear Completed (${state.stats.completed})
-        </button>
+      <footer>
+        <small>
+          ${state.activeTodos?.length} item${state.activeTodos?.length !== 1 ? 's' : ''} left
+        </small>
       </footer>
     </div>
   `,
 
   style: css`
     .todo-app {
-      max-width: 600px;
+      max-width: 400px;
       margin: 2rem auto;
-      padding: 2rem;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: white;
-      border-radius: 12px;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+      padding: 1rem;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-family: system-ui, sans-serif;
     }
 
-    .app-header {
-      text-align: center;
-      margin-bottom: 2rem;
-    }
-
-    .app-header h1 {
+    header h1 {
       margin: 0 0 1rem 0;
-      color: #2c3e50;
-      font-size: 2.5rem;
+      text-align: center;
+      color: #333;
     }
 
-    .stats {
-      display: flex;
-      justify-content: center;
-      gap: 1rem;
-      flex-wrap: wrap;
-    }
-
-    .stat {
-      padding: 0.5rem 1rem;
-      border-radius: 20px;
-      font-size: 0.9rem;
-      font-weight: 600;
-      background: #f8f9fa;
-      color: #495057;
-    }
-
-    .stat.active { background: #e3f2fd; color: #1976d2; }
-    .stat.completed { background: #e8f5e8; color: #388e3c; }
-    .stat.priority { background: #fff3e0; color: #f57c00; }
-
-    .add-todo-form {
-      display: flex;
-      gap: 0.5rem;
-      margin-bottom: 2rem;
-      flex-wrap: wrap;
-    }
-
-    .new-todo-input {
-      flex: 1;
-      min-width: 200px;
+    .new-todo {
+      width: 100%;
       padding: 0.75rem;
-      border: 2px solid #e9ecef;
-      border-radius: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
       font-size: 1rem;
+      box-sizing: border-box;
     }
 
-    .new-todo-input:focus {
-      border-color: #007bff;
-      outline: none;
-    }
-
-    .priority-select, .filter-select, .sort-select {
-      padding: 0.75rem;
-      border: 2px solid #e9ecef;
-      border-radius: 8px;
-      background: white;
-      cursor: pointer;
-    }
-
-    .add-btn {
-      padding: 0.75rem 1.5rem;
-      background: #007bff;
-      color: white;
-      border: none;
-      border-radius: 8px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
-
-    .add-btn:hover {
-      background: #0056b3;
-    }
-
-    .controls {
+    .filters {
       display: flex;
-      justify-content: space-between;
-      margin-bottom: 1.5rem;
-      gap: 1rem;
-      flex-wrap: wrap;
-    }
-
-    .filters, .priority-filters, .sort-controls {
-      display: flex;
-      align-items: center;
       gap: 0.5rem;
-    }
-
-    .filters label, .priority-filters label, .sort-controls label {
-      font-weight: 600;
-      color: #495057;
+      margin: 1rem 0;
     }
 
     .filters button {
-      padding: 0.5rem 1rem;
-      border: 2px solid #e9ecef;
+      flex: 1;
+      padding: 0.5rem;
+      border: 1px solid #ddd;
       background: white;
+      border-radius: 4px;
       cursor: pointer;
-      border-radius: 6px;
       transition: all 0.2s;
     }
 
@@ -387,256 +460,141 @@ component<TodoAppState>({
       border-color: #007bff;
     }
 
-    .todo-list {
-      list-style: none;
-      padding: 0;
-      margin: 0 0 2rem 0;
-    }
-
-    .todo-item {
-      display: flex;
-      align-items: center;
-      padding: 1rem;
-      border: 1px solid #e9ecef;
-      border-radius: 8px;
-      margin-bottom: 0.5rem;
-      transition: all 0.2s;
-      gap: 1rem;
-    }
-
-    .todo-item:hover {
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    }
-
-    .todo-item.completed {
-      opacity: 0.7;
+    .filters button:hover {
       background: #f8f9fa;
     }
 
-    .todo-item.completed .todo-text {
-      text-decoration: line-through;
+    .filters button.active:hover {
+      background: #0056b3;
     }
 
-    .todo-checkbox {
-      width: 20px;
-      height: 20px;
-      cursor: pointer;
-    }
-
-    .todo-text {
-      flex: 1;
-      font-size: 1rem;
-      color: #495057;
-    }
-
-    .priority-badge {
-      padding: 0.25rem 0.75rem;
-      border-radius: 12px;
-      font-size: 0.8rem;
-      font-weight: 600;
-      text-transform: uppercase;
-    }
-
-    .priority-high { background: #ffebee; color: #c62828; }
-    .priority-medium { background: #fff3e0; color: #ef6c00; }
-    .priority-low { background: #e8f5e8; color: #2e7d32; }
-
-    .todo-actions {
-      display: flex;
-      gap: 0.5rem;
-    }
-
-    .edit-btn, .delete-btn {
-      padding: 0.5rem;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    .edit-btn {
-      background: #fff3cd;
-    }
-
-    .edit-btn:hover {
-      background: #ffeeba;
-    }
-
-    .delete-btn {
-      background: #f8d7da;
-    }
-
-    .delete-btn:hover {
-      background: #f5c6cb;
-    }
-
-    .empty-state {
-      text-align: center;
-      padding: 3rem;
-      color: #6c757d;
-    }
-
-    .empty-state h3 {
-      margin: 0 0 0.5rem 0;
-    }
-
-    .app-footer {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding-top: 1rem;
-      border-top: 1px solid #e9ecef;
-      flex-wrap: wrap;
-      gap: 1rem;
-    }
-
-    .app-footer p {
+    .todo-list {
+      list-style: none;
+      padding: 0;
       margin: 0;
-      color: #6c757d;
     }
 
-    .clear-completed-btn {
-      padding: 0.5rem 1rem;
+    .todo-list li {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.75rem 0;
+      border-bottom: 1px solid #eee;
+    }
+
+    .todo-list li.completed .text {
+      text-decoration: line-through;
+      color: #888;
+    }
+
+    .todo-list .text {
+      flex: 1;
+    }
+
+    .delete {
       background: #dc3545;
       color: white;
       border: none;
-      border-radius: 6px;
+      border-radius: 50%;
+      width: 24px;
+      height: 24px;
       cursor: pointer;
-      transition: background 0.2s;
+      font-size: 16px;
+      line-height: 1;
     }
 
-    .clear-completed-btn:hover {
+    .delete:hover {
       background: #c82333;
     }
 
-    @media (max-width: 768px) {
-      .todo-app {
-        margin: 1rem;
-        padding: 1rem;
-      }
-
-      .controls {
-        flex-direction: column;
-        align-items: stretch;
-      }
-
-      .filters {
-        justify-content: center;
-      }
-
-      .todo-item {
-        flex-wrap: wrap;
-      }
-
-      .todo-actions {
-        margin-left: auto;
-      }
+    footer {
+      text-align: center;
+      margin-top: 1rem;
+      color: #888;
     }
   `,
 
   refs: {
-    addForm: (el, state, api) => {
-      el.addEventListener('submit', (e) => {
-        e.preventDefault();
-        if (state.newTodo.trim()) {
-          const prioritySelect = el.querySelector('.priority-select') as HTMLSelectElement;
-          state.todos.push({
-            id: Date.now(),
-            text: state.newTodo.trim(),
-            completed: false,
-            priority: prioritySelect.value as 'low' | 'medium' | 'high'
+    newTodoInput: (element, state, api) => {
+      const input = element as HTMLInputElement;
+      
+      // Two-way binding
+      input.addEventListener('input', () => {
+        api.updateKey('newTodo', input.value);
+      });
+
+      // Add todo on Enter
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && state.newTodo.trim()) {
+          const newId = Math.max(0, ...state.todos.map(t => t.id)) + 1;
+          const todoText = state.newTodo.trim();
+          
+          api.update({
+            todos: [...state.todos, {
+              id: newId,
+              text: todoText,
+              completed: false
+            }],
+            newTodo: ''
           });
-          state.newTodo = '';
-          api.emit('todo-added', { count: state.todos.length });
+          
+          // Manually clear the input to ensure it updates immediately
+          input.value = '';
+          
+          // Emit custom event
+          api.emit('todo-added', { id: newId, text: todoText });
         }
       });
     },
 
-    todoInput: (el, state) => {
-      el.addEventListener('input', (e) => {
-        state.newTodo = (e.target as HTMLInputElement).value;
+    allFilter: (element, _state, api) => {
+      element.addEventListener('click', () => {
+        api.updateKey('filter', 'all');
       });
     },
 
-    allFilter: (el, state) => {
-      el.addEventListener('click', () => state.filter = 'all');
-    },
-
-    activeFilter: (el, state) => {
-      el.addEventListener('click', () => state.filter = 'active');
-    },
-
-    completedFilter: (el, state) => {
-      el.addEventListener('click', () => state.filter = 'completed');
-    },
-
-    priorityFilterSelect: (el, state) => {
-      el.addEventListener('change', (e) => {
-        state.priorityFilter = (e.target as HTMLSelectElement).value as any;
+    activeFilter: (element, _state, api) => {
+      element.addEventListener('click', () => {
+        api.updateKey('filter', 'active');
       });
     },
 
-    sortSelect: (el, state) => {
-      el.addEventListener('change', (e) => {
-        state.sortBy = (e.target as HTMLSelectElement).value as any;
+    completedFilter: (element, _state, api) => {
+      element.addEventListener('click', () => {
+        api.updateKey('filter', 'completed');
       });
     },
 
-    todoList: (el, state, api) => {
-      el.addEventListener('change', (e) => {
-        const target = e.target as HTMLInputElement;
-        if (target.type === 'checkbox') {
-          const todoId = parseInt(target.dataset.todoId!);
-          const todo = state.todos.find(t => t.id === todoId);
-          if (todo) {
-            todo.completed = target.checked;
-            api.emit('todo-toggled', { id: todoId, completed: todo.completed });
-          }
-        }
-      });
-
-      el.addEventListener('click', (e) => {
+    todoList: (element, state, api) => {
+      // Event delegation for todo items
+      element.addEventListener('click', (e) => {
         const target = e.target as HTMLElement;
-        const todoId = parseInt(target.dataset.todoId!);
-        const action = target.dataset.action;
+        const todoId = parseInt(target.getAttribute('data-todo-id') || '0');
+        const action = target.getAttribute('data-action');
 
         if (action === 'delete') {
-          state.todos = state.todos.filter(t => t.id !== todoId);
-          api.emit('todo-deleted', { id: todoId });
-        } else if (action === 'edit') {
-          const todo = state.todos.find(t => t.id === todoId);
-          if (todo) {
-            const newText = prompt('Edit todo:', todo.text);
-            if (newText && newText.trim()) {
-              todo.text = newText.trim();
-              api.emit('todo-edited', { id: todoId, text: todo.text });
-            }
-          }
+          api.updateKey('todos', state.todos.filter(t => t.id !== todoId));
+          api.emit('todo-removed', { id: todoId });
         }
       });
-    },
 
-    clearCompleted: (el, state, api) => {
-      el.addEventListener('click', () => {
-        const completedCount = state.todos.filter(t => t.completed).length;
-        state.todos = state.todos.filter(t => !t.completed);
-        api.emit('todos-cleared', { count: completedCount });
+      element.addEventListener('change', (e) => {
+        const target = e.target as HTMLInputElement;
+        const todoId = parseInt(target.getAttribute('data-todo-id') || '0');
+        const action = target.getAttribute('data-action');
+
+        if (action === 'toggle') {
+          api.updateKey('todos', state.todos.map(t =>
+            t.id === todoId ? { ...t, completed: target.checked } : t
+          ));
+          api.emit('todo-toggled', { id: todoId, completed: target.checked });
+        }
       });
     }
   },
 
-  onMount: (state, api) => {
-    console.log('Todo app mounted with', state.todos.length, 'todos');
-    
-    // Store cleanup functions
-    api.cleanup = [];
-  },
-
-  onUnmount: (state, api) => {
-    console.log('Todo app unmounting');
-    if (api.cleanup) {
-      api.cleanup.forEach((fn: () => void) => fn());
-    }
+  onMounted: () => {
+    console.log('📝 Todo App mounted');
   }
 });
 ```
@@ -660,17 +618,17 @@ const userCardConfig: SSRComponentConfig<{
   email: string;
   avatar: string;
   isOnline: boolean;
+  statusText: string;
+  statusClass: string;
 }> = {
   tag: 'user-card',
   state: {
     name: 'John Doe',
     email: 'john@example.com',
     avatar: 'https://via.placeholder.com/80x80',
-    isOnline: true
-  },
-  computed: {
-    statusText: (state) => state.isOnline ? 'Online' : 'Offline',
-    statusClass: (state) => `status ${state.isOnline ? 'online' : 'offline'}`
+    isOnline: true,
+    get statusText() { return this.isOnline ? 'Online' : 'Offline'; },
+    get statusClass() { return `status ${this.isOnline ? 'online' : 'offline'}`; }
   },
   template: (state) => `
     <div class="user-card">
@@ -727,6 +685,7 @@ const userCardConfig: SSRComponentConfig<{
 const dashboardConfig: SSRComponentConfig<{
   title: string;
   widgets: Array<{ id: number; name: string; value: number }>;
+  totalValue: number;
 }> = {
   tag: 'dashboard',
   state: {
@@ -735,10 +694,10 @@ const dashboardConfig: SSRComponentConfig<{
       { id: 1, name: 'Users', value: 1234 },
       { id: 2, name: 'Revenue', value: 56789 },
       { id: 3, name: 'Orders', value: 432 }
-    ]
-  },
-  computed: {
-    totalValue: (state) => state.widgets.reduce((sum, w) => sum + w.value, 0)
+    ],
+    get totalValue() {
+      return this.widgets.reduce((sum, w) => sum + w.value, 0);
+    }
   },
   template: (state) => `
     <div class="dashboard">
@@ -1012,10 +971,9 @@ interface ComponentConfig<T> {
   state: T;                       // Initial state object
   template: (state: T, api: ComponentAPI<T>) => string;
   style?: string | ((state: T) => string);     // CSS styles
-  computed?: Record<string, (state: T) => any>; // Computed properties
   refs?: Record<string, RefHandler<T>>;         // DOM element refs
-  onMount?: (state: T, api: ComponentAPI<T>) => void;
-  onUnmount?: (state: T, api: ComponentAPI<T>) => void;
+  onMounted?: (state: T, api: ComponentAPI<T>) => void;
+  onUnmounted?: (state: T, api: ComponentAPI<T>) => void;
 }
 ```
 
@@ -1054,10 +1012,143 @@ generateHydrationScript(context: SSRContext): string;
 html(strings: TemplateStringsArray, ...values: any[]): string;
 css(strings: TemplateStringsArray, ...values: any[]): string;
 
+// Compile-time optimized template literal
+compile<T = any>(strings: TemplateStringsArray, ...expressions: Array<(state: T, api: any) => unknown>): CompiledTemplate<T>;
+
 // Utility functions
 classes(obj: Record<string, boolean>): string;
 styles(obj: Record<string, string | number>): string;
 ```
+
+#### How and When to Use Template Helpers
+
+---
+### Template Helper Usage Overview
+
+**1. Plain String Literals**
+
+Use for very simple, static templates with no dynamic values or logic. Fastest and smallest code.
+
+```typescript
+component({
+  tag: 'static-banner',
+  template: '<div class="banner">Welcome!</div>'
+});
+```
+
+**Use when:**
+- Template is short and static
+- No dynamic values or logic
+- Absolute minimal code is desired
+
+---
+**2. `html` and `css` Helpers**
+
+Use for multi-line, readable templates and styles. Provides syntax highlighting and editor support. Ideal for most components.
+
+```typescript
+import { html, css } from './lib/template-helpers.ts';
+
+component({
+  tag: 'fancy-card',
+  state: { title: 'Card Title' },
+  template: (state) => html`
+    <div class="card">
+      <h2>${state.title}</h2>
+    </div>
+  `,
+  styles: css`
+    .card { padding: 1rem; border-radius: 8px; background: #fff; }
+    h2 { color: #333; }
+  `
+});
+```
+
+**Use when:**
+- Template is simple or moderate in complexity
+- Readability and maintainability are priorities
+- You want editor syntax highlighting
+
+---
+**3. `compile` Helper**
+
+Use for advanced, performance-critical templates. Parses and optimizes DOM structure at definition time for faster updates and lower runtime overhead.
+
+```typescript
+import { compile } from './lib/runtime.ts';
+
+component({
+  tag: 'super-list',
+  state: { items: ['A', 'B', 'C'] },
+  template: (state) => compile`
+    <ul>
+      ${state.items.map(item => `<li>${item}</li>`).join('')}
+    </ul>
+  `
+});
+```
+
+**Use when:**
+- Template is large or complex with many dynamic regions
+- Maximum runtime performance is needed
+- Fine-grained DOM updates and caching are desired
+
+---
+### Comparison & Best Practices
+
+- Use `html` for most templates; it's simple, readable, and flexible.
+- Use `compile` only when profiling shows a real performance benefit for large or complex templates.
+- Use a plain string literal for static, minimal templates.
+
+**Why not always use `compile`?**
+- Adds overhead for template analysis and caching, unnecessary for simple/static templates.
+- Less flexible for highly dynamic or programmatically generated templates.
+- `html` is easier to debug and more flexible for changing template structures.
+
+---
+### SSR Compatibility
+
+Both `html` and `compile` templates work seamlessly with server-side rendering (SSR) in the runtime. SSR functions like `renderToString` and `renderComponentsToString` will handle either approach correctly.
+
+---
+### Nesting and Composition
+
+You can nest `html` and `compile` calls within template expressions for modularity, but only the outermost helper determines parsing/optimization. Avoid deep nesting for performance-critical templates; prefer a single top-level `compile` for best optimization.
+
+```typescript
+const itemTemplate = html`<li>${item}</li>`;
+component({
+  tag: 'item-list',
+  state: { items: ['A', 'B', 'C'] },
+  template: (state) => compile`
+    <ul>
+      ${state.items.map(item => itemTemplate).join('')}
+    </ul>
+  `
+});
+```
+
+---
+### Utility Helpers: `classes` and `styles`
+
+Use for dynamic class and style generation. Conditionally apply classes or inline styles based on component state.
+
+```typescript
+import { classes, styles } from './lib/template-helpers.ts';
+
+template: (state) => `
+  <button
+    class="${classes({ active: state.isActive, disabled: state.isDisabled })}"
+    style="${styles({ color: state.color, fontSize: state.size + 'px' })}"
+  >Click Me</button>
+`
+```
+
+**Use when:**
+- Clean, maintainable dynamic class/style logic is needed
+- Especially useful in interactive or stateful components
+
+---
 
 ### Global State & Events
 

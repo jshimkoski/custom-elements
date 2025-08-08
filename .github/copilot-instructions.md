@@ -13,6 +13,7 @@ You are an expert in TypeScript, JavaScript, HTML, CSS. Your task is to produce 
 - Structure files: exported component, subcomponents, helpers, static content, types.
 - Use lowercase with dashes for directory names (e.g., `components/auth-wizard`).
 - Use kebab-case for file names (e.g., `auth-wizard.ts`).
+- Avoid using "this" keyword in functional components.
 
 ## Naming Conventions
 
