@@ -1,67 +1,88 @@
-import './style.css'
-import typescriptLogo from './typescript.svg'
-import viteLogo from '/vite.svg'
+import './style.css';
+import './components/examples/Examples.js';
+import './components/examples/TodoApp.ts';
+import './components/examples/ShoppingCart.ts';
+import './components/examples/NotificationSystem.ts';
 
-import './components/FancyCounter';
-import './components/ShoppingCart';
-
-import { on, emit } from './lib/event-bus.ts';
+// The new runtime is completely self-contained
+// Components automatically register themselves when imported
 
 document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
   <div>
-    <fancy-counter></fancy-counter>
-
-    <app-state-manager></app-state-manager>
-    <notification-center></notification-center>
-    <product-card name="Laptop" price="999.99" stock="3"></product-card>
-    <product-card name="Mouse" price="29.99" stock="10"></product-card>
-    <product-card name="Keyboard" price="79.99" stock="0"></product-card>
-    <shopping-cart></shopping-cart>
-
-    <a href="https://vite.dev" target="_blank">
-      <img src="${viteLogo}" class="logo" alt="Vite logo" />
-    </a>
-    <a href="https://www.typescriptlang.org/" target="_blank">
-      <img src="${typescriptLogo}" class="logo vanilla" alt="TypeScript logo" />
-    </a>
-    <h1>Vite + TypeScript</h1>
-    <div class="card">
-      <button id="counter" type="button"></button>
-    </div>
-    <p class="read-the-docs">
-      Click on the Vite and TypeScript logos to learn more
+    <h1>🚀 Modern TypeScript Runtime</h1>
+    <p style="font-size: 1.1em; color: #666; margin-bottom: 2rem;">
+      ✨ Performant • Type-Safe • Developer-Friendly ✨
     </p>
+    
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 2rem; margin: 2rem 0;">
+      <todo-app></todo-app>
+      <perf-counter></perf-counter>
+    </div>
+    
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 2rem; margin: 2rem 0;">
+      <smart-form></smart-form>
+      <dynamic-styling></dynamic-styling>
+      <live-typing-demo></live-typing-demo>
+    </div>
+    
+    <div style="margin: 2rem 0;">
+      <shopping-cart-demo></shopping-cart-demo>
+    </div>
+    
+    <div style="margin: 2rem 0;">
+      <notification-system-demo></notification-system-demo>
+    </div>
+    
+    <div style="text-align: center; margin: 3rem 0;">
+      <p style="font-size: 1.1em; margin-bottom: 1rem;">
+        <strong>✅ Runtime Features Demonstrated:</strong>
+      </p>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; max-width: 800px; margin: 0 auto;">
+        <div style="padding: 1rem; background: #f8f9fa; border-radius: 8px;">
+          📊 <strong>Reactive State</strong><br>
+          <small>Proxy-based reactivity</small>
+        </div>
+        <div style="padding: 1rem; background: #f8f9fa; border-radius: 8px;">
+          🧮 <strong>Computed Props</strong><br>
+          <small>Cached calculations</small>
+        </div>
+        <div style="padding: 1rem; background: #f8f9fa; border-radius: 8px;">
+          🎨 <strong>Dynamic Styling</strong><br>
+          <small>CSS-in-JS with variables</small>
+        </div>
+        <div style="padding: 1rem; background: #f8f9fa; border-radius: 8px;">
+          🔗 <strong>Event Handling</strong><br>
+          <small>Single-attach refs</small>
+        </div>
+        <div style="padding: 1rem; background: #f8f9fa; border-radius: 8px;">
+          📝 <strong>Form Validation</strong><br>
+          <small>Real-time feedback</small>
+        </div>
+        <div style="padding: 1rem; background: #f8f9fa; border-radius: 8px;">
+          ⚡ <strong>Performance</strong><br>
+          <small>Smart DOM morphing</small>
+        </div>
+      </div>
+      
+      <p style="margin-top: 2rem;">
+        <a href="./showcase.html" style="display: inline-block; padding: 0.75rem 1.5rem; background: #007bff; color: white; text-decoration: none; border-radius: 6px; font-weight: 500;">
+          View Complete Showcase →
+        </a>
+      </p>
+    </div>
   </div>
-`
+`;
 
-// Example of external event triggering:
-setTimeout(() => {
-  console.log('Emitting welcome notification...');
-  emit('notify', { message: 'Welcome to our store!', type: 'success' });
-}, 1000);
-
-// Test direct cart addition
-setTimeout(() => {
-  console.log('Emitting direct cart add item...');
-  emit('cart:add-item', { name: 'Test Product', price: 99.99 });
-}, 2000);
-
-// Add global debugging
-(window as any).debugCart = () => {
-  console.log('Manual cart debug triggered');
-  emit('cart:add-item', { name: 'Debug Product', price: 123.45 });
-};
-
-// Example of listening to events outside components:
-on('cart:item-added', (data) => {
-  console.log('External listener: Item added to cart', data);
-  // Could send analytics, update external systems, etc.
+// Listen for custom events from components
+document.addEventListener('form-submit', (e: any) => {
+  console.log('📝 Form submitted:', e.detail);
+  alert(`✅ Form submitted successfully!\n\nName: ${e.detail.name}\nEmail: ${e.detail.email}\nAge: ${e.detail.age}\nNewsletter: ${e.detail.newsletter ? 'Yes' : 'No'}`);
 });
 
-// Add a global debug function
-(window as any).debugCart = function() {
-  console.log('Manual cart test...');
-  emit('cart:add-item', { name: 'Debug Item', price: 123.45 });
-};
+document.addEventListener('todo-added', (e: any) => {
+  console.log('✅ Todo added:', e.detail);
+});
 
-console.log('Debug function available: window.debugCart()');
+document.addEventListener('todo-toggled', (e: any) => {
+  console.log('🔄 Todo toggled:', e.detail);
+});

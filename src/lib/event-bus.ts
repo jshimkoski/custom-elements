@@ -4,6 +4,7 @@ type EventMap = { [eventName: string]: EventHandler[] };
 class GlobalEventBus extends EventTarget {
   private handlers: EventMap = {};
   private static instance: GlobalEventBus;
+  private eventCounters: Map<string, { count: number; window: number }> = new Map();
 
   static getInstance(): GlobalEventBus {
     if (!GlobalEventBus.instance) {
@@ -12,8 +13,30 @@ class GlobalEventBus extends EventTarget {
     return GlobalEventBus.instance;
   }
 
-  // Enhanced emit method with better typing
+  // Enhanced emit method with better typing and event storm protection
   emit<T = any>(eventName: string, data?: T): void {
+    // Event storm protection
+    const now = Date.now();
+    const counter = this.eventCounters.get(eventName);
+    
+    if (!counter || now - counter.window > 1000) {
+      // Reset counter every second
+      this.eventCounters.set(eventName, { count: 1, window: now });
+    } else {
+      counter.count++;
+      
+      if (counter.count > 50) {
+        // Too many events of the same type in one second
+        console.error(`Event storm detected for "${eventName}": ${counter.count} events in 1 second. Throttling...`);
+        
+        // Throttle this event type for a short period
+        if (counter.count > 100) {
+          console.warn(`Blocking further "${eventName}" events to prevent infinite loop`);
+          return;
+        }
+      }
+    }
+
     // Use native CustomEvent for better browser integration
     this.dispatchEvent(new CustomEvent(eventName, { 
       detail: data,
@@ -95,6 +118,25 @@ class GlobalEventBus extends EventTarget {
   // Debug helper
   getHandlerCount(eventName: string): number {
     return this.handlers[eventName]?.length || 0;
+  }
+
+  // Get event statistics for debugging
+  getEventStats(): Record<string, { count: number; handlersCount: number }> {
+    const stats: Record<string, { count: number; handlersCount: number }> = {};
+    
+    for (const [eventName, counter] of this.eventCounters.entries()) {
+      stats[eventName] = {
+        count: counter.count,
+        handlersCount: this.getHandlerCount(eventName)
+      };
+    }
+    
+    return stats;
+  }
+
+  // Reset event counters (useful for testing or after resolving issues)
+  resetEventCounters(): void {
+    this.eventCounters.clear();
   }
 }
 
