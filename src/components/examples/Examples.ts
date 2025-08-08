@@ -441,380 +441,70 @@ component<FormState>({
   }
 });
 
-// ============================================================================
-// LIVE TYPING EXAMPLE - Real-time state updates as you type
-// ============================================================================
-
 interface LiveTypingState extends ComponentState {
   text: string;
   charCount: number;
-  wordCount: number;
-  lineCount: number;
-  lastTyped: string;
-  typingSpeed: number;
-  lastKeystroke: number;
 }
 
 component<LiveTypingState>({
-  tag: 'live-typing-demo',
+  tag: 'test-live-typing',
   
   state: {
     text: '',
-    charCount: 0,
-    wordCount: 0,
-    lineCount: 1,
-    lastTyped: '',
-    typingSpeed: 0,
-    lastKeystroke: Date.now()
-  },
-
-  computed: {
-    isEmpty: (state) => state.text.length === 0,
-    hasText: (state) => state.text.length > 0,
-    wordsPerMinute: (state) => Math.round(state.typingSpeed * 60 / 5), // Assuming 5 chars per word
-    textPreview: (state) => state.text.length > 100 ? state.text.substring(0, 100) + '...' : state.text,
-    textStats: (state) => ({
-      chars: state.charCount,
-      words: state.wordCount,
-      lines: state.lineCount,
-      wpm: Math.round(state.typingSpeed * 60 / 5)
-    })
+    charCount: 0
   },
 
   template: (state) => html`
-    <div class="live-typing">
-      <h2>Live Typing Demo</h2>
-      <p class="description">Watch the state update in real-time as you type!</p>
-      
-      <div class="input-section">
-        <label for="textInput">Type something:</label>
-        <textarea 
-          data-ref="textInput" 
-          placeholder="Start typing to see live updates..."
-          rows="6"
-          cols="50"
-        >${state.text}</textarea>
-      </div>
-
-      <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-value">${state.charCount}</div>
-          <div class="stat-label">Characters</div>
-        </div>
-        
-        <div class="stat-card">
-          <div class="stat-value">${state.wordCount}</div>
-          <div class="stat-label">Words</div>
-        </div>
-        
-        <div class="stat-card">
-          <div class="stat-value">${state.lineCount}</div>
-          <div class="stat-label">Lines</div>
-        </div>
-        
-        <div class="stat-card">
-          <div class="stat-value">${(state as any).wordsPerMinute}</div>
-          <div class="stat-label">WPM</div>
-        </div>
-      </div>
-
-      <div class="live-display">
-        <h3>Live State Display</h3>
-        <div class="state-viewer">
-          <div class="state-row">
-            <span class="state-key">text:</span>
-            <span class="state-value">"${(state as any).textPreview}"</span>
-          </div>
-          <div class="state-row">
-            <span class="state-key">charCount:</span>
-            <span class="state-value">${state.charCount}</span>
-          </div>
-          <div class="state-row">
-            <span class="state-key">wordCount:</span>
-            <span class="state-value">${state.wordCount}</span>
-          </div>
-          <div class="state-row">
-            <span class="state-key">lineCount:</span>
-            <span class="state-value">${state.lineCount}</span>
-          </div>
-          <div class="state-row">
-            <span class="state-key">lastTyped:</span>
-            <span class="state-value">"${state.lastTyped}"</span>
-          </div>
-          <div class="state-row">
-            <span class="state-key">typingSpeed:</span>
-            <span class="state-value">${state.typingSpeed.toFixed(2)} chars/sec</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="actions">
-        <button data-ref="clearBtn">Clear Text</button>
-        <button data-ref="sampleBtn">Load Sample</button>
-      </div>
+    <div style="padding: 20px; border: 1px solid #ccc;">
+      <h3>Simple Live Typing Test</h3>
+      <textarea 
+        data-ref="textInput" 
+        value="${state.text}"
+        placeholder="Type here..."
+        rows="4"
+        cols="50"
+      ></textarea>
+      <p>Characters: ${state.charCount}</p>
+      <button data-ref="clearBtn">Clear</button>
+      <button data-ref="sampleBtn">Load Sample</button>
     </div>
-  `,
-
-  style: css`
-    .live-typing {
-      max-width: 600px;
-      margin: 1rem;
-      padding: 1.5rem;
-      border: 2px solid #17a2b8;
-      border-radius: 12px;
-      font-family: system-ui, sans-serif;
-      background: linear-gradient(135deg, #f0f8ff, #e6f3ff);
-    }
-
-    h2 {
-      margin: 0 0 0.5rem 0;
-      color: #17a2b8;
-    }
-
-    .description {
-      margin: 0 0 1.5rem 0;
-      color: #6c757d;
-      font-style: italic;
-    }
-
-    .input-section {
-      margin-bottom: 1.5rem;
-    }
-
-    label {
-      display: block;
-      margin-bottom: 0.5rem;
-      font-weight: 600;
-      color: #495057;
-    }
-
-    textarea {
-      width: 100%;
-      padding: 0.75rem;
-      border: 2px solid #ced4da;
-      border-radius: 8px;
-      font-family: 'Monaco', 'Menlo', monospace;
-      font-size: 0.9rem;
-      resize: vertical;
-      transition: border-color 0.2s;
-    }
-
-    textarea:focus {
-      outline: none;
-      border-color: #17a2b8;
-      box-shadow: 0 0 0 3px rgba(23, 162, 184, 0.1);
-    }
-
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-      gap: 1rem;
-      margin-bottom: 1.5rem;
-    }
-
-    .stat-card {
-      background: white;
-      padding: 1rem;
-      border-radius: 8px;
-      text-align: center;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-      border: 1px solid #e9ecef;
-    }
-
-    .stat-value {
-      font-size: 1.8rem;
-      font-weight: bold;
-      color: #28a745;
-      margin-bottom: 0.25rem;
-    }
-
-    .stat-label {
-      font-size: 0.9rem;
-      color: #6c757d;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-
-    .live-display {
-      background: #f8f9fa;
-      padding: 1rem;
-      border-radius: 8px;
-      margin-bottom: 1.5rem;
-      border: 1px solid #dee2e6;
-    }
-
-    .live-display h3 {
-      margin: 0 0 1rem 0;
-      color: #495057;
-      font-size: 1.1rem;
-    }
-
-    .state-viewer {
-      font-family: 'Monaco', 'Menlo', monospace;
-      font-size: 0.85rem;
-      line-height: 1.6;
-    }
-
-    .state-row {
-      margin-bottom: 0.5rem;
-      display: flex;
-      align-items: flex-start;
-    }
-
-    .state-key {
-      color: #6f42c1;
-      font-weight: 600;
-      min-width: 120px;
-      flex-shrink: 0;
-    }
-
-    .state-value {
-      color: #e83e8c;
-      word-break: break-all;
-      flex: 1;
-    }
-
-    .actions {
-      display: flex;
-      gap: 0.75rem;
-    }
-
-    button {
-      padding: 0.75rem 1.5rem;
-      border: none;
-      border-radius: 6px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    button:first-child {
-      background: #dc3545;
-      color: white;
-    }
-
-    button:first-child:hover {
-      background: #c82333;
-      transform: translateY(-1px);
-    }
-
-    button:last-child {
-      background: #6c757d;
-      color: white;
-    }
-
-    button:last-child:hover {
-      background: #545b62;
-      transform: translateY(-1px);
-    }
-
-    button:active {
-      transform: translateY(0);
-    }
   `,
 
   refs: {
     textInput: (textarea, _state, api) => {
       const textareaEl = textarea as HTMLTextAreaElement;
       
-      // Store reference to textarea for other handlers to access
-      (api as any).textareaElement = textareaEl;
-      
-      // Handle input events for real-time updates
       textareaEl.addEventListener('input', (event) => {
         const target = event.target as HTMLTextAreaElement;
         const text = target.value;
-        const now = Date.now();
         
-        // Calculate character count
-        const charCount = text.length;
-        
-        // Calculate word count (split by whitespace, filter empty strings)
-        const wordCount = text.trim() === '' ? 0 : text.trim().split(/\s+/).length;
-        
-        // Calculate line count
-        const lineCount = text === '' ? 1 : text.split('\n').length;
-        
-        // Get last typed character
-        const lastTyped = text.length > 0 ? text.charAt(text.length - 1) : '';
-        
-        // Calculate typing speed (characters per second)
-        const timeDiff = (now - api.state.lastKeystroke) / 1000;
-        const typingSpeed = timeDiff > 0 && timeDiff < 5 ? 1 / timeDiff : 0;
-        
-        // Update all state at once
         api.update({
           text,
-          charCount,
-          wordCount,
-          lineCount,
-          lastTyped,
-          typingSpeed,
-          lastKeystroke: now
+          charCount: text.length
         });
-      });
-
-      // Handle keydown for more responsive feedback
-      textareaEl.addEventListener('keydown', (event) => {
-        const key = event.key;
-        if (key.length === 1 || key === 'Backspace' || key === 'Delete') {
-          api.updateKey('lastTyped', key === 'Backspace' ? '⌫' : key === 'Delete' ? '⌦' : key);
-        }
       });
     },
 
     clearBtn: (btn, _state, api) => {
       btn.addEventListener('click', () => {
-        // Update both state and textarea value
-        const textareaEl = (api as any).textareaElement as HTMLTextAreaElement;
-        if (textareaEl) {
-          textareaEl.value = '';
-        }
-        
+        console.log('Clear clicked - current text:', api.state.text);
         api.update({
           text: '',
-          charCount: 0,
-          wordCount: 0,
-          lineCount: 1,
-          lastTyped: '',
-          typingSpeed: 0,
-          lastKeystroke: Date.now()
+          charCount: 0
         });
+        console.log('Clear clicked - new text:', api.state.text);
       });
     },
 
     sampleBtn: (btn, _state, api) => {
       btn.addEventListener('click', () => {
-        const sampleText = `This is a sample text to demonstrate the live typing feature.
-
-You can see how the state updates in real-time as you type, including:
-- Character count
-- Word count
-- Line count
-- Typing speed
-- Last typed character
-
-Try editing this text to see the live updates!`;
-
-        const charCount = sampleText.length;
-        const wordCount = sampleText.trim().split(/\s+/).length;
-        const lineCount = sampleText.split('\n').length;
-
-        // Update both state and textarea value
-        const textareaEl = (api as any).textareaElement as HTMLTextAreaElement;
-        if (textareaEl) {
-          textareaEl.value = sampleText;
-        }
-
+        const sampleText = 'This is sample text to test the functionality.';
+        console.log('Sample clicked - current text:', api.state.text);
         api.update({
           text: sampleText,
-          charCount,
-          wordCount,
-          lineCount,
-          lastTyped: '',
-          typingSpeed: 0,
-          lastKeystroke: Date.now()
+          charCount: sampleText.length
         });
+        console.log('Sample clicked - new text:', api.state.text);
       });
     }
   }

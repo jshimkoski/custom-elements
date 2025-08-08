@@ -146,7 +146,7 @@ class DOMDiffer {
       if (!newAttrs.includes(attr) && !attr.startsWith('data-refs-')) {
         // Special handling for form elements when removing form attributes
         if (this.isFormElement(oldEl) && this.isValueAttribute(attr)) {
-          this.updateFormValue(oldEl as HTMLInputElement, attr, null);
+          this.updateFormValue(oldEl as HTMLInputElement | HTMLTextAreaElement, attr, null);
         }
         oldEl.removeAttribute(attr);
       }
@@ -155,13 +155,15 @@ class DOMDiffer {
     // Set new/changed attributes
     for (const attr of newAttrs) {
       const newValue = newEl.getAttribute(attr);
-      if (oldEl.getAttribute(attr) !== newValue) {
-        // Special handling for form elements
-        if (this.isFormElement(oldEl) && this.isValueAttribute(attr)) {
-          this.updateFormValue(oldEl as HTMLInputElement, attr, newValue);
-        } else {
-          oldEl.setAttribute(attr, newValue || '');
-        }
+      const oldValue = oldEl.getAttribute(attr);
+      
+      // For value attributes, we need to handle empty string vs null properly
+      if (this.isFormElement(oldEl) && this.isValueAttribute(attr)) {
+        // Always call updateFormValue for form elements, even if values seem the same
+        // because DOM element value might differ from attribute value
+        this.updateFormValue(oldEl as HTMLInputElement | HTMLTextAreaElement, attr, newValue);
+      } else if (oldValue !== newValue) {
+        oldEl.setAttribute(attr, newValue || '');
       }
     }
   }
@@ -329,20 +331,47 @@ class DOMDiffer {
     return attr === 'value' || attr === 'checked' || attr === 'selected';
   }
 
-  private static updateFormValue(el: HTMLInputElement, attr: string, value: string | null): void {
-    // Only update if element is not focused (preserve user input)
-    if (el === document.activeElement) return;
-
+  private static updateFormValue(el: HTMLInputElement | HTMLTextAreaElement, attr: string, value: string | null): void {
     switch (attr) {
       case 'value':
-        el.value = value || '';
+        const newValue = value || '';
+        const currentValue = el.value;
+        
+        // Only update if the values are actually different
+        if (currentValue !== newValue) {
+          const isFocused = el === document.activeElement;
+          
+          if (!isFocused) {
+            // Element not focused - always safe to update
+            el.value = newValue;
+          } else {
+            // Element is focused - only update for significant programmatic changes
+            const lengthDiff = Math.abs(currentValue.length - newValue.length);
+            const isClearing = newValue.length === 0;
+            const isLargeChange = lengthDiff > 20;
+            const isCompletelyDifferent = newValue.length > 50 && !currentValue.toLowerCase().includes(newValue.toLowerCase().substring(0, 30));
+            
+            if (isClearing || isLargeChange || isCompletelyDifferent) {
+              el.value = newValue;
+              // Preserve cursor position for large changes
+              if (!isClearing && el === document.activeElement) {
+                const cursorPos = Math.min(newValue.length, (el as any).selectionStart || newValue.length);
+                setTimeout(() => {
+                  if (el === document.activeElement) {
+                    (el as any).setSelectionRange(cursorPos, cursorPos);
+                  }
+                }, 0);
+              }
+            }
+          }
+        }
         break;
+        
       case 'checked':
-        // For checkboxes, the presence of the attribute means checked=true
-        // null/undefined means checked=false
         const newChecked = value !== null;
-        el.checked = newChecked;
+        (el as HTMLInputElement).checked = newChecked;
         break;
+        
       case 'selected':
         (el as any).selected = value !== null;
         break;

@@ -22,11 +22,14 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 2rem; margin: 2rem 0;">
       <smart-form></smart-form>
       <dynamic-styling></dynamic-styling>
-      <live-typing-demo></live-typing-demo>
     </div>
     
     <div style="margin: 2rem 0;">
       <shopping-cart-demo></shopping-cart-demo>
+    </div>
+    
+    <div style="margin: 2rem 0;">
+      <test-live-typing></test-live-typing>
     </div>
     
     <div style="margin: 2rem 0;">
