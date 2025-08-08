@@ -2,8 +2,6 @@
 
 > **A modern, ultra-lightweight TypeScript runtime for building fast, reactive, and maintainable web components.**
 
-Custom Elements Runtime is a TypeScript library for building reactive web components using functional programming patterns. It provides direct DOM updates, strict TypeScript types, and supports server-side rendering and hydration. The runtime has no external dependencies and is designed for modular, maintainable code.
-
 ## ✨ Features
 
 - **Direct DOM performance**: No virtual DOM, no diffing overhead
@@ -14,121 +12,28 @@ Custom Elements Runtime is a TypeScript library for building reactive web compon
 - **Functional API**: One function, no classes
 - **Event bus & global store**: Built-in communication and state
 
-## 🚀 Quick Start
+## 🚀 Getting Started
 
-### Hello World Example
+1. **Clone this repository**
+2. **Run the examples**: `npm run dev`
+3. **Create your first component** (see minimal example above)
+4. **Build something awesome!**
 
-```typescript
-import { component } from './lib/runtime.ts';
+## 🎯 Use Cases
 
-component({
-  tag: 'hello-world',
-  state: { name: 'World' },
-  template: (state) => `<h1>Hello, ${state.name}!</h1>`
-});
-```
+- **Micro-frontends**: Lightweight, isolated components
+- **Progressive Enhancement**: Add reactivity to existing sites
+- **Design Systems**: Reusable component libraries
+- **SSR Applications**: Universal rendering with hydration
+- **Performance-Critical Apps**: When bundle size matters
+- **Web Standards**: Future-proof, standards-based development
 
-```html
-<hello-world></hello-world>
-```
+## ⚠️ SSR Caveats
 
-### Minimal Boilerplate Example
+- SSR only generates HTML and styles; DOM APIs, refs, and event listeners are not available during server rendering.
+- Lifecycle hooks (`onMounted`, `onUnmounted`) and refs are ignored during SSR.
+- Hydration requires the client bundle to match the server-rendered markup and state exactly.
 
-```typescript
-import { component } from './lib/runtime.ts';
-
-component({
-  tag: 'simple-counter',
-  state: { count: 0 },
-  template: (state) => `<button data-ref="btn">Count: ${state.count}</button>`,
-  refs: {
-    btn: (el, state) => el.addEventListener('click', () => state.count++)
-  }
-});
-```
-
-```html
-<simple-counter></simple-counter>
-```
-
-### Todo App with Notifications Example
-
-```typescript
-import { component, emit, on } from './lib/runtime.ts';
-
-component({
-  tag: 'todo-app',
-  state: { todos: [], newTodo: '' },
-  template: (state) => `
-    <input data-ref="input" value="${state.newTodo}" placeholder="Add todo" />
-    <button data-ref="add">Add</button>
-    <ul>
-      ${state.todos.map((t: string) => `<li>${t}</li>`).join('')}
-    </ul>
-    <notification-display></notification-display>
-  `,
-  refs: {
-    input: (el, state) => el.addEventListener('input', e => state.newTodo = (e.target as HTMLInputElement).value),
-    add: (el, state) => el.addEventListener('click', () => {
-      if (state.newTodo.trim()) {
-        state.todos.push(state.newTodo.trim());
-        emit('notify', { message: `Added: ${state.newTodo}` });
-        state.newTodo = '';
-      }
-    })
-  }
-});
-
-component({
-  tag: 'notification-display',
-  state: { notifications: [] },
-  template: (state) => `
-    <div>
-      ${state.notifications.map((n: any) => `<div>${n.message}</div>`).join('')}
-    </div>
-  `,
-  onMount: (state) => {
-    on('notify', (n) => {
-      state.notifications.push(n);
-      setTimeout(() => {
-        state.notifications = state.notifications.filter(x => x !== n);
-      }, 2000);
-    });
-  }
-});
-```
-
-```html
-<todo-app></todo-app>
-```
-
-## 🧩 Core Concepts
-
-- **Reactive state**: Automatic updates via ES6 Proxy
-- **Functional templates**: Just return HTML strings
-- **Refs**: Direct DOM access, no selectors
-- **Computed properties**: ES6 getters in state, recalculated on access
-- **Event bus**: Cross-component communication
-- **Global store**: Shared state, subscriptions
-
-## ⚡ Performance & Scalability
-
-- Direct DOM updates for minimal overhead
-- Modular, tree-shakable architecture
-- No runtime dependencies
-- SSR-ready with hydration
-- Suitable for micro-frontends, design systems, and high-performance apps
-
-## 🆚 Framework Comparison
-
-| Feature         | Custom Elements Runtime | React | Vue | Angular | Svelte |
-|-----------------|------------------------|-------|------|---------|--------|
-| Bundle Size     | ~8KB                   | ~45KB | ~35KB| ~60KB   | ~10KB  |
-| SSR             | Built-in               | Yes   | Yes  | Yes     | Yes    |
-| TypeScript      | Strict                 | Opt   | Opt  | Strict  | Opt    |
-| State Mgmt      | Manual/Store           | Redux | Pinia| RxJS    | Store  |
-| Routing         | Manual                 | Router| Router| Router  | SvelteKit|
-| Learning Curve  | Low                    | Med   | Med  | High    | Med    |
 
 ## 🛡️ Production-Readiness
 
@@ -137,22 +42,18 @@ component({
 - No external dependencies
 - Manual input validation and error handling
 
+## ⚡ Performance Features
 
-## ⚠️ SSR Caveats
+- **Advanced DOM Morphing**: Only updates what actually changed
+- **Template Caching**: Parsed templates are cached for reuse
+- **Batched Updates**: Multiple state changes are batched using RAF
+- **Computed Property Caching**: Expensive calculations are cached
+- **Memory Management**: Automatic cleanup prevents memory leaks
+- **Focus Preservation**: Smart input focus handling during updates
 
-- SSR only generates HTML and styles; DOM APIs, refs, and event listeners are not available during server rendering.
-- Lifecycle hooks (`onMounted`, `onUnmounted`) and refs are ignored during SSR.
-- Hydration requires the client bundle to match the server-rendered markup and state exactly.
+## 🧐 Examples
 
-## 📖 API Reference
-
-See [`src/lib/runtime.ts`](src/lib/runtime.ts) for full API docs and advanced usage.
-
----
-
-## Quick Start
-
-### Hello World Example
+### Hello World
 
 ```typescript
 import { component } from './lib/runtime.ts';
@@ -168,7 +69,7 @@ component({
 <hello-world></hello-world>
 ```
 
-### Minimal Boilerplate Example
+### Simple Counter
 
 ```typescript
 import { component } from './lib/runtime.ts';
@@ -238,69 +139,7 @@ component({
 <todo-app></todo-app>
 ```
 
-## Concepts
-
-- Reactive state via ES6 Proxy
-- Functional templates (return HTML strings)
-- Refs for direct DOM access
-- Computed properties
-- Event bus for communication
-- Global store for shared state
-
-## API Reference
-
-See [`src/lib/runtime.ts`](src/lib/runtime.ts) for API documentation and advanced usage.
-
-## Installation
-
-```bash
-git clone https://github.com/your-repo/custom-elements
-cd custom-elements
-npm install
-npm run dev
-```
-State changes automatically trigger re-renders using ES6 Proxies:
-
-```typescript
-state.count++; // Automatically re-renders the component
-```
-
-### 2. Template Functions
-Templates are just JavaScript functions that return HTML strings:
-
-```typescript
-template: (state, api) => `<div>Hello ${state.name}!</div>`
-```
-
-### 3. Refs System
-Direct DOM access without complex selectors:
-
-```typescript
-refs: {
-  myButton: (element, state, api) => {
-    element.addEventListener('click', () => {
-      state.clicks++;
-      api.emit('button-clicked', { clicks: state.clicks });
-    });
-  }
-}
-```
-
-### 4. Computed Properties
-Define computed values as ES6 getters inside the state object. Getters should reference `this` for reactivity:
-
-```typescript
-state: {
-  firstName: 'Jane',
-  lastName: 'Doe',
-  email: '',
-  password: '',
-  get fullName() { return `${this.firstName} ${this.lastName}` },
-  get isValid() { return this.email.includes('@') && this.password.length >= 8 }
-}
-```
-
-## 🍳 Kitchen Sink Example
+### 🍳 Kitchen Sink Example
 
 A comprehensive todo app showcasing all features:
 
@@ -348,14 +187,14 @@ component<TodoAppState>({
     }
   },
 
-  template: (state) => html`
+  template: (state) => compiled`
     <div class="todo-app">
       <header>
         <h1>📝 Todo App</h1>
         <input 
           data-ref="newTodoInput"
           type="text" 
-          value="${state.newTodo}"
+          value="${state => state.newTodo}"
           placeholder="What needs to be done?"
           class="new-todo"
         >
@@ -365,26 +204,26 @@ component<TodoAppState>({
         <div class="filters">
           <button 
             data-ref="allFilter"
-            class="${state.filter === 'all' ? 'active' : ''}"
+            class="${state => state.filter === 'all' ? 'active' : ''}"
           >
-            All (${state.todos.length})
+            All (${state => state.todos.length})
           </button>
           <button 
             data-ref="activeFilter"
-            class="${state.filter === 'active' ? 'active' : ''}"
+            class="${state => state.filter === 'active' ? 'active' : ''}"
           >
-            Active (${state.activeTodos?.length})
+            Active (${state => state.activeTodos?.length})
           </button>
           <button 
             data-ref="completedFilter"
-            class="${state.filter === 'completed' ? 'active' : ''}"
+            class="${state => state.filter === 'completed' ? 'active' : ''}"
           >
-            Completed (${state.completedCount})
+            Completed (${state => state.completedCount})
           </button>
         </div>
 
         <ul class="todo-list" data-ref="todoList">
-          ${state.filteredTodos?.map((todo: Todo) => html`
+          ${state => state.filteredTodos?.map((todo: Todo) => html`
             <li key="${todo.id}" class="${todo.completed ? 'completed' : ''}">
               <input 
                 type="checkbox" 
@@ -407,7 +246,7 @@ component<TodoAppState>({
 
       <footer>
         <small>
-          ${state.activeTodos?.length} item${state.activeTodos?.length !== 1 ? 's' : ''} left
+          ${state => state.activeTodos?.length} item${state => state.activeTodos?.length !== 1 ? 's' : ''} left
         </small>
       </footer>
     </div>
@@ -595,8 +434,101 @@ component<TodoAppState>({
 
   onMounted: () => {
     console.log('📝 Todo App mounted');
+  },
+
+  onUnmounted: () => {
+    console.log('📝 Todo App unmounted');
   }
 });
+```
+
+## 🎯 Framework Comparison Details
+
+| Feature         | Custom Elements Runtime | React | Vue | Angular | Svelte |
+|-----------------|------------------------|-------|------|---------|--------|
+| Bundle Size     | ~8KB                   | ~45KB | ~35KB| ~60KB   | ~10KB  |
+| SSR             | Built-in               | Yes   | Yes  | Yes     | Yes    |
+| TypeScript      | Strict                 | Opt   | Opt  | Strict  | Opt    |
+| State Mgmt      | Manual/Store           | Redux | Pinia| RxJS    | Store  |
+| Routing         | Manual                 | Router| Router| Router  | SvelteKit|
+| Learning Curve  | Low                    | Med   | Med  | High    | Med    |
+
+### vs React
+- **Bundle Size**: 5x smaller (~8KB vs ~45KB)
+- **Performance**: 3x faster rendering with direct DOM manipulation
+- **Complexity**: No JSX, build steps, or virtual DOM overhead
+- **Standards**: Uses native Web Components, future-proof
+
+### vs Vue
+- **Bundle Size**: 4x smaller (~8KB vs ~35KB)
+- **Learning Curve**: Simpler API, no special directives to learn
+- **TypeScript**: Native support, no additional configuration
+- **Templates**: Plain JavaScript functions, full language power
+
+### vs Svelte
+- **Runtime**: True runtime vs compile-time (better debugging)
+- **SSR**: Built-in server-side rendering support
+- **Bundle**: Smaller for most real-world applications
+- **Ecosystem**: Works with any existing tools and libraries
+
+### vs Lit
+- **Performance**: Faster state management with ES6 Proxies
+- **API**: Simpler component definition syntax
+- **Bundle**: Smaller overall runtime size
+- **Features**: More built-in features (SSR, event bus, global state)
+
+## 🧩 Core Concepts
+
+- **Reactive state**: Automatic updates via ES6 Proxy
+- **Functional templates**: Just return HTML strings
+- **Refs**: Direct DOM access, no selectors
+- **Computed properties**: ES6 getters in state, recalculated on access
+- **Event bus**: Cross-component communication
+- **Global store**: Shared state, subscriptions
+
+### 1. State changes automatically trigger re-renders using ES6 Proxies:
+
+```typescript
+state.count++; // Automatically re-renders the component
+```
+
+### 2. Template Functions
+Templates are just JavaScript functions that return HTML strings:
+
+```typescript
+template: (state, api) => `<div>Hello ${state.name}!</div>`
+```
+
+### 3. Refs System
+Direct DOM access without complex selectors:
+
+```typescript
+refs: {
+  myButton: (element, state, api) => {
+    element.addEventListener('click', () => {
+      state.clicks++;
+      api.emit('button-clicked', { clicks: state.clicks });
+    });
+  }
+}
+```
+
+### 4. Computed Properties
+Define computed values as ES6 getters inside the state object. Getters should reference `this` for reactivity:
+
+```typescript
+state: {
+  firstName: 'Jane',
+  lastName: 'Doe',
+  email: '',
+  password: '',
+  get fullName() {
+    return `${this.firstName} ${this.lastName}`;
+  },
+  get isValid() {
+    return this.email.includes('@') && this.password.length >= 8;
+  }
+}
 ```
 
 ## 🌐 Server-Side Rendering (SSR)
@@ -800,6 +732,210 @@ export function handleSSR(req: any, res: any) {
 }
 ```
 
+## 📖 Runtime API Reference
+
+See [`src/lib/runtime.ts`](src/lib/runtime.ts) for full API docs and advanced usage.
+
+### Core Function
+
+```typescript
+component<T extends ComponentState>(config: ComponentConfig<T>): void
+```
+
+### Component Configuration
+
+```typescript
+interface ComponentConfig<T> {
+  tag: string;                    // Custom element tag name
+  state: T;                       // Initial state object
+  template: (state: T, api: ComponentAPI<T>) => string;
+  style?: string | ((state: T) => string);     // CSS styles
+  refs?: Record<string, RefHandler<T>>;         // DOM element refs
+  onMounted?: (state: T, api: ComponentAPI<T>) => void;
+  onUnmounted?: (state: T, api: ComponentAPI<T>) => void;
+}
+```
+
+### Component API
+
+```typescript
+interface ComponentAPI<T> {
+  readonly state: T;              // Reactive state proxy
+  emit(eventName: string, detail?: any): void;
+  update(changes: Partial<T>): void;
+  updateKey<K extends keyof T>(key: K, value: T[K]): void;
+}
+```
+
+### SSR Functions
+
+```typescript
+// Render single component to HTML string
+renderToString<T>(config: SSRComponentConfig<T>, options?: SSRRenderOptions): string;
+
+// Render multiple components with shared context
+renderComponentsToString(components: SSRComponentConfig<any>[], options?: SSRRenderOptions): {
+  html: string;
+  styles: string;
+  context: SSRContext;
+};
+
+// Generate hydration script for client-side takeover
+generateHydrationScript(context: SSRContext): string;
+```
+
+### Template Helpers
+
+```typescript
+// Template literal tags for syntax highlighting
+html(strings: TemplateStringsArray, ...values: any[]): string;
+css(strings: TemplateStringsArray, ...values: any[]): string;
+
+// Compile-time optimized template literal
+compile<T = any>(strings: TemplateStringsArray, ...expressions: Array<(state: T, api: any) => unknown>): CompiledTemplate<T>;
+
+// Utility functions
+classes(obj: Record<string, boolean>): string;
+styles(obj: Record<string, string | number>): string;
+```
+
+### Global State & Events
+
+```typescript
+// Event bus
+emit<T = any>(eventName: string, data?: T): void;
+on<T = any>(eventName: string, handler: (data: T) => void): () => void;
+once<T = any>(eventName: string, handler: (data: T) => void): Promise<T>;
+
+// Global store
+class Store<T extends object> {
+  constructor(initial: T);
+  subscribe(listener: (state: T) => void): void;
+  getState(): T;
+}
+```
+
+## How and When to Use Template Helpers
+
+### Template Helper Usage Overview
+
+#### 1. Plain String Literals
+
+Use for very simple, static templates with no dynamic values or logic. Fastest and smallest code.
+
+```typescript
+component({
+  tag: 'static-banner',
+  template: '<div class="banner">Welcome!</div>'
+});
+```
+
+**Use when:**
+- Template is short and static
+- No dynamic values or logic
+- Absolute minimal code is desired
+
+#### 2. `html` and `css` Helpers
+
+Use for multi-line, readable templates and styles. Provides syntax highlighting and editor support. Ideal for most components.
+
+```typescript
+import { html, css } from './lib/template-helpers.ts';
+
+component({
+  tag: 'fancy-card',
+  state: { title: 'Card Title' },
+  template: (state) => html`
+    <div class="card">
+      <h2>${state.title}</h2>
+    </div>
+  `,
+  styles: css`
+    .card { padding: 1rem; border-radius: 8px; background: #fff; }
+    h2 { color: #333; }
+  `
+});
+```
+
+**Use when:**
+- Template is simple or moderate in complexity
+- Readability and maintainability are priorities
+- You want editor syntax highlighting
+
+#### 3. `compile` Helper
+
+Use for advanced, performance-critical templates. Parses and optimizes DOM structure at definition time for faster updates and lower runtime overhead.
+
+```typescript
+import { compile } from './lib/runtime.ts';
+
+component({
+  tag: 'super-list',
+  state: { items: ['A', 'B', 'C'] },
+  template: (state) => compile`
+    <ul>
+      ${state.items.map(item => `<li>${item}</li>`).join('')}
+    </ul>
+  `
+});
+```
+
+**Use when:**
+- Template is large or complex with many dynamic regions
+- Maximum runtime performance is needed
+- Fine-grained DOM updates and caching are desired
+
+### Comparison & Best Practices
+
+- Use `html` for most templates; it's simple, readable, and flexible.
+- Use `compile` only when profiling shows a real performance benefit for large or complex templates.
+- Use a plain string literal for static, minimal templates.
+
+#### Why not always use `compile`?
+- Adds overhead for template analysis and caching, unnecessary for simple/static templates.
+- Less flexible for highly dynamic or programmatically generated templates.
+- `html` is easier to debug and more flexible for changing template structures.
+
+### SSR Compatibility
+
+Both `html` and `compile` templates work seamlessly with server-side rendering (SSR) in the runtime. SSR functions like `renderToString` and `renderComponentsToString` will handle either approach correctly.
+
+### Nesting and Composition
+
+You can nest `html` and `compile` calls within template expressions for modularity, but only the outermost helper determines parsing/optimization. Avoid deep nesting for performance-critical templates; prefer a single top-level `compile` for best optimization.
+
+```typescript
+const itemTemplate = html`<li>${item}</li>`;
+component({
+  tag: 'item-list',
+  state: { items: ['A', 'B', 'C'] },
+  template: (state) => compile`
+    <ul>
+      ${state.items.map(item => itemTemplate).join('')}
+    </ul>
+  `
+});
+```
+
+#### Utility Helpers: `classes` and `styles`
+
+Use for dynamic class and style generation. Conditionally apply classes or inline styles based on component state.
+
+```typescript
+import { classes, styles } from './lib/template-helpers.ts';
+
+template: (state) => `
+  <button
+    class="${classes({ active: state.isActive, disabled: state.isDisabled })}"
+    style="${styles({ color: state.color, fontSize: state.size + 'px' })}"
+  >Click Me</button>
+`
+```
+
+**Use when:**
+- Clean, maintainable dynamic class/style logic is needed
+- Especially useful in interactive or stateful components
+
 ## 🔥 Advanced Features
 
 ### Global State Management
@@ -882,7 +1018,7 @@ component({
 });
 ```
 
-## 🛠️ Development Tools
+### Development Tools
 
 ```typescript
 import { Performance, DevTools } from './lib/dev-tools.ts';
@@ -903,270 +1039,7 @@ DevTools.trackStateChanges(element, (changes) => {
 });
 ```
 
-## ⚡ Performance Features
-
-- **Advanced DOM Morphing**: Only updates what actually changed
-- **Template Caching**: Parsed templates are cached for reuse
-- **Batched Updates**: Multiple state changes are batched using RAF
-- **Computed Property Caching**: Expensive calculations are cached
-- **Memory Management**: Automatic cleanup prevents memory leaks
-- **Focus Preservation**: Smart input focus handling during updates
-
-## 🎯 Framework Comparison Details
-
-### vs React
-- **Bundle Size**: 5x smaller (~8KB vs ~45KB)
-- **Performance**: 3x faster rendering with direct DOM manipulation
-- **Complexity**: No JSX, build steps, or virtual DOM overhead
-- **Standards**: Uses native Web Components, future-proof
-
-### vs Vue
-- **Bundle Size**: 4x smaller (~8KB vs ~35KB)
-- **Learning Curve**: Simpler API, no special directives to learn
-- **TypeScript**: Native support, no additional configuration
-- **Templates**: Plain JavaScript functions, full language power
-
-### vs Svelte
-- **Runtime**: True runtime vs compile-time (better debugging)
-- **SSR**: Built-in server-side rendering support
-- **Bundle**: Smaller for most real-world applications
-- **Ecosystem**: Works with any existing tools and libraries
-
-### vs Lit
-- **Performance**: Faster state management with ES6 Proxies
-- **API**: Simpler component definition syntax
-- **Bundle**: Smaller overall runtime size
-- **Features**: More built-in features (SSR, event bus, global state)
-
-## 🎯 Use Cases
-
-Perfect for:
-- **Micro-frontends**: Lightweight, isolated components
-- **Progressive Enhancement**: Add reactivity to existing sites
-- **Design Systems**: Reusable component libraries
-- **SSR Applications**: Universal rendering with hydration
-- **Performance-Critical Apps**: When bundle size matters
-- **Web Standards**: Future-proof, standards-based development
-
-## 🚀 Getting Started
-
-1. **Clone this repository**
-2. **Run the examples**: `npm run dev`
-3. **Create your first component** (see minimal example above)
-4. **Build something awesome!**
-
-## 📖 Runtime API Reference
-
-### Core Function
-
-```typescript
-component<T extends ComponentState>(config: ComponentConfig<T>): void
-```
-
-### Component Configuration
-
-```typescript
-interface ComponentConfig<T> {
-  tag: string;                    // Custom element tag name
-  state: T;                       // Initial state object
-  template: (state: T, api: ComponentAPI<T>) => string;
-  style?: string | ((state: T) => string);     // CSS styles
-  refs?: Record<string, RefHandler<T>>;         // DOM element refs
-  onMounted?: (state: T, api: ComponentAPI<T>) => void;
-  onUnmounted?: (state: T, api: ComponentAPI<T>) => void;
-}
-```
-
-### Component API
-
-```typescript
-interface ComponentAPI<T> {
-  readonly state: T;              // Reactive state proxy
-  emit(eventName: string, detail?: any): void;
-  update(changes: Partial<T>): void;
-  updateKey<K extends keyof T>(key: K, value: T[K]): void;
-}
-```
-
-### SSR Functions
-
-```typescript
-// Render single component to HTML string
-renderToString<T>(config: SSRComponentConfig<T>, options?: SSRRenderOptions): string;
-
-// Render multiple components with shared context
-renderComponentsToString(components: SSRComponentConfig<any>[], options?: SSRRenderOptions): {
-  html: string;
-  styles: string;
-  context: SSRContext;
-};
-
-// Generate hydration script for client-side takeover
-generateHydrationScript(context: SSRContext): string;
-```
-
-### Template Helpers
-
-```typescript
-// Template literal tags for syntax highlighting
-html(strings: TemplateStringsArray, ...values: any[]): string;
-css(strings: TemplateStringsArray, ...values: any[]): string;
-
-// Compile-time optimized template literal
-compile<T = any>(strings: TemplateStringsArray, ...expressions: Array<(state: T, api: any) => unknown>): CompiledTemplate<T>;
-
-// Utility functions
-classes(obj: Record<string, boolean>): string;
-styles(obj: Record<string, string | number>): string;
-```
-
-#### How and When to Use Template Helpers
-
----
-### Template Helper Usage Overview
-
-**1. Plain String Literals**
-
-Use for very simple, static templates with no dynamic values or logic. Fastest and smallest code.
-
-```typescript
-component({
-  tag: 'static-banner',
-  template: '<div class="banner">Welcome!</div>'
-});
-```
-
-**Use when:**
-- Template is short and static
-- No dynamic values or logic
-- Absolute minimal code is desired
-
----
-**2. `html` and `css` Helpers**
-
-Use for multi-line, readable templates and styles. Provides syntax highlighting and editor support. Ideal for most components.
-
-```typescript
-import { html, css } from './lib/template-helpers.ts';
-
-component({
-  tag: 'fancy-card',
-  state: { title: 'Card Title' },
-  template: (state) => html`
-    <div class="card">
-      <h2>${state.title}</h2>
-    </div>
-  `,
-  styles: css`
-    .card { padding: 1rem; border-radius: 8px; background: #fff; }
-    h2 { color: #333; }
-  `
-});
-```
-
-**Use when:**
-- Template is simple or moderate in complexity
-- Readability and maintainability are priorities
-- You want editor syntax highlighting
-
----
-**3. `compile` Helper**
-
-Use for advanced, performance-critical templates. Parses and optimizes DOM structure at definition time for faster updates and lower runtime overhead.
-
-```typescript
-import { compile } from './lib/runtime.ts';
-
-component({
-  tag: 'super-list',
-  state: { items: ['A', 'B', 'C'] },
-  template: (state) => compile`
-    <ul>
-      ${state.items.map(item => `<li>${item}</li>`).join('')}
-    </ul>
-  `
-});
-```
-
-**Use when:**
-- Template is large or complex with many dynamic regions
-- Maximum runtime performance is needed
-- Fine-grained DOM updates and caching are desired
-
----
-### Comparison & Best Practices
-
-- Use `html` for most templates; it's simple, readable, and flexible.
-- Use `compile` only when profiling shows a real performance benefit for large or complex templates.
-- Use a plain string literal for static, minimal templates.
-
-**Why not always use `compile`?**
-- Adds overhead for template analysis and caching, unnecessary for simple/static templates.
-- Less flexible for highly dynamic or programmatically generated templates.
-- `html` is easier to debug and more flexible for changing template structures.
-
----
-### SSR Compatibility
-
-Both `html` and `compile` templates work seamlessly with server-side rendering (SSR) in the runtime. SSR functions like `renderToString` and `renderComponentsToString` will handle either approach correctly.
-
----
-### Nesting and Composition
-
-You can nest `html` and `compile` calls within template expressions for modularity, but only the outermost helper determines parsing/optimization. Avoid deep nesting for performance-critical templates; prefer a single top-level `compile` for best optimization.
-
-```typescript
-const itemTemplate = html`<li>${item}</li>`;
-component({
-  tag: 'item-list',
-  state: { items: ['A', 'B', 'C'] },
-  template: (state) => compile`
-    <ul>
-      ${state.items.map(item => itemTemplate).join('')}
-    </ul>
-  `
-});
-```
-
----
-### Utility Helpers: `classes` and `styles`
-
-Use for dynamic class and style generation. Conditionally apply classes or inline styles based on component state.
-
-```typescript
-import { classes, styles } from './lib/template-helpers.ts';
-
-template: (state) => `
-  <button
-    class="${classes({ active: state.isActive, disabled: state.isDisabled })}"
-    style="${styles({ color: state.color, fontSize: state.size + 'px' })}"
-  >Click Me</button>
-`
-```
-
-**Use when:**
-- Clean, maintainable dynamic class/style logic is needed
-- Especially useful in interactive or stateful components
-
----
-
-### Global State & Events
-
-```typescript
-// Event bus
-emit<T = any>(eventName: string, data?: T): void;
-on<T = any>(eventName: string, handler: (data: T) => void): () => void;
-once<T = any>(eventName: string, handler: (data: T) => void): Promise<T>;
-
-// Global store
-class Store<T extends object> {
-  constructor(initial: T);
-  subscribe(listener: (state: T) => void): void;
-  getState(): T;
-}
-```
-
----
+## That's a Wrap!
 
 **Ready to build lightning-fast, universal web components?** 🚀
 
