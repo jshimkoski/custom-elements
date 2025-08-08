@@ -778,8 +778,8 @@ class ComponentElement<T extends ComponentState> extends HTMLElement {
     this.unsubscribes.push(unsubscribe);
 
     // Check if this is SSR hydration
-    const isSSRHydration = this.hasAttribute('data-hydrated') || this.shadowRoot!.hasChildNodes();
-    
+    const isSSRHydration = this.hasAttribute('data-hydrated');
+
     if (!isSSRHydration) {
       // Initial render for client-side components
       this.render();
@@ -812,7 +812,7 @@ class ComponentElement<T extends ComponentState> extends HTMLElement {
         if (templateResult === this.lastHTML) {
           return;
         }
-        
+
         const isInitialRender = !this.shadowRoot!.firstElementChild;
         
         if (isInitialRender) {

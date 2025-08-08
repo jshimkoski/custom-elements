@@ -17,40 +17,38 @@ interface TodoAppState extends ComponentState {
 
 component<TodoAppState>({
   tag: 'todo-app-compiled',
-  
-  state: (() => {
-    const todos: Todo[] = [
+
+  state: {
+    todos: [
       { id: 1, text: 'Learn TypeScript', completed: true },
       { id: 2, text: 'Build awesome components', completed: false },
       { id: 3, text: 'Ship to production', completed: false }
-    ];
-    const filter = 'all';
-    return {
-      todos,
-      newTodo: '',
-      filter,
-      get filteredTodos() {
-        switch (filter as 'all' | 'active' | 'completed') {
-          case 'active': return todos.filter(todo => !todo.completed);
-          case 'completed': return todos.filter(todo => todo.completed);
-          default: return todos;
-        }
-      },
-      get activeTodos() {
-        return todos.filter(todo => !todo.completed);
-      },
-      get completedCount() {
-        return todos.filter(todo => todo.completed).length;
+    ],
+    newTodo: '',
+    filter: 'all',
+  },
+
+  template: () => {
+    const filteredTodos = (state: TodoAppState) => {
+      switch (state.filter) {
+        case 'active': return state.todos.filter(todo => !todo.completed);
+        case 'completed': return state.todos.filter(todo => todo.completed);
+        default: return state.todos;
       }
     };
-  })(),
+    const activeTodos = (state: TodoAppState) => {
+      return state.todos.filter(todo => !todo.completed);
+    };
+    const completedCount = (state: TodoAppState) => {
+      return state.todos.filter(todo => todo.completed).length;
+    };
 
-  template: () => compile`
-    <div class="todo-app">
-      <header>
-        <h1>📝 Todo App</h1>
-        <input 
-          data-ref="newTodoInput"
+    return compile`
+      <div class="todo-app">
+        <header>
+          <h1>📝 Todo App</h1>
+          <input 
+            data-ref="newTodoInput"
           type="text" 
           value="${state => state.newTodo}"
           placeholder="What needs to be done?"
@@ -70,18 +68,18 @@ component<TodoAppState>({
             data-ref="activeFilter"
             class="${state => state.filter === 'active' ? 'active' : ''}"
           >
-            Active (${state => state.activeTodos?.length})
+            Active (${state => activeTodos(state)?.length})
           </button>
           <button 
             data-ref="completedFilter"
             class="${state => state.filter === 'completed' ? 'active' : ''}"
           >
-            Completed (${state => state.completedCount})
+            Completed (${state => completedCount(state)})
           </button>
         </div>
 
         <ul class="todo-list" data-ref="todoList">
-          ${state => state.filteredTodos?.map((todo: Todo) => html`
+          ${state => filteredTodos(state)?.map((todo: Todo) => html`
             <li key="${todo.id}" class="${todo.completed ? 'completed' : ''}">
               <input 
                 type="checkbox" 
@@ -104,11 +102,11 @@ component<TodoAppState>({
 
       <footer>
         <small>
-          ${state => state.activeTodos?.length} item${state => state.activeTodos?.length !== 1 ? 's' : ''} left
+          ${state => activeTodos(state)?.length} item${state => activeTodos(state)?.length !== 1 ? 's' : ''} left
         </small>
       </footer>
     </div>
-  `,
+  `},
 
   style: css`
     .todo-app {
