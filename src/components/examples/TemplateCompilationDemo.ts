@@ -66,5 +66,3 @@ component({
     }
   }
 });
-
-console.log('✅ Template comparison components registered!');

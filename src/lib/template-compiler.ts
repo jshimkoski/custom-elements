@@ -49,6 +49,23 @@ export interface TemplateCompilerOptions {
   optimize?: boolean;
 }
 
+// Global development mode detection
+const isDevelopment = (() => {
+  try {
+    // @ts-ignore - Check for Node.js environment
+    if (typeof process !== 'undefined' && process.env) {
+      // @ts-ignore
+      return process.env.NODE_ENV === 'development';
+    }
+  } catch {
+    // Ignore Node.js check in browser
+  }
+  if (typeof window !== 'undefined') {
+    return window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  }
+  return false;
+})();
+
 // ============================================================================
 // TEMPLATE COMPILATION
 // ============================================================================
@@ -61,14 +78,39 @@ export function compileTemplate<T = any>(
   templateString: string,
   options: TemplateCompilerOptions = {}
 ): CompiledTemplate<T> {
-  const { development = false, cache = true, optimize = true } = options;
+  const { development = isDevelopment, cache = true, optimize = true } = options;
   
   // Generate unique ID for caching
   const id = generateTemplateId(templateString);
   
   // Check cache first
   if (cache && templateCache.has(id)) {
+    // Track cache hit
+    if (development) {
+      const metrics = performanceMetrics.get(id) || {
+        compilationTime: 0,
+        renderTime: 0,
+        updateTime: 0,
+        cacheHits: 0,
+        cacheMisses: 0
+      };
+      metrics.cacheHits++;
+      performanceMetrics.set(id, metrics);
+    }
     return templateCache.get(id)!;
+  }
+  
+  // Track cache miss
+  if (development) {
+    const metrics = performanceMetrics.get(id) || {
+      compilationTime: 0,
+      renderTime: 0,
+      updateTime: 0,
+      cacheHits: 0,
+      cacheMisses: 0
+    };
+    metrics.cacheMisses++;
+    performanceMetrics.set(id, metrics);
   }
   
   try {
@@ -85,7 +127,7 @@ export function compileTemplate<T = any>(
       console.error('Template:', templateString);
     }
     
-    // Fallback to runtime parsing in development
+    // Fallback to runtime parsing
     return createFallbackTemplate<T>(templateString, id);
   }
 }
@@ -103,41 +145,40 @@ function findDOMPath(templateHTML: string, placeholder: string): number[] {
     return [0]; // Fallback for server-side
   }
   
-  console.log('🔍 Finding path for placeholder:', placeholder, 'in:', templateHTML);
-  
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(`<div>${templateHTML}</div>`, 'text/html');
-  const container = doc.body.firstElementChild!;
-  
-  console.log('📊 Container structure:', container.innerHTML);
-  
-  // Find the element or text node containing the placeholder
-  function findPlaceholderPath(node: Node, currentPath: number[] = []): number[] | null {
-    console.log('🔎 Checking node:', node.nodeType, node.textContent?.slice(0, 50));
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(`<div>${templateHTML}</div>`, 'text/html');
+    const container = doc.body.firstElementChild!;
     
-    if (node.nodeType === Node.TEXT_NODE) {
-      if (node.textContent?.includes(placeholder)) {
-        console.log('✅ Found placeholder in text node at path:', currentPath);
-        return currentPath;
-      }
-    } else if (node.nodeType === Node.ELEMENT_NODE) {
-      // Check child nodes, but use a more robust indexing that accounts for the actual DOM structure
-      let childIndex = 0;
-      for (let i = 0; i < node.childNodes.length; i++) {
-        const child = node.childNodes[i];
-        const result = findPlaceholderPath(child, [...currentPath, childIndex]);
-        if (result) {
-          return result;
+    // Find the element or text node containing the placeholder
+    function findPlaceholderPath(node: Node, currentPath: number[] = []): number[] | null {
+      if (node.nodeType === Node.TEXT_NODE) {
+        if (node.textContent?.includes(placeholder)) {
+          return currentPath;
         }
-        childIndex++;
+      } else if (node.nodeType === Node.ELEMENT_NODE) {
+        // Check child nodes, but use a more robust indexing that accounts for the actual DOM structure
+        let childIndex = 0;
+        for (let i = 0; i < node.childNodes.length; i++) {
+          const child = node.childNodes[i];
+          const result = findPlaceholderPath(child, [...currentPath, childIndex]);
+          if (result) {
+            return result;
+          }
+          childIndex++;
+        }
       }
+      return null;
     }
-    return null;
+    
+    const path = findPlaceholderPath(container);
+    return path || [0];
+  } catch (error) {
+    if (isDevelopment) {
+      console.warn('[Template Compiler] Error finding DOM path for placeholder:', placeholder, error);
+    }
+    return [0]; // Safe fallback
   }
-  
-  const path = findPlaceholderPath(container);
-  console.log('🎯 Final path for', placeholder, ':', path);
-  return path || [0];
 }
 
 export function compile<T = any>(
@@ -152,12 +193,9 @@ export function compile<T = any>(
     str + (i < expressions.length ? `__DYNAMIC_${i}__` : '')
   ).join('');
   
-  console.log('🔍 Template HTML for analysis:', templateHTML);
-  
   // Parse the template to find DOM paths for each dynamic value
   const dynamics: UpdateFunction<T>[] = expressions.map((expr, index) => {
     const path = findDOMPath(templateHTML, `__DYNAMIC_${index}__`);
-    console.log(`📍 Dynamic ${index} path:`, path);
     return {
       path,
       type: 'text' as UpdateType,
@@ -425,95 +463,100 @@ function reconstructTemplate<T>(
 }
 
 function applyUpdate(element: Element, update: UpdateFunction, value: unknown): void {
-  if (update.type === 'text') {
-    // Use TreeWalker to find and update text nodes efficiently
-    const walker = document.createTreeWalker(
-      element,
-      NodeFilter.SHOW_TEXT
-    );
-    
-    let node;
-    while (node = walker.nextNode()) {
-      const textContent = node.textContent || '';
-      // Look for pattern like "Count: 0" and replace the number part
-      if (textContent.includes('Count: ')) {
-        // Replace the number after "Count: "
-        const newText = textContent.replace(/Count: \d+/, `Count: ${value}`);
-        node.textContent = newText;
-        return;
-      }
-    }
-    return;
-  }
-  
-  // Fallback to path-based updates for other types
-  const targetNode = getNodeByPath(element, update.path);
-  
-  if (!targetNode) {
-    return;
-  }
-  
-  switch (update.type) {
-    case 'attribute':
-      if (targetNode.nodeType === Node.ELEMENT_NODE && update.target) {
-        const el = targetNode as Element;
-        if (value == null) {
-          el.removeAttribute(update.target);
-        } else {
-          el.setAttribute(update.target, String(value));
+  try {
+    if (update.type === 'text') {
+      // Use TreeWalker to find and update text nodes efficiently
+      const walker = document.createTreeWalker(
+        element,
+        NodeFilter.SHOW_TEXT
+      );
+      
+      let node;
+      while (node = walker.nextNode()) {
+        const textContent = node.textContent || '';
+        // Look for pattern like "Count: 0" and replace the number part
+        if (textContent.includes('Count: ')) {
+          // Replace the number after "Count: "
+          const newText = textContent.replace(/Count: \d+/, `Count: ${value}`);
+          node.textContent = newText;
+          return;
         }
       }
-      break;
-      
-    case 'property':
-      if (targetNode.nodeType === Node.ELEMENT_NODE && update.target) {
-        (targetNode as any)[update.target] = value;
-      }
-      break;
-      
-    case 'class':
-      if (targetNode.nodeType === Node.ELEMENT_NODE && update.target) {
-        const el = targetNode as Element;
-        el.classList.toggle(update.target, Boolean(value));
-      }
-      break;
-      
-    case 'style':
-      if (targetNode.nodeType === Node.ELEMENT_NODE && update.target) {
-        const el = targetNode as HTMLElement;
-        (el.style as any)[update.target] = value;
-      }
-      break;
+      return;
+    }
+    
+    // Fallback to path-based updates for other types
+    const targetNode = getNodeByPath(element, update.path);
+    
+    if (!targetNode) {
+      return;
+    }
+    
+    switch (update.type) {
+      case 'attribute':
+        if (targetNode.nodeType === Node.ELEMENT_NODE && update.target) {
+          const el = targetNode as Element;
+          if (value == null) {
+            el.removeAttribute(update.target);
+          } else {
+            el.setAttribute(update.target, String(value));
+          }
+        }
+        break;
+        
+      case 'property':
+        if (targetNode.nodeType === Node.ELEMENT_NODE && update.target) {
+          (targetNode as any)[update.target] = value;
+        }
+        break;
+        
+      case 'class':
+        if (targetNode.nodeType === Node.ELEMENT_NODE && update.target) {
+          const el = targetNode as Element;
+          el.classList.toggle(update.target, Boolean(value));
+        }
+        break;
+        
+      case 'style':
+        if (targetNode.nodeType === Node.ELEMENT_NODE && update.target) {
+          const el = targetNode as HTMLElement;
+          (el.style as any)[update.target] = value;
+        }
+        break;
+    }
+  } catch (error) {
+    if (isDevelopment) {
+      console.warn('[Template Compiler] Error applying update:', update, error);
+    }
+    // Silently fail in production to prevent crashes
   }
 }
 
 function getNodeByPath(root: Element, path: readonly number[]): Node | null {
-  console.log('🗺️ Getting node by path:', path, 'from root:', root.tagName);
-  console.log('🏗️ Root structure:', root.innerHTML.slice(0, 200));
-  
-  let current: Node = root;
-  
-  for (let i = 0; i < path.length; i++) {
-    const index = path[i];
-    console.log(`🗺️ Step ${i}: looking for child ${index} in node with ${current.childNodes.length} children`);
-    console.log(`🗺️ Current node:`, current.nodeType, current.textContent?.slice(0, 50));
+  try {
+    let current: Node = root;
     
-    if (index >= current.childNodes.length) {
-      console.log(`❌ Index ${index} out of bounds (${current.childNodes.length} children)`);
-      return null;
+    for (let i = 0; i < path.length; i++) {
+      const index = path[i];
+      
+      if (index >= current.childNodes.length) {
+        return null;
+      }
+      
+      current = current.childNodes[index];
+      
+      if (!current) {
+        return null;
+      }
     }
     
-    current = current.childNodes[index];
-    console.log(`🗺️ Selected child ${index}:`, current.nodeType, current.textContent?.slice(0, 50));
-    
-    if (!current) {
-      console.log(`❌ No child at index ${index}`);
-      return null;
+    return current;
+  } catch (error) {
+    if (isDevelopment) {
+      console.warn('[Template Compiler] Error getting node by path:', path, error);
     }
+    return null;
   }
-  
-  console.log('✅ Final target node:', current.nodeType, current.textContent?.slice(0, 50));
-  return current;
 }
 
 // ============================================================================
@@ -521,6 +564,17 @@ function getNodeByPath(root: Element, path: readonly number[]): Node | null {
 // ============================================================================
 
 const templateCache = new Map<string, CompiledTemplate<any>>();
+
+// Performance tracking for production monitoring
+interface PerformanceMetrics {
+  compilationTime: number;
+  renderTime: number;
+  updateTime: number;
+  cacheHits: number;
+  cacheMisses: number;
+}
+
+const performanceMetrics = new Map<string, PerformanceMetrics>();
 
 function generateTemplateId(template: string): string {
   // Simple hash function for template IDs
@@ -542,6 +596,10 @@ function createFallbackTemplate<T>(templateString: string, id: string): Compiled
     hasDynamics: false
   };
 }
+
+// ============================================================================
+// DEVELOPMENT UTILITIES
+// ============================================================================
 
 // ============================================================================
 // DEVELOPMENT UTILITIES
@@ -588,10 +646,28 @@ export function analyzeTemplate(template: string): {
 }
 
 /**
- * Clear template cache (useful in development)
+ * Clear template cache for development/testing
  */
 export function clearTemplateCache(): void {
   templateCache.clear();
+  performanceMetrics.clear();
+}
+
+/**
+ * Get performance metrics for development monitoring
+ */
+export function getPerformanceMetrics(): Map<string, PerformanceMetrics> {
+  return new Map(performanceMetrics);
+}
+
+/**
+ * Get cache statistics
+ */
+export function getCacheStats(): { size: number; entries: string[] } {
+  return {
+    size: templateCache.size,
+    entries: Array.from(templateCache.keys())
+  };
 }
 
 // ============================================================================
