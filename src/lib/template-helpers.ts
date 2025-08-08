@@ -1,5 +1,7 @@
 // Template helpers for enhanced DX
-export type TemplateResult = string;
+import type { CompiledTemplate } from './template-compiler.js';
+
+export type TemplateResult = string | CompiledTemplate;
 
 /**
  * Template literal tag for HTML strings

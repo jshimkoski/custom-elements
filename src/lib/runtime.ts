@@ -1,6 +1,8 @@
 export { Store } from './store.js';
 export { eventBus } from './event-bus.js';
 export { html, css, classes, styles, ref, on } from './template-helpers.js';
+export { compileTemplate, compile, renderCompiledTemplate, updateCompiledTemplate } from './template-compiler.js';
+export type { CompiledTemplate, UpdateFunction, UpdateType } from './template-compiler.js';
 
 /**
  * Modern Web Component Runtime - v2.0
@@ -10,11 +12,15 @@ export { html, css, classes, styles, ref, on } from './template-helpers.js';
  * - Developer experience
  * - Performance
  * - Server-Side Rendering (SSR) support
+ * - Template Compilation support
  */
 
 // ============================================================================
 // CORE TYPES
 // ============================================================================
+
+import type { CompiledTemplate } from './template-compiler.js';
+import { renderCompiledTemplate, updateCompiledTemplate } from './template-compiler.js';
 
 export interface ComponentState extends Record<string, unknown> {}
 
@@ -27,7 +33,7 @@ export interface ComponentAPI<T extends ComponentState = ComponentState> {
 
 export interface ComponentConfig<T extends ComponentState = ComponentState> {
   readonly tag: string;
-  readonly template: (state: T, api: ComponentAPI<T>) => string;
+  readonly template: (state: T, api: ComponentAPI<T>) => string | CompiledTemplate<T>;
   readonly state: T;
   readonly style?: string | ((state: T) => string);
   readonly refs?: Record<string, RefHandler<T>>;
@@ -271,6 +277,47 @@ function formatHTML(html: string): string {
       return '  '.repeat(Math.max(0, depth)) + line.trim();
     })
     .join('\n');
+}
+
+// ============================================================================
+// UTILITIES
+// ============================================================================
+
+/**
+ * Safe deep clone that handles functions and circular references
+ * For performance comparison, we'll use a JSON-safe approach
+ */
+function safeClone<T>(obj: T): T {
+  try {
+    // First try the native structuredClone if it's available and works
+    return structuredClone(obj);
+  } catch (error) {
+    // Fallback: Create a clean object with only serializable properties
+    if (obj === null || typeof obj !== 'object') {
+      return obj;
+    }
+    
+    try {
+      // Use JSON round-trip for simple cloning (loses functions but preserves data)
+      return JSON.parse(JSON.stringify(obj));
+    } catch (jsonError) {
+      // Final fallback: shallow copy of enumerable properties
+      if (obj instanceof Array) {
+        return [...obj] as T;
+      }
+      
+      const cloned = {} as T;
+      for (const key in obj) {
+        if (obj.hasOwnProperty(key)) {
+          const value = obj[key];
+          if (typeof value !== 'function' && typeof value !== 'symbol') {
+            cloned[key] = value;
+          }
+        }
+      }
+      return cloned;
+    }
+  }
 }
 
 // ============================================================================
@@ -644,7 +691,7 @@ function createReactiveState<T extends ComponentState>(
   };
 
   // Create state with proper reference
-  proxyState = new Proxy(structuredClone(initialState), {
+  proxyState = new Proxy(safeClone(initialState), {
     get: (target, key) => {
       if (typeof key === 'string' && key in computedHandlers) {
         return getComputed(key);
@@ -689,6 +736,8 @@ class ComponentElement<T extends ComponentState> extends HTMLElement {
   private readonly reactiveSystem: ReturnType<typeof createReactiveState<T>>;
   private readonly api: ComponentAPI<T>;
   private lastHTML = '';
+  private lastCompiledTemplate: CompiledTemplate<T> | null = null;
+  private lastState: T | null = null;
   private unsubscribes: Array<() => void> = [];
   private refsAttached = false;
   private isHydrating = false;
@@ -773,29 +822,71 @@ class ComponentElement<T extends ComponentState> extends HTMLElement {
 
   private render(): void {
     try {
-      const html = this.config.template(this.api.state, this.api);
+      const templateResult = this.config.template(this.api.state, this.api);
       
-      if (html === this.lastHTML) {
-        return;
-      }
-      
-      const isInitialRender = !this.shadowRoot!.firstElementChild;
-      
-      if (isInitialRender) {
-        // Initial render
-        const fragment = TemplateParser.parseTemplate(html);
-        this.shadowRoot!.appendChild(fragment);
-        this.refsAttached = false; // New DOM, need to attach refs
-      } else {
-        // Update render - DOM morphing replaces elements, so refs need reattachment
-        const firstElement = this.shadowRoot!.firstElementChild;
-        if (firstElement) {
-          DOMDiffer.morph(firstElement, html);
-          this.refsAttached = false; // DOM was morphed, need to reattach refs
+      // Handle both string and compiled templates
+      if (typeof templateResult === 'string') {
+        // Traditional string template
+        if (templateResult === this.lastHTML) {
+          return;
         }
+        
+        const isInitialRender = !this.shadowRoot!.firstElementChild;
+        
+        if (isInitialRender) {
+          // Initial render
+          const fragment = TemplateParser.parseTemplate(templateResult);
+          this.shadowRoot!.appendChild(fragment);
+          this.refsAttached = false; // New DOM, need to attach refs
+        } else {
+          // Update render - DOM morphing replaces elements, so refs need reattachment
+          const firstElement = this.shadowRoot!.firstElementChild;
+          if (firstElement) {
+            DOMDiffer.morph(firstElement, templateResult);
+            this.refsAttached = false; // DOM was morphed, need to reattach refs
+          }
+        }
+        
+        this.lastHTML = templateResult;
+        this.lastCompiledTemplate = null; // Clear compiled template cache
+      } else {
+        // Compiled template
+        const isInitialRender = !this.shadowRoot!.firstElementChild;
+        const isSameTemplate = this.lastCompiledTemplate?.id === templateResult.id;
+        
+        if (isInitialRender) {
+          // Initial render with compiled template
+          const fragment = renderCompiledTemplate(templateResult, this.api.state, this.api);
+          this.shadowRoot!.appendChild(fragment);
+          this.refsAttached = false;
+        } else if (isSameTemplate && this.shadowRoot!.firstElementChild) {
+          // Efficient update using compiled template - this is the key performance benefit!
+          const oldState = this.lastState; // Capture old state before update
+          updateCompiledTemplate(
+            templateResult,
+            this.shadowRoot!.firstElementChild,
+            this.api.state,
+            this.api,
+            oldState || undefined
+          );
+          // For compiled templates with stable structure, refs should already be attached
+          // Only force reattachment if refs haven't been attached yet
+        } else {
+          // Template changed, full re-render
+          const fragment = renderCompiledTemplate(templateResult, this.api.state, this.api);
+          this.shadowRoot!.innerHTML = '';
+          this.shadowRoot!.appendChild(fragment);
+          this.refsAttached = false;
+        }
+        
+        this.lastCompiledTemplate = templateResult;
+        
+        this.lastHTML = ''; // Clear string template cache
       }
       
-      this.lastHTML = html;
+      // Store current state for next update comparison
+      this.lastState = safeClone(this.api.state);
+      
       this.updateStyle();
       
       // Process refs if not already attached for this render
