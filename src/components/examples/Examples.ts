@@ -2,6 +2,8 @@ import { component, html, css, type ComponentState } from '../../lib/runtime.ts'
 
 // Import the notification system demo
 import './NotificationSystem.ts';
+// Import the reactive form demo
+import './ReactiveForm.ts';
 
 // ============================================================================
 // COUNTER EXAMPLE - Shows basic reactivity and performance

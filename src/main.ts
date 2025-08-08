@@ -19,6 +19,10 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
       <perf-counter></perf-counter>
     </div>
     
+    <div style="margin: 2rem 0;">
+      <reactive-form></reactive-form>
+    </div>
+    
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 2rem; margin: 2rem 0;">
       <smart-form></smart-form>
       <dynamic-styling></dynamic-styling>
