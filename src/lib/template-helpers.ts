@@ -11,14 +11,17 @@ export type TemplateResult = string | CompiledTemplate | ((state?: any) => strin
 export const html = (
   strings: TemplateStringsArray,
   ...values: unknown[]
-): ((state?: any) => string) => {
-  // Return a function that takes state and evaluates all dynamic slots at render time
-  return (state?: any) => {
+): ((state?: any, api?: any) => string) => {
+  /**
+   * Returns a function that takes state and api, and evaluates all dynamic slots at render time.
+   * Dynamic values (functions) receive both state and api.
+   */
+  return (state?: any, api?: any) => {
     return strings.reduce((result, string, i) => {
       let value = values[i];
-      // If value is a function, call it with state
+      // If value is a function, call it with state and api
       if (typeof value === 'function') {
-        value = value(state);
+        value = value(state, api);
       }
       // If value is a string referencing state, access state property
       if (typeof value === 'string' && state && value.startsWith('state.')) {
@@ -55,8 +58,12 @@ export function ref<T extends Element = Element>(
 export function on<K extends keyof HTMLElementEventMap>(
   eventType: K,
   handler: (event: HTMLElementEventMap[K], state: any, api: any) => void
-) {
-  return { [eventType]: handler };
+): { [key in K]: (event: HTMLElementEventMap[K], state: any, api: any) => void } {
+  /**
+   * Returns an event handler object for use in templates.
+   * Handler receives event, state, and api.
+   */
+  return { [eventType]: handler } as { [key in K]: (event: HTMLElementEventMap[K], state: any, api: any) => void };
 }
 
 /**

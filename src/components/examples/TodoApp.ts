@@ -44,11 +44,11 @@ component<TodoAppState, TodoAppComputed>('todo-app', {
   state: initialState,
   computed: computedMap,
   template: (state) => {
-  // Debug logs to confirm computed getter access
-  console.debug('[TodoApp] template render: filteredTodos', state.filteredTodos);
-  console.debug('[TodoApp] template render: activeTodos', state.activeTodos);
-  console.debug('[TodoApp] template render: completedCount', state.completedCount);
-  return `
+    // Debug logs to confirm computed getter access
+    console.debug('[TodoApp] template render: filteredTodos', state.filteredTodos);
+    console.debug('[TodoApp] template render: activeTodos', state.activeTodos);
+    console.debug('[TodoApp] template render: completedCount', state.completedCount);
+    return html`
       <div class="todo-app">
         <header>
           <h1>📝 Todo App</h1>
@@ -108,7 +108,7 @@ component<TodoAppState, TodoAppComputed>('todo-app', {
           </small>
         </footer>
       </div>
-    `;
+    `();
   },
   style: css`
     .todo-app {

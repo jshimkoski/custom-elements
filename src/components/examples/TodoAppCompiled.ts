@@ -1,5 +1,5 @@
-import { component, compile, html, css, type ComponentState } from '../../lib/runtime';
-
+import { component, css, type ComponentState } from '../../lib/runtime';
+import { compile } from '../../lib/runtime';
 interface Todo {
   id: number;
   text: string;
@@ -18,7 +18,7 @@ interface TodoAppComputed {
   completedCount: number;
 }
 
-const state: TodoAppState = {
+const initialState: TodoAppState = {
   todos: [
     { id: 1, text: 'Learn TypeScript', completed: true },
     { id: 2, text: 'Build awesome components', completed: false },
@@ -28,86 +28,87 @@ const state: TodoAppState = {
   filter: 'all'
 };
 
-const computed = {
-  filteredTodos: (state: TodoAppState & TodoAppComputed) => state.todos.filter((todo: Todo) => {
+const computedMap = {
+  filteredTodos: (state: TodoAppState) => state.todos.filter((todo: Todo) => {
     if (state.filter === 'active') return !todo.completed;
     if (state.filter === 'completed') return todo.completed;
     return true;
   }),
-  activeTodos: (state: TodoAppState & TodoAppComputed) => state.todos.filter((todo: Todo) => !todo.completed),
-  completedCount: (state: TodoAppState & TodoAppComputed) => state.todos.filter((todo: Todo) => todo.completed).length
+  activeTodos: (state: TodoAppState) => state.todos.filter((todo: Todo) => !todo.completed),
+  completedCount: (state: TodoAppState) => state.todos.filter((todo: Todo) => todo.completed).length
 };
 
-component<TodoAppState, TodoAppComputed>('todo-app-compiled', {
-  state,
-  computed,
-  template: () => compile`
-    <div class="todo-app">
-      <header>
-        <h1>📝 Todo App</h1>
-        <input 
-          data-ref="newTodoInput"
-          type="text" 
-          value="${state => state.newTodo}"
-          placeholder="What needs to be done?"
-          class="new-todo"
+const compiledTemplate = compile`
+  <div class="todo-app">
+    <header>
+      <h1>📝 Todo App</h1>
+      <input 
+        data-ref="newTodoInput"
+        type="text" 
+        value="${(state: TodoAppState) => state.newTodo}"
+        placeholder="What needs to be done?"
+        class="new-todo"
+      >
+    </header>
+    <main>
+      <div class="filters">
+        <button 
+          data-ref="allFilter"
+          class="${(state: TodoAppState) => state.filter === 'all' ? 'active' : ''}"
         >
-      </header>
-      <main>
-        <div class="filters">
-          <button 
-            data-ref="allFilter"
-            class="${state => state.filter === 'all' ? 'active' : ''}"
-          >
-            All (${state => state.todos.length})
-          </button>
-          <button 
-            data-ref="activeFilter"
-            class="${state => state.filter === 'active' ? 'active' : ''}"
-          >
-            Active (${state => state.activeTodos.length})
-          </button>
-          <button 
-            data-ref="completedFilter"
-            class="${state => state.filter === 'completed' ? 'active' : ''}"
-          >
-            Completed (${state => state.completedCount})
-          </button>
-        </div>
-        <ul class="todo-list" data-ref="todoList">
-          ${state => state.filteredTodos.map((todo: Todo) => html`
-            <li key="${todo.id}" class="${todo.completed ? 'completed' : ''}">
-              <input 
-                type="checkbox" 
-                ${todo.completed ? 'checked' : ''}
-                data-todo-id="${todo.id}"
-                data-action="toggle"
-              >
-              <span class="text">${todo.text}</span>
-              <button 
-                class="delete"
-                data-todo-id="${todo.id}"
-                data-action="delete"
-              >
-                ×
-              </button>
-            </li>
-          `).join('')}
-        </ul>
-      </main>
-      <footer>
-        <small>
-          ${state => state.activeTodos.length} item${state => state.activeTodos.length !== 1 ? 's' : ''} left
-        </small>
-      </footer>
-    </div>
-  `,
+          All (${(state: TodoAppState) => state.todos.length})
+        </button>
+        <button 
+          data-ref="activeFilter"
+          class="${(state: TodoAppState) => state.filter === 'active' ? 'active' : ''}"
+        >
+          Active (${(state: TodoAppState) => (state.activeTodos as Todo[]).length})
+        </button>
+        <button 
+          data-ref="completedFilter"
+          class="${(state: TodoAppState) => state.filter === 'completed' ? 'active' : ''}"
+        >
+          Completed (${(state: TodoAppState) => state.completedCount})
+        </button>
+      </div>
+      <ul class="todo-list" data-ref="todoList">
+  ${(state: TodoAppState) => (state.filteredTodos as Todo[]).map((todo: Todo) => `
+          <li key="${todo.id}" class="${todo.completed ? 'completed' : ''}">
+            <input 
+              type="checkbox" 
+              ${todo.completed ? 'checked' : ''}
+              data-todo-id="${todo.id}"
+              data-action="toggle"
+            >
+            <span class="text">${todo.text}</span>
+            <button 
+              class="delete"
+              data-todo-id="${todo.id}"
+              data-action="delete"
+            >
+              ×
+            </button>
+          </li>
+        `).join('')}
+      </ul>
+    </main>
+    <footer>
+      <small>
+  ${(state: TodoAppState) => (state.activeTodos as Todo[]).length} items left
+      </small>
+    </footer>
+  </div>
+`;
+
+component<TodoAppState, TodoAppComputed>('todo-app', {
+  state: initialState,
+  computed: computedMap,
+  template: () => compiledTemplate,
   style: css`
     .todo-app {
       max-width: 400px;
       margin: 2rem auto;
       padding: 1rem;
-      border: 1px solid #ddd;
       border-radius: 8px;
       font-family: system-ui, sans-serif;
     }
@@ -218,7 +219,9 @@ component<TodoAppState, TodoAppComputed>('todo-app-compiled', {
     },
     activeFilter: (element: Element, _state, api) => {
       element.addEventListener('click', () => {
+        console.log('Active filter clicked before:', _state, 'state ref:', _state);
         api.updateKey('filter', 'active');
+        console.log('Active filter clicked after:', _state, 'state ref:', _state);
       });
     },
     completedFilter: (element: Element, _state, api) => {
@@ -250,6 +253,6 @@ component<TodoAppState, TodoAppComputed>('todo-app-compiled', {
     }
   },
   onMounted: (state) => {
-    console.log('📝 Todo App Compiled mounted', state);
+    console.log('📝 Todo App mounted', state);
   }
 });
