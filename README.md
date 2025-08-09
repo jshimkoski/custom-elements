@@ -10,6 +10,7 @@
 - **SSR & Hydration**: Universal rendering, seamless client takeover
 - **Tree-shakable & modular**: Only ship what you use
 - **Functional API**: One function, no classes
+- **Automatic event binding**: Declarative event handlers via `data-on-*` attributes
 - **Event bus & global store**: Built-in communication and state
 
 ## 🚀 Getting Started
@@ -75,9 +76,11 @@ import { component } from './lib/runtime.ts';
 
 component('simple-counter', {
   state: { count: 0 },
-  template: (state, api) => `<button data-ref="btn">Count: ${state.count}</button>`,
-  refs: {
-    btn: (el, state, api) => el.addEventListener('click', () => api.updateKey('count', state.count + 1))
+  template: (state) => `
+    <button data-on-click="increment">Count: ${state.count}</button>
+  `,
+  increment(_e, state, api) {
+    api.updateKey('count', state.count + 1);
   }
 });
 ```
@@ -93,23 +96,23 @@ import { component, emit, on } from './lib/runtime.ts';
 
 component('todo-app', {
   state: { todos: [], newTodo: '' },
-  template: (state, api) => `
-    <input data-ref="input" value="${state.newTodo}" placeholder="Add todo" />
-    <button data-ref="add">Add</button>
+  template: (state) => `
+    <input value="${state.newTodo}" placeholder="Add todo" data-on-input="handleInput" />
+    <button data-on-click="handleAdd">Add</button>
     <ul>
       ${state.todos.map((t: string) => `<li>${t}</li>`).join('')}
     </ul>
     <notification-display></notification-display>
   `,
-  refs: {
-    input: (el, state, api) => el.addEventListener('input', e => api.updateKey('newTodo', (e.target as HTMLInputElement).value)),
-    add: (el, state, api) => el.addEventListener('click', () => {
-      if (state.newTodo.trim()) {
-        api.updateKey('todos', [...state.todos, state.newTodo.trim()]);
-        emit('notify', { message: `Added: ${state.newTodo}` });
-        api.updateKey('newTodo', '');
-      }
-    })
+  handleInput(e, state, api) {
+    api.updateKey('newTodo', (e.target as HTMLInputElement).value);
+  },
+  handleAdd(_e, state, api) {
+    if (state.newTodo.trim()) {
+      api.updateKey('todos', [...state.todos, state.newTodo.trim()]);
+      emit('notify', { message: `Added: ${state.newTodo}` });
+      api.updateKey('newTodo', '');
+    }
   }
 });
 
@@ -563,6 +566,45 @@ component('user-profile', {
   `
 });
 ```
+
+### 5. Automatic Event Binding
+
+Define event handlers directly in your component config and use `data-on-*` attributes in your template for declarative, type-safe event handling. The runtime automatically attaches listeners after each render, ensuring no duplicate bindings and robust updates.
+
+**Usage Example:**
+
+```typescript
+component('my-form', {
+  state: { name: '' },
+  template: (state) => `
+    <form>
+      <input type="text" value="${state.name}" data-on-input="handleInput">
+      <button type="submit" data-on-click="handleSubmit">Submit</button>
+    </form>
+  `,
+  handleInput(e, state, api) {
+    state.name = (e.target as HTMLInputElement).value;
+  },
+  handleSubmit(e, state, api) {
+    e.preventDefault();
+    api.emit('form-submitted', { name: state.name });
+  }
+});
+```
+
+**Benefits:**
+- No manual event listener management
+- Handlers are type-safe and colocated with component logic
+- Works with all native DOM events
+- No duplicate listeners after rerender
+
+**Supported Syntax:**
+- `data-on-click="handlerName"`
+- `data-on-input="handlerName"`
+- `data-on-change="handlerName"`
+- ...any DOM event type
+
+See the TodoApp example for advanced usage.
 
 ## 🌐 Server-Side Rendering (SSR)
 

@@ -51,6 +51,10 @@ export interface ComponentConfig<S extends ComponentState, C extends Record<stri
   readonly refs?: Record<string, RefHandler<S & C>>;
   readonly onMounted?: LifecycleHandler<S & C>;
   readonly onUnmounted?: LifecycleHandler<S & C>;
+  /**
+   * Arbitrary event handler methods for automatic event binding
+   */
+  [handler: string]: any;
 }
 
 export type RefHandler<T extends ComponentState> = (
@@ -832,6 +836,8 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
         this.processRefs();
         this.refsAttached = true;
       }
+      // Automatic event binding after refs and DOM update
+      this.bindEvents();
     } catch (error) {
       if ('onError' in this.config && typeof (this.config as any).onError === 'function') {
         (this.config as any).onError(error as Error, this.api.state, this.api);
@@ -885,6 +891,42 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
       }
       // Silently skip missing refs as they may be conditionally rendered
     });
+  }
+
+  /**
+   * Automatically bind events for elements with data-on-* attributes.
+   * Ensures events are not attached multiple times after rerender.
+   */
+  private _eventListenerMap: WeakMap<Element, Set<string>> = new WeakMap();
+  private bindEvents(): void {
+    if (!this.shadowRoot) return;
+    const walker = document.createTreeWalker(this.shadowRoot, NodeFilter.SHOW_ELEMENT);
+    let node = walker.nextNode();
+    while (node) {
+      const el = node as Element;
+      Array.from(el.attributes).forEach(attr => {
+        if (attr.name.startsWith('data-on-')) {
+          const eventType = attr.name.slice('data-on-'.length);
+          const handlerName = attr.value;
+          // Look for handler on config, not api
+          const handler = (this.config as any)[handlerName];
+          if (typeof handler === 'function') {
+            let attached = this._eventListenerMap.get(el);
+            if (!attached) {
+              attached = new Set();
+              this._eventListenerMap.set(el, attached);
+            }
+            if (!attached.has(eventType)) {
+              el.addEventListener(eventType, (e: Event) => handler.call(this.config, e, this.api.state, this.api));
+              attached.add(eventType);
+            }
+          } else {
+            console.warn(`[bindEvents] Handler '${handlerName}' not found on config for event '${eventType}'`, el);
+          }
+        }
+      });
+      node = walker.nextNode();
+    }
   }
 
   private renderError(error: Error): void {

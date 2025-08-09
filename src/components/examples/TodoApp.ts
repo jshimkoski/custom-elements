@@ -38,74 +38,73 @@ const computedMap = {
   completedCount: (state: TodoAppState) => state.todos.filter((todo: Todo) => todo.completed).length
 };
 
-
-
 component<TodoAppState, TodoAppComputed>('todo-app', {
   state: initialState,
   computed: computedMap,
-  template: (state) => {
-    return html`
-      <div class="todo-app">
-        <header>
-          <h1>📝 Todo App</h1>
-          <input 
-            data-ref="newTodoInput"
-            type="text" 
-            value="${state.newTodo}"
-            placeholder="What needs to be done?"
-            class="new-todo"
+  template: (state, api) => html`
+    <div class="todo-app">
+      <header>
+        <h1>📝 Todo App</h1>
+        <input 
+          type="text" 
+          value="${state.newTodo}"
+          placeholder="What needs to be done?"
+          class="new-todo"
+          data-on-input="handleInput"
+          data-on-keydown="handleKeydown"
+        >
+      </header>
+      <main>
+        <div class="filters">
+          <button 
+            class="${state.filter === 'all' ? 'active' : ''}"
+            data-on-click="handleAllFilter"
           >
-        </header>
-        <main>
-          <div class="filters">
-            <button 
-              data-ref="allFilter"
-              class="${state.filter === 'all' ? 'active' : ''}"
-            >
-              All (${state.todos.length})
-            </button>
-            <button 
-              data-ref="activeFilter"
-              class="${state.filter === 'active' ? 'active' : ''}"
-            >
-              Active (${state.activeTodos.length})
-            </button>
-            <button 
-              data-ref="completedFilter"
-              class="${state.filter === 'completed' ? 'active' : ''}"
-            >
-              Completed (${state.completedCount})
-            </button>
-          </div>
-          <ul class="todo-list" data-ref="todoList">
-            ${state.filteredTodos.map((todo: Todo) => `
-              <li key="${todo.id}" class="${todo.completed ? 'completed' : ''}">
-                <input 
-                  type="checkbox" 
-                  ${todo.completed ? 'checked' : ''}
-                  data-todo-id="${todo.id}"
-                  data-action="toggle"
-                >
-                <span class="text">${todo.text}</span>
-                <button 
-                  class="delete"
-                  data-todo-id="${todo.id}"
-                  data-action="delete"
-                >
-                  ×
-                </button>
-              </li>
-            `).join('')}
-          </ul>
-        </main>
-        <footer>
-          <small>
-            ${state.activeTodos.length} items left
-          </small>
-        </footer>
-      </div>
-    `();
-  },
+            All (${state.todos.length})
+          </button>
+          <button 
+            class="${state.filter === 'active' ? 'active' : ''}"
+            data-on-click="handleActiveFilter"
+          >
+            Active (${state.activeTodos.length})
+          </button>
+          <button 
+            class="${state.filter === 'completed' ? 'active' : ''}"
+            data-on-click="handleCompletedFilter"
+          >
+            Completed (${state.completedCount})
+          </button>
+        </div>
+        <ul class="todo-list">
+          ${state.filteredTodos.map((todo: Todo) => html`
+            <li key="${todo.id}" class="${todo.completed ? 'completed' : ''}">
+              <input 
+                type="checkbox" 
+                ${todo.completed ? 'checked' : ''}
+                data-todo-id="${todo.id}"
+                data-action="toggle"
+                data-on-change="handleToggle"
+              >
+              <span class="text">${todo.text}</span>
+              <button 
+                class="delete"
+                data-todo-id="${todo.id}"
+                data-action="delete"
+                data-on-click="handleDelete"
+              >
+                ×
+              </button>
+            </li>
+          `(state, api)).join('')}
+        </ul>
+      </main>
+      <footer>
+        <small>
+          ${state.activeTodos.length} items left
+        </small>
+      </footer>
+    </div>
+  `(state, api),
   style: css`
     .todo-app {
       max-width: 400px;
@@ -191,66 +190,50 @@ component<TodoAppState, TodoAppComputed>('todo-app', {
       color: #888;
     }
   `,
-  refs: {
-    newTodoInput: (element: Element, state, api) => {
-      const input = element as HTMLInputElement;
-      input.addEventListener('input', () => {
-        api.updateKey('newTodo', input.value);
+  // Event handler methods for automatic binding
+  handleInput(e: Event, _state: TodoAppState, api: any) {
+    const input = e.target as HTMLInputElement;
+    api.updateKey('newTodo', input.value);
+  },
+  handleKeydown(e: Event, state: TodoAppState, api: any) {
+    const input = e.target as HTMLInputElement;
+    if ('key' in e && (e as KeyboardEvent).key === 'Enter' && state.newTodo.trim()) {
+      const newId = Math.max(0, ...state.todos.map((t: Todo) => t.id)) + 1;
+      const todoText = state.newTodo.trim();
+      api.update({
+        todos: [...state.todos, {
+          id: newId,
+          text: todoText,
+          completed: false
+        }],
+        newTodo: ''
       });
-      input.addEventListener('keydown', (e: Event) => {
-        if ('key' in e && (e as KeyboardEvent).key === 'Enter' && state.newTodo.trim()) {
-          const newId = Math.max(0, ...state.todos.map((t: Todo) => t.id)) + 1;
-          const todoText = state.newTodo.trim();
-          api.update({
-            todos: [...state.todos, {
-              id: newId,
-              text: todoText,
-              completed: false
-            }],
-            newTodo: ''
-          });
-          input.value = '';
-          api.emit('todo-added', { id: newId, text: todoText });
-        }
-      });
-    },
-    allFilter: (element: Element, _state, api) => {
-      element.addEventListener('click', () => {
-        api.updateKey('filter', 'all');
-      });
-    },
-    activeFilter: (element: Element, _state, api) => {
-      element.addEventListener('click', () => {
-        api.updateKey('filter', 'active');
-      });
-    },
-    completedFilter: (element: Element, _state, api) => {
-      element.addEventListener('click', () => {
-        api.updateKey('filter', 'completed');
-      });
-    },
-    todoList: (element: Element, state, api) => {
-      element.addEventListener('click', (e: Event) => {
-        const target = e.target as HTMLElement;
-        const todoId = parseInt(target.getAttribute('data-todo-id') || '0');
-        const action = target.getAttribute('data-action');
-        if (action === 'delete') {
-          api.updateKey('todos', state.todos.filter((t: Todo) => t.id !== todoId));
-          api.emit('todo-removed', { id: todoId });
-        }
-      });
-      element.addEventListener('change', (e: Event) => {
-        const target = e.target as HTMLInputElement;
-        const todoId = parseInt(target.getAttribute('data-todo-id') || '0');
-        const action = target.getAttribute('data-action');
-        if (action === 'toggle') {
-          api.updateKey('todos', state.todos.map((t: Todo) =>
-            t.id === todoId ? { ...t, completed: target.checked } : t
-          ));
-          api.emit('todo-toggled', { id: todoId, completed: target.checked });
-        }
-      });
+      input.value = '';
+      api.emit('todo-added', { id: newId, text: todoText });
     }
+  },
+  handleAllFilter(_e: Event, _state: TodoAppState, api: any) {
+    api.updateKey('filter', 'all');
+  },
+  handleActiveFilter(_e: Event, _state: TodoAppState, api: any) {
+    api.updateKey('filter', 'active');
+  },
+  handleCompletedFilter(_e: Event, _state: TodoAppState, api: any) {
+    api.updateKey('filter', 'completed');
+  },
+  handleDelete(e: Event, state: TodoAppState, api: any) {
+    const target = e.target as HTMLElement;
+    const todoId = parseInt(target.getAttribute('data-todo-id') || '0');
+    api.updateKey('todos', state.todos.filter((t: Todo) => t.id !== todoId));
+    api.emit('todo-removed', { id: todoId });
+  },
+  handleToggle(e: Event, state: TodoAppState, api: any) {
+    const target = e.target as HTMLInputElement;
+    const todoId = parseInt(target.getAttribute('data-todo-id') || '0');
+    api.updateKey('todos', state.todos.map((t: Todo) =>
+      t.id === todoId ? { ...t, completed: target.checked } : t
+    ));
+    api.emit('todo-toggled', { id: todoId, completed: target.checked });
   },
   onMounted: (state, api) => {
     console.log('📝 Todo App mounted', state);
