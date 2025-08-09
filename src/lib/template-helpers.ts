@@ -31,7 +31,36 @@ export const html = (
       return result + string + (value ?? '');
     }, '');
   };
+}
+/**
+ * compile helper: works like html, but returns a compiled template function with a unique id property.
+ * Accepts tagged template literals and dynamic values (functions or primitives).
+ */
+export type CompiledTemplateFn = {
+  (state: any, api?: any): string;
+  id: string;
 };
+
+export function compile(strings: TemplateStringsArray, ...values: any[]): CompiledTemplateFn {
+  const id = 'compiled-' + Math.random().toString(36).slice(2);
+  const fn = (state: any, api?: any) => {
+    let result = '';
+    for (let i = 0; i < strings.length; i++) {
+      result += strings[i];
+      if (i < values.length) {
+        const v = values[i];
+        if (typeof v === 'function') {
+          result += v(state, api);
+        } else {
+          result += v;
+        }
+      }
+    }
+    return result;
+  };
+  (fn as CompiledTemplateFn).id = id;
+  return fn as CompiledTemplateFn;
+}
 
 /**
  * Template literal tag for CSS strings  

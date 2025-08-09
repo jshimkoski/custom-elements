@@ -1,5 +1,6 @@
 import { component, css, type ComponentState } from '../../lib/runtime';
-import { compile } from '../../lib/runtime';
+import { compile } from '../../lib/template-helpers';
+
 interface Todo {
   id: number;
   text: string;
@@ -38,6 +39,7 @@ const computedMap = {
   completedCount: (state: TodoAppState) => state.todos.filter((todo: Todo) => todo.completed).length
 };
 
+
 const compiledTemplate = compile`
   <div class="todo-app">
     <header>
@@ -45,7 +47,7 @@ const compiledTemplate = compile`
       <input 
         data-ref="newTodoInput"
         type="text" 
-        value="${(state: TodoAppState) => state.newTodo}"
+  value="${(state: TodoAppState) => state.newTodo}"
         placeholder="What needs to be done?"
         class="new-todo"
       >
@@ -103,7 +105,7 @@ const compiledTemplate = compile`
 component<TodoAppState, TodoAppComputed>('todo-app-compiled', {
   state: initialState,
   computed: computedMap,
-  template: () => compiledTemplate,
+  template: compiledTemplate,
   style: css`
     .todo-app {
       max-width: 400px;
@@ -219,9 +221,7 @@ component<TodoAppState, TodoAppComputed>('todo-app-compiled', {
     },
     activeFilter: (element: Element, _state, api) => {
       element.addEventListener('click', () => {
-        console.log('Active filter clicked before:', _state, 'state ref:', _state);
         api.updateKey('filter', 'active');
-        console.log('Active filter clicked after:', _state, 'state ref:', _state);
       });
     },
     completedFilter: (element: Element, _state, api) => {

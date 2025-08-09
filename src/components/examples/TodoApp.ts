@@ -44,10 +44,6 @@ component<TodoAppState, TodoAppComputed>('todo-app', {
   state: initialState,
   computed: computedMap,
   template: (state) => {
-    // Debug logs to confirm computed getter access
-    console.debug('[TodoApp] template render: filteredTodos', state.filteredTodos);
-    console.debug('[TodoApp] template render: activeTodos', state.activeTodos);
-    console.debug('[TodoApp] template render: completedCount', state.completedCount);
     return html`
       <div class="todo-app">
         <header>
@@ -225,9 +221,7 @@ component<TodoAppState, TodoAppComputed>('todo-app', {
     },
     activeFilter: (element: Element, _state, api) => {
       element.addEventListener('click', () => {
-        console.log('Active filter clicked before:', _state, 'state ref:', _state);
         api.updateKey('filter', 'active');
-        console.log('Active filter clicked after:', _state, 'state ref:', _state);
       });
     },
     completedFilter: (element: Element, _state, api) => {
