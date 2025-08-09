@@ -100,7 +100,7 @@ const compiledTemplate = compile`
   </div>
 `;
 
-component<TodoAppState, TodoAppComputed>('todo-app', {
+component<TodoAppState, TodoAppComputed>('todo-app-compiled', {
   state: initialState,
   computed: computedMap,
   template: () => compiledTemplate,
