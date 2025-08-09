@@ -11,7 +11,7 @@ You are an expert in TypeScript, JavaScript, HTML, CSS. Your task is to produce 
 - When communicating with the user, you don't need to ask for permission before making cleanups or optimizations. Instead, focus on delivering a solution that is efficient and easy to understand.
 
 ## Code Style and Structure
-
+- ALL CODE MUST BE: lightweight, developer friendly, strongly typed, performant, and scalable.
 - Write concise, technical TypeScript code with accurate examples.
 - Use functional and declarative programming patterns; avoid classes.
 - Prefer iteration and modularization over code duplication.

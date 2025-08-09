@@ -21,9 +21,16 @@ export interface ComputedState<T extends object, C extends ComputedMap<T>> {
   ) => () => void;
 }
 
-export interface ReactiveState<T extends object, C extends ComputedMap<T>> extends ComputedState<T, C> {
+export interface ReactiveState<T extends object> {
   update: (changes: Partial<T>) => void;
-  onUpdate: (listener: (key: keyof T | keyof C, value: any) => void) => () => void;
+  onUpdate: (listener: (key: keyof T, value: T[keyof T]) => void) => () => void;
+  state: T;
+  recompute: (changes?: Partial<T>) => void;
+  watch: (
+    key: keyof T,
+    callback: (value: any) => void,
+    options?: { deep?: boolean; immediate?: boolean }
+  ) => () => void;
 }
 
 /**
@@ -181,24 +188,27 @@ export function computed<T extends object, C extends ComputedMap<T>>(
 /**
  * Create a reactive state object with computed properties and update/onUpdate methods.
  */
-export function reactive<T extends object, C extends ComputedMap<T>>(
-  initial: T,
-  computedMap: C
-): ReactiveState<T, C> {
-  const listeners = new Set<(key: keyof T | keyof C, value: any) => void>();
-  const result = defineComputed(initial, computedMap, listeners);
+export function reactive<T extends object>(
+  initial: T
+): ReactiveState<T> {
+  const listeners = new Set<(key: keyof T, value: T[keyof T]) => void>();
+  let proxyState: T;
+
+  const result = defineComputed(initial, {}, listeners);
 
   function update(changes: Partial<T>): void {
     result.recompute(changes);
   }
 
-  function onUpdate(listener: (key: keyof T | keyof C, value: any) => void): () => void {
+  function onUpdate(listener: (key: keyof T, value: T[keyof T]) => void): () => void {
     listeners.add(listener);
     return () => listeners.delete(listener);
   }
 
+  proxyState = result.state;
+
   return {
-    state: result.state,
+    state: proxyState,
     update,
     onUpdate,
     recompute: result.recompute,

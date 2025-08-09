@@ -15,6 +15,8 @@ export type { CompiledTemplate, UpdateFunction, UpdateType } from './template-co
  * - Template Compilation support
  */
 
+import { reactive } from './computed-state';
+
 // ============================================================================
 // CORE TYPES
 // ============================================================================
@@ -31,22 +33,20 @@ export interface ComponentAPI<T extends ComponentState = ComponentState> {
   updateKey<K extends keyof T>(key: K, value: T[K]): void;
 }
 
-export interface ComponentConfig<T extends ComponentState = ComponentState> {
-  readonly tag: string;
-  readonly template: (state: T, api: ComponentAPI<T>) => string | CompiledTemplate<T>;
+export interface ComponentConfig<S extends ComponentState, C extends Record<string, any> = {}> {
+  readonly template: (state: S & C, api: ComponentAPI<S & C>) => string | CompiledTemplate<S & C>;
   /**
-   * State object can include computed properties as getter functions that accept state as a parameter.
-   * Example:
-   * state: {
-   *   count: 0,
-   *   doubled(state) { return state.count * 2 }
-   * }
+   * State must be a plain object. Reactivity is handled automatically.
    */
-  readonly state: T;
-  readonly style?: string | ((state: T) => string);
-  readonly refs?: Record<string, RefHandler<T>>;
-  readonly onMounted?: LifecycleHandler<T>;
-  readonly onUnmounted?: LifecycleHandler<T>;
+  readonly state: S;
+  /**
+   * Computed values can be defined as a map of functions that accept merged state.
+   */
+  readonly computed?: { [K in keyof C]: (state: S & C) => C[K] };
+  readonly style?: string | ((state: S & C) => string);
+  readonly refs?: Record<string, RefHandler<S & C>>;
+  readonly onMounted?: LifecycleHandler<S & C>;
+  readonly onUnmounted?: LifecycleHandler<S & C>;
 }
 
 export type RefHandler<T extends ComponentState> = (
@@ -654,105 +654,45 @@ class DOMDiffer {
 }
 
 // ============================================================================
-// REACTIVE STATE SYSTEM
-// ============================================================================
-
-function createReactiveState<T extends ComponentState>(
-  initialState: T
-): {
-  state: T;
-  onUpdate: (listener: (key: keyof T, value: T[keyof T]) => void) => () => void;
-  update: (changes: Partial<T>) => void;
-} {
-  const listeners = new Set<(key: keyof T, value: T[keyof T]) => void>();
-
-  // We'll reference this later
-  let proxyState: T;
-
-  const notifyListeners = (key: keyof T, value: T[keyof T]): void => {
-    listeners.forEach(listener => {
-      try {
-        listener(key, value);
-      } catch (error) {
-        console.error('[ReactiveState] Listener error:', error);
-      }
-    });
-  };
-
-  // Create state with proper reference
-  proxyState = new Proxy(safeClone(initialState), {
-    get: (target, key) => {
-      return target[key as keyof T];
-    },
-    
-    set: (target, key, value) => {
-      const oldValue = target[key as keyof T];
-      if (oldValue === value) return true;
-
-      target[key as keyof T] = value;
-      notifyListeners(key as keyof T, value);
-      return true;
-    }
-  });
-
-  const onUpdate = (listener: (key: keyof T, value: T[keyof T]) => void): (() => void) => {
-    listeners.add(listener);
-    return () => listeners.delete(listener);
-  };
-
-  const update = (changes: Partial<T>): void => {
-    Object.assign(proxyState, changes);
-    Object.entries(changes).forEach(([key, value]) => {
-      notifyListeners(key as keyof T, value as T[keyof T]);
-    });
-  };
-
-  return { state: proxyState, onUpdate, update };
-}
-
-// ============================================================================
 // COMPONENT IMPLEMENTATION
 // ============================================================================
 
-class ComponentElement<T extends ComponentState> extends HTMLElement {
-  private readonly config: ComponentConfig<T>;
-  private readonly reactiveSystem: ReturnType<typeof createReactiveState<T>>;
-  private readonly api: ComponentAPI<T>;
-  private lastHTML = '';
-  private lastCompiledTemplate: CompiledTemplate<T> | null = null;
-  private lastState: T | null = null;
+class ComponentElement<S extends ComponentState, C extends Record<string, any> = {}> extends HTMLElement {
+  private readonly config: ComponentConfig<S, C>;
+  private readonly stateObj: S & C;
+  private readonly api: ComponentAPI<S & C>;
   private unsubscribes: Array<() => void> = [];
   private refsAttached = false;
   private isHydrating = false;
+  private lastHTML = '';
+  private lastCompiledTemplate: CompiledTemplate<S & C> | null = null;
+  private lastState: (S & C) | null = null;
 
-  constructor(config: ComponentConfig<T>) {
+  constructor(config: ComponentConfig<S, C>) {
     super();
     this.config = config;
-    
-    // Create reactive state
-    this.reactiveSystem = createReactiveState(
-      config.state
-    );
+
+  // State is always reactive, handled in component()
+  this.stateObj = config.state as S & C;
 
     // Create API
-    const reactiveSystem = this.reactiveSystem;
     const element = this;
     this.api = {
-      get state() { return reactiveSystem.state; },
+      get state() { return element.stateObj; },
       emit: (eventName: string, detail?: unknown) => {
         element.dispatchEvent(new CustomEvent(eventName, { detail, bubbles: true }));
       },
-      update: (changes: Partial<T>) => {
-        reactiveSystem.update(changes);
+      update: (changes: Partial<S & C>) => {
+        Object.assign(element.stateObj, changes);
       },
-      updateKey: <K extends keyof T>(key: K, value: T[K]) => {
-        (reactiveSystem.state as any)[key] = value;
+      updateKey: <K extends keyof (S & C)>(key: K, value: (S & C)[K]) => {
+        (element.stateObj as any)[key] = value;
       }
     };
 
     // Attach shadow DOM
     this.attachShadow({ mode: 'open' });
-    
+
     // Setup style
     if (config.style) {
       const style = document.createElement('style');
@@ -761,21 +701,27 @@ class ComponentElement<T extends ComponentState> extends HTMLElement {
     }
 
     // Add hydration support
-    (this as any)._hydrateWithState = (ssrState: T) => {
+    (this as any)._hydrateWithState = (ssrState: S & C) => {
       this.isHydrating = true;
-      this.reactiveSystem.update(ssrState);
+      Object.assign(this.stateObj, ssrState);
       this.isHydrating = false;
     };
   }
 
   connectedCallback(): void {
-    // Subscribe to state changes
-    const unsubscribe = this.reactiveSystem.onUpdate(() => {
-      if (!this.isHydrating) {
-        scheduler.schedule(() => this.render());
-      }
-    });
-    this.unsubscribes.push(unsubscribe);
+    // Subscribe to state changes using watch if available
+    if ('watch' in this.config.state && typeof this.config.state.watch === 'function') {
+      const unsubscribe = this.config.state.watch(
+        undefined as any, // watch all keys
+        () => {
+          if (!this.isHydrating) {
+            scheduler.schedule(() => this.render());
+          }
+        },
+        { deep: true }
+      );
+      this.unsubscribes.push(unsubscribe);
+    }
 
     // Check if this is SSR hydration
     const isSSRHydration = this.hasAttribute('data-hydrated');
@@ -788,7 +734,7 @@ class ComponentElement<T extends ComponentState> extends HTMLElement {
       this.lastHTML = this.shadowRoot!.innerHTML;
       this.processRefs();
     }
-    
+
     // Call lifecycle hook
     this.config.onMounted?.(this.api.state, this.api);
   }
@@ -878,8 +824,8 @@ class ComponentElement<T extends ComponentState> extends HTMLElement {
       }
       
     } catch (error) {
-      console.error(`[${this.config.tag}] Render error:`, error);
-      this.renderError(error as Error);
+  console.error(`[Component] Render error:`, error);
+  this.renderError(error as Error);
     }
   }
 
@@ -916,7 +862,7 @@ class ComponentElement<T extends ComponentState> extends HTMLElement {
     this.shadowRoot!.innerHTML = `
       <div style="color: red; border: 1px solid red; padding: 1rem; border-radius: 4px;">
         <h3>Component Error</h3>
-        <p><strong>${this.config.tag}:</strong> ${error.message}</p>
+        <p><strong>Component:</strong> ${error.message}</p>
       </div>
     `;
   }
@@ -926,23 +872,36 @@ class ComponentElement<T extends ComponentState> extends HTMLElement {
 // PUBLIC API
 // ============================================================================
 
-export function component<T extends ComponentState>(config: ComponentConfig<T>): void {
+export function component<S extends ComponentState, C extends Record<string, any> = {}>(tag: string, config: ComponentConfig<S, C>): void {
   // Validate config
-  if (!config.tag || !config.template || !config.state) {
+  if (!tag || !config.template || !config.state) {
     throw new Error('Component requires tag, template, and state');
   }
 
-  if (customElements.get(config.tag)) {
-    console.warn(`Component "${config.tag}" already registered`);
+  if (customElements.get(tag)) {
+    console.warn(`Component "${tag}" already registered`);
     return;
   }
 
+  // Always make state reactive
+  let reactiveState = reactive(config.state);
+  // Wire up computed as getters on merged state
+  let mergedState: S & C = reactiveState.state as S & C;
+  if (config.computed) {
+    for (const key in config.computed) {
+      Object.defineProperty(mergedState, key, {
+        get: () => config.computed![key](mergedState),
+        enumerable: true,
+        configurable: true
+      });
+    }
+  }
   // Create and register component class
-  const ComponentClass = class extends ComponentElement<T> {
+  const wrappedConfig = { ...config, state: mergedState };
+  const ComponentClass = class extends ComponentElement<S, C> {
     constructor() {
-      super(config);
+      super(wrappedConfig);
     }
   };
-
-  customElements.define(config.tag, ComponentClass);
+  customElements.define(tag, ComponentClass);
 }
