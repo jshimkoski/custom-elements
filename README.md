@@ -58,8 +58,7 @@
 ```typescript
 import { component } from './lib/runtime.ts';
 
-component({
-  tag: 'hello-world',
+component('hello-world', {
   state: { name: 'World' },
   template: (state) => `<h1>Hello, ${state.name}!</h1>`
 });
@@ -74,12 +73,11 @@ component({
 ```typescript
 import { component } from './lib/runtime.ts';
 
-component({
-  tag: 'simple-counter',
+component('simple-counter', {
   state: { count: 0 },
-  template: (state) => `<button data-ref="btn">Count: ${state.count}</button>`,
+  template: (state, api) => `<button data-ref="btn">Count: ${state.count}</button>`,
   refs: {
-    btn: (el, state) => el.addEventListener('click', () => state.count++)
+    btn: (el, state, api) => el.addEventListener('click', () => api.updateKey('count', state.count + 1))
   }
 });
 ```
@@ -93,10 +91,9 @@ component({
 ```typescript
 import { component, emit, on } from './lib/runtime.ts';
 
-component({
-  tag: 'todo-app',
+component('todo-app', {
   state: { todos: [], newTodo: '' },
-  template: (state) => `
+  template: (state, api) => `
     <input data-ref="input" value="${state.newTodo}" placeholder="Add todo" />
     <button data-ref="add">Add</button>
     <ul>
@@ -105,30 +102,29 @@ component({
     <notification-display></notification-display>
   `,
   refs: {
-    input: (el, state) => el.addEventListener('input', e => state.newTodo = (e.target as HTMLInputElement).value),
-    add: (el, state) => el.addEventListener('click', () => {
+    input: (el, state, api) => el.addEventListener('input', e => api.updateKey('newTodo', (e.target as HTMLInputElement).value)),
+    add: (el, state, api) => el.addEventListener('click', () => {
       if (state.newTodo.trim()) {
-        state.todos.push(state.newTodo.trim());
+        api.updateKey('todos', [...state.todos, state.newTodo.trim()]);
         emit('notify', { message: `Added: ${state.newTodo}` });
-        state.newTodo = '';
+        api.updateKey('newTodo', '');
       }
     })
   }
 });
 
-component({
-  tag: 'notification-display',
+component('notification-display', {
   state: { notifications: [] },
   template: (state) => `
     <div>
       ${state.notifications.map((n: any) => `<div>${n.message}</div>`).join('')}
     </div>
   `,
-  onMount: (state) => {
+  onMounted: (state, api) => {
     on('notify', (n) => {
-      state.notifications.push(n);
+      api.updateKey('notifications', [...state.notifications, n]);
       setTimeout(() => {
-        state.notifications = state.notifications.filter(x => x !== n);
+        api.updateKey('notifications', state.notifications.filter(x => x !== n));
       }, 2000);
     });
   }
@@ -514,21 +510,26 @@ refs: {
 ```
 
 ### 4. Computed Properties
-Define computed values as ES6 getters inside the state object. Getters should reference `this` for reactivity:
+
+Define computed properties using the `computed` property in `ComponentConfig`. This ensures correct reactivity and separation of state and derived values:
 
 ```typescript
-state: {
-  firstName: 'Jane',
-  lastName: 'Doe',
-  email: '',
-  password: '',
-  get fullName() {
-    return `${this.firstName} ${this.lastName}`;
+component('user-profile', {
+  state: {
+    firstName: 'Jane',
+    lastName: 'Doe',
+    email: '',
+    password: ''
   },
-  get isValid() {
-    return this.email.includes('@') && this.password.length >= 8;
-  }
-}
+  computed: {
+    fullName: (state) => `${state.firstName} ${state.lastName}`,
+    isValid: (state) => state.email.includes('@') && state.password.length >= 8
+  },
+  template: (state, computed) => `
+    <div>Name: ${computed.fullName}</div>
+    <div>Valid: ${computed.isValid ? 'Yes' : 'No'}</div>
+  `
+});
 ```
 
 ## 🌐 Server-Side Rendering (SSR)
@@ -753,6 +754,7 @@ interface ComponentConfig<T> {
   refs?: Record<string, RefHandler<T>>;         // DOM element refs
   onMounted?: (state: T, api: ComponentAPI<T>) => void;
   onUnmounted?: (state: T, api: ComponentAPI<T>) => void;
+  onError?: (error: Error, state: T, api: ComponentAPI<T>) => void; // Error boundary
 }
 ```
 
@@ -764,6 +766,9 @@ interface ComponentAPI<T> {
   emit(eventName: string, detail?: any): void;
   update(changes: Partial<T>): void;
   updateKey<K extends keyof T>(key: K, value: T[K]): void;
+  onGlobal?<U = any>(eventName: string, handler: (data: U) => void): () => void;
+  offGlobal?<U = any>(eventName: string, handler: (data: U) => void): void;
+  emitGlobal?<U = any>(eventName: string, data?: U): void;
 }
 ```
 
@@ -1019,6 +1024,29 @@ component({
 ```
 
 ### Development Tools
+
+## Hot Module Replacement (HMR)
+
+The runtime supports hot-module replacement in development environments. When using Vite or similar tools, component definitions will update in place without requiring a full page reload. HMR is automatic and safe—custom elements are only defined once per tag.
+
+## Error Boundaries
+
+You can provide an `onError` handler in your `ComponentConfig` to catch and handle errors during rendering. This allows you to display fallback UI or log errors for diagnostics:
+
+```typescript
+component('my-component', {
+  state: { ... },
+  template: (state) => {
+    // ...
+    throw new Error('Something went wrong!');
+  },
+  onError: (error, state, api) => {
+    api.emit('component-error', { error });
+    // Optionally render fallback UI
+  }
+});
+```
+## Performance & Monitoring
 
 ```typescript
 import { Performance, DevTools } from './lib/dev-tools.ts';
