@@ -443,70 +443,56 @@ component<TodoAppState>({
 
 ## 🎯 Framework Comparison Details
 
-| Feature         | Custom Elements Runtime | React | Vue | Angular | Svelte |
-|-----------------|------------------------|-------|------|---------|--------|
-| Bundle Size     | ~8KB                   | ~45KB | ~35KB| ~60KB   | ~10KB  |
-| SSR             | Built-in               | Yes   | Yes  | Yes     | Yes    |
-| TypeScript      | Strict                 | Opt   | Opt  | Strict  | Opt    |
-| State Mgmt      | Manual/Store           | Redux | Pinia| RxJS    | Store  |
-| Routing         | Manual                 | Router| Router| Router  | SvelteKit|
-| HMR             | Built-in               | Yes   | Yes  | Yes     | Yes    |
-| Error Boundaries| Built-in               | Yes   | Yes  | Yes     | Yes    |
-| Learning Curve  | Low                    | Med   | Med  | High    | Med    |
+| Feature                | Custom Elements Runtime | React   | Vue     | Angular | Svelte  | Lit     |
+|------------------------|------------------------|---------|---------|---------|---------|---------|
+| **Bundle Size**        | ~8KB                   | ~45KB   | ~35KB   | ~60KB   | ~10KB   | ~7KB    |
+| **SSR**                | Built-in               | Yes     | Yes     | Yes     | Yes     | Yes     |
+| **TypeScript**         | Strict                 | Opt     | Opt     | Strict  | Opt     | Strict  |
+| **State Mgmt**         | Manual/Store           | Redux   | Pinia   | RxJS    | Store   | Manual  |
+| **Routing**            | Manual                 | Router  | Router  | Router  | SvelteKit| Manual  |
+| **HMR**                | Built-in               | Yes     | Yes     | Yes     | Yes     | Yes     |
+| **Error Boundaries**   | Built-in               | Yes     | Yes     | Yes     | Yes     | Manual  |
+| **Learning Curve**     | Low                    | Medium  | Medium  | High    | Medium  | Low     |
+| **Event Binding**      | Declarative (data-on-*)| JSX     | v-on    | (ng)    | on:     | @event  |
+| **Reactivity**         | ES6 Proxy              | setState| Proxy   | Zone.js | Compiler| LitElement|
+| **Dependencies**       | None                   | Many    | Some    | Many    | None    | None    |
+| **SSR Hydration**      | Seamless               | Yes     | Yes     | Yes     | Yes     | Yes     |
+| **Tree-shaking**       | Yes                    | Partial | Partial | Partial | Yes     | Yes     |
+| **Custom Elements**    | Native                 | No      | No      | No      | No      | Yes     |
+| **DevTools**           | Minimal                | Advanced| Advanced| Advanced| Basic   | Basic   |
 
-### Custom Elements Runtime (Current)
-- **Direct DOM updates**: No virtual DOM, fastest possible rendering.
-- **Strict TypeScript**: Type-safe, developer-friendly, no config required.
-- **Zero dependencies**: Pure TypeScript/JavaScript, tree-shakable.
-- **SSR & Hydration**: Universal rendering, seamless client takeover.
-- **Functional API**: One function, no classes, easy onboarding.
-- **Event bus & global store**: Built-in communication and state.
-- **HMR & Error Boundaries**: Built-in for robust development and production safety.
+### Key Strengths of Custom Elements Runtime
+- **Smallest bundle size**: ~8KB, zero dependencies, tree-shakable
+- **Direct DOM updates**: No virtual DOM, fastest rendering
+- **Strict TypeScript**: Type-safe by default, no config required
+- **SSR & Hydration**: Universal rendering, seamless client takeover
+- **Declarative event binding**: `data-on-*` attributes, no manual listeners
+- **Functional API**: No classes, easy onboarding
+- **Built-in error boundaries, HMR, and global event bus**
+- **Native Custom Elements**: Standards-based, interoperable
 
-#### Pros
-- Fastest DOM updates (no VDOM, no diffing)
-- Smallest bundle size (tree-shakable, modular)
-- Simple, functional API (easy onboarding)
-- SSR, hydration, HMR, error boundaries built-in
-- No external dependencies (security, maintainability)
+### Weaknesses / Tradeoffs
+- Smaller ecosystem, fewer plugins/integrations
+- Manual state management (no context API, no built-in store)
+- No built-in router, forms, or animation system
+- Minimal devtools and CLI support
 
-#### Cons
-- Smaller ecosystem (fewer plugins, integrations)
-- Fewer advanced features (no built-in router, forms, animation, etc.)
-- Manual state management (no context, no global store by default)
-- Less tooling (no CLI, no official devtools)
+### When to Choose Custom Elements Runtime
+- Micro-frontends, design systems, performance-critical apps, progressive enhancement, SSR sites, web standards projects
+- When bundle size, performance, and standards compliance are top priorities
 
-#### When to Use
-- Micro-frontends, design systems, performance-critical apps, progressive enhancement, SSR sites, web standards projects.
+### When to Choose a Major Framework
+- Large apps needing advanced routing, forms, context, or extensive ecosystem/tooling
+- Teams requiring mature devtools, CLI, and third-party integrations
 
-#### When Not to Use
-- Large apps needing routing, forms, advanced state management, or extensive ecosystem and tooling.
+### Unique Features Compared to Other Frameworks
+- **Automatic event binding**: Declarative, type-safe, and cleaned up automatically
+- **Native custom elements**: True web standard, interoperable with any framework
+- **Zero dependencies**: No external libraries, secure and maintainable
+- **Functional, modular API**: No classes, no boilerplate
 
-### Comparison Highlights
-
-#### vs React
-- 5x smaller bundle (~8KB vs ~45KB)
-- Direct DOM updates, no virtual DOM overhead
-- No JSX, build steps, or complex tooling
-- Native Web Components, future-proof
-
-#### vs Vue
-- 4x smaller bundle (~8KB vs ~35KB)
-- Simpler API, no directives or config
-- Native TypeScript support
-- Templates are plain JS functions
-
-#### vs Svelte
-- True runtime (better debugging, no compile step)
-- Built-in SSR and hydration
-- Smaller bundle for most real-world apps
-- Works with any tools/libraries
-
-#### vs Lit
-- Faster state management (ES6 Proxy)
-- Simpler component definition
-- Smaller runtime size
-- More built-in features (SSR, event bus, global state)
+### Summary Table
+Custom Elements Runtime is ideal for modern, lightweight, standards-based web components and micro-frontends, while major frameworks excel in large-scale, feature-rich applications.
 
 ## 🧩 Core Concepts
 
