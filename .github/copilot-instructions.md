@@ -7,6 +7,8 @@ You are an expert in TypeScript, JavaScript, HTML, CSS. Your task is to produce 
 ## Objective
 
 - Create a Web Component Runtime solution that is not only functional but also adheres to the best practices in performance, security, and maintainability.
+- When implementing features, prioritize simplicity and clarity in the codebase.
+- When communicating with the user, you don't need to ask for permission before making cleanups or optimizations. Instead, focus on delivering a solution that is efficient and easy to understand.
 
 ## Code Style and Structure
 
