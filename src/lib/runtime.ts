@@ -882,15 +882,32 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
 
   private processRefs(): void {
     if (!this.config.refs) return;
+    // Track attached listeners per element/type
+    const listenerMap: WeakMap<Element, Set<string>> = new WeakMap();
 
     Object.entries(this.config.refs).forEach(([refName, handler]) => {
       const element = this.shadowRoot!.querySelector(`[data-ref="${refName}"]`);
       if (element) {
-        // Check if refs are already processed for this element
-        if (element.hasAttribute('data-refs-processed')) {
-          return;
+        // Only attach listeners once per element/type
+        if (!listenerMap.has(element)) {
+          listenerMap.set(element, new Set());
         }
+        const attachedTypes = listenerMap.get(element)!;
 
+        // Wrap addEventListener to prevent duplicates
+        const originalAddEventListener = element.addEventListener;
+        element.addEventListener = function(
+          type: string,
+          listener: EventListenerOrEventListenerObject,
+          options?: boolean | AddEventListenerOptions
+        ) {
+          const key = `${type}`;
+          if (attachedTypes.has(key)) return;
+          attachedTypes.add(key);
+          originalAddEventListener.call(element, type, listener, options);
+        };
+
+        // Mark as processed and call handler
         element.setAttribute('data-refs-processed', 'true');
         handler(element, this.api.state, this.api);
       }
