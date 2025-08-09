@@ -31,12 +31,9 @@ export interface ComponentAPI<T extends ComponentState = ComponentState> {
   readonly state: T;
   emit(eventName: string, detail?: unknown): void;
   update(changes: Partial<T>): void;
-  updateKey<K extends keyof T>(key: K, value: T[K]): void;
-  /** Listen to a global event. Returns unsubscribe function. */
+  updateKey?<K extends keyof T>(key: K, value: T[K]): void;
   onGlobal?<U = any>(eventName: string, handler: (data: U) => void): () => void;
-  /** Remove a global event handler. */
   offGlobal?<U = any>(eventName: string, handler: (data: U) => void): void;
-  /** Emit a global event. */
   emitGlobal?<U = any>(eventName: string, data?: U): void;
 }
 
@@ -116,6 +113,9 @@ function createSSRAPI<T extends ComponentState>(state: T): ComponentAPI<T> {
     emit: () => {}, // No-op on server
     update: () => {}, // No-op on server
     updateKey: () => {}, // No-op on server
+    onGlobal: () => () => {},
+    offGlobal: () => {},
+    emitGlobal: () => {},
   };
 }
 
@@ -907,6 +907,19 @@ export function component<S extends ComponentState, C extends Record<string, any
     throw new Error('Component requires tag, template, and state');
   }
 
+  // HMR support: unregister previous definition if in dev and module.hot is available
+  const isDev = typeof window !== 'undefined' && (window as any).VITE_DEV_HMR;
+  const hasHMR = typeof import.meta !== 'undefined' && (import.meta as any).hot;
+  if ((isDev || hasHMR) && customElements.get(tag)) {
+    try {
+      document.querySelectorAll(tag).forEach(el => el.remove());
+      // @ts-ignore
+      if ((window as any).customElements._definitions) {
+        delete (window as any).customElements._definitions[tag];
+      }
+    } catch (e) {}
+  }
+
   if (customElements.get(tag)) {
     console.warn(`Component "${tag}" already registered`);
     return;
@@ -915,8 +928,6 @@ export function component<S extends ComponentState, C extends Record<string, any
   // Create reactive state with computed properties
   const state = reactive(config.state, config.computed as Record<string, (state: S) => any>);
   (config as any).state = state;
-
-  // Setup subscription for reactivity (optional, for external listeners)
   (config as any)._subscribe = state.subscribe;
 
   const ComponentClass = class extends ComponentElement<S, C> {
@@ -924,5 +935,16 @@ export function component<S extends ComponentState, C extends Record<string, any
       super(config);
     }
   };
-  customElements.define(tag, ComponentClass);
+  if (!customElements.get(tag)) {
+    customElements.define(tag, ComponentClass);
+  }
+
+  // Accept HMR updates if available
+  if (hasHMR && typeof (import.meta as any).hot.accept === 'function') {
+    (import.meta as any).hot.accept(() => {
+      if (!customElements.get(tag)) {
+        customElements.define(tag, ComponentClass);
+      }
+    });
+  }
 }
