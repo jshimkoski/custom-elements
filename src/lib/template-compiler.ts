@@ -310,22 +310,28 @@ class TemplateAnalyzer {
   }
   
   private createValueGetter(expression: string): (state: any, api: any) => unknown {
-    // Create a safe getter function for the expression
-    // In production, this would be proper expression compilation
+    // Always evaluate at render time, never cache
     return (state: any, _api: any) => {
       try {
-        // Simple state property access
-        if (expression.startsWith('state.')) {
-          const prop = expression.slice(6);
-          return state[prop];
+        // If the expression is a function, call it with state
+        if (expression && typeof expression === 'function') {
+          const value = (expression as (s: any) => any)(state);
+          if (typeof window !== 'undefined') {
+            console.debug(`[template-compiler] [function expr] called, value:`, value);
+          }
+          return value;
         }
-        
-        // Simple computed access
-        if (expression.includes('(')) {
-          // For now, just return the expression as-is
+        if (typeof expression === 'string' && expression.startsWith('state.')) {
+          const prop = expression.slice(6);
+          const value = state[prop];
+          if (typeof window !== 'undefined') {
+            console.debug(`[template-compiler] [getter] '${prop}' called, value:`, value);
+          }
+          return value;
+        }
+        if (typeof expression === 'string' && expression.includes('(')) {
           return expression;
         }
-        
         return expression;
       } catch (error) {
         if (this.options.development) {

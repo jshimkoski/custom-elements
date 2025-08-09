@@ -42,7 +42,7 @@ export interface ComponentConfig<S extends ComponentState, C extends Record<stri
   /**
    * Computed values can be defined as a map of functions that accept merged state.
    */
-  readonly computed?: { [K in keyof C]: (state: S & C) => C[K] };
+  readonly computed?: { [K in keyof C]: (state: S) => C[K] };
   readonly style?: string | ((state: S & C) => string);
   readonly refs?: Record<string, RefHandler<S & C>>;
   readonly onMounted?: LifecycleHandler<S & C>;
@@ -330,35 +330,6 @@ function safeClone<T>(obj: T): T {
 // Efficient string template cache
 const templateCache = new Map<string, DocumentFragment>();
 
-// RAF scheduler for batched updates
-class RenderScheduler {
-  private readonly queue = new Set<() => void>();
-  private rafId: number | null = null;
-
-  schedule(callback: () => void): void {
-    this.queue.add(callback);
-    if (this.rafId === null) {
-      this.rafId = requestAnimationFrame(() => this.flush());
-    }
-  }
-
-  private flush(): void {
-    const callbacks = Array.from(this.queue);
-    this.queue.clear();
-    this.rafId = null;
-    
-    for (const callback of callbacks) {
-      try {
-        callback();
-      } catch (error) {
-        console.error('[Component] Render error:', error);
-      }
-    }
-  }
-}
-
-const scheduler = new RenderScheduler();
-
 // ============================================================================
 // OPTIMIZED DOM MORPHING
 // ============================================================================
@@ -388,55 +359,92 @@ class DOMDiffer {
   static morph(oldElement: Element, newHTML: string): void {
     const newFragment = TemplateParser.parseTemplate(newHTML);
     const newElement = newFragment.firstElementChild;
-    
+    console.log('[DOMDiffer] morph called');
+    console.log('[DOMDiffer] oldElement:', oldElement.outerHTML);
+    console.log('[DOMDiffer] newElement:', newElement?.outerHTML);
     if (!newElement) {
       oldElement.innerHTML = '';
       return;
     }
-
     this.morphElement(oldElement, newElement);
+    console.log('[DOMDiffer] morph complete, result:', oldElement.outerHTML);
   }
 
   private static morphElement(oldEl: Element, newEl: Element): void {
-    // Fast path: if tag names differ, replace entirely
-    if (oldEl.tagName !== newEl.tagName) {
-      oldEl.replaceWith(newEl.cloneNode(true));
-      return;
-    }
+    console.log('[DOMDiffer] morphElement:', oldEl.tagName, '->', newEl.tagName);
+    // Replace node if tag name, key, or class differs
+    const oldKey = oldEl.getAttribute('key');
+    const newKey = newEl.getAttribute('key');
+    const oldClass = oldEl.getAttribute('class');
+    const newClass = newEl.getAttribute('class');
+      if (oldEl.tagName !== newEl.tagName || oldKey !== newKey || oldClass !== newClass) {
+        console.warn('[DOMDiffer] Node differs, replacing node:', oldEl.outerHTML, '->', newEl.outerHTML);
+        const parent = oldEl.parentNode;
+        const newNode = newEl.cloneNode(true);
+        if (parent) {
+          parent.replaceChild(newNode, oldEl);
+        }
+        return;
+      }
 
+      // Special handling for <input> to preserve focus and cursor
+      if (oldEl.tagName === 'INPUT' && newEl.tagName === 'INPUT') {
+        const oldType = oldEl.getAttribute('type');
+        const newType = newEl.getAttribute('type');
+        // Only update value if type is the same
+        if (oldType === newType) {
+          const oldValue = (oldEl as HTMLInputElement).value;
+          const newValue = newEl.getAttribute('value') ?? '';
+          // Only update if value differs
+          if (oldValue !== newValue) {
+            const isFocused = document.activeElement === oldEl;
+            let selectionStart = null;
+            let selectionEnd = null;
+            if (isFocused) {
+              selectionStart = (oldEl as HTMLInputElement).selectionStart;
+              selectionEnd = (oldEl as HTMLInputElement).selectionEnd;
+            }
+            (oldEl as HTMLInputElement).value = newValue;
+            // Restore cursor position if focused
+            if (isFocused && selectionStart !== null && selectionEnd !== null) {
+              (oldEl as HTMLInputElement).setSelectionRange(selectionStart, selectionEnd);
+            }
+          }
+          // Morph other attributes except value
+          this.morphAttributes(oldEl, newEl);
+          this.morphChildren(oldEl, newEl);
+          return;
+        }
+      }
     // Morph attributes efficiently
     this.morphAttributes(oldEl, newEl);
-
     // Morph children (includes text nodes)
     this.morphChildren(oldEl, newEl);
   }
 
   private static morphAttributes(oldEl: Element, newEl: Element): void {
-    // Remove old attributes not in new element
     const oldAttrs = oldEl.getAttributeNames();
     const newAttrs = newEl.getAttributeNames();
-    
+    console.log('[DOMDiffer] morphAttributes:', oldAttrs, '->', newAttrs);
+    // Remove old attributes not in new element (including data-refs-processed)
     for (const attr of oldAttrs) {
-      if (!newAttrs.includes(attr) && !attr.startsWith('data-refs-')) {
+      if (!newAttrs.includes(attr)) {
         // Special handling for form elements when removing form attributes
         if (this.isFormElement(oldEl) && this.isValueAttribute(attr)) {
           this.updateFormValue(oldEl as HTMLInputElement | HTMLTextAreaElement, attr, null);
         }
+        console.log('[DOMDiffer] Removing attribute:', attr);
         oldEl.removeAttribute(attr);
       }
     }
-
     // Set new/changed attributes
     for (const attr of newAttrs) {
       const newValue = newEl.getAttribute(attr);
       const oldValue = oldEl.getAttribute(attr);
-      
-      // For value attributes, we need to handle empty string vs null properly
       if (this.isFormElement(oldEl) && this.isValueAttribute(attr)) {
-        // Always call updateFormValue for form elements, even if values seem the same
-        // because DOM element value might differ from attribute value
         this.updateFormValue(oldEl as HTMLInputElement | HTMLTextAreaElement, attr, newValue);
       } else if (oldValue !== newValue) {
+        console.log('[DOMDiffer] Setting attribute:', attr, '=', newValue);
         oldEl.setAttribute(attr, newValue || '');
       }
     }
@@ -445,12 +453,16 @@ class DOMDiffer {
   private static morphChildren(oldEl: Element, newEl: Element): void {
     const oldChildren = Array.from(oldEl.childNodes);
     const newChildren = Array.from(newEl.childNodes);
-
+    console.log('[DOMDiffer] morphChildren:', {
+      oldCount: oldChildren.length,
+      newCount: newChildren.length,
+      oldChildren: oldChildren.map(n => n.nodeType === 1 ? (n as Element).outerHTML : n.textContent),
+      newChildren: newChildren.map(n => n.nodeType === 1 ? (n as Element).outerHTML : n.textContent)
+    });
     // Try key-based morphing first for elements with keys
     if (this.hasKeyedElements(oldChildren) || this.hasKeyedElements(newChildren)) {
       this.morphNodesByKey(oldEl, oldChildren, newChildren);
     } else {
-      // Fall back to position-based morphing
       this.morphNodesByPosition(oldEl, oldChildren, newChildren);
     }
   }
@@ -659,36 +671,44 @@ class DOMDiffer {
 
 class ComponentElement<S extends ComponentState, C extends Record<string, any> = {}> extends HTMLElement {
   private readonly config: ComponentConfig<S, C>;
-  private readonly stateObj: S & C;
+  private readonly stateObj!: S & C;
   private readonly api: ComponentAPI<S & C>;
   private unsubscribes: Array<() => void> = [];
   private refsAttached = false;
-  private isHydrating = false;
+  // Removed unused isHydrating property
   private lastHTML = '';
   private lastCompiledTemplate: CompiledTemplate<S & C> | null = null;
   private lastState: (S & C) | null = null;
 
   constructor(config: ComponentConfig<S, C>) {
-    super();
-    this.config = config;
+  super();
+  this.config = config;
 
-  // State is always reactive, handled in component()
+  // Store reactive state
   this.stateObj = config.state as S & C;
+  // Subscribe to state changes and re-render
+  if (typeof (this.stateObj as any).subscribe === 'function') {
+    (this.stateObj as any).subscribe(() => this.render());
+  }
 
-    // Create API
-    const element = this;
-    this.api = {
-      get state() { return element.stateObj; },
-      emit: (eventName: string, detail?: unknown) => {
-        element.dispatchEvent(new CustomEvent(eventName, { detail, bubbles: true }));
-      },
-      update: (changes: Partial<S & C>) => {
-        Object.assign(element.stateObj, changes);
-      },
-      updateKey: <K extends keyof (S & C)>(key: K, value: (S & C)[K]) => {
-        (element.stateObj as any)[key] = value;
+  // Create API
+  const element = this;
+  this.api = {
+    get state() { return element.stateObj; },
+    emit: (eventName: string, detail?: unknown) => {
+      element.dispatchEvent(new CustomEvent(eventName, { detail, bubbles: true }));
+    },
+    update: (changes: Partial<S & C>) => {
+      if (typeof (element.stateObj as any).set === 'function') {
+        (element.stateObj as any).set(changes);
       }
-    };
+    },
+    updateKey: <K extends keyof (S & C)>(key: K, value: (S & C)[K]) => {
+      if (typeof (element.stateObj as any).set === 'function') {
+        (element.stateObj as any).set({ [key]: value });
+      }
+    }
+  };
 
     // Attach shadow DOM
     this.attachShadow({ mode: 'open' });
@@ -702,39 +722,21 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
 
     // Add hydration support
     (this as any)._hydrateWithState = (ssrState: S & C) => {
-      this.isHydrating = true;
       Object.assign(this.stateObj, ssrState);
-      this.isHydrating = false;
     };
   }
 
   connectedCallback(): void {
-    // Subscribe to state changes using watch if available
-    if ('watch' in this.config.state && typeof this.config.state.watch === 'function') {
-      const unsubscribe = this.config.state.watch(
-        undefined as any, // watch all keys
-        () => {
-          if (!this.isHydrating) {
-            scheduler.schedule(() => this.render());
-          }
-        },
-        { deep: true }
-      );
-      this.unsubscribes.push(unsubscribe);
-    }
-
-    // Check if this is SSR hydration
+  // ...existing code...
+    // Initial render for client-side components
     const isSSRHydration = this.hasAttribute('data-hydrated');
-
     if (!isSSRHydration) {
-      // Initial render for client-side components
       this.render();
     } else {
       // SSR hydration - preserve existing DOM, just attach refs and events
       this.lastHTML = this.shadowRoot!.innerHTML;
       this.processRefs();
     }
-
     // Call lifecycle hook
     this.config.onMounted?.(this.api.state, this.api);
   }
@@ -750,82 +752,148 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
 
   private render(): void {
     try {
-      const templateResult = this.config.template(this.api.state, this.api);
-      
-      // Handle both string and compiled templates
+      console.log('[runtime] render() called');
+      console.log('[runtime] render() merged state ref:', this.stateObj);
+      const templateResult = this.config.template(this.stateObj, this.api);
+      console.log('[runtime] render() DOM state before:', this.shadowRoot?.innerHTML);
       if (typeof templateResult === 'string') {
-        // Traditional string template
+        console.log('[runtime] render() lastHTML:', this.lastHTML);
+        console.log('[runtime] render() templateResult:', templateResult);
         if (templateResult === this.lastHTML) {
+          console.log('[runtime] Skipping render: template unchanged');
           return;
         }
-
-        const isInitialRender = !this.shadowRoot!.firstElementChild;
-        
+        // Parse template string to get the app container
+        const fragment = TemplateParser.parseTemplate(templateResult);
+        let appContainer: Element | null = Array.from(fragment.childNodes).find(n => 
+          n.nodeType === 1 && (n as Element).tagName !== 'STYLE') as Element | null;
+        let styleNode: Element | null = Array.from(fragment.childNodes).find(n => 
+          n.nodeType === 1 && (n as Element).tagName === 'STYLE') as Element | null;
+        // Detect initial render by checking for app container element in shadowRoot
+        const shadowAppContainer = Array.from(this.shadowRoot!.children).find(
+          el => el.nodeType === 1 && (el as Element).tagName !== 'STYLE'
+        ) as Element | undefined;
+        const isInitialRender = !shadowAppContainer;
         if (isInitialRender) {
-          // Initial render
-          const fragment = TemplateParser.parseTemplate(templateResult);
-          this.shadowRoot!.appendChild(fragment);
-          this.refsAttached = false; // New DOM, need to attach refs
-        } else {
-          // Update render - DOM morphing replaces elements, so refs need reattachment
-          const firstElement = this.shadowRoot!.firstElementChild;
-          if (firstElement) {
-            DOMDiffer.morph(firstElement, templateResult);
-            this.refsAttached = false; // DOM was morphed, need to reattach refs
+          console.log('[runtime] Initial render');
+          console.log('[runtime] Initial render: styleNode', styleNode);
+          console.log('[runtime] Initial render: appContainer', appContainer);
+          if (styleNode) this.shadowRoot!.appendChild(styleNode.cloneNode(true));
+          if (appContainer) {
+            this.shadowRoot!.appendChild(appContainer.cloneNode(true));
+          } else {
+            // If no app container found, try to append the first element child in fragment
+            const firstEl = Array.from(fragment.childNodes).find(n => n.nodeType === 1) as Element | undefined;
+            if (firstEl) this.shadowRoot!.appendChild(firstEl.cloneNode(true));
           }
+          this.refsAttached = false;
+        } else {
+          console.log('[runtime] DOM morph update');
+          console.log('[runtime] DOM morph: shadowApp', shadowAppContainer);
+          console.log('[runtime] DOM morph: appContainer', appContainer);
+          // Ensure style is present and up to date
+          let shadowStyle = this.shadowRoot!.querySelector('style');
+          if (!shadowStyle && styleNode) {
+            this.shadowRoot!.insertBefore(styleNode.cloneNode(true), this.shadowRoot!.firstChild);
+          } else if (shadowStyle && styleNode) {
+            shadowStyle.textContent = styleNode.textContent;
+          }
+            // Morph only the app container in the shadow root
+            let shadowApp = this.shadowRoot!.querySelector('.todo-app');
+            if (shadowApp && appContainer) {
+              // Save reference before morph
+              console.log('[runtime] [DOM] shadowApp before morph:', shadowApp);
+              console.log('[runtime] [DOM] shadowApp.innerHTML before:', shadowApp.innerHTML);
+              console.log('[runtime] [DOM] shadowApp.outerHTML before:', shadowApp.outerHTML);
+              console.log('[runtime] [DOM] appContainer.outerHTML (template):', appContainer.outerHTML);
+              // Morph the live shadow DOM node
+              DOMDiffer.morph(shadowApp, appContainer.outerHTML);
+              // Update reference if node was replaced
+              shadowApp = this.shadowRoot!.querySelector('.todo-app');
+              console.log('[runtime] [DOM] shadowApp after morph:', shadowApp);
+              if (shadowApp) {
+                console.log('[runtime] [DOM] shadowApp.innerHTML after:', shadowApp.innerHTML);
+                console.log('[runtime] [DOM] shadowApp.outerHTML after:', shadowApp.outerHTML);
+              }
+              console.log('[runtime] [DOM] shadowRoot.innerHTML after morph:', this.shadowRoot!.innerHTML);
+              // If the DOM visually did not update, forcibly replace the node
+              if (shadowApp && shadowApp.outerHTML !== appContainer.outerHTML) {
+                // Ignore input value differences when comparing DOM
+                function normalizeInputValues(html: string): string {
+                  return html.replace(/(<input[^>]*)(value="[^"]*")([^>]*>)/gi, '$1value="__IGNORE__"$3');
+                }
+                const normalizedShadow = normalizeInputValues(shadowApp.outerHTML);
+                const normalizedTemplate = normalizeInputValues(appContainer.outerHTML);
+                if (normalizedShadow !== normalizedTemplate) {
+                  console.warn('[runtime] [DOM] Forcing node replacement due to visual mismatch (excluding input value differences)');
+                  const newNode = appContainer.cloneNode(true);
+                  this.shadowRoot!.replaceChild(newNode, shadowApp);
+                  shadowApp = newNode as Element;
+                } else {
+                  console.log('[runtime] [DOM] Visual mismatch only in input value, skipping node replacement');
+                }
+              }
+              this.refsAttached = false;
+              // Recursively clean up data-refs-processed attributes from subtree
+              function cleanupRefs(node: Element) {
+                if (node.hasAttribute && node.hasAttribute('data-refs-processed')) {
+                  node.removeAttribute('data-refs-processed');
+                }
+                Array.from(node.children).forEach(child => cleanupRefs(child as Element));
+              }
+              if (shadowApp) cleanupRefs(shadowApp);
+              // Re-attach event listeners to all refs
+              if (shadowApp) this.processRefs();
+              this.refsAttached = true;
+            }
         }
-        
         this.lastHTML = templateResult;
-        this.lastCompiledTemplate = null; // Clear compiled template cache
+        this.lastCompiledTemplate = null;
+        console.log('[runtime] render() DOM state after:', this.shadowRoot?.innerHTML);
+        console.log('[runtime] render() complete (string template)');
       } else {
         // Compiled template
+        // Debug: print compiled template id and state
+        console.log('[runtime] render() compiled template id:', templateResult.id, 'state:', this.stateObj);
         const isInitialRender = !this.shadowRoot!.firstElementChild;
         const isSameTemplate = this.lastCompiledTemplate?.id === templateResult.id;
-        
         if (isInitialRender) {
-          // Initial render with compiled template
-          const fragment = renderCompiledTemplate(templateResult, this.api.state, this.api);
+          console.log('[runtime] Initial render (compiled template)');
+          const fragment = renderCompiledTemplate(templateResult, this.stateObj, this.api);
           this.shadowRoot!.appendChild(fragment);
           this.refsAttached = false;
         } else if (isSameTemplate && this.shadowRoot!.firstElementChild) {
-          // Efficient update using compiled template - this is the key performance benefit!
+          console.log('[runtime] Efficient update (compiled template)');
           const oldState = this.lastState; // Capture old state before update
           updateCompiledTemplate(
             templateResult,
             this.shadowRoot!.firstElementChild,
-            this.api.state,
+            this.stateObj,
             this.api,
             oldState || undefined
           );
-          // For compiled templates with stable structure, refs should already be attached
-          // Only force reattachment if refs haven't been attached yet
         } else {
-          // Template changed, full re-render
-          const fragment = renderCompiledTemplate(templateResult, this.api.state, this.api);
+          console.log('[runtime] Full re-render (compiled template)');
+          const fragment = renderCompiledTemplate(templateResult, this.stateObj, this.api);
           this.shadowRoot!.innerHTML = '';
           this.shadowRoot!.appendChild(fragment);
           this.refsAttached = false;
         }
-        
         this.lastCompiledTemplate = templateResult;
-        
         this.lastHTML = ''; // Clear string template cache
+        console.log('[runtime] render() complete (compiled template)');
       }
-      
       // Store current state for next update comparison
-      this.lastState = safeClone(this.api.state);
-      
+      this.lastState = safeClone(this.stateObj);
       this.updateStyle();
-      
       // Process refs if not already attached for this render
       if (!this.refsAttached) {
         this.processRefs();
         this.refsAttached = true;
       }
-      
     } catch (error) {
-  console.error(`[Component] Render error:`, error);
-  this.renderError(error as Error);
+      console.error(`[Component] Render error:`, error);
+      this.renderError(error as Error);
     }
   }
 
@@ -883,24 +951,16 @@ export function component<S extends ComponentState, C extends Record<string, any
     return;
   }
 
-  // Always make state reactive
-  let reactiveState = reactive(config.state);
-  // Wire up computed as getters on merged state
-  let mergedState: S & C = reactiveState.state as S & C;
-  if (config.computed) {
-    for (const key in config.computed) {
-      Object.defineProperty(mergedState, key, {
-        get: () => config.computed![key](mergedState),
-        enumerable: true,
-        configurable: true
-      });
-    }
-  }
-  // Create and register component class
-  const wrappedConfig = { ...config, state: mergedState };
+  // Create reactive state with computed properties
+  const state = reactive(config.state, config.computed as Record<string, (state: S) => any>);
+  (config as any).state = state;
+
+  // Setup subscription for reactivity (optional, for external listeners)
+  (config as any)._subscribe = state.subscribe;
+
   const ComponentClass = class extends ComponentElement<S, C> {
     constructor() {
-      super(wrappedConfig);
+      super(config);
     }
   };
   customElements.define(tag, ComponentClass);
