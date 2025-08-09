@@ -447,31 +447,63 @@ component<TodoAppState>({
 | TypeScript      | Strict                 | Opt   | Opt  | Strict  | Opt    |
 | State Mgmt      | Manual/Store           | Redux | Pinia| RxJS    | Store  |
 | Routing         | Manual                 | Router| Router| Router  | SvelteKit|
+| HMR             | Built-in               | Yes   | Yes  | Yes     | Yes    |
+| Error Boundaries| Built-in               | Yes   | Yes  | Yes     | Yes    |
 | Learning Curve  | Low                    | Med   | Med  | High    | Med    |
 
-### vs React
-- **Bundle Size**: 5x smaller (~8KB vs ~45KB)
-- **Performance**: 3x faster rendering with direct DOM manipulation
-- **Complexity**: No JSX, build steps, or virtual DOM overhead
-- **Standards**: Uses native Web Components, future-proof
+### Custom Elements Runtime (Current)
+- **Direct DOM updates**: No virtual DOM, fastest possible rendering.
+- **Strict TypeScript**: Type-safe, developer-friendly, no config required.
+- **Zero dependencies**: Pure TypeScript/JavaScript, tree-shakable.
+- **SSR & Hydration**: Universal rendering, seamless client takeover.
+- **Functional API**: One function, no classes, easy onboarding.
+- **Event bus & global store**: Built-in communication and state.
+- **HMR & Error Boundaries**: Built-in for robust development and production safety.
 
-### vs Vue
-- **Bundle Size**: 4x smaller (~8KB vs ~35KB)
-- **Learning Curve**: Simpler API, no special directives to learn
-- **TypeScript**: Native support, no additional configuration
-- **Templates**: Plain JavaScript functions, full language power
+#### Pros
+- Fastest DOM updates (no VDOM, no diffing)
+- Smallest bundle size (tree-shakable, modular)
+- Simple, functional API (easy onboarding)
+- SSR, hydration, HMR, error boundaries built-in
+- No external dependencies (security, maintainability)
 
-### vs Svelte
-- **Runtime**: True runtime vs compile-time (better debugging)
-- **SSR**: Built-in server-side rendering support
-- **Bundle**: Smaller for most real-world applications
-- **Ecosystem**: Works with any existing tools and libraries
+#### Cons
+- Smaller ecosystem (fewer plugins, integrations)
+- Fewer advanced features (no built-in router, forms, animation, etc.)
+- Manual state management (no context, no global store by default)
+- Less tooling (no CLI, no official devtools)
 
-### vs Lit
-- **Performance**: Faster state management with ES6 Proxies
-- **API**: Simpler component definition syntax
-- **Bundle**: Smaller overall runtime size
-- **Features**: More built-in features (SSR, event bus, global state)
+#### When to Use
+- Micro-frontends, design systems, performance-critical apps, progressive enhancement, SSR sites, web standards projects.
+
+#### When Not to Use
+- Large apps needing routing, forms, advanced state management, or extensive ecosystem and tooling.
+
+### Comparison Highlights
+
+#### vs React
+- 5x smaller bundle (~8KB vs ~45KB)
+- Direct DOM updates, no virtual DOM overhead
+- No JSX, build steps, or complex tooling
+- Native Web Components, future-proof
+
+#### vs Vue
+- 4x smaller bundle (~8KB vs ~35KB)
+- Simpler API, no directives or config
+- Native TypeScript support
+- Templates are plain JS functions
+
+#### vs Svelte
+- True runtime (better debugging, no compile step)
+- Built-in SSR and hydration
+- Smaller bundle for most real-world apps
+- Works with any tools/libraries
+
+#### vs Lit
+- Faster state management (ES6 Proxy)
+- Simpler component definition
+- Smaller runtime size
+- More built-in features (SSR, event bus, global state)
 
 ## 🧩 Core Concepts
 
