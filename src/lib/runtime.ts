@@ -31,10 +31,10 @@ export interface ComponentAPI<T extends ComponentState = ComponentState> {
   readonly state: T;
   emit(eventName: string, detail?: unknown): void;
   update(changes: Partial<T>): void;
-  updateKey?<K extends keyof T>(key: K, value: T[K]): void;
-  onGlobal?<U = any>(eventName: string, handler: (data: U) => void): () => void;
-  offGlobal?<U = any>(eventName: string, handler: (data: U) => void): void;
-  emitGlobal?<U = any>(eventName: string, data?: U): void;
+  updateKey<K extends keyof T>(key: K, value: T[K]): void;
+  onGlobal<U = any>(eventName: string, handler: (data: U) => void): () => void;
+  offGlobal<U = any>(eventName: string, handler: (data: U) => void): void;
+  emitGlobal<U = any>(eventName: string, data?: U): void;
 }
 
 export interface ComponentConfig<S extends ComponentState, C extends Record<string, any> = {}> {
