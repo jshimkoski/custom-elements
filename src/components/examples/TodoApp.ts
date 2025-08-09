@@ -252,7 +252,11 @@ component<TodoAppState, TodoAppComputed>('todo-app', {
       });
     }
   },
-  onMounted: (state) => {
+  onMounted: (state, api) => {
     console.log('📝 Todo App mounted', state);
+    // Subscribe to global event using runtime API
+    api.onGlobal?.('todo-toggled', (data: any) => {
+      console.log('🔄 Todo toggled:', data);
+    });
   }
 });

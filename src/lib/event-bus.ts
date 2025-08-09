@@ -62,8 +62,10 @@ class GlobalEventBus extends EventTarget {
     if (!this.handlers[eventName]) {
       this.handlers[eventName] = [];
     }
-    this.handlers[eventName].push(handler);
-
+    // Prevent duplicate registration (only for same function reference)
+    if (!this.handlers[eventName].includes(handler)) {
+      this.handlers[eventName].push(handler);
+    }
     // Return unsubscribe function
     return () => this.off(eventName, handler);
   }

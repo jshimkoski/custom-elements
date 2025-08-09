@@ -16,6 +16,7 @@ export type { CompiledTemplate, UpdateFunction, UpdateType } from './template-co
  */
 
 import { reactive } from './computed-state';
+import { eventBus } from './event-bus';
 
 // ============================================================================
 // CORE TYPES
@@ -31,6 +32,12 @@ export interface ComponentAPI<T extends ComponentState = ComponentState> {
   emit(eventName: string, detail?: unknown): void;
   update(changes: Partial<T>): void;
   updateKey<K extends keyof T>(key: K, value: T[K]): void;
+  /** Listen to a global event. Returns unsubscribe function. */
+  onGlobal?<U = any>(eventName: string, handler: (data: U) => void): () => void;
+  /** Remove a global event handler. */
+  offGlobal?<U = any>(eventName: string, handler: (data: U) => void): void;
+  /** Emit a global event. */
+  emitGlobal?<U = any>(eventName: string, data?: U): void;
 }
 
 export interface ComponentConfig<S extends ComponentState, C extends Record<string, any> = {}> {
@@ -658,6 +665,7 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
   private readonly config: ComponentConfig<S, C>;
   private readonly stateObj!: S & C;
   private readonly api: ComponentAPI<S & C>;
+  private _globalUnsubscribes: Array<() => void> = [];
   private unsubscribes: Array<() => void> = [];
   private refsAttached = false;
   // Removed unused isHydrating property
@@ -692,6 +700,17 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
       if (typeof (element.stateObj as any).set === 'function') {
         (element.stateObj as any).set({ [key]: value });
       }
+    },
+    onGlobal: <U = any>(eventName: string, handler: (data: U) => void) => {
+      const unsub = eventBus.on(eventName, handler);
+      element._globalUnsubscribes.push(unsub);
+      return unsub;
+    },
+    offGlobal: <U = any>(eventName: string, handler: (data: U) => void) => {
+      eventBus.off(eventName, handler);
+    },
+    emitGlobal: <U = any>(eventName: string, data?: U) => {
+      eventBus.emit(eventName, data);
     }
   };
 
@@ -727,12 +746,14 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
   }
 
   disconnectedCallback(): void {
-    // Cleanup subscriptions
-    this.unsubscribes.forEach(fn => fn());
-    this.unsubscribes = [];
-    
-    // Call lifecycle hook
-    this.config.onUnmounted?.(this.api.state, this.api);
+  // Cleanup subscriptions
+  this.unsubscribes.forEach(fn => fn());
+  this.unsubscribes = [];
+  // Cleanup global event listeners
+  this._globalUnsubscribes.forEach(fn => fn());
+  this._globalUnsubscribes = [];
+  // Call lifecycle hook
+  this.config.onUnmounted?.(this.api.state, this.api);
   }
 
   private render(): void {
