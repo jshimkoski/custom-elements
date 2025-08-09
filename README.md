@@ -798,9 +798,9 @@ interface ComponentAPI<T> {
   emit(eventName: string, detail?: any): void;
   update(changes: Partial<T>): void;
   updateKey<K extends keyof T>(key: K, value: T[K]): void;
-  onGlobal?<U = any>(eventName: string, handler: (data: U) => void): () => void;
-  offGlobal?<U = any>(eventName: string, handler: (data: U) => void): void;
-  emitGlobal?<U = any>(eventName: string, data?: U): void;
+  onGlobal<U = any>(eventName: string, handler: (data: U) => void): () => void;
+  offGlobal<U = any>(eventName: string, handler: (data: U) => void): void;
+  emitGlobal<U = any>(eventName: string, data?: U): void;
 }
 ```
 
