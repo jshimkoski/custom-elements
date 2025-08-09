@@ -1,7 +1,7 @@
 import './style.css';
 // import './components/examples/Examples';
 import './components/examples/TodoApp';
-// import './components/examples/TodoAppCompiled';
+import './components/examples/TodoAppCompiled';
 // import './components/examples/ShoppingCart';
 // import './components/examples/NotificationSystem';
 // import './components/examples/TemplateCompilationDemo';
