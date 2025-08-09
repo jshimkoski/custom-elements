@@ -1,46 +1,52 @@
-// Template helpers for enhanced DX
+
 import type { CompiledTemplate } from './template-compiler.js';
 
+/**
+ * TemplateResult type for template helpers
+ */
 export type TemplateResult = string | CompiledTemplate | ((state?: any) => string);
 
 /**
- * Template literal tag for HTML strings
- * Enables syntax highlighting in IDEs that support tagged template literals
- * Note: Use the component's events configuration for event handling, not inline functions
+ * Tagged template literal for HTML strings.
+ * Returns a pure function for rendering with state and api.
+ * @param strings - Template strings
+ * @param values - Dynamic values (functions or primitives)
  */
-export const html = (
+export function html(
   strings: TemplateStringsArray,
   ...values: unknown[]
-): ((state?: any, api?: any) => string) => {
-  /**
-   * Returns a function that takes state and api, and evaluates all dynamic slots at render time.
-   * Dynamic values (functions) receive both state and api.
-   */
+): (state?: any, api?: any) => string {
   return (state?: any, api?: any) => {
-    return strings.reduce((result, string, i) => {
-      let value = values[i];
-      // If value is a function, call it with state and api
-      if (typeof value === 'function') {
-        value = value(state, api);
+    let result = '';
+    for (let i = 0; i < strings.length; i++) {
+      result += strings[i];
+      if (i < values.length) {
+        let value = values[i];
+        if (typeof value === 'function') value = value(state, api);
+        if (typeof value === 'string' && state && value.startsWith('state.')) {
+          const prop = value.slice(6);
+          value = state[prop];
+        }
+        result += value ?? '';
       }
-      // If value is a string referencing state, access state property
-      if (typeof value === 'string' && state && value.startsWith('state.')) {
-        const prop = value.slice(6);
-        value = state[prop];
-      }
-      return result + string + (value ?? '');
-    }, '');
+    }
+    return result;
   };
 }
 /**
- * compile helper: works like html, but returns a compiled template function with a unique id property.
- * Accepts tagged template literals and dynamic values (functions or primitives).
+ * CompiledTemplateFn type for compiled templates
  */
-export type CompiledTemplateFn = {
+export interface CompiledTemplateFn {
   (state: any, api?: any): string;
   id: string;
-};
+}
 
+/**
+ * compile helper: returns a compiled template function with a unique id property.
+ * Accepts tagged template literals and dynamic values (functions or primitives).
+ * @param strings - Template strings
+ * @param values - Dynamic values
+ */
 export function compile(strings: TemplateStringsArray, ...values: any[]): CompiledTemplateFn {
   const id = 'compiled-' + Math.random().toString(36).slice(2);
   const fn = (state: any, api?: any) => {
@@ -48,12 +54,9 @@ export function compile(strings: TemplateStringsArray, ...values: any[]): Compil
     for (let i = 0; i < strings.length; i++) {
       result += strings[i];
       if (i < values.length) {
-        const v = values[i];
-        if (typeof v === 'function') {
-          result += v(state, api);
-        } else {
-          result += v;
-        }
+        let value = values[i];
+        if (typeof value === 'function') value = value(state, api);
+        result += value ?? '';
       }
     }
     return result;
@@ -63,50 +66,51 @@ export function compile(strings: TemplateStringsArray, ...values: any[]): Compil
 }
 
 /**
- * Template literal tag for CSS strings  
- * Enables syntax highlighting in IDEs that support tagged template literals
+ * Tagged template literal for CSS strings.
+ * Returns a pure string for use in style blocks.
+ * @param strings - Template strings
+ * @param values - Dynamic values
  */
-export const css = (strings: TemplateStringsArray, ...values: unknown[]): string => {
-  return strings.reduce((result, string, i) => {
-    return result + string + (values[i] ?? '');
-  }, '');
-};
-
-/**
- * Create a ref function that's easier to use
- */
-export function ref<T extends Element = Element>(
-  callback: (el: T) => void
-): (el: Element) => void {
-  return callback as any;
+export function css(strings: TemplateStringsArray, ...values: unknown[]): string {
+  let result = '';
+  for (let i = 0; i < strings.length; i++) {
+    result += strings[i];
+    if (i < values.length) result += values[i] ?? '';
+  }
+  return result;
 }
 
 /**
- * Create event handlers with better typing
+ * Create a ref function for element references.
+ * @param callback - Callback to run with the element
+ */
+export function ref<T extends Element = Element>(callback: (el: T) => void): (el: Element) => void {
+  return callback as (el: Element) => void;
+}
+
+/**
+ * Create event handlers with strong typing for use in templates.
+ * @param eventType - Event type
+ * @param handler - Handler function
  */
 export function on<K extends keyof HTMLElementEventMap>(
   eventType: K,
   handler: (event: HTMLElementEventMap[K], state: any, api: any) => void
 ): { [key in K]: (event: HTMLElementEventMap[K], state: any, api: any) => void } {
-  /**
-   * Returns an event handler object for use in templates.
-   * Handler receives event, state, and api.
-   */
   return { [eventType]: handler } as { [key in K]: (event: HTMLElementEventMap[K], state: any, api: any) => void };
 }
 
 /**
- * Helper for conditional classes
+ * Helper for conditional classes. Returns a space-separated string of class names.
+ * @param obj - Object with class names as keys and boolean conditions as values
  */
 export function classes(obj: Record<string, boolean>): string {
-  return Object.entries(obj)
-    .filter(([, condition]) => condition)
-    .map(([className]) => className)
-    .join(' ');
+  return Object.keys(obj).filter(className => obj[className]).join(' ');
 }
 
 /**
- * Helper for inline styles
+ * Helper for inline styles. Returns a CSS string for use in style attributes.
+ * @param obj - Object with style properties and values
  */
 export function styles(obj: Record<string, string | number>): string {
   return Object.entries(obj)

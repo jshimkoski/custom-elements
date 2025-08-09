@@ -661,6 +661,10 @@ class DOMDiffer {
 // COMPONENT IMPLEMENTATION
 // ============================================================================
 
+/**
+ * Internal custom element implementation for runtime components.
+ * Handles state, rendering, refs, and lifecycle hooks.
+ */
 class ComponentElement<S extends ComponentState, C extends Record<string, any> = {}> extends HTMLElement {
   private readonly config: ComponentConfig<S, C>;
   private readonly stateObj!: S & C;
@@ -668,169 +672,142 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
   private _globalUnsubscribes: Array<() => void> = [];
   private unsubscribes: Array<() => void> = [];
   private refsAttached = false;
-  // Removed unused isHydrating property
   private lastHTML = '';
   private lastCompiledTemplate: CompiledTemplate<S & C> | null = null;
   private lastState: (S & C) | null = null;
 
+  /**
+   * Construct a new runtime component element.
+   * @param config - Component configuration
+   */
   constructor(config: ComponentConfig<S, C>) {
-  super();
-  this.config = config;
-
-  // Store reactive state
-  this.stateObj = config.state as S & C;
-  // Subscribe to state changes and re-render
-  if (typeof (this.stateObj as any).subscribe === 'function') {
-    (this.stateObj as any).subscribe(() => this.render());
-  }
-
-  // Create API
-  const element = this;
-  this.api = {
-    get state() { return element.stateObj; },
-    emit: (eventName: string, detail?: unknown) => {
-      element.dispatchEvent(new CustomEvent(eventName, { detail, bubbles: true }));
-    },
-    update: (changes: Partial<S & C>) => {
-      if (typeof (element.stateObj as any).set === 'function') {
-        (element.stateObj as any).set(changes);
-      }
-    },
-    updateKey: <K extends keyof (S & C)>(key: K, value: (S & C)[K]) => {
-      if (typeof (element.stateObj as any).set === 'function') {
-        (element.stateObj as any).set({ [key]: value });
-      }
-    },
-    onGlobal: <U = any>(eventName: string, handler: (data: U) => void) => {
-      const unsub = eventBus.on(eventName, handler);
-      element._globalUnsubscribes.push(unsub);
-      return unsub;
-    },
-    offGlobal: <U = any>(eventName: string, handler: (data: U) => void) => {
-      eventBus.off(eventName, handler);
-    },
-    emitGlobal: <U = any>(eventName: string, data?: U) => {
-      eventBus.emit(eventName, data);
+    super();
+    this.config = config;
+    this.stateObj = config.state as S & C;
+    // Subscribe to state changes and re-render
+    if (typeof (this.stateObj as any).subscribe === 'function') {
+      this.unsubscribes.push((this.stateObj as any).subscribe(() => this.render()));
     }
-  };
-
+    // Create API
+    this.api = {
+      state: this.stateObj,
+      emit: (eventName: string, detail?: unknown) => this.dispatchEvent(new CustomEvent(eventName, { detail, bubbles: true })),
+      update: (changes: Partial<S & C>) => {
+        if (typeof (this.stateObj as any).set === 'function') {
+          (this.stateObj as any).set(changes);
+        } else {
+          Object.assign(this.stateObj, changes);
+        }
+      },
+      updateKey: <K extends keyof (S & C)>(key: K, value: (S & C)[K]) => {
+        if (typeof (this.stateObj as any).set === 'function') {
+          (this.stateObj as any).set({ [key]: value });
+        } else {
+          this.stateObj[key] = value;
+        }
+      },
+      onGlobal: <U = any>(eventName: string, handler: (data: U) => void) => {
+        const unsub = eventBus.on(eventName, handler);
+        this._globalUnsubscribes.push(unsub);
+        return unsub;
+      },
+      offGlobal: <U = any>(eventName: string, handler: (data: U) => void) => eventBus.off(eventName, handler),
+      emitGlobal: <U = any>(eventName: string, data?: U) => eventBus.emit(eventName, data)
+    };
     // Attach shadow DOM
     this.attachShadow({ mode: 'open' });
-
     // Setup style
     if (config.style) {
-      const style = document.createElement('style');
-      this.shadowRoot!.appendChild(style);
-      this.updateStyle();
+      const styleEl = document.createElement('style');
+      styleEl.textContent = typeof config.style === 'function' ? config.style(this.stateObj) : config.style;
+      this.shadowRoot!.appendChild(styleEl);
     }
-
     // Add hydration support
     (this as any)._hydrateWithState = (ssrState: S & C) => {
       Object.assign(this.stateObj, ssrState);
+      this.render();
     };
   }
 
+  /**
+   * Lifecycle: called when element is added to DOM.
+   */
   connectedCallback(): void {
-  // ...existing code...
-    // Initial render for client-side components
     const isSSRHydration = this.hasAttribute('data-hydrated');
     if (!isSSRHydration) {
       this.render();
     } else {
-      // SSR hydration - preserve existing DOM, just attach refs and events
       this.lastHTML = this.shadowRoot!.innerHTML;
       this.processRefs();
     }
-    // Call lifecycle hook
     this.config.onMounted?.(this.api.state, this.api);
   }
 
+  /**
+   * Lifecycle: called when element is removed from DOM.
+   */
   disconnectedCallback(): void {
-  // Cleanup subscriptions
-  this.unsubscribes.forEach(fn => fn());
-  this.unsubscribes = [];
-  // Cleanup global event listeners
-  this._globalUnsubscribes.forEach(fn => fn());
-  this._globalUnsubscribes = [];
-  // Call lifecycle hook
-  this.config.onUnmounted?.(this.api.state, this.api);
+    this.unsubscribes.forEach(fn => fn());
+    this.unsubscribes = [];
+    this._globalUnsubscribes.forEach(fn => fn());
+    this._globalUnsubscribes = [];
+    this.config.onUnmounted?.(this.api.state, this.api);
   }
 
+  /**
+   * Render the component. Handles both string and compiled templates, refs, and error boundaries.
+   */
   private render(): void {
     try {
       const templateResult = this.config.template(this.stateObj, this.api);
       if (typeof templateResult === 'string') {
-        if (templateResult === this.lastHTML) {
-          return;
-        }
-        // Parse template string to get the app container
+        if (templateResult === this.lastHTML) return;
         const fragment = TemplateParser.parseTemplate(templateResult);
-        let appContainer: Element | null = Array.from(fragment.childNodes).find(n => 
-          n.nodeType === 1 && (n as Element).tagName !== 'STYLE') as Element | null;
-        let styleNode: Element | null = Array.from(fragment.childNodes).find(n => 
-          n.nodeType === 1 && (n as Element).tagName === 'STYLE') as Element | null;
-        // Detect initial render by checking for app container element in shadowRoot
-        const shadowAppContainer = Array.from(this.shadowRoot!.children).find(
-          el => el.nodeType === 1 && (el as Element).tagName !== 'STYLE'
-        ) as Element | undefined;
+        let appContainer: Element | null = Array.from(fragment.childNodes).find(n => n.nodeType === 1 && (n as Element).tagName !== 'STYLE') as Element | null;
+        let styleNode: Element | null = Array.from(fragment.childNodes).find(n => n.nodeType === 1 && (n as Element).tagName === 'STYLE') as Element | null;
+        const shadowAppContainer = Array.from(this.shadowRoot!.children).find(el => el.nodeType === 1 && (el as Element).tagName !== 'STYLE') as Element | undefined;
         const isInitialRender = !shadowAppContainer;
         if (isInitialRender) {
           if (styleNode) this.shadowRoot!.appendChild(styleNode.cloneNode(true));
-          if (appContainer) {
-            this.shadowRoot!.appendChild(appContainer.cloneNode(true));
-          } else {
-            // If no app container found, try to append the first element child in fragment
+          if (appContainer) this.shadowRoot!.appendChild(appContainer.cloneNode(true));
+          else {
             const firstEl = Array.from(fragment.childNodes).find(n => n.nodeType === 1) as Element | undefined;
             if (firstEl) this.shadowRoot!.appendChild(firstEl.cloneNode(true));
           }
           this.refsAttached = false;
         } else {
-          // Ensure style is present and up to date
           let shadowStyle = this.shadowRoot!.querySelector('style');
-          if (!shadowStyle && styleNode) {
-            this.shadowRoot!.insertBefore(styleNode.cloneNode(true), this.shadowRoot!.firstChild);
-          } else if (shadowStyle && styleNode) {
-            shadowStyle.textContent = styleNode.textContent;
-          }
-            // Morph only the app container in the shadow root
-            let shadowApp = this.shadowRoot!.querySelector('.todo-app');
-            if (shadowApp && appContainer) {
-              // Morph the live shadow DOM node
-              DOMDiffer.morph(shadowApp, appContainer.outerHTML);
-              // Update reference if node was replaced
-              shadowApp = this.shadowRoot!.querySelector('.todo-app');
-              // If the DOM visually did not update, forcibly replace the node
-              if (shadowApp && shadowApp.outerHTML !== appContainer.outerHTML) {
-                // Ignore input value differences when comparing DOM
-                function normalizeInputValues(html: string): string {
-                  return html.replace(/(<input[^>]*)(value="[^"]*")([^>]*>)/gi, '$1value="__IGNORE__"$3');
-                }
-                const normalizedShadow = normalizeInputValues(shadowApp.outerHTML);
-                const normalizedTemplate = normalizeInputValues(appContainer.outerHTML);
-                if (normalizedShadow !== normalizedTemplate) {
-                  const newNode = appContainer.cloneNode(true);
-                  this.shadowRoot!.replaceChild(newNode, shadowApp);
-                  shadowApp = newNode as Element;
-                }
-              }
-              this.refsAttached = false;
-              // Recursively clean up data-refs-processed attributes from subtree
-              function cleanupRefs(node: Element) {
-                if (node.hasAttribute && node.hasAttribute('data-refs-processed')) {
-                  node.removeAttribute('data-refs-processed');
-                }
-                Array.from(node.children).forEach(child => cleanupRefs(child as Element));
-              }
-              if (shadowApp) cleanupRefs(shadowApp);
-              // Re-attach event listeners to all refs
-              if (shadowApp) this.processRefs();
-              this.refsAttached = true;
+          if (!shadowStyle && styleNode) this.shadowRoot!.insertBefore(styleNode.cloneNode(true), this.shadowRoot!.firstChild);
+          else if (shadowStyle && styleNode) shadowStyle.textContent = styleNode.textContent;
+          let shadowApp = this.shadowRoot!.querySelector('.todo-app');
+          if (shadowApp && appContainer) {
+            DOMDiffer.morph(shadowApp, appContainer.outerHTML);
+            shadowApp = this.shadowRoot!.querySelector('.todo-app');
+            function normalizeInputValues(html: string): string {
+              return html.replace(/(<input[^>]*)(value="[^"]*")([^>]*>)/gi, '$1value="__IGNORE__"$3');
             }
+            if (shadowApp) {
+              const normalizedShadow = normalizeInputValues(shadowApp.outerHTML);
+              const normalizedTemplate = normalizeInputValues(appContainer.outerHTML);
+              if (normalizedShadow !== normalizedTemplate) {
+                const newNode = appContainer.cloneNode(true);
+                this.shadowRoot!.replaceChild(newNode, shadowApp);
+                shadowApp = newNode as Element;
+              }
+            }
+            this.refsAttached = false;
+            function cleanupRefs(node: Element) {
+              if (node.hasAttribute && node.hasAttribute('data-refs-processed')) node.removeAttribute('data-refs-processed');
+              Array.from(node.children).forEach(child => cleanupRefs(child as Element));
+            }
+            if (shadowApp) cleanupRefs(shadowApp);
+            if (shadowApp) this.processRefs();
+            this.refsAttached = true;
+          }
         }
         this.lastHTML = templateResult;
         this.lastCompiledTemplate = null;
       } else {
-        // Compiled template
         const isInitialRender = !this.shadowRoot!.firstElementChild;
         const isSameTemplate = this.lastCompiledTemplate?.id === templateResult.id;
         if (isInitialRender) {
@@ -838,14 +815,8 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
           this.shadowRoot!.appendChild(fragment);
           this.refsAttached = false;
         } else if (isSameTemplate && this.shadowRoot!.firstElementChild) {
-          const oldState = this.lastState; // Capture old state before update
-          updateCompiledTemplate(
-            templateResult,
-            this.shadowRoot!.firstElementChild,
-            this.stateObj,
-            this.api,
-            oldState || undefined
-          );
+          const oldState = this.lastState;
+          updateCompiledTemplate(templateResult, this.shadowRoot!.firstElementChild, this.stateObj, this.api, oldState || undefined);
         } else {
           const fragment = renderCompiledTemplate(templateResult, this.stateObj, this.api);
           this.shadowRoot!.innerHTML = '';
@@ -853,19 +824,20 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
           this.refsAttached = false;
         }
         this.lastCompiledTemplate = templateResult;
-        this.lastHTML = ''; // Clear string template cache
+        this.lastHTML = '';
       }
-      // Store current state for next update comparison
       this.lastState = safeClone(this.stateObj);
       this.updateStyle();
-      // Process refs if not already attached for this render
       if (!this.refsAttached) {
         this.processRefs();
         this.refsAttached = true;
       }
     } catch (error) {
-      console.error(`[Component] Render error:`, error);
-      this.renderError(error as Error);
+      if ('onError' in this.config && typeof (this.config as any).onError === 'function') {
+        (this.config as any).onError(error as Error, this.api.state, this.api);
+      } else {
+        this.renderError(error as Error);
+      }
     }
   }
 
