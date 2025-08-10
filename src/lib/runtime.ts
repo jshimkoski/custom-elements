@@ -182,6 +182,10 @@ interface VNode {
 function createVNodeFromElement(node: ChildNode, parentPath: string = '', childIndex: number = 0): VNode {
   let debugType = '';
   let debugKey = undefined;
+  if (!node) {
+    // Guard: skip undefined/null nodes
+    return { type: '#unknown', key: undefined, props: {}, children: [], dom: undefined };
+  }
   if (node.nodeType === Node.TEXT_NODE) {
     debugType = '#text';
     debugKey = undefined;
@@ -286,8 +290,18 @@ function patchVNode(parent: Element, oldVNode: VNode, newVNode: VNode): void {
     // Track DOM children for reconciliation
     const parentEl = oldVNode.dom as Element;
     let domChildren = Array.from(parentEl.childNodes);
-    // Remove extra old children
+    // Remove extra old children, but preserve <link rel="stylesheet"> and <style> elements
     while (domChildren.length > newVNode.children.length) {
+      const lastChild = domChildren[domChildren.length - 1];
+      if (
+        lastChild &&
+        lastChild.nodeType === Node.ELEMENT_NODE &&
+        (((lastChild as Element).tagName && (lastChild as Element).tagName.toLowerCase() === 'link' && (lastChild as Element).getAttribute('rel') === 'stylesheet')
+        || ((lastChild as Element).tagName && (lastChild as Element).tagName.toLowerCase() === 'style'))
+      ) {
+        // Do not remove stylesheet nodes
+        break;
+      }
       parentEl.removeChild(domChildren.pop()!);
     }
     // Patch or add new children
@@ -313,13 +327,23 @@ function patchVNode(parent: Element, oldVNode: VNode, newVNode: VNode): void {
       }
       if (oldChild && domChild) {
         // If node type changed, replace
+        const isStylesheetNode =
+          domChild &&
+          domChild.nodeType === Node.ELEMENT_NODE &&
+          (((domChild as Element).tagName && (domChild as Element).tagName.toLowerCase() === 'link' && (domChild as Element).getAttribute('rel') === 'stylesheet') ||
+            ((domChild as Element).tagName && (domChild as Element).tagName.toLowerCase() === 'style'));
+        if (isStylesheetNode) {
+          // Never replace stylesheet nodes unless explicitly changed
+          newChild.dom = domChild as Element;
+          continue;
+        }
         if (oldChild.type !== newChild.type) {
           const newDom = newChild.dom || (newChild.type === '#text' ? document.createTextNode('') : document.createElement(newChild.type));
           parentEl.replaceChild(newDom, domChild);
           newChild.dom = newDom;
         } else if (oldChild.type === '#text' && newChild.type === '#text') {
           // Patch text node content directly
-          if (domChild.textContent !== (newChild.dom?.textContent ?? newChild.props?.nodeValue ?? '')) {
+          if (domChild && domChild.textContent !== (newChild.dom?.textContent ?? newChild.props?.nodeValue ?? '')) {
             domChild.textContent = newChild.dom?.textContent ?? newChild.props?.nodeValue ?? '';
           }
           newChild.dom = domChild as Element | Text;
@@ -330,6 +354,21 @@ function patchVNode(parent: Element, oldVNode: VNode, newVNode: VNode): void {
       } else {
         // Add new node
         if (newChild.dom) {
+          const isStylesheetNode =
+            newChild.type === 'link' && newChild.props.rel === 'stylesheet' || newChild.type === 'style';
+          if (isStylesheetNode) {
+            // Only add stylesheet node if not already present
+            const existing = Array.from(parentEl.childNodes).find(
+              n =>
+                n.nodeType === Node.ELEMENT_NODE &&
+                ((n as Element).tagName && (n as Element).tagName.toLowerCase() === newChild.type &&
+                  ((newChild.type !== 'link') || (n as Element).getAttribute('rel') === 'stylesheet'))
+            );
+            if (existing) {
+              newChild.dom = existing as Element;
+              return;
+            }
+          }
           const appended = parentEl.appendChild(newChild.dom.cloneNode(true));
           newChild.dom = appended as Element | Text;
         }
@@ -745,8 +784,29 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
           updateCompiledTemplate(templateResult, this.shadowRoot!.firstElementChild, this.stateObj, this.api, oldState || undefined);
         } else {
           const fragment = renderCompiledTemplate(templateResult, this.stateObj, this.api);
-          this.shadowRoot!.innerHTML = '';
-          this.shadowRoot!.appendChild(fragment);
+          // Ensure <style> is first child of shadow root
+          let styleEl = this.shadowRoot!.querySelector('style');
+          if (!styleEl && this.config.style) {
+            styleEl = document.createElement('style');
+            this.shadowRoot!.insertBefore(styleEl, this.shadowRoot!.firstChild);
+          }
+          if (styleEl && this.config.style) {
+            styleEl.textContent = typeof this.config.style === 'function' ? this.config.style(this.stateObj) : this.config.style;
+          }
+
+          // Ensure <div data-root> is second child of shadow root
+          let rootEl = this.shadowRoot!.querySelector('[data-root]');
+          if (!rootEl) {
+            rootEl = document.createElement('div');
+            rootEl.setAttribute('data-root', '');
+            this.shadowRoot!.appendChild(rootEl);
+          }
+          // Remove all children from rootEl before patching
+          while (rootEl.firstChild) {
+            rootEl.removeChild(rootEl.firstChild);
+          }
+          // Append VDOM fragment to rootEl
+          rootEl.appendChild(fragment);
           this.refsAttached = false;
         }
         this.lastCompiledTemplate = templateResult;
