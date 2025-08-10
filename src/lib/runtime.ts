@@ -54,8 +54,8 @@ export interface ComponentAPI<T extends ComponentState = ComponentState> {
  * @template C - Computed type
  */
 export interface ComponentConfig<S extends ComponentState, C extends Record<string, any> = {}> {
-  /** Template function returning HTML or compiled template */
-  readonly template: (state: S & C, api: ComponentAPI<S & C>) => string | CompiledTemplate<S & C>;
+  /** Template function returning HTML, compiled template, or Promise<string> */
+  readonly template: (state: S & C, api: ComponentAPI<S & C>) => string | Promise<string> | CompiledTemplate<S & C>;
   /** Initial state object (reactivity handled automatically) */
   readonly state: S;
   /** Computed values as a map of functions (optional) */
@@ -367,9 +367,6 @@ function safeClone<T>(obj: T): T {
 
 // Efficient string template cache
 const htmlParseCache = new Map<string, DocumentFragment>();
-
-// Memoization cache for computed properties
-const computedCache = new WeakMap<object, Map<string, any>>();
 
 // ============================================================================
 // OPTIMIZED DOM MORPHING
@@ -878,23 +875,6 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
       });
     });
   }
-  /**
-   * Memoize computed properties for the current state object.
-   */
-  private getComputed<K extends keyof C>(key: K): C[K] {
-    if (!this.config.computed) return undefined as any;
-    let cache = computedCache.get(this.stateObj);
-    if (!cache) {
-      cache = new Map<string, any>();
-      computedCache.set(this.stateObj, cache);
-    }
-    if (cache.has(key as string)) {
-      return cache.get(key as string);
-    }
-    const value = this.config.computed[key](this.stateObj as S);
-    cache.set(key as string, value);
-    return value;
-  }
   private readonly config: ComponentConfig<S, C>;
   private readonly stateObj!: S & C;
   private readonly api: ComponentAPI<S & C>;
@@ -999,16 +979,7 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
   // Attach controlled input listeners after each render
   setTimeout(() => this.attachControlledInputListeners(), 0);
     try {
-      // Memoize computed properties before rendering
-      if (this.config.computed) {
-        Object.keys(this.config.computed).forEach(key => {
-          const descriptor = Object.getOwnPropertyDescriptor(this.stateObj, key);
-          // Only assign if not a getter
-          if (!descriptor || !descriptor.get) {
-            (this.stateObj as any)[key] = this.getComputed(key as keyof C);
-          }
-        });
-      }
+  // Computed properties are now always getters via Proxy; no assignment needed
       const templateResultOrPromise = this.config.template(this.stateObj, this.api);
       if (templateResultOrPromise instanceof Promise) {
         templateResultOrPromise.then(templateResult => {

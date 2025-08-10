@@ -191,9 +191,9 @@ component<TodoAppState, TodoAppComputed>('todo-app-compiled', {
     }
   `,
   // Event handler methods for automatic binding
-  handleInput(e: Event, _state: TodoAppState, api: any) {
+  handleInput(e: Event, state: TodoAppState) {
     const input = e.target as HTMLInputElement;
-    api.updateKey('newTodo', input.value);
+    state.newTodo = input.value;
   },
   handleKeydown(e: Event, state: TodoAppState, api: any) {
     const input = e.target as HTMLInputElement;
@@ -212,27 +212,27 @@ component<TodoAppState, TodoAppComputed>('todo-app-compiled', {
       api.emit('todo-added', { id: newId, text: todoText });
     }
   },
-  handleAllFilter(_e: Event, _state: TodoAppState, api: any) {
-    api.updateKey('filter', 'all');
+  handleAllFilter(_e: Event, state: TodoAppState) {
+    state.filter = 'all';
   },
-  handleActiveFilter(_e: Event, _state: TodoAppState, api: any) {
-    api.updateKey('filter', 'active');
+  handleActiveFilter(_e: Event, state: TodoAppState) {
+    state.filter = 'active';
   },
-  handleCompletedFilter(_e: Event, _state: TodoAppState, api: any) {
-    api.updateKey('filter', 'completed');
+  handleCompletedFilter(_e: Event, state: TodoAppState) {
+    state.filter = 'completed';
   },
   handleDelete(e: Event, state: TodoAppState, api: any) {
     const target = e.target as HTMLElement;
     const todoId = parseInt(target.getAttribute('data-todo-id') || '0');
-    api.updateKey('todos', state.todos.filter((t: Todo) => t.id !== todoId));
+    state.todos = state.todos.filter((t: Todo) => t.id !== todoId);
     api.emit('todo-removed', { id: todoId });
   },
   handleToggle(e: Event, state: TodoAppState, api: any) {
     const target = e.target as HTMLInputElement;
     const todoId = parseInt(target.getAttribute('data-todo-id') || '0');
-    api.updateKey('todos', state.todos.map((t: Todo) =>
+    state.todos = state.todos.map((t: Todo) =>
       t.id === todoId ? { ...t, completed: target.checked } : t
-    ));
+    );
     api.emit('todo-toggled', { id: todoId, completed: target.checked });
   },
   onMounted: (state, api) => {
