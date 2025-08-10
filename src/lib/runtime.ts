@@ -408,12 +408,46 @@ class DOMDiffer {
   }
 
   private static morphElement(oldEl: Element, newEl: Element): void {
-    // Replace node if tag name, key, or class differs
+    // Replace node if tag name, key, or class differs, but preserve focus for input/textarea/select
     const oldKey = oldEl.getAttribute('key');
     const newKey = newEl.getAttribute('key');
     const oldClass = oldEl.getAttribute('class');
     const newClass = newEl.getAttribute('class');
-      if (oldEl.tagName !== newEl.tagName || oldKey !== newKey || oldClass !== newClass) {
+    const isFocusable = (el: Element) => ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName);
+    const isFocused = document.activeElement === oldEl;
+    const identityMatches = oldEl.tagName === newEl.tagName && oldKey === newKey && oldClass === newClass;
+    if (!identityMatches) {
+      // If focused and focusable, update in place
+      if (isFocused && isFocusable(oldEl) && isFocusable(newEl)) {
+        // Update value and attributes
+        if (oldEl.tagName === 'INPUT') {
+          const oldValue = (oldEl as HTMLInputElement).value;
+          const newValue = newEl.getAttribute('value') ?? '';
+          if (oldValue !== newValue) {
+            let selectionStart = (oldEl as HTMLInputElement).selectionStart;
+            let selectionEnd = (oldEl as HTMLInputElement).selectionEnd;
+            (oldEl as HTMLInputElement).value = newValue;
+            if (selectionStart !== null && selectionEnd !== null) {
+              (oldEl as HTMLInputElement).setSelectionRange(selectionStart, selectionEnd);
+            }
+          }
+        } else if (oldEl.tagName === 'TEXTAREA') {
+          const oldValue = (oldEl as HTMLTextAreaElement).value;
+          const newValue = newEl.textContent ?? '';
+          if (oldValue !== newValue) {
+            let selectionStart = (oldEl as HTMLTextAreaElement).selectionStart;
+            let selectionEnd = (oldEl as HTMLTextAreaElement).selectionEnd;
+            (oldEl as HTMLTextAreaElement).value = newValue;
+            if (selectionStart !== null && selectionEnd !== null) {
+              (oldEl as HTMLTextAreaElement).setSelectionRange(selectionStart, selectionEnd);
+            }
+          }
+        }
+        this.morphAttributes(oldEl, newEl);
+        this.morphChildren(oldEl, newEl);
+        return;
+      } else {
+        // Not focused or not focusable, safe to replace
         const parent = oldEl.parentNode;
         const newNode = newEl.cloneNode(true);
         if (parent) {
@@ -421,36 +455,44 @@ class DOMDiffer {
         }
         return;
       }
-
-      // Special handling for <input> to preserve focus and cursor
-      if (oldEl.tagName === 'INPUT' && newEl.tagName === 'INPUT') {
-        const oldType = oldEl.getAttribute('type');
-        const newType = newEl.getAttribute('type');
-        // Only update value if type is the same
-        if (oldType === newType) {
-          const oldValue = (oldEl as HTMLInputElement).value;
-          const newValue = newEl.getAttribute('value') ?? '';
-          // Only update if value differs
-          if (oldValue !== newValue) {
-            const isFocused = document.activeElement === oldEl;
-            let selectionStart = null;
-            let selectionEnd = null;
-            if (isFocused) {
-              selectionStart = (oldEl as HTMLInputElement).selectionStart;
-              selectionEnd = (oldEl as HTMLInputElement).selectionEnd;
-            }
-            (oldEl as HTMLInputElement).value = newValue;
-            // Restore cursor position if focused
-            if (isFocused && selectionStart !== null && selectionEnd !== null) {
-              (oldEl as HTMLInputElement).setSelectionRange(selectionStart, selectionEnd);
-            }
+    }
+    // Special handling for <input> to preserve focus and cursor
+    if (oldEl.tagName === 'INPUT' && newEl.tagName === 'INPUT') {
+      const oldType = oldEl.getAttribute('type');
+      const newType = newEl.getAttribute('type');
+      // Only update value if type is the same
+      if (oldType === newType) {
+        const oldValue = (oldEl as HTMLInputElement).value;
+        const newValue = newEl.getAttribute('value') ?? '';
+        if (oldValue !== newValue) {
+          let selectionStart = (oldEl as HTMLInputElement).selectionStart;
+          let selectionEnd = (oldEl as HTMLInputElement).selectionEnd;
+          (oldEl as HTMLInputElement).value = newValue;
+          if (selectionStart !== null && selectionEnd !== null) {
+            (oldEl as HTMLInputElement).setSelectionRange(selectionStart, selectionEnd);
           }
-          // Morph other attributes except value
-          this.morphAttributes(oldEl, newEl);
-          this.morphChildren(oldEl, newEl);
-          return;
+        }
+        this.morphAttributes(oldEl, newEl);
+        this.morphChildren(oldEl, newEl);
+        return;
+      }
+    }
+    // Special handling for <textarea>
+    if (oldEl.tagName === 'TEXTAREA' && newEl.tagName === 'TEXTAREA') {
+      const oldValue = (oldEl as HTMLTextAreaElement).value;
+      const newValue = newEl.textContent ?? '';
+      if (oldValue !== newValue) {
+        let selectionStart = (oldEl as HTMLTextAreaElement).selectionStart;
+        let selectionEnd = (oldEl as HTMLTextAreaElement).selectionEnd;
+        (oldEl as HTMLTextAreaElement).value = newValue;
+        if (selectionStart !== null && selectionEnd !== null) {
+          (oldEl as HTMLTextAreaElement).setSelectionRange(selectionStart, selectionEnd);
         }
       }
+      this.morphAttributes(oldEl, newEl);
+      this.morphChildren(oldEl, newEl);
+      return;
+    }
     // Morph attributes efficiently
     this.morphAttributes(oldEl, newEl);
     // Morph children (includes text nodes)

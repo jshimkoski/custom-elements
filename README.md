@@ -3,6 +3,10 @@
 > **A modern, ultra-lightweight TypeScript runtime for building fast, reactive, and maintainable web components.**
 
 ## ✨ Features
+- **Fine-grained DOM diffing**: Efficiently updates only changed parts of the DOM, preserving input/textarea/select focus and selection state
+- **Async rendering**: Template functions can return Promises for seamless async data fetching and rendering
+- **Selective hydration**: Hydrate only marked regions (e.g., with `data-hydrate`), enabling partial SSR hydration
+- **Focus preservation**: Input, textarea, and select fields retain focus and cursor/selection during updates
 - **Smart DOM batching**: State-triggered renders are batched via requestAnimationFrame for optimal performance
 - **Error boundaries & diagnostics**: Robust error handling with fallback UI and clear logs
 - **Template & computed caching**: Memoization for templates and computed properties
@@ -46,11 +50,13 @@
 - Manual input validation and error handling
 
 ## ⚡ Performance Features
-
 - **Batched Updates**: Multiple state changes are batched using RAF
 - **Template & Computed Property Caching**: Expensive calculations are cached
 - **Memory Management**: Automatic cleanup prevents memory leaks
 - **Focus Preservation**: Smart input focus handling during updates
+- **Fine-grained DOM diffing**: Only changed DOM nodes are updated, not replaced, for optimal performance and UX
+- **Async rendering**: Supports Promises in templates for async data and UI
+- **Selective hydration**: Hydrate only regions marked with `data-hydrate` for efficient SSR
 
 ## 🧐 Examples
 
@@ -87,6 +93,42 @@ component('simple-counter', {
 
 ```html
 <simple-counter></simple-counter>
+```
+
+### Async Rendering Example
+
+```typescript
+import { component } from './lib/runtime.ts';
+
+const AsyncDemo = component({
+  state: {},
+  template: async () => {
+    const data = await fetch('/api/data').then(r => r.json());
+    return `<div>Loaded: ${data.value}</div>`;
+  }
+});
+customElements.define('async-demo', AsyncDemo);
+```
+
+### Selective Hydration Example
+
+```html
+<div data-hydrate>
+  <!-- Only this region will be hydrated on the client -->
+</div>
+```
+
+### Focus Preservation Example
+
+```typescript
+const FocusDemo = component({
+  state: { text: '' },
+  template: (state) => `
+    <input type="text" value="${state.text}" />
+    <textarea>${state.text}</textarea>
+  `
+});
+// Typing in either field will preserve focus and cursor position
 ```
 
 ### Todo App with Notifications Example
