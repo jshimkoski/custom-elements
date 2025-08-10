@@ -1,5 +1,8 @@
 export { Store } from './store';
 export { eventBus } from './event-bus';
+export { renderToString, renderComponentsToString, generateHydrationScript } from './ssr';
+export type { SSRComponentConfig, SSRRenderOptions, SSRContext } from './ssr';
+export { TemplateParser, DOMDiffer } from './dom-diff';
 export { html, css, classes, styles, ref, on } from './template-helpers';
 export { compileTemplate, compile, renderCompiledTemplate, updateCompiledTemplate } from './template-compiler';
 export type { CompiledTemplate, UpdateFunction, UpdateType } from './template-compiler';
@@ -17,6 +20,22 @@ export type { CompiledTemplate, UpdateFunction, UpdateType } from './template-co
 
 import { reactive } from './computed-state';
 import { eventBus } from './event-bus';
+import { TemplateParser, DOMDiffer } from './dom-diff';
+
+// =============================
+// PLUGIN SYSTEM (Experimental)
+// =============================
+
+type RuntimePlugin<S extends ComponentState, C extends Record<string, any>> = {
+  onInit?: (config: ComponentConfig<S, C>) => void;
+  onRender?: (state: S & C, api: ComponentAPI<S & C>) => void;
+  onError?: (error: Error, state: S & C, api: ComponentAPI<S & C>) => void;
+};
+
+const runtimePlugins: RuntimePlugin<any, any>[] = [];
+export function useRuntimePlugin<S extends ComponentState, C extends Record<string, any>>(plugin: RuntimePlugin<S, C>) {
+  runtimePlugins.push(plugin);
+}
 
 // ============================================================================
 // CORE TYPES
@@ -98,229 +117,6 @@ export type LifecycleHandler<T extends ComponentState> = (
 ) => void;
 
 // ============================================================================
-// SSR TYPES & INTERFACES
-// ============================================================================
-
-export interface SSRComponentConfig<T extends ComponentState = ComponentState> {
-  readonly tag: string;
-  readonly template: (state: T, api: ComponentAPI<T>) => string;
-  /**
-   * State object can include computed properties as getter functions that accept state as a parameter.
-   */
-  readonly state: T;
-  readonly style?: string | ((state: T) => string);
-  readonly attrs?: Record<string, string>;
-}
-
-export interface SSRRenderOptions {
-  /** Include component styles in the output */
-  includeStyles?: boolean;
-  /** Pretty print the HTML output */
-  prettyPrint?: boolean;
-  /** Custom attribute sanitization function */
-  sanitizeAttributes?: (attrs: Record<string, string>) => Record<string, string>;
-}
-
-export interface SSRContext {
-  /** Track rendered components for hydration */
-  components: Map<string, SSRComponentConfig>;
-  /** Global styles collected during SSR */
-  styles: Set<string>;
-}
-
-// Environment detection for treeshaking
-const isServer = typeof window === 'undefined' || typeof document === 'undefined';
-
-// ============================================================================
-// SSR IMPLEMENTATION (Treeshakable)
-// ============================================================================
-
-/**
- * Create a minimal API for SSR that doesn't rely on DOM
- */
-function createSSRAPI<T extends ComponentState>(state: T): ComponentAPI<T> {
-  return {
-    state,
-    emit: () => {}, // No-op on server
-    update: () => {}, // No-op on server
-    updateKey: () => {}, // No-op on server
-    onGlobal: () => () => {},
-    offGlobal: () => {},
-    emitGlobal: () => {},
-  };
-}
-
-/**
- * Render a component to HTML string on the server
- * This function is treeshakable - only included when imported
- */
-export function renderToString<T extends ComponentState>(
-  config: SSRComponentConfig<T>,
-  options: SSRRenderOptions = {}
-): string {
-  if (!isServer) {
-    console.warn('renderToString should only be used on the server');
-  }
-
-  try {
-    // Use state directly (getters will be available)
-    const state = config.state;
-
-    // Create API and render template
-    const api = createSSRAPI(state);
-    const innerHTML = config.template(state, api);
-    
-    // Generate component styles if needed
-    let styleContent = '';
-    if (options.includeStyles && config.style) {
-      const css = typeof config.style === 'function' 
-        ? config.style(state) 
-        : config.style;
-      styleContent = `<style>${css}</style>`;
-    }
-
-    // Sanitize attributes
-    const attrs = options.sanitizeAttributes 
-      ? options.sanitizeAttributes(config.attrs || {})
-      : config.attrs || {};
-
-    // Build attribute string
-    const attrString = Object.entries(attrs)
-      .map(([key, value]) => `${escapeAttribute(key)}="${escapeAttribute(value)}"`)
-      .join(' ');
-
-    // Construct final HTML
-    const openTag = attrString 
-      ? `<${config.tag} ${attrString}>` 
-      : `<${config.tag}>`;
-    
-    const html = `${openTag}${styleContent}${innerHTML}</${config.tag}>`;
-
-    return options.prettyPrint ? formatHTML(html) : html;
-    
-  } catch (error) {
-    console.error(`[SSR] Error rendering ${config.tag}:`, error);
-    return `<${config.tag}><div style="color: red;">SSR Error: ${escapeHTML(String(error))}</div></${config.tag}>`;
-  }
-}
-
-/**
- * Render multiple components to HTML with shared context
- */
-export function renderComponentsToString(
-  components: SSRComponentConfig<any>[],
-  options: SSRRenderOptions = {}
-): { html: string; styles: string; context: SSRContext } {
-  const context: SSRContext = {
-    components: new Map(),
-    styles: new Set(),
-  };
-
-  const htmlParts: string[] = [];
-  
-  components.forEach(config => {
-    // Track component for hydration
-    context.components.set(config.tag, config);
-    
-    // Collect styles
-    if (config.style) {
-      const css = typeof config.style === 'function' 
-        ? config.style(config.state) 
-        : config.style;
-      context.styles.add(css);
-    }
-    
-    // Render component
-    const html = renderToString(config, { ...options, includeStyles: false });
-    htmlParts.push(html);
-  });
-
-  const styles = Array.from(context.styles).join('\n');
-  const html = htmlParts.join('\n');
-
-  return { html, styles, context };
-}
-
-/**
- * Generate hydration script for client-side takeover
- */
-export function generateHydrationScript(context: SSRContext): string {
-  const componentConfigs = Array.from(context.components.entries()).map(([tag, config]) => ({
-    tag,
-    state: config.state,
-  }));
-
-  return `
-<script type="module">
-  // Hydration data from SSR
-  window.__SSR_CONTEXT__ = ${JSON.stringify({ components: componentConfigs })};
-  
-  // Auto-hydrate when DOM is ready
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', hydrate);
-  } else {
-    hydrate();
-  }
-  
-  function hydrate() {
-    const context = window.__SSR_CONTEXT__;
-    if (!context?.components) return;
-    
-    context.components.forEach(({ tag, state }) => {
-      const elements = document.querySelectorAll(tag);
-      elements.forEach(el => {
-        // Mark as hydrated to prevent re-initialization
-        if (!el.hasAttribute('data-hydrated')) {
-          el.setAttribute('data-hydrated', 'true');
-          // Restore state if component supports it
-          if (el._hydrateWithState) {
-            el._hydrateWithState(state);
-          }
-        }
-      });
-    });
-    
-    // Clean up
-    delete window.__SSR_CONTEXT__;
-  }
-</script>`.trim();
-}
-
-// ============================================================================
-// SSR UTILITIES
-// ============================================================================
-
-function escapeHTML(str: string): string {
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-function escapeAttribute(str: string): string {
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-}
-
-function formatHTML(html: string): string {
-  // Simple HTML formatting for development
-  return html
-    .replace(/></g, '>\n<')
-    .split('\n')
-    .map(line => {
-      const depth = (line.match(/^<[^\/]/g) || []).length - (line.match(/<\//g) || []).length;
-      return '  '.repeat(Math.max(0, depth)) + line.trim();
-    })
-    .join('\n');
-}
-
-// ============================================================================
 // UTILITIES
 // ============================================================================
 
@@ -362,491 +158,6 @@ function safeClone<T>(obj: T): T {
 }
 
 // ============================================================================
-// PERFORMANCE OPTIMIZATIONS
-// ============================================================================
-
-// Efficient string template cache
-const htmlParseCache = new Map<string, DocumentFragment>();
-
-// ============================================================================
-// OPTIMIZED DOM MORPHING
-// ============================================================================
-
-class TemplateParser {
-  /**
-   * Basic input sanitization: only escape double quotes for attribute context, do not filter or remove any content
-   */
-  /**
-   * No-op for template HTML; escaping is handled contextually in template helpers and compiler.
-   */
-  static sanitizeHTML(html: string): string {
-    return html;
-  }
-
-  static parseTemplate(html: string): DocumentFragment {
-    const sanitized = TemplateParser.sanitizeHTML(html);
-    const fragment = document.createDocumentFragment();
-    // Simple parser: split by tags, handle input/textarea specially
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = sanitized;
-    Array.from(tempDiv.childNodes).forEach(node => {
-      if (node.nodeType === Node.ELEMENT_NODE && (node as Element).tagName === 'INPUT') {
-        // Create input via createElement
-        const input = document.createElement('input');
-        Array.from((node as Element).attributes).forEach(attr => {
-          if (attr.name !== 'value') {
-            input.setAttribute(attr.name, attr.value);
-          }
-        });
-        // Always set value property directly from state (ignore value attribute)
-        input.value = (node as Element).getAttribute('value') || '';
-        fragment.appendChild(input);
-      } else if (node.nodeType === Node.ELEMENT_NODE && (node as Element).tagName === 'TEXTAREA') {
-        // Create textarea via createElement
-        const textarea = document.createElement('textarea');
-        Array.from((node as Element).attributes).forEach(attr => {
-          if (attr.name !== 'value') {
-            textarea.setAttribute(attr.name, attr.value);
-          }
-        });
-        // Always set value property directly from state (ignore value attribute)
-        textarea.value = (node as Element).getAttribute('value') || '';
-        textarea.textContent = (node as Element).textContent ?? '';
-        fragment.appendChild(textarea);
-      } else {
-        fragment.appendChild(node.cloneNode(true));
-      }
-    });
-    htmlParseCache.set(sanitized, fragment.cloneNode(true) as DocumentFragment);
-    return fragment;
-  }
-}
-
-class DOMDiffer {
-  static morph(oldElement: Element, newHTML: string): void {
-    // For controlled input/textarea, render node only once, then update value/attributes directly
-    const isControlledInput = ['INPUT', 'TEXTAREA'].includes(oldElement.tagName);
-    if (isControlledInput) {
-      // Only update value and attributes, never replace node
-      const valueMatch = newHTML.match(/value=["']([^"']*)["']/);
-      const newValue = valueMatch ? valueMatch[1] : '';
-      if ((oldElement as any).value !== newValue) {
-        (oldElement as any).value = newValue;
-      }
-      // Optionally update attributes (skip children)
-      // Never replace or re-render node
-      return;
-    }
-    // Normal diffing for all other elements
-    const newFragment = TemplateParser.parseTemplate(newHTML);
-    const newElement = newFragment.firstElementChild;
-    if (!newElement) {
-      oldElement.innerHTML = '';
-      return;
-    }
-    this.morphElement(oldElement, newElement);
-  }
-
-  private static morphElement(oldEl: Element, newEl: Element): void {
-    // Robust controlled input/textarea diffing
-    if (['INPUT', 'TEXTAREA'].includes(oldEl.tagName)) {
-      const isFocused = document.activeElement === oldEl;
-      let selectionStart = null;
-      let selectionEnd = null;
-      if (isFocused) {
-        selectionStart = (oldEl as any).selectionStart;
-        selectionEnd = (oldEl as any).selectionEnd;
-      }
-      // Always set value property from state
-      const stateValue = (newEl as any).value ?? (newEl as any).props?.value ?? '';
-      if ((oldEl as any).value !== stateValue) {
-        (oldEl as any).value = stateValue;
-      }
-      // Restore cursor/selection if focused
-      if (isFocused && selectionStart !== null && selectionEnd !== null) {
-        const len = stateValue.length;
-        (oldEl as any).setSelectionRange(
-          Math.min(selectionStart, len),
-          Math.min(selectionEnd, len)
-        );
-      }
-      // Only update attributes, never replace/reparse node or update children/innerHTML
-      this.morphAttributes(oldEl, newEl);
-      return;
-    }
-    // Node identity and focus logic
-    const oldKey = oldEl.getAttribute('key');
-    const newKey = newEl.getAttribute('key');
-    const oldClass = oldEl.getAttribute('class');
-    const newClass = newEl.getAttribute('class');
-    const isFocusable = (el: Element) => ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName);
-    const isFocused = document.activeElement === oldEl;
-    const identityMatches = oldEl.tagName === newEl.tagName && oldKey === newKey && oldClass === newClass;
-
-    // For input/textarea, always set value from state, never replace node if identity matches
-    if (isFocusable(oldEl) && isFocusable(newEl) && identityMatches) {
-      // For controlled input/textarea, never replace or reparse node. Only update value property and attributes.
-      if (oldEl.tagName === 'INPUT') {
-        const input = oldEl as HTMLInputElement;
-        const stateValue = (newEl as any).props?.value ?? '';
-        const isFocused = document.activeElement === input;
-        let selectionStart = null;
-        let selectionEnd = null;
-        if (isFocused) {
-          selectionStart = input.selectionStart;
-          selectionEnd = input.selectionEnd;
-        }
-        // Always set value property directly
-        input.value = stateValue;
-        if (input.hasAttribute('value')) input.removeAttribute('value');
-        // Restore cursor position if focused
-        if (isFocused && selectionStart !== null && selectionEnd !== null) {
-          const len = stateValue.length;
-          input.setSelectionRange(
-            Math.min(selectionStart, len),
-            Math.min(selectionEnd, len)
-          );
-        }
-        this.morphAttributes(oldEl, newEl);
-        // Never morph children for controlled input
-        return;
-      } else if (oldEl.tagName === 'TEXTAREA') {
-        const textarea = oldEl as HTMLTextAreaElement;
-        const stateValue = (newEl as any).props?.value ?? '';
-        const isFocused = document.activeElement === textarea;
-        let selectionStart = null;
-        let selectionEnd = null;
-        if (isFocused) {
-          selectionStart = textarea.selectionStart;
-          selectionEnd = textarea.selectionEnd;
-        }
-        // Always set value property directly
-        textarea.value = stateValue;
-        if (textarea.hasAttribute('value')) textarea.removeAttribute('value');
-        // Restore cursor position if focused
-        if (isFocused && selectionStart !== null && selectionEnd !== null) {
-          const len = stateValue.length;
-          textarea.setSelectionRange(
-            Math.min(selectionStart, len),
-            Math.min(selectionEnd, len)
-          );
-        }
-        this.morphAttributes(oldEl, newEl);
-        // Never morph children for controlled textarea
-        return;
-      }
-    }
-
-    // Only replace node if not focused or not focusable
-    if (!isFocused && !identityMatches) {
-      const parent = oldEl.parentNode;
-      const newNode = newEl.cloneNode(true);
-      if (parent) {
-        parent.replaceChild(newNode, oldEl);
-      }
-      return;
-    }
-    // Special handling for <input> to preserve focus and cursor
-    if (oldEl.tagName === 'INPUT' && newEl.tagName === 'INPUT') {
-      const oldType = oldEl.getAttribute('type');
-      const newType = newEl.getAttribute('type');
-      // Only update value if type is the same
-      if (oldType === newType) {
-        const input = oldEl as HTMLInputElement;
-        const oldValue = input.value;
-        // Always use direct state value for controlled input
-        const newValue = (newEl as any).props?.value ?? '';
-        if (oldValue !== newValue) {
-          const selectionStart = input.selectionStart;
-          const selectionEnd = input.selectionEnd;
-          input.value = newValue;
-          if (input.hasAttribute('value')) input.removeAttribute('value');
-          if (selectionStart !== null && selectionEnd !== null) {
-            const len = newValue.length;
-            input.setSelectionRange(
-              Math.min(selectionStart, len),
-              Math.min(selectionEnd, len)
-            );
-          }
-        }
-        this.morphAttributes(oldEl, newEl);
-        this.morphChildren(oldEl, newEl);
-        return;
-      }
-    }
-    // Special handling for <textarea>
-    if (oldEl.tagName === 'TEXTAREA' && newEl.tagName === 'TEXTAREA') {
-      const textarea = oldEl as HTMLTextAreaElement;
-      const oldValue = textarea.value;
-      // Always use direct state value for controlled textarea
-      const newValue = (newEl as any).props?.value ?? '';
-      if (oldValue !== newValue) {
-        const selectionStart = textarea.selectionStart;
-        const selectionEnd = textarea.selectionEnd;
-        textarea.value = newValue;
-        if (selectionStart !== null && selectionEnd !== null) {
-          const len = newValue.length;
-          textarea.setSelectionRange(
-            Math.min(selectionStart, len),
-            Math.min(selectionEnd, len)
-          );
-        }
-      }
-      this.morphAttributes(oldEl, newEl);
-      this.morphChildren(oldEl, newEl);
-      return;
-    }
-    // Morph attributes efficiently
-    this.morphAttributes(oldEl, newEl);
-    // Morph children (includes text nodes)
-    this.morphChildren(oldEl, newEl);
-  }
-
-  private static morphAttributes(oldEl: Element, newEl: Element): void {
-    const oldAttrs = oldEl.getAttributeNames();
-    const newAttrs = newEl.getAttributeNames();
-    // Remove old attributes not in new element (including data-refs-processed)
-    for (const attr of oldAttrs) {
-      // Only allow valid attribute names, never use user input as attribute name
-      if (!/^[a-zA-Z_:][-a-zA-Z0-9_:.]*$/.test(attr)) continue;
-      if (!newAttrs.includes(attr)) {
-        if (this.isFormElement(oldEl) && this.isValueAttribute(attr)) {
-          this.updateFormValue(oldEl as HTMLInputElement | HTMLTextAreaElement, attr, null);
-        }
-        oldEl.removeAttribute(attr);
-      }
-    }
-    // Set new/changed attributes
-    for (const attr of newAttrs) {
-      // Only allow valid attribute names, never use user input as attribute name
-      if (!/^[a-zA-Z_:][-a-zA-Z0-9_:.]*$/.test(attr)) continue;
-      const newValue = newEl.getAttribute(attr);
-      const oldValue = oldEl.getAttribute(attr);
-      // For input/textarea/select, set value via property, not attribute
-      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(oldEl.tagName) && attr === 'value') {
-        if ((oldEl as any).value !== newValue) {
-          (oldEl as any).value = newValue ?? '';
-        }
-        continue;
-      }
-      if (this.isFormElement(oldEl) && this.isValueAttribute(attr)) {
-        this.updateFormValue(oldEl as HTMLInputElement | HTMLTextAreaElement, attr, newValue);
-      } else if (oldValue !== newValue) {
-        oldEl.setAttribute(attr, newValue || '');
-      }
-    }
-  }
-
-  private static morphChildren(oldEl: Element, newEl: Element): void {
-    const oldChildren = Array.from(oldEl.childNodes);
-    const newChildren = Array.from(newEl.childNodes);
-    // Try key-based morphing first for elements with keys
-    if (this.hasKeyedElements(oldChildren) || this.hasKeyedElements(newChildren)) {
-      this.morphNodesByKey(oldEl, oldChildren, newChildren);
-    } else {
-      this.morphNodesByPosition(oldEl, oldChildren, newChildren);
-    }
-  }
-
-  private static hasKeyedElements(nodes: Node[]): boolean {
-    return nodes.some(node => 
-      node.nodeType === Node.ELEMENT_NODE && 
-      (node as Element).hasAttribute('key')
-    );
-  }
-
-  private static morphNodesByKey(parent: Element, oldNodes: Node[], newNodes: Node[]): void {
-    // Create maps for keyed elements
-    const oldKeyedElements = new Map<string, Element>();
-    const newKeyedElements = new Map<string, Element>();
-    const oldNonKeyedNodes: Node[] = [];
-    const newNonKeyedNodes: Node[] = [];
-
-    // Categorize old nodes
-    oldNodes.forEach(node => {
-      if (node.nodeType === Node.ELEMENT_NODE) {
-        const element = node as Element;
-        const key = element.getAttribute('key');
-        if (key) {
-          oldKeyedElements.set(key, element);
-        } else {
-          oldNonKeyedNodes.push(node);
-        }
-      } else {
-        oldNonKeyedNodes.push(node);
-      }
-    });
-
-    // Categorize new nodes
-    newNodes.forEach(node => {
-      if (node.nodeType === Node.ELEMENT_NODE) {
-        const element = node as Element;
-        const key = element.getAttribute('key');
-        if (key) {
-          newKeyedElements.set(key, element);
-        } else {
-          newNonKeyedNodes.push(node);
-        }
-      } else {
-        newNonKeyedNodes.push(node);
-      }
-    });
-
-    // Remove old keyed elements that don't exist in new
-    oldKeyedElements.forEach((element, key) => {
-      if (!newKeyedElements.has(key)) {
-        parent.removeChild(element);
-      }
-    });
-
-    // Process nodes in order from new template
-    let currentNode = parent.firstChild;
-    
-    newNodes.forEach(newNode => {
-      if (newNode.nodeType === Node.ELEMENT_NODE) {
-        const newElement = newNode as Element;
-        const key = newElement.getAttribute('key');
-        
-        if (key) {
-          // Handle keyed element
-          const oldElement = oldKeyedElements.get(key);
-          if (oldElement) {
-            // Move existing element to correct position if needed
-            if (currentNode !== oldElement) {
-              parent.insertBefore(oldElement, currentNode);
-            }
-            // Morph the element
-            this.morphElement(oldElement, newElement);
-            currentNode = oldElement.nextSibling;
-          } else {
-            // Add new keyed element
-            const cloned = newElement.cloneNode(true);
-            parent.insertBefore(cloned, currentNode);
-            currentNode = cloned.nextSibling;
-          }
-        } else {
-          // Handle non-keyed element
-          if (currentNode?.nodeType === Node.ELEMENT_NODE) {
-            this.morphElement(currentNode as Element, newElement);
-            currentNode = currentNode.nextSibling;
-          } else {
-            const cloned = newElement.cloneNode(true);
-            parent.insertBefore(cloned, currentNode);
-            currentNode = cloned.nextSibling;
-          }
-        }
-      } else {
-        // Handle text nodes and other node types
-        if (currentNode?.nodeType === newNode.nodeType) {
-          if (currentNode.nodeType === Node.TEXT_NODE && 
-              currentNode.textContent !== newNode.textContent) {
-            currentNode.textContent = newNode.textContent;
-          }
-          currentNode = currentNode.nextSibling;
-        } else {
-          const cloned = newNode.cloneNode(true);
-          parent.insertBefore(cloned, currentNode);
-          currentNode = cloned.nextSibling;
-        }
-      }
-    });
-
-    // Remove any remaining old nodes
-    while (currentNode) {
-      const next = currentNode.nextSibling;
-      parent.removeChild(currentNode);
-      currentNode = next;
-    }
-  }
-
-  private static morphNodesByPosition(parent: Element, oldNodes: Node[], newNodes: Node[]): void {
-    const maxLength = Math.max(oldNodes.length, newNodes.length);
-
-    for (let i = 0; i < maxLength; i++) {
-      const oldNode = oldNodes[i];
-      const newNode = newNodes[i];
-
-      if (!oldNode && newNode) {
-        // Add new node
-        parent.appendChild(newNode.cloneNode(true));
-      } else if (oldNode && !newNode) {
-        // Remove old node
-        parent.removeChild(oldNode);
-      } else if (oldNode && newNode) {
-        // Morph existing node
-        if (oldNode.nodeType !== newNode.nodeType) {
-          // Different node types, replace
-          parent.replaceChild(newNode.cloneNode(true), oldNode);
-        } else if (oldNode.nodeType === Node.TEXT_NODE) {
-          // Text node - update content
-          if (oldNode.textContent !== newNode.textContent) {
-            oldNode.textContent = newNode.textContent;
-          }
-        } else if (oldNode.nodeType === Node.ELEMENT_NODE) {
-          // Element node - recurse
-          this.morphElement(oldNode as Element, newNode as Element);
-        }
-      }
-    }
-  }
-
-  private static isFormElement(el: Element): boolean {
-    return el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT';
-  }
-
-  private static isValueAttribute(attr: string): boolean {
-    return attr === 'value' || attr === 'checked' || attr === 'selected';
-  }
-
-  private static updateFormValue(el: HTMLInputElement | HTMLTextAreaElement, attr: string, value: string | null): void {
-    switch (attr) {
-      case 'value':
-        const newValue = value || '';
-        const currentValue = el.value;
-        
-        // Only update if the values are actually different
-        if (currentValue !== newValue) {
-          const isFocused = el === document.activeElement;
-          
-          if (!isFocused) {
-            // Element not focused - always safe to update
-            el.value = newValue;
-          } else {
-            // Element is focused - only update for significant programmatic changes
-            const lengthDiff = Math.abs(currentValue.length - newValue.length);
-            const isClearing = newValue.length === 0;
-            const isLargeChange = lengthDiff > 20;
-            const isCompletelyDifferent = newValue.length > 50 && !currentValue.toLowerCase().includes(newValue.toLowerCase().substring(0, 30));
-            
-            if (isClearing || isLargeChange || isCompletelyDifferent) {
-              el.value = newValue;
-              // Preserve cursor position for large changes
-              if (!isClearing && el === document.activeElement) {
-                const cursorPos = Math.min(newValue.length, (el as any).selectionStart || newValue.length);
-                setTimeout(() => {
-                  if (el === document.activeElement) {
-                    (el as any).setSelectionRange(cursorPos, cursorPos);
-                  }
-                }, 0);
-              }
-            }
-          }
-        }
-        break;
-        
-      case 'checked':
-        const newChecked = value !== null;
-        (el as HTMLInputElement).checked = newChecked;
-        break;
-        
-      case 'selected':
-        (el as any).selected = value !== null;
-        break;
-    }
-  }
-}
-
-// ============================================================================
 // COMPONENT IMPLEMENTATION
 // ============================================================================
 
@@ -862,17 +173,19 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
     const shadow = this.shadowRoot;
     if (!shadow) return;
     shadow.querySelectorAll('input, textarea').forEach((el) => {
+      // Only attach listener once
+      if ((el as any)._listenerAttached) return;
       el.addEventListener('input', (e: Event) => {
         const target = e.target as HTMLInputElement | HTMLTextAreaElement;
-        // Update state with DOM value
         if (target && target.value !== undefined) {
-          // Find state key by name or ref (assumes name attribute matches state key)
           const key = target.getAttribute('name');
           if (key && key in this.stateObj) {
-            this.api.updateKey(key as keyof (S & C), target.value as any);
+            // Direct assignment for developer ease of use
+            (this.stateObj as any)[key] = target.value;
           }
         }
       });
+      (el as any)._listenerAttached = true;
     });
   }
   private readonly config: ComponentConfig<S, C>;
@@ -979,7 +292,8 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
   // Attach controlled input listeners after each render
   setTimeout(() => this.attachControlledInputListeners(), 0);
     try {
-  // Computed properties are now always getters via Proxy; no assignment needed
+      // Plugin hook: onRender
+      runtimePlugins.forEach(p => p.onRender?.(this.stateObj, this.api));
       const templateResultOrPromise = this.config.template(this.stateObj, this.api);
       if (templateResultOrPromise instanceof Promise) {
         templateResultOrPromise.then(templateResult => {
@@ -1073,6 +387,7 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
   private _handleRenderError(error: any): void {
     // Improved error boundary: log details and allow fallback UI
     console.error(`[runtime] Render error in <${this.tagName.toLowerCase()}>:`, error);
+    runtimePlugins.forEach(p => p.onError?.(error, this.stateObj, this.api));
     if ('onError' in this.config && typeof (this.config as any).onError === 'function') {
       try {
         (this.config as any).onError(error as Error, this.api.state, this.api);

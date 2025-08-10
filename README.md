@@ -1,3 +1,57 @@
+## 🧩 Extensibility: Plugin System
+
+You can extend the runtime with plugins for logging, analytics, debugging, or custom lifecycle hooks:
+
+```typescript
+import { useRuntimePlugin } from './lib/runtime';
+
+useRuntimePlugin({
+  onRender(state, api) {
+    // Custom logic on every render
+    console.log('Component rendered:', state);
+  },
+  onError(error, state, api) {
+    // Custom error handling
+    alert('Component error: ' + error.message);
+  }
+});
+```
+
+## 📝 State Management: Direct Assignment
+
+Update state directly for reactivity and ease of use:
+
+```typescript
+state.count += 1;
+state.name = 'Alice';
+```
+No need to use `api.update` or `api.updateKey`—just assign to state properties.
+
+## 🛠️ Error Boundaries & Diagnostics
+
+Error boundaries catch render errors and allow fallback UI or custom handling:
+
+```typescript
+component('my-component', {
+  // ...
+  onError(error, state, api) {
+    // Custom fallback logic
+    state.hasError = true;
+  }
+});
+```
+
+## 🪶 Modularization & Tree-Shaking
+
+Import only the features you need. SSR, hydration, and DOM diffing are modular and tree-shakable.
+
+## ✅ Best Practices
+
+- Use direct assignment for state updates
+- Use plugins for extensibility (`useRuntimePlugin`)
+- Modularize SSR, hydration, and DOM diffing for tree-shaking
+- Remove unused legacy APIs for minimal footprint
+- Use error boundaries and plugin hooks for robust error handling
 # Custom Elements Runtime
 
 > **A modern, ultra-lightweight TypeScript runtime for building fast, reactive, and maintainable web components.**
@@ -1222,6 +1276,89 @@ const inspection = DevTools.inspectComponent(element);
 console.log('Component state:', inspection.state);
 
 // State change tracking
+DevTools.trackStateChanges(element, (changes) => {
+  console.log('State updated:', changes);
+});
+```
+
+## 🚀 Advanced Patterns
+
+### 1. Effect-Level Reactivity
+
+Enable fine-grained updates by tracking which DOM nodes depend on which state properties. This minimizes unnecessary re-renders and improves performance for large components.
+
+```typescript
+import { effect } from './lib/computed-state';
+
+effect(() => {
+  // Only updates when state.count changes
+  updateSpecificDOMNode(state.count);
+});
+```
+
+### 2. Build-Time Template Compilation
+
+Use compile-time template optimization for better runtime performance and smaller bundles.
+
+```typescript
+import { compile } from './lib/template-helpers';
+
+const template = compile`<div>${state.name}</div>`;
+component({
+  tag: 'user-card',
+  template,
+  state: { name: 'Alice' }
+});
+```
+
+### 3. Plugin Extensibility
+
+Extend the runtime with plugins for custom lifecycle hooks, error boundaries, or analytics.
+
+```typescript
+import { useRuntimePlugin } from './lib/runtime';
+
+useRuntimePlugin({
+  onRender: (state, api) => {
+    // Custom analytics or logging
+    logRender(state);
+  },
+  onError: (error, state, api) => {
+    // Custom error reporting
+    reportError(error);
+  }
+});
+```
+
+### 4. Selective Hydration
+
+Hydrate only marked regions for SSR, enabling partial client takeover and improved performance.
+
+```typescript
+component({
+  tag: 'my-component',
+  template: (state) => `<div data-hydrate>${state.content}</div>`,
+  hydrate: (el, state, api) => {
+    // Custom hydration logic for this region
+    hydrateRegion(el, state);
+  }
+});
+```
+
+### 5. Devtools Integration
+
+Monitor performance, inspect components, and track state changes in development.
+
+```typescript
+import { Performance, DevTools } from './lib/dev-tools';
+
+const renderTime = Performance.measureRender('my-component', () => {
+  // Component render logic
+});
+
+const inspection = DevTools.inspectComponent(element);
+console.log('Component state:', inspection.state);
+
 DevTools.trackStateChanges(element, (changes) => {
   console.log('State updated:', changes);
 });
