@@ -4,7 +4,7 @@ import './components/examples/TodoApp';
 import './components/examples/TodoAppCompiled';
 import './components/examples/ShoppingCart';
 // import './components/examples/NotificationSystem';
-// import './components/examples/TemplateCompilationDemo';
+import './components/examples/TemplateCompilationDemo';
 import './components/examples/SimpleTest';
 
 // The new runtime is completely self-contained
