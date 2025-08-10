@@ -41,6 +41,7 @@ component<TodoAppState, TodoAppComputed>('todo-app', {
     <div class="todo-app">
       <header>
         <h1>📝 Todo App</h1>
+        ${state.newTodo}
         <input 
           type="text" 
           data-model="newTodo"

@@ -128,8 +128,14 @@ export type LifecycleHandler<T extends ComponentState> = (
 export function useDataModel<T extends Record<string, any>>(
   inputEl: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement,
   state: T,
-  key: keyof T
+  keyWithModifiers: string
 ): void {
+  // Parse key and modifiers
+  const [key, ...modifiers] = keyWithModifiers.split('|').map(s => s.trim());
+  const eventModifiers = modifiers.filter(m => ['input', 'change', 'blur'].includes(m));
+  const valueModifiers = modifiers.filter(m => ['number', 'trim'].includes(m));
+  const events = eventModifiers.length ? eventModifiers : ['input', 'change'];
+
   // Initial value sync
   if ('value' in inputEl && typeof state[key] !== 'undefined') {
     inputEl.value = String(state[key] ?? '');
@@ -140,17 +146,24 @@ export function useDataModel<T extends Record<string, any>>(
   if (inputEl.type === 'radio') {
     (inputEl as HTMLInputElement).checked = inputEl.value === String(state[key]);
   }
-  // Listen for user input
-  inputEl.addEventListener('input', (e) => {
-    const el = e.target as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
-    if (el.type === 'checkbox') {
-      state[key] = (el as HTMLInputElement).checked as unknown as T[keyof T];
-    } else if (el.type === 'radio') {
-      if ((el as HTMLInputElement).checked) state[key] = el.value as unknown as T[keyof T];
+
+  // Update logic with modifiers
+  const updateState = (_e: Event) => {
+    let value: any = inputEl.type === 'checkbox'
+      ? (inputEl as HTMLInputElement).checked
+      : inputEl.value;
+    if (valueModifiers.includes('trim') && typeof value === 'string') value = value.trim();
+    if (valueModifiers.includes('number')) value = Number(value);
+    if (inputEl.type === 'radio') {
+      if ((inputEl as HTMLInputElement).checked) {
+        state[key as keyof T] = value as unknown as T[keyof T];
+      }
     } else {
-      state[key] = el.value as unknown as T[keyof T];
+      state[key as keyof T] = value as unknown as T[keyof T];
     }
-  });
+  };
+  events.forEach(event => inputEl.addEventListener(event, updateState));
+
   // Listen for state changes (reactive)
   if (typeof state.subscribe === 'function') {
     state.subscribe(() => {
@@ -219,30 +232,32 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
   private attachControlledInputListeners(): void {
     const shadow = this.shadowRoot;
     if (!shadow) return;
-    shadow.querySelectorAll('input, textarea').forEach((el) => {
-      // Only attach listener once
-      if ((el as any)._listenerAttached) return;
-      el.addEventListener('input', (e: Event) => {
-        const target = e.target as HTMLInputElement | HTMLTextAreaElement;
-        if (target && target.value !== undefined) {
-          const key = target.getAttribute('name');
-          if (key && key in this.stateObj) {
-            // Direct assignment for developer ease of use
-            (this.stateObj as any)[key] = target.value;
-          }
-        }
-      });
-      (el as any)._listenerAttached = true;
-    });
     // --- Auto data-model binding ---
     shadow.querySelectorAll('[data-model]').forEach((el) => {
-      const key = el.getAttribute('data-model');
-      if (!key || !(key in this.stateObj)) return;
+      const keyWithModifiers = el.getAttribute('data-model');
+      if (!keyWithModifiers) return;
       // Only bind once per element
       if ((el as any)._dataModelBound) return;
       // @ts-ignore
-      useDataModel(el, this.stateObj, key);
+      useDataModel(el, this.stateObj, keyWithModifiers);
       (el as any)._dataModelBound = true;
+    });
+    // --- Post-render sync for all data-model inputs ---
+    shadow.querySelectorAll('[data-model]').forEach((el) => {
+      const [key] = el.getAttribute('data-model')?.split('|').map(s => s.trim()) ?? [];
+      if (!key || !(key in this.stateObj)) return;
+      // Only set value/checked for input, textarea, select
+      if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement) {
+        if (typeof this.stateObj[key] !== 'undefined') {
+          el.value = String(this.stateObj[key] ?? '');
+        }
+        if (el instanceof HTMLInputElement && el.type === 'checkbox') {
+          el.checked = Boolean(this.stateObj[key]);
+        }
+        if (el instanceof HTMLInputElement && el.type === 'radio') {
+          el.checked = el.value === String(this.stateObj[key]);
+        }
+      }
     });
   }
   private readonly config: ComponentConfig<S, C>;
@@ -359,12 +374,38 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
     try {
       if (typeof templateResult === 'string') {
         if (templateResult === this.lastHTML) return;
+        // Enhanced controlled input preservation
         const fragment = TemplateParser.parseTemplate(templateResult);
+        // If shadowAppContainer exists, preserve controlled inputs
+        const shadowAppContainer = this.shadowRoot!.querySelector('[data-root]') as Element | undefined;
+        if (shadowAppContainer) {
+          fragment.querySelectorAll('[data-model]').forEach(newEl => {
+            const keyWithModifiers = newEl.getAttribute('data-model');
+            if (!keyWithModifiers) return;
+            // Try to find matching input in shadow DOM by data-model and type
+            const selector = `[data-model="${keyWithModifiers}"][type="${(newEl as HTMLInputElement).type}"]`;
+            const oldEl = shadowAppContainer.querySelector(selector);
+            if (oldEl && oldEl.tagName === newEl.tagName) {
+              // Preserve old input node, update value/checked only
+              if (
+                (oldEl instanceof HTMLInputElement || oldEl instanceof HTMLTextAreaElement || oldEl instanceof HTMLSelectElement) &&
+                (newEl instanceof HTMLInputElement || newEl instanceof HTMLTextAreaElement || newEl instanceof HTMLSelectElement)
+              ) {
+                newEl.value = oldEl.value;
+                if (oldEl instanceof HTMLInputElement && newEl instanceof HTMLInputElement && oldEl.type === 'checkbox') {
+                  newEl.checked = oldEl.checked;
+                }
+                if (oldEl instanceof HTMLInputElement && newEl instanceof HTMLInputElement && oldEl.type === 'radio') {
+                  newEl.checked = oldEl.checked;
+                }
+              }
+            }
+          });
+        }
         let appContainer: Element | null = Array.from(fragment.childNodes).find(n => n.nodeType === 1 && (n as Element).tagName !== 'STYLE') as Element | null;
         let styleNode: Element | null = Array.from(fragment.childNodes).find(n => n.nodeType === 1 && (n as Element).tagName === 'STYLE') as Element | null;
         // Automatically add data-root to the main app container
         if (appContainer) appContainer.setAttribute('data-root', '');
-        const shadowAppContainer = this.shadowRoot!.querySelector('[data-root]') as Element | undefined;
         const isInitialRender = !shadowAppContainer;
         if (isInitialRender) {
           if (styleNode) this.shadowRoot!.appendChild(styleNode.cloneNode(true));
@@ -383,6 +424,18 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
           else if (shadowStyle && styleNode) shadowStyle.textContent = styleNode.textContent;
           let shadowApp = this.shadowRoot!.querySelector('[data-root]');
           if (shadowApp && appContainer) {
+            // --- Keyed element preservation ---
+            // For each keyed element in new fragment, try to find and reuse the old one
+            const keyedNew = appContainer.querySelectorAll('[key]');
+            keyedNew.forEach(newEl => {
+              const key = newEl.getAttribute('key');
+              if (!key || !shadowApp) return;
+              const oldEl = shadowApp.querySelector(`[key="${key}"]`);
+              if (oldEl && oldEl.tagName === newEl.tagName) {
+                // Replace newEl in fragment with oldEl (preserve listeners, value, etc.)
+                newEl.replaceWith(oldEl.cloneNode(true));
+              }
+            });
             DOMDiffer.morph(shadowApp, appContainer.outerHTML);
             shadowApp = this.shadowRoot!.querySelector('[data-root]');
             // Clean up refs after morph
