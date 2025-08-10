@@ -1283,20 +1283,7 @@ DevTools.trackStateChanges(element, (changes) => {
 
 ## 🚀 Advanced Patterns
 
-### 1. Effect-Level Reactivity
-
-Enable fine-grained updates by tracking which DOM nodes depend on which state properties. This minimizes unnecessary re-renders and improves performance for large components.
-
-```typescript
-import { effect } from './lib/computed-state';
-
-effect(() => {
-  // Only updates when state.count changes
-  updateSpecificDOMNode(state.count);
-});
-```
-
-### 2. Build-Time Template Compilation
+### 1. Build-Time Template Compilation
 
 Use compile-time template optimization for better runtime performance and smaller bundles.
 
@@ -1311,7 +1298,7 @@ component({
 });
 ```
 
-### 3. Plugin Extensibility
+### 2. Plugin Extensibility
 
 Extend the runtime with plugins for custom lifecycle hooks, error boundaries, or analytics.
 
@@ -1330,7 +1317,7 @@ useRuntimePlugin({
 });
 ```
 
-### 4. Selective Hydration
+### 3. Selective Hydration
 
 Hydrate only marked regions for SSR, enabling partial client takeover and improved performance.
 
@@ -1345,7 +1332,7 @@ component({
 });
 ```
 
-### 5. Devtools Integration
+### 4. Devtools Integration
 
 Monitor performance, inspect components, and track state changes in development.
 
