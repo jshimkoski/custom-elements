@@ -366,7 +366,7 @@ function safeClone<T>(obj: T): T {
 // ============================================================================
 
 // Efficient string template cache
-const templateCache = new Map<string, DocumentFragment>();
+const htmlParseCache = new Map<string, DocumentFragment>();
 
 // Memoization cache for computed properties
 const computedCache = new WeakMap<object, Map<string, any>>();
@@ -379,7 +379,7 @@ class TemplateParser {
   private static readonly parser = new window.DOMParser();
 
   static parseTemplate(html: string): DocumentFragment {
-    const cached = templateCache.get(html);
+  const cached = htmlParseCache.get(html);
     if (cached) {
       return cached.cloneNode(true) as DocumentFragment;
     }
@@ -391,7 +391,7 @@ class TemplateParser {
       fragment.appendChild(doc.body.firstChild);
     }
 
-    templateCache.set(html, fragment.cloneNode(true) as DocumentFragment);
+  htmlParseCache.set(html, fragment.cloneNode(true) as DocumentFragment);
     return fragment;
   }
 }
@@ -727,6 +727,7 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
   private lastCompiledTemplate: CompiledTemplate<S & C> | null = null;
   private lastState: (S & C) | null = null;
   private _pendingRender = false;
+  private rafId: number | null = null;
 
   /**
    * Construct a new runtime component element.
@@ -774,17 +775,18 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
       styleEl.textContent = typeof config.style === 'function' ? config.style(this.stateObj) : config.style;
       this.shadowRoot!.appendChild(styleEl);
     }
-    // Add hydration support
-    (this as any)._hydrateWithState = (ssrState: S & C) => {
-      Object.assign(this.stateObj, ssrState);
-      this.render();
-    };
-  }
-
-  /**
-   * Lifecycle: called when element is added to DOM.
-   */
-  connectedCallback(): void {
+    // SSR hydration support (selective)
+    if (this.config.hydrate) {
+      const hydrateEls = this.shadowRoot?.querySelectorAll('[data-hydrate]');
+      if (hydrateEls && hydrateEls.length > 0) {
+        hydrateEls.forEach(el => {
+          this.config.hydrate(el, this.stateObj, this.api);
+        });
+      } else {
+        // Fallback: hydrate entire shadow root
+        this.config.hydrate(this.shadowRoot!, this.stateObj, this.api);
+      }
+    }
     const isSSRHydration = this.hasAttribute('data-hydrated');
     if (!isSSRHydration) {
       this.render();
@@ -822,7 +824,26 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
           }
         });
       }
-      const templateResult = this.config.template(this.stateObj, this.api);
+      const templateResultOrPromise = this.config.template(this.stateObj, this.api);
+      if (templateResultOrPromise instanceof Promise) {
+        templateResultOrPromise.then(templateResult => {
+          this._renderTemplateResult(templateResult);
+        }).catch(error => {
+          this._handleRenderError(error);
+        });
+      } else {
+        this._renderTemplateResult(templateResultOrPromise);
+      }
+    } catch (error) {
+      this._handleRenderError(error);
+    }
+  }
+
+  /**
+   * Internal: render a template result (string or compiled template)
+   */
+  private _renderTemplateResult(templateResult: any): void {
+    try {
       if (typeof templateResult === 'string') {
         if (templateResult === this.lastHTML) return;
         const fragment = TemplateParser.parseTemplate(templateResult);
@@ -898,18 +919,25 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
       // Automatic event binding after refs and DOM update
       this.bindEvents();
     } catch (error) {
-      // Improved error boundary: log details and allow fallback UI
-      console.error(`[runtime] Render error in <${this.tagName.toLowerCase()}>:`, error);
-      if ('onError' in this.config && typeof (this.config as any).onError === 'function') {
-        try {
-          (this.config as any).onError(error as Error, this.api.state, this.api);
-        } catch (fallbackError) {
-          console.error(`[runtime] Error in onError handler:`, fallbackError);
-          this.renderError(error as Error);
-        }
-      } else {
+      this._handleRenderError(error);
+    }
+  }
+
+  /**
+   * Internal: handle render errors and error boundaries
+   */
+  private _handleRenderError(error: any): void {
+    // Improved error boundary: log details and allow fallback UI
+    console.error(`[runtime] Render error in <${this.tagName.toLowerCase()}>:`, error);
+    if ('onError' in this.config && typeof (this.config as any).onError === 'function') {
+      try {
+        (this.config as any).onError(error as Error, this.api.state, this.api);
+      } catch (fallbackError) {
+        console.error(`[runtime] Error in onError handler:`, fallbackError);
         this.renderError(error as Error);
       }
+    } else {
+      this.renderError(error as Error);
     }
   }
 
@@ -917,9 +945,13 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
    * Schedule a render using requestAnimationFrame, batching multiple state changes.
    */
   private scheduleRender(): void {
-    if (this._pendingRender) return;
-    this._pendingRender = true;
-    requestAnimationFrame(() => this.render());
+    if (this.rafId !== undefined && this.rafId !== null) {
+      cancelAnimationFrame(this.rafId);
+    }
+    this.rafId = requestAnimationFrame(() => {
+      this.render();
+      this.rafId = null;
+    });
   }
 
   private updateStyle(): void {

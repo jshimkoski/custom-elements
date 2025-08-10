@@ -15,22 +15,41 @@ export type TemplateResult = string | CompiledTemplate | ((state?: any) => strin
 export function html(
   strings: TemplateStringsArray,
   ...values: unknown[]
-): (state?: any, api?: any) => string {
+): (state?: any, api?: any) => string | Promise<string> {
   return (state?: any, api?: any) => {
-    let result = '';
-    for (let i = 0; i < strings.length; i++) {
-      result += strings[i];
-      if (i < values.length) {
-        let value = values[i];
-        if (typeof value === 'function') value = value(state, api);
-        if (typeof value === 'string' && state && value.startsWith('state.')) {
-          const prop = value.slice(6);
-          value = state[prop];
+      let result = '';
+      let hasAsync = false;
+      const valuePromises: Promise<any>[] = [];
+      for (let i = 0; i < strings.length; i++) {
+        result += strings[i];
+        if (i < values.length) {
+          const value = values[i];
+          if (value instanceof Promise) {
+            hasAsync = true;
+            valuePromises.push(value);
+          } else {
+            result += value;
+          }
         }
-        result += value ?? '';
       }
-    }
-    return result;
+      if (!hasAsync) return result;
+      // If any value is a Promise, resolve all and reconstruct
+      return Promise.all(valuePromises).then(resolvedValues => {
+        let asyncResult = '';
+        let asyncIndex = 0;
+        for (let i = 0; i < strings.length; i++) {
+          asyncResult += strings[i];
+          if (i < values.length) {
+            const value = values[i];
+            if (value instanceof Promise) {
+              asyncResult += resolvedValues[asyncIndex++];
+            } else {
+              asyncResult += value;
+            }
+          }
+        }
+        return asyncResult;
+      });
   };
 }
 /**

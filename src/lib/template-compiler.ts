@@ -25,6 +25,8 @@ export interface CompiledTemplate<T = any> {
   readonly id: string;
   /** Whether this template has dynamic content */
   readonly hasDynamics: boolean;
+  /** Render method supporting async output */
+  render: (state: T, api: any) => string | Promise<string>;
 }
 
 export interface UpdateFunction<T = any> {
@@ -187,12 +189,10 @@ export function compile<T = any>(
 ): CompiledTemplate<T> {
   // Create statics array directly from strings
   const statics = [...strings];
-  
   // Build the template HTML with placeholders to analyze structure
   const templateHTML = strings.map((str, i) => 
     str + (i < expressions.length ? `__DYNAMIC_${i}__` : '')
   ).join('');
-  
   // Parse the template to find DOM paths for each dynamic value
   const dynamics: UpdateFunction<T>[] = expressions.map((expr, index) => {
     const path = findDOMPath(templateHTML, `__DYNAMIC_${index}__`);
@@ -202,17 +202,51 @@ export function compile<T = any>(
       getValue: expr
     };
   });
-  
   // Generate unique ID
   const templateString = strings.join('{{PLACEHOLDER}}');
   const id = generateTemplateId(templateString);
-  
+  // Render method supporting async output
+  function render(state: T, api: any): string | Promise<string> {
+    let result = '';
+    let hasAsync = false;
+    const valuePromises: Promise<any>[] = [];
+    for (let i = 0; i < strings.length; i++) {
+      result += strings[i];
+      if (i < expressions.length) {
+        let value = expressions[i](state, api);
+        if (value instanceof Promise) {
+          hasAsync = true;
+          valuePromises.push(value);
+        } else {
+          result += value;
+        }
+      }
+    }
+    if (!hasAsync) return result;
+    return Promise.all(valuePromises).then(resolvedValues => {
+      let asyncResult = '';
+      let asyncIndex = 0;
+      for (let i = 0; i < strings.length; i++) {
+        asyncResult += strings[i];
+        if (i < expressions.length) {
+          let value = expressions[i](state, api);
+          if (value instanceof Promise) {
+            asyncResult += resolvedValues[asyncIndex++];
+          } else {
+            asyncResult += value;
+          }
+        }
+      }
+      return asyncResult;
+    });
+  }
   return {
     id,
     statics,
     dynamics,
     hasDynamics: dynamics.length > 0,
-    fragment: null // Will be created on first render if needed
+    fragment: null,
+    render
   };
 }
 
@@ -249,12 +283,39 @@ class TemplateAnalyzer {
     // Generate unique ID
     const id = generateTemplateId(this.template);
     
+    // Render method for static/dynamic templates
+    const render = (state: T, api: any): string | Promise<string> => {
+      let result = '';
+      for (let i = 0; i < this.statics.length; i++) {
+        result += this.statics[i];
+        if (i < this.dynamics.length) {
+          let value = this.dynamics[i].getValue(state, api);
+          if (value instanceof Promise) {
+            // If any dynamic value is async, resolve all and reconstruct
+            return Promise.all(this.dynamics.map(d => {
+              const v = d.getValue(state, api);
+              return v instanceof Promise ? v : Promise.resolve(v);
+            })).then(resolvedValues => {
+              let asyncResult = '';
+              for (let j = 0; j < this.statics.length; j++) {
+                asyncResult += this.statics[j];
+                if (j < resolvedValues.length) asyncResult += resolvedValues[j];
+              }
+              return asyncResult;
+            });
+          }
+          result += value;
+        }
+      }
+      return result;
+    };
     return {
       statics: this.statics,
       dynamics: this.dynamics as UpdateFunction<T>[],
       fragment,
       id,
-      hasDynamics: this.dynamics.length > 0
+      hasDynamics: this.dynamics.length > 0,
+      render
     };
   }
   
@@ -599,7 +660,8 @@ function createFallbackTemplate<T>(templateString: string, id: string): Compiled
     dynamics: [],
     fragment: null,
     id,
-    hasDynamics: false
+    hasDynamics: false,
+    render: () => templateString
   };
 }
 
