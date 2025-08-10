@@ -161,8 +161,19 @@ export type LifecycleHandler<T extends ComponentState> = (
 function parseVNodeFromHTML(html: string): VNode {
   const template = document.createElement('template');
   template.innerHTML = html.trim();
-  const node = template.content.firstChild as ChildNode;
-  return node ? createVNodeFromElement(node) : { type: '#text', props: {}, children: [], dom: undefined };
+  const nodes = Array.from(template.content.childNodes);
+  // If only one root node, return as before
+  if (nodes.length === 1) {
+    return createVNodeFromElement(nodes[0]);
+  }
+  // If multiple root nodes, create a fragment VNode
+  return {
+    type: '#fragment',
+    key: undefined,
+    props: {},
+    children: nodes.map((node, idx) => createVNodeFromElement(node, '#fragment', idx)),
+    dom: undefined
+  };
 }
 /**
  * Virtual Node (VNode) structure for incremental migration
@@ -241,137 +252,41 @@ function createVNodeFromElement(node: ChildNode, parentPath: string = '', childI
  */
 function patchVNode(parent: Element, oldVNode: VNode, newVNode: VNode): void {
   if (oldVNode.key === newVNode.key && oldVNode.type === newVNode.type) {
-    // Patch text nodes
-    if (oldVNode.type === '#text' && newVNode.type === '#text') {
-      if (oldVNode.dom instanceof Text && newVNode.dom instanceof Text) {
-        if (oldVNode.dom.textContent !== newVNode.dom.textContent) {
-          oldVNode.dom.textContent = newVNode.dom.textContent;
-        }
-      }
-      return;
-    }
-    // After patching, always update controlled input values for all child nodes
-    if (parent instanceof Element) {
-      // Find host from shadowRoot
-      let host: any = null;
-      const rootNode = parent.getRootNode();
-      if (rootNode instanceof ShadowRoot && 'host' in rootNode) {
-        host = (rootNode as ShadowRoot).host;
-      }
-      updateControlledInputs(parent, host);
-    }
-    // Update other attributes
-    Object.entries(newVNode.props).forEach(([name, value]) => {
-      if (oldVNode.dom instanceof Element) {
-        oldVNode.dom.setAttribute(name, value);
-      }
-    });
-    // Controlled input sync: force input.value to match VNode props.value
-    if (
-      oldVNode.dom instanceof HTMLInputElement &&
-      typeof newVNode.props.value !== 'undefined' &&
-      oldVNode.dom.value !== newVNode.props.value
-    ) {
-      oldVNode.dom.value = newVNode.props.value;
-    }
-    // Also handle textarea
-    if (
-      oldVNode.dom instanceof HTMLTextAreaElement &&
-      typeof newVNode.props.value !== 'undefined' &&
-      oldVNode.dom.value !== newVNode.props.value
-    ) {
-      oldVNode.dom.value = newVNode.props.value;
-    }
-    // --- Robust keyed children diffing for lists ---
-    const oldChildrenByKey: Record<string, VNode> = {};
-    oldVNode.children.forEach(child => {
-      if (child.key) oldChildrenByKey[child.key] = child;
-    });
-    // Track DOM children for reconciliation
+    // Patch children robustly
     const parentEl = oldVNode.dom as Element;
-    let domChildren = Array.from(parentEl.childNodes);
-    // Remove extra old children, but preserve <link rel="stylesheet"> and <style> elements
-    while (domChildren.length > newVNode.children.length) {
-      const lastChild = domChildren[domChildren.length - 1];
-      if (
-        lastChild &&
-        lastChild.nodeType === Node.ELEMENT_NODE &&
-        (((lastChild as Element).tagName && (lastChild as Element).tagName.toLowerCase() === 'link' && (lastChild as Element).getAttribute('rel') === 'stylesheet')
-        || ((lastChild as Element).tagName && (lastChild as Element).tagName.toLowerCase() === 'style'))
-      ) {
-        // Do not remove stylesheet nodes
-        break;
-      }
-      parentEl.removeChild(domChildren.pop()!);
+    // Remove extra children
+    while (parentEl.childNodes.length > newVNode.children.length) {
+      parentEl.removeChild(parentEl.lastChild!);
     }
-    // Patch or add new children
-    let domIdx = 0;
+    // Patch or add children
     for (let i = 0; i < newVNode.children.length; i++) {
       const newChild = newVNode.children[i];
-      let oldChild = oldVNode.children[i];
-      if (newChild.key && oldChildrenByKey[newChild.key]) {
-        oldChild = oldChildrenByKey[newChild.key];
-      }
-      // Find the matching DOM child by node type
-      let domChild: ChildNode | null = null;
-      while (domIdx < domChildren.length) {
-        if (
-          (newChild.type === '#text' && domChildren[domIdx].nodeType === Node.TEXT_NODE) ||
-          (newChild.type !== '#text' && domChildren[domIdx].nodeType === Node.ELEMENT_NODE)
-        ) {
-          domChild = domChildren[domIdx];
-          domIdx++;
-          break;
-        }
-        domIdx++;
-      }
-      if (oldChild && domChild) {
-        // If node type changed, replace
-        const isStylesheetNode =
-          domChild &&
-          domChild.nodeType === Node.ELEMENT_NODE &&
-          (((domChild as Element).tagName && (domChild as Element).tagName.toLowerCase() === 'link' && (domChild as Element).getAttribute('rel') === 'stylesheet') ||
-            ((domChild as Element).tagName && (domChild as Element).tagName.toLowerCase() === 'style'));
-        if (isStylesheetNode) {
-          // Never replace stylesheet nodes unless explicitly changed
-          newChild.dom = domChild as Element;
-          continue;
-        }
-        if (oldChild.type !== newChild.type) {
-          const newDom = newChild.dom || (newChild.type === '#text' ? document.createTextNode('') : document.createElement(newChild.type));
-          parentEl.replaceChild(newDom, domChild);
-          newChild.dom = newDom;
-        } else if (oldChild.type === '#text' && newChild.type === '#text') {
-          // Patch text node content directly
-          if (domChild && domChild.textContent !== (newChild.dom?.textContent ?? newChild.props?.nodeValue ?? '')) {
-            domChild.textContent = newChild.dom?.textContent ?? newChild.props?.nodeValue ?? '';
+      const oldChild = oldVNode.children[i];
+      if (oldChild && oldChild.dom && newChild.type === oldChild.type) {
+        if (newChild.type === '#text') {
+          // Patch text node content
+          if (oldChild.dom.textContent !== newChild.props.nodeValue) {
+            oldChild.dom.textContent = newChild.props.nodeValue;
           }
-          newChild.dom = domChild as Element | Text;
+          newChild.dom = oldChild.dom;
         } else {
-          patchVNode(parentEl, oldChild, newChild);
-          newChild.dom = domChild as Element | Text;
+          patchVNode(oldChild.dom as Element, oldChild, newChild);
+          newChild.dom = oldChild.dom;
         }
       } else {
-        // Add new node
-        if (newChild.dom) {
-          const isStylesheetNode =
-            newChild.type === 'link' && newChild.props.rel === 'stylesheet' || newChild.type === 'style';
-          if (isStylesheetNode) {
-            // Only add stylesheet node if not already present
-            const existing = Array.from(parentEl.childNodes).find(
-              n =>
-                n.nodeType === Node.ELEMENT_NODE &&
-                ((n as Element).tagName && (n as Element).tagName.toLowerCase() === newChild.type &&
-                  ((newChild.type !== 'link') || (n as Element).getAttribute('rel') === 'stylesheet'))
-            );
-            if (existing) {
-              newChild.dom = existing as Element;
-              return;
-            }
-          }
-          const appended = parentEl.appendChild(newChild.dom.cloneNode(true));
-          newChild.dom = appended as Element | Text;
+        // Replace or add node
+        let newDom: Element | Text;
+        if (newChild.type === '#text') {
+          newDom = document.createTextNode(newChild.props.nodeValue ?? '');
+        } else {
+          newDom = document.createElement(newChild.type);
         }
+        if (oldChild && oldChild.dom && parentEl.contains(oldChild.dom)) {
+          parentEl.replaceChild(newDom, oldChild.dom);
+        } else {
+          parentEl.appendChild(newDom);
+        }
+        newChild.dom = newDom;
       }
     }
   } else {
@@ -380,7 +295,6 @@ function patchVNode(parent: Element, oldVNode: VNode, newVNode: VNode): void {
     if (oldVNode.dom && oldVNode.dom.parentNode === parent) {
       parent.replaceChild(newEl, oldVNode.dom);
     } else {
-      // Fallback: replace parent's innerHTML for this subtree
       parent.innerHTML = '';
       parent.appendChild(newEl);
     }
@@ -509,26 +423,61 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
     if (!this.shadowRoot) return;
     this.shadowRoot.querySelectorAll('input[data-model]').forEach(input => {
       const modelAttr = input.getAttribute('data-model');
-      if (modelAttr && this.stateObj && typeof this.stateObj[modelAttr] !== 'undefined') {
-        const inputEl = input as HTMLInputElement;
-        const stateValue = String(this.stateObj[modelAttr]);
-        const isFocused = document.activeElement === inputEl;
-        let selectionStart = null, selectionEnd = null;
-        if (isFocused && 'selectionStart' in inputEl && 'selectionEnd' in inputEl) {
-          selectionStart = inputEl.selectionStart;
-          selectionEnd = inputEl.selectionEnd;
+      if (!modelAttr || !this.stateObj || typeof this.stateObj[modelAttr] === 'undefined') return;
+      const inputEl = input as HTMLInputElement;
+      const stateValue = String(this.stateObj[modelAttr]);
+      const isFocused = document.activeElement === inputEl;
+      const selectionStart = inputEl.selectionStart;
+      const selectionEnd = inputEl.selectionEnd;
+      // Log all relevant info before any assignment
+      console.debug('[forceSync][diagnostic] Input:', {
+        modelAttr,
+        inputEl,
+        stateValue,
+        currentValue: inputEl.value,
+        isFocused,
+        selectionStart,
+        selectionEnd,
+        callStack: new Error().stack
+      });
+      // Never set value for focused inputs—let user typing win
+      if (isFocused) {
+        console.debug('[forceSync][diagnostic] Skipped value assignment for focused input:', {
+          modelAttr,
+          currentValue: inputEl.value,
+          stateValue,
+          selectionStart,
+          selectionEnd,
+          callStack: new Error().stack
+        });
+        // Restore selection/cursor for focused input
+        inputEl.focus();
+        if (typeof selectionStart === 'number' && typeof selectionEnd === 'number') {
+          inputEl.setSelectionRange(selectionStart, selectionEnd);
         }
+        return;
+      }
+      // Only set value for unfocused inputs if it differs
+      if (inputEl.value !== stateValue) {
+        console.debug('[forceSync][diagnostic] Forcing value assignment for unfocused input:', {
+          modelAttr,
+          oldValue: inputEl.value,
+          newValue: stateValue,
+          selectionStart,
+          selectionEnd,
+          callStack: new Error().stack
+        });
         inputEl.value = stateValue;
-        // Restore focus and selection
-        if (isFocused) {
-          inputEl.focus();
-          if (selectionStart !== null && selectionEnd !== null) {
-            inputEl.setSelectionRange(selectionStart, selectionEnd);
-            console.debug('[forceSync] Restored selection for', modelAttr, 'start:', selectionStart, 'end:', selectionEnd);
-          }
-        }
-        // Debug log for forced sync and input reference
-        console.debug('[forceSync] Forced input value for', modelAttr, 'to', stateValue, '| input.value after assignment:', inputEl.value, '| input ref:', inputEl);
+        console.debug('[forceSync][diagnostic] Forced input value for', modelAttr, 'to', stateValue, '| input.value after assignment:', inputEl.value, '| input ref:', inputEl);
+      } else {
+        console.debug('[forceSync][diagnostic] Unfocused input value matches state:', {
+          modelAttr,
+          value: inputEl.value,
+          stateValue,
+          selectionStart,
+          selectionEnd,
+          callStack: new Error().stack
+        });
       }
       // Always rebind input event
       const handlerName = input.getAttribute('data-on-input');
@@ -536,7 +485,7 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
         (input as HTMLInputElement).oninput = (event: Event) => {
           (this as any)[handlerName](event);
         };
-        console.debug('[forceSync] Rebound input event for', handlerName);
+        console.debug('[forceSync][diagnostic] Rebound input event for', handlerName);
       }
     });
     // Rebind other events (e.g., data-on-click)
@@ -742,36 +691,77 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
     try {
       if (typeof templateResult === 'string') {
         console.debug('[vdom] _renderTemplateResult called with string template:', templateResult);
+  // ...existing code...
         const newVNode = parseVNodeFromHTML(templateResult);
         console.debug('[vdom] Generated new VNode:', newVNode);
-        let shadowAppContainer = this.shadowRoot!.querySelector('[data-root]') as Element | undefined;
-        const isInitialRender = !shadowAppContainer;
-        if (isInitialRender) {
-          if (newVNode.dom instanceof Element) {
-            newVNode.dom.setAttribute('data-root', '');
-            this.shadowRoot!.innerHTML = '';
-            this.shadowRoot!.appendChild(newVNode.dom);
-            shadowAppContainer = newVNode.dom;
-            this._prevVNode = newVNode;
-            this._prevVNode.dom = shadowAppContainer;
-            console.debug('[vdom] Initial render complete. VNode stored.');
-          }
-          this.refsAttached = false;
-          this.rebindEventListeners();
-        } else {
-          if (shadowAppContainer && newVNode && this._prevVNode) {
-            // Always patch the [data-root] element itself
-            newVNode.dom = shadowAppContainer;
-            console.debug('[vdom] Patching DOM with VNode diff. Old:', this._prevVNode, 'New:', newVNode);
-            patchVNode(shadowAppContainer, this._prevVNode, newVNode);
-            this._prevVNode = newVNode;
-            this._prevVNode.dom = shadowAppContainer;
-            this.refsAttached = true;
-            // Force sync controlled inputs and events after VDOM patch
-            this.forceSyncControlledInputs();
+        // Recursively assign DOM nodes to all VNodes
+        function assignDomRecursive(vnode: VNode, domNode: Element | Text) {
+          vnode.dom = domNode;
+          if (vnode.children && vnode.children.length && domNode instanceof Element) {
+            const domChildren = Array.from(domNode.childNodes) as (Element | Text)[];
+            for (let i = 0; i < vnode.children.length; i++) {
+              if (domChildren[i]) {
+                assignDomRecursive(vnode.children[i], domChildren[i]);
+              }
+            }
           }
         }
+  // Assign DOM nodes to VNode tree
+  const tempContainer = document.createElement('div');
+  tempContainer.innerHTML = templateResult.trim();
+  const actualRootNode = tempContainer.firstElementChild as Element;
+  assignDomRecursive(newVNode, actualRootNode);
+        // --- Key-based granular patching: persistent root node, child reconciliation by key ---
+        // Always ensure <style> element is present and up-to-date
+        let styleEl = this.shadowRoot!.querySelector('style');
+        if (!styleEl) {
+          styleEl = document.createElement('style');
+          this.shadowRoot!.appendChild(styleEl);
+        }
+        if (this.config.style) {
+          styleEl.textContent = typeof this.config.style === 'function' ? this.config.style(this.stateObj) : this.config.style;
+        } else {
+          styleEl.textContent = '';
+        }
+        // If fragment, reconcile all children
+        if (newVNode.type === '#fragment') {
+          // Remove all non-style children
+          Array.from(this.shadowRoot!.childNodes).forEach(node => {
+            if (node !== styleEl) this.shadowRoot!.removeChild(node);
+          });
+          // Append all fragment children
+          newVNode.children.forEach(childVNode => {
+            if (childVNode.dom) {
+              this.shadowRoot!.appendChild(childVNode.dom);
+            }
+          });
+          // Do not assign shadowRoot to VNode.dom; fragment VNode's dom remains undefined
+        } else {
+          // Find or create persistent root node
+          let rootEl = Array.from(this.shadowRoot!.childNodes).find(
+            node => node !== styleEl && node.nodeType === 1
+          ) as Element | undefined;
+          if (rootEl) {
+            // If type or key differ, replace root node
+            if (this._prevVNode && (this._prevVNode.type !== newVNode.type || this._prevVNode.key !== newVNode.key)) {
+              this.shadowRoot!.replaceChild(actualRootNode, rootEl);
+              rootEl = actualRootNode;
+            } else {
+              // Patch root node in place
+              patchVNode(rootEl, this._prevVNode!, newVNode);
+            }
+          } else {
+            // No root node, append new
+            rootEl = actualRootNode;
+            this.shadowRoot!.appendChild(rootEl);
+          }
+          newVNode.dom = rootEl;
+        }
+        this._prevVNode = newVNode;
+        this.refsAttached = true;
+        this.forceSyncControlledInputs();
         this.lastCompiledTemplate = null;
+  // ...existing code...
       } else {
         const isInitialRender = !this.shadowRoot!.firstElementChild;
         const isSameTemplate = this.lastCompiledTemplate?.id === templateResult.id;
@@ -784,14 +774,16 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
           updateCompiledTemplate(templateResult, this.shadowRoot!.firstElementChild, this.stateObj, this.api, oldState || undefined);
         } else {
           const fragment = renderCompiledTemplate(templateResult, this.stateObj, this.api);
-          // Ensure <style> is first child of shadow root
+          // Always ensure <style> element is present and up-to-date
           let styleEl = this.shadowRoot!.querySelector('style');
-          if (!styleEl && this.config.style) {
+          if (!styleEl) {
             styleEl = document.createElement('style');
             this.shadowRoot!.insertBefore(styleEl, this.shadowRoot!.firstChild);
           }
-          if (styleEl && this.config.style) {
+          if (this.config.style) {
             styleEl.textContent = typeof this.config.style === 'function' ? this.config.style(this.stateObj) : this.config.style;
+          } else {
+            styleEl.textContent = '';
           }
 
           // Ensure <div data-root> is second child of shadow root

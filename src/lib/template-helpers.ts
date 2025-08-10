@@ -51,6 +51,13 @@ export function html(
   strings: TemplateStringsArray,
   ...values: unknown[]
 ): (state?: any, api?: any) => string | Promise<string> {
+  function flatten(val: any, state?: any, api?: any): string {
+    if (Array.isArray(val)) return val.map(v => flatten(v, state, api)).join('');
+    if (typeof val === 'function') return flatten(val(state, api), state, api);
+    // Only skip null and undefined, not empty string
+    if (val === null || val === undefined) return '';
+    return String(val);
+  }
   return (state?: any, api?: any) => {
     let result = '';
     let hasAsync = false;
@@ -61,17 +68,17 @@ export function html(
         let value = values[i];
         const prevStatic = strings[i];
         const isEventHandlerAttr = /data-on-[a-z]+="?$/.test(prevStatic);
-        // Recursively resolve nested helpers
-        if (typeof value === 'function') value = value(state, api);
+        value = flatten(value, state, api);
         if (value instanceof Promise) {
           hasAsync = true;
           valuePromises.push(value);
         } else {
           if (/=\s*"?$/.test(prevStatic) && typeof value === 'string' && !isEventHandlerAttr) {
+            // Attribute value: escape both double and single quotes
             value = value.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
             result += value;
-          } else if (typeof value === 'string' && !isEventHandlerAttr && !/=\s*"?$/.test(prevStatic)) {
-            // Escape any user input from state or arrays of objects
+          } else if (!isEventHandlerAttr && !/=\s*"?$/.test(prevStatic)) {
+            // Text node: always escape user input
             result += escapeIfUserInput(value, state);
           } else {
             result += value;
@@ -88,16 +95,20 @@ export function html(
         asyncResult += strings[i];
         if (i < values.length) {
           let value = values[i];
+          const prevStatic = strings[i];
+          const isEventHandlerAttr = /data-on-[a-z]+="?$/.test(prevStatic);
+          value = flatten(value, state, api);
           if (value instanceof Promise) {
             asyncResult += resolvedValues[asyncIndex++];
           } else {
-            const prevStatic = strings[i];
-            const isEventHandlerAttr = /data-on-[a-z]+="?$/.test(prevStatic);
-            // Only escape double quotes, do not filter or remove any other content
             if (/=\s*"?$/.test(prevStatic) && typeof value === 'string' && !isEventHandlerAttr) {
-              value = value.replace(/"/g, '&quot;');
+              value = value.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+              asyncResult += value;
+            } else if (!isEventHandlerAttr && !/=\s*"?$/.test(prevStatic)) {
+              asyncResult += escapeIfUserInput(value, state);
+            } else {
+              asyncResult += value;
             }
-            asyncResult += value;
           }
         }
       }
@@ -121,6 +132,12 @@ export interface CompiledTemplateFn {
  */
 export function compile(strings: TemplateStringsArray, ...values: any[]): CompiledTemplateFn {
   const id = 'compiled-' + Math.random().toString(36).slice(2);
+  function flatten(val: any, state?: any, api?: any): string {
+    if (Array.isArray(val)) return val.map(v => flatten(v, state, api)).join('');
+    if (typeof val === 'function') return flatten(val(state, api), state, api);
+    if (val == null) return '';
+    return String(val);
+  }
   const fn = (state: any, api?: any) => {
     let result = '';
     for (let i = 0; i < strings.length; i++) {
@@ -129,13 +146,11 @@ export function compile(strings: TemplateStringsArray, ...values: any[]): Compil
         let value = values[i];
         const prevStatic = strings[i];
         const isEventHandlerAttr = /data-on-[a-z]+="?$/.test(prevStatic);
-        // Recursively resolve nested helpers
-        if (typeof value === 'function') value = value(state, api);
+        value = flatten(value, state, api);
         if (/=\s*"?$/.test(prevStatic) && typeof value === 'string' && !isEventHandlerAttr) {
           value = value.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
           result += value;
-        } else if (typeof value === 'string' && !isEventHandlerAttr && !/=\s*"?$/.test(prevStatic)) {
-          // Escape any user input from state or arrays of objects
+        } else if (!isEventHandlerAttr && !/=\s*"?$/.test(prevStatic)) {
           result += escapeIfUserInput(value, state);
         } else {
           result += value ?? '';
