@@ -3,7 +3,6 @@ import { component, html, type ComponentState } from '../../lib/runtime';
 interface SimpleTestState extends ComponentState {
   message: string;
   clicked: boolean;
-  uppercasedMessage: string;
 }
 
 // Simple test component to verify registration
@@ -11,9 +10,10 @@ component<SimpleTestState>('simple-test-component', {
   state: {
     message: 'Hello from Simple Test Component!',
     clicked: false,
-    get uppercasedMessage() {
-      return this.message.toUpperCase();
-    }
+  },
+
+  computed: {
+    uppercasedMessage: (state: SimpleTestState) => state.message.toUpperCase()
   },
 
   template: (state) => html`

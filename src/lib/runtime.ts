@@ -1,3 +1,41 @@
+  // Helper to update controlled input values recursively
+  function updateControlledInputs(el: Element | null, host: any) {
+    if (!el) return;
+    el.querySelectorAll('[data-model]').forEach((input: Element) => {
+      const modelProp = input.getAttribute('data-model');
+      if (!modelProp || !host || !host.stateObj) return;
+      const stateValue = host.stateObj[modelProp];
+      // Debug: log input, state, and value before sync
+      console.debug('[sync] Controlled input:', { input, modelProp, stateValue, currentValue: (input as any).value });
+      if ('value' in input && typeof stateValue === 'string') {
+        const inputEl = input as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
+        requestAnimationFrame(() => {
+          if (inputEl.value !== stateValue) {
+            // Save selection if focused
+            const isFocused = document.activeElement === inputEl;
+            let selectionStart = null, selectionEnd = null;
+            if (isFocused && 'selectionStart' in inputEl && 'selectionEnd' in inputEl) {
+              selectionStart = (inputEl as any).selectionStart;
+              selectionEnd = (inputEl as any).selectionEnd;
+            }
+            console.debug('[sync] Forcing value update:', { inputEl, oldValue: inputEl.value, newValue: stateValue, isFocused });
+            inputEl.value = stateValue;
+            // Restore focus and selection
+            if (isFocused) {
+              inputEl.focus();
+              if (selectionStart !== null && selectionEnd !== null) {
+                (inputEl as any).setSelectionRange(selectionStart, selectionEnd);
+              }
+            }
+          } else {
+            console.debug('[sync] Value already matches state:', { inputEl, value: inputEl.value });
+          }
+        });
+      }
+      if (input instanceof HTMLInputElement && input.type === 'checkbox' && typeof stateValue === 'boolean') input.checked = stateValue;
+      if (input instanceof HTMLInputElement && input.type === 'radio' && typeof stateValue === 'boolean') input.checked = stateValue;
+    });
+  }
 export { Store } from './store';
 export { eventBus } from './event-bus';
 export { renderToString, renderComponentsToString, generateHydrationScript } from './ssr';
@@ -20,7 +58,6 @@ export type { CompiledTemplate, UpdateFunction, UpdateType } from './template-co
 
 import { reactive } from './computed-state';
 import { eventBus } from './event-bus';
-import { TemplateParser, DOMDiffer } from './dom-diff';
 
 // =============================
 // PLUGIN SYSTEM (Experimental)
@@ -118,6 +155,16 @@ export type LifecycleHandler<T extends ComponentState> = (
 
 // Minimal VNode structure for incremental migration
 /**
+ * Minimal template-to-VNode parser for HTML strings
+ * Only supports basic tags, attributes, text, and key/data-model
+ */
+function parseVNodeFromHTML(html: string): VNode {
+  const template = document.createElement('template');
+  template.innerHTML = html.trim();
+  const node = template.content.firstChild as ChildNode;
+  return node ? createVNodeFromElement(node) : { type: '#text', props: {}, children: [], dom: undefined };
+}
+/**
  * Virtual Node (VNode) structure for incremental migration
  */
 interface VNode {
@@ -130,10 +177,16 @@ interface VNode {
 
 /**
  * Create a VNode from a DOM ChildNode (Element or Text)
+ * Assigns a stable, deterministic key to every element for VDOM reconciliation
  */
-function createVNodeFromElement(node: ChildNode): VNode {
+function createVNodeFromElement(node: ChildNode, parentPath: string = '', childIndex: number = 0): VNode {
+  let debugType = '';
+  let debugKey = undefined;
   if (node.nodeType === Node.TEXT_NODE) {
-    return { type: '#text', props: {}, children: [], dom: node as Text };
+    debugType = '#text';
+    debugKey = undefined;
+    console.debug('[VNode]', debugType, 'key:', debugKey);
+    return { type: '#text', key: undefined, props: { nodeValue: node.nodeValue }, children: [], dom: node as Text };
   }
   if (node.nodeType === Node.ELEMENT_NODE) {
     const elem = node as Element;
@@ -141,18 +194,42 @@ function createVNodeFromElement(node: ChildNode): VNode {
     Array.from(elem.attributes).forEach(attr => {
       props[attr.name] = attr.value;
     });
-    const children: VNode[] = Array.from(elem.childNodes).map(createVNodeFromElement);
+    const tagName = elem.tagName.toLowerCase();
+    let vnodeKey: string | undefined = undefined;
+    // User-typed element: input, textarea, contenteditable
+    if (tagName === 'input' && elem.hasAttribute('data-model')) {
+      const model = elem.getAttribute('data-model')!;
+      props['data-uid'] = model;
+      elem.setAttribute('data-uid', model);
+      vnodeKey = model;
+      console.debug(`[VNode] input[data-model] assigned stable data-uid and key:`, model);
+    } else if (tagName === 'input' || tagName === 'textarea' || elem.hasAttribute('contenteditable')) {
+      // Use path-based key for uncontrolled user-typed elements
+      vnodeKey = `${parentPath}.${tagName}[${childIndex}]`;
+      props['data-uid'] = vnodeKey;
+      elem.setAttribute('data-uid', vnodeKey);
+      console.debug(`[VNode] ${tagName} user-typed element assigned data-uid and key:`, vnodeKey);
+    } else {
+      // Non-user-typed element: assign deterministic key based on tree path
+      vnodeKey = `${parentPath}.${tagName}[${childIndex}]`;
+    }
+    // Recursively assign stable keys for all children
+    const children: VNode[] = Array.from(elem.childNodes).map((child, idx) => {
+      return createVNodeFromElement(child, vnodeKey, idx);
+    });
+    debugType = tagName;
+    debugKey = vnodeKey;
+    console.debug('[VNode]', debugType, 'key:', debugKey);
     return {
-      type: elem.tagName.toLowerCase(),
-      key: props['key'],
+      type: tagName,
+      key: vnodeKey,
       props,
       children,
       dom: elem
     };
   }
   // Fallback for unsupported node types
-  // Only Element or Text nodes are supported for VNode.dom
-  return { type: '#unknown', props: {}, children: [], dom: undefined };
+  return { type: '#unknown', key: undefined, props: {}, children: [], dom: undefined };
 }
 
 /**
@@ -160,27 +237,114 @@ function createVNodeFromElement(node: ChildNode): VNode {
  */
 function patchVNode(parent: Element, oldVNode: VNode, newVNode: VNode): void {
   if (oldVNode.key === newVNode.key && oldVNode.type === newVNode.type) {
-    // Controlled input: update value/checked, preserve node
-    if (newVNode.props['data-model']) {
-      const el = oldVNode.dom as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
-      if ('value' in el && 'value' in newVNode.props) el.value = newVNode.props.value;
-      if (el instanceof HTMLInputElement && el.type === 'checkbox' && 'checked' in newVNode.props) el.checked = newVNode.props.checked;
-      if (el instanceof HTMLInputElement && el.type === 'radio' && 'checked' in newVNode.props) el.checked = newVNode.props.checked;
+    // Patch text nodes
+    if (oldVNode.type === '#text' && newVNode.type === '#text') {
+      if (oldVNode.dom instanceof Text && newVNode.dom instanceof Text) {
+        if (oldVNode.dom.textContent !== newVNode.dom.textContent) {
+          oldVNode.dom.textContent = newVNode.dom.textContent;
+        }
+      }
+      return;
+    }
+    // After patching, always update controlled input values for all child nodes
+    if (parent instanceof Element) {
+      // Find host from shadowRoot
+      let host: any = null;
+      const rootNode = parent.getRootNode();
+      if (rootNode instanceof ShadowRoot && 'host' in rootNode) {
+        host = (rootNode as ShadowRoot).host;
+      }
+      updateControlledInputs(parent, host);
     }
     // Update other attributes
     Object.entries(newVNode.props).forEach(([name, value]) => {
-      if (oldVNode.dom instanceof Element) oldVNode.dom.setAttribute(name, value);
+      if (oldVNode.dom instanceof Element) {
+        oldVNode.dom.setAttribute(name, value);
+      }
     });
-    // Patch children
+    // Controlled input sync: force input.value to match VNode props.value
+    if (
+      oldVNode.dom instanceof HTMLInputElement &&
+      typeof newVNode.props.value !== 'undefined' &&
+      oldVNode.dom.value !== newVNode.props.value
+    ) {
+      oldVNode.dom.value = newVNode.props.value;
+    }
+    // Also handle textarea
+    if (
+      oldVNode.dom instanceof HTMLTextAreaElement &&
+      typeof newVNode.props.value !== 'undefined' &&
+      oldVNode.dom.value !== newVNode.props.value
+    ) {
+      oldVNode.dom.value = newVNode.props.value;
+    }
+    // --- Robust keyed children diffing for lists ---
+    const oldChildrenByKey: Record<string, VNode> = {};
+    oldVNode.children.forEach(child => {
+      if (child.key) oldChildrenByKey[child.key] = child;
+    });
+    // Track DOM children for reconciliation
+    const parentEl = oldVNode.dom as Element;
+    let domChildren = Array.from(parentEl.childNodes);
+    // Remove extra old children
+    while (domChildren.length > newVNode.children.length) {
+      parentEl.removeChild(domChildren.pop()!);
+    }
+    // Patch or add new children
+    let domIdx = 0;
     for (let i = 0; i < newVNode.children.length; i++) {
-      if (oldVNode.children[i] && newVNode.children[i]) {
-        patchVNode(oldVNode.dom as Element, oldVNode.children[i], newVNode.children[i]);
+      const newChild = newVNode.children[i];
+      let oldChild = oldVNode.children[i];
+      if (newChild.key && oldChildrenByKey[newChild.key]) {
+        oldChild = oldChildrenByKey[newChild.key];
+      }
+      // Find the matching DOM child by node type
+      let domChild: ChildNode | null = null;
+      while (domIdx < domChildren.length) {
+        if (
+          (newChild.type === '#text' && domChildren[domIdx].nodeType === Node.TEXT_NODE) ||
+          (newChild.type !== '#text' && domChildren[domIdx].nodeType === Node.ELEMENT_NODE)
+        ) {
+          domChild = domChildren[domIdx];
+          domIdx++;
+          break;
+        }
+        domIdx++;
+      }
+      if (oldChild && domChild) {
+        // If node type changed, replace
+        if (oldChild.type !== newChild.type) {
+          const newDom = newChild.dom || (newChild.type === '#text' ? document.createTextNode('') : document.createElement(newChild.type));
+          parentEl.replaceChild(newDom, domChild);
+          newChild.dom = newDom;
+        } else if (oldChild.type === '#text' && newChild.type === '#text') {
+          // Patch text node content directly
+          if (domChild.textContent !== (newChild.dom?.textContent ?? newChild.props?.nodeValue ?? '')) {
+            domChild.textContent = newChild.dom?.textContent ?? newChild.props?.nodeValue ?? '';
+          }
+          newChild.dom = domChild as Element | Text;
+        } else {
+          patchVNode(parentEl, oldChild, newChild);
+          newChild.dom = domChild as Element | Text;
+        }
+      } else {
+        // Add new node
+        if (newChild.dom) {
+          const appended = parentEl.appendChild(newChild.dom.cloneNode(true));
+          newChild.dom = appended as Element | Text;
+        }
       }
     }
   } else {
-    // Replace node
+    // Replace node, but only if oldVNode.dom is actually a child of parent
     const newEl = (newVNode.dom as Element) || document.createElement(newVNode.type);
-    parent.replaceChild(newEl, oldVNode.dom!);
+    if (oldVNode.dom && oldVNode.dom.parentNode === parent) {
+      parent.replaceChild(newEl, oldVNode.dom);
+    } else {
+      // Fallback: replace parent's innerHTML for this subtree
+      parent.innerHTML = '';
+      parent.appendChild(newEl);
+    }
   }
 }
 
@@ -300,6 +464,52 @@ function safeClone<T>(obj: T): T {
  */
 class ComponentElement<S extends ComponentState, C extends Record<string, any> = {}> extends HTMLElement {
   /**
+   * Force sync all controlled input values and event listeners after VDOM patching.
+   */
+  private forceSyncControlledInputs(): void {
+    if (!this.shadowRoot) return;
+    this.shadowRoot.querySelectorAll('input[data-model]').forEach(input => {
+      const modelAttr = input.getAttribute('data-model');
+      if (modelAttr && this.stateObj && typeof this.stateObj[modelAttr] !== 'undefined') {
+        const inputEl = input as HTMLInputElement;
+        const stateValue = String(this.stateObj[modelAttr]);
+        const isFocused = document.activeElement === inputEl;
+        let selectionStart = null, selectionEnd = null;
+        if (isFocused && 'selectionStart' in inputEl && 'selectionEnd' in inputEl) {
+          selectionStart = inputEl.selectionStart;
+          selectionEnd = inputEl.selectionEnd;
+        }
+        inputEl.value = stateValue;
+        // Restore focus and selection
+        if (isFocused) {
+          inputEl.focus();
+          if (selectionStart !== null && selectionEnd !== null) {
+            inputEl.setSelectionRange(selectionStart, selectionEnd);
+            console.debug('[forceSync] Restored selection for', modelAttr, 'start:', selectionStart, 'end:', selectionEnd);
+          }
+        }
+        // Debug log for forced sync and input reference
+        console.debug('[forceSync] Forced input value for', modelAttr, 'to', stateValue, '| input.value after assignment:', inputEl.value, '| input ref:', inputEl);
+      }
+      // Always rebind input event
+      const handlerName = input.getAttribute('data-on-input');
+      if (handlerName && typeof (this as any)[handlerName] === 'function') {
+        (input as HTMLInputElement).oninput = (event: Event) => {
+          (this as any)[handlerName](event);
+        };
+        console.debug('[forceSync] Rebound input event for', handlerName);
+      }
+    });
+    // Rebind other events (e.g., data-on-click)
+    this.rebindEventListeners();
+  }
+  /**
+   * Sync all controlled inputs and event listeners after render
+   */
+  private syncControlledInputsAndEvents(): void {
+  // No-op: input value sync is handled only by forceSyncControlledInputs after render
+  }
+  /**
    * Attach controlled input listeners to sync DOM value to state
    */
   private attachControlledInputListeners(): void {
@@ -333,13 +543,12 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
       }
     });
   }
-  private readonly config: ComponentConfig<S, C>;
-  private readonly stateObj!: S & C;
-  private readonly api: ComponentAPI<S & C>;
+  private config!: ComponentConfig<S, C>;
+  private stateObj!: S & C;
+  private api!: ComponentAPI<S & C>;
   private _globalUnsubscribes: Array<() => void> = [];
   private unsubscribes: Array<() => void> = [];
   private refsAttached = false;
-  private lastHTML = '';
   private lastCompiledTemplate: CompiledTemplate<S & C> | null = null;
   private lastState: (S & C) | null = null;
   private rafId: number | null = null;
@@ -348,9 +557,17 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
    * Construct a new runtime component element.
    * @param config - Component configuration
    */
-  constructor(config: ComponentConfig<S, C>) {
+  constructor() {
     super();
-    // Runtime guard: ensure config is valid
+    // Config/state setup will be done in connectedCallback
+  }
+
+  private initializeConfig() {
+    console.debug('[vdom] initializeConfig called for', this.tagName);
+    if (this.config) return;
+    const tag = this.tagName.toLowerCase();
+    const registry = (window as any).__componentRegistry || {};
+    const config = registry[tag];
     if (!config || typeof config !== 'object') {
       throw new Error('Invalid component config: must be an object');
     }
@@ -358,10 +575,18 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
       throw new Error('Invalid component config: state must be an object');
     }
     this.config = config;
-    this.stateObj = config.state as S & C;
+    // Always use the reactive proxy for state
+    const computedState = config.computed
+      ? reactive(config.state, config.computed)
+      : reactive(config.state);
+    this.stateObj = computedState as S & C;
+    console.debug('[vdom] Assigned reactive stateObj:', this.stateObj);
     // Subscribe to state changes and batch re-render
     if (typeof (this.stateObj as any).subscribe === 'function') {
-      this.unsubscribes.push((this.stateObj as any).subscribe(() => this.scheduleRender()));
+      this.unsubscribes.push((this.stateObj as any).subscribe(() => {
+        console.debug('[vdom] state subscription fired, calling scheduleRender');
+        this.scheduleRender();
+      }));
     }
     // Create API
     this.api = {
@@ -399,10 +624,15 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
     if (!isSSRHydration) {
       this.render();
     } else {
-      this.lastHTML = this.shadowRoot!.innerHTML;
       this.processRefs();
     }
     this.config.onMounted?.(this.api.state, this.api);
+  }
+
+  connectedCallback(): void {
+    console.debug('[vdom] connectedCallback called for', this.tagName);
+    this.initializeConfig();
+    // ...existing connectedCallback logic...
   }
 
   /**
@@ -420,19 +650,24 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
    * Render the component. Handles both string and compiled templates, refs, and error boundaries.
    */
   private render(): void {
-  // Attach controlled input listeners after each render
+    console.debug('[runtime] render() called');
+  // Robust controlled input sync after every render
+  this.syncControlledInputsAndEvents();
   setTimeout(() => this.attachControlledInputListeners(), 0);
     try {
       // Plugin hook: onRender
       runtimePlugins.forEach(p => p.onRender?.(this.stateObj, this.api));
+      console.debug('[runtime] Calling template function with state:', JSON.stringify(this.stateObj));
       const templateResultOrPromise = this.config.template(this.stateObj, this.api);
       if (templateResultOrPromise instanceof Promise) {
         templateResultOrPromise.then(templateResult => {
+          console.debug('[runtime] Template function resolved to:', templateResult);
           this._renderTemplateResult(templateResult);
         }).catch(error => {
           this._handleRenderError(error);
         });
       } else {
+        console.debug('[runtime] Template function returned:', templateResultOrPromise);
         this._renderTemplateResult(templateResultOrPromise);
       }
     } catch (error) {
@@ -443,57 +678,60 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
   /**
    * Internal: render a template result (string or compiled template)
    */
+  private _prevVNode: VNode | null = null;
+  /**
+   * Rebind event listeners for elements with data-on-* attributes in the shadow DOM
+   */
+  private rebindEventListeners(): void {
+    if (!this.shadowRoot) return;
+    const eventAttrs = ['data-on-input', 'data-on-change', 'data-on-blur', 'data-on-click'];
+    eventAttrs.forEach(attr => {
+      this.shadowRoot!.querySelectorAll(`[${attr}]`).forEach(el => {
+        const eventType = attr.replace('data-on-', '');
+        const handlerName = el.getAttribute(attr);
+        if (!handlerName || typeof this.config[handlerName] !== 'function') return;
+        // Remove previous listener if any
+        el.removeEventListener(eventType, (el as any)._boundHandler);
+        // Bind new handler
+        const boundHandler = (e: Event) => this.config[handlerName](e, this.stateObj, this.api);
+        el.addEventListener(eventType, boundHandler);
+        (el as any)._boundHandler = boundHandler;
+      });
+    });
+  }
   private _renderTemplateResult(templateResult: any): void {
     try {
       if (typeof templateResult === 'string') {
-        if (templateResult === this.lastHTML) return;
-        // --- VNode-based rendering integration ---
-        const fragment = TemplateParser.parseTemplate(templateResult);
-        let autoKeyCounter = 0;
-        fragment.querySelectorAll('[data-model]').forEach(el => {
-          if (!el.hasAttribute('key')) {
-            el.setAttribute('key', `auto-model-key-${autoKeyCounter++}`);
-          }
-        });
-        // Find main app container and style node
-        let appContainer: Element | null = Array.from(fragment.childNodes).find(n => n.nodeType === 1 && (n as Element).tagName !== 'STYLE') as Element | null;
-        let styleNode: Element | null = Array.from(fragment.childNodes).find(n => n.nodeType === 1 && (n as Element).tagName === 'STYLE') as Element | null;
-        if (appContainer) appContainer.setAttribute('data-root', '');
-        const shadowAppContainer = this.shadowRoot!.querySelector('[data-root]') as Element | undefined;
+        console.debug('[vdom] _renderTemplateResult called with string template:', templateResult);
+        const newVNode = parseVNodeFromHTML(templateResult);
+        console.debug('[vdom] Generated new VNode:', newVNode);
+        let shadowAppContainer = this.shadowRoot!.querySelector('[data-root]') as Element | undefined;
         const isInitialRender = !shadowAppContainer;
-        // --- VNode diffing ---
         if (isInitialRender) {
-          if (styleNode) this.shadowRoot!.appendChild(styleNode.cloneNode(true));
-          if (appContainer) this.shadowRoot!.appendChild(appContainer.cloneNode(true));
-          else {
-            const firstEl = Array.from(fragment.childNodes).find(n => n.nodeType === 1) as Element | undefined;
-            if (firstEl) {
-              firstEl.setAttribute('data-root', '');
-              this.shadowRoot!.appendChild(firstEl.cloneNode(true));
-            }
+          if (newVNode.dom instanceof Element) {
+            newVNode.dom.setAttribute('data-root', '');
+            this.shadowRoot!.innerHTML = '';
+            this.shadowRoot!.appendChild(newVNode.dom);
+            shadowAppContainer = newVNode.dom;
+            this._prevVNode = newVNode;
+            this._prevVNode.dom = shadowAppContainer;
+            console.debug('[vdom] Initial render complete. VNode stored.');
           }
           this.refsAttached = false;
+          this.rebindEventListeners();
         } else {
-          // Use VNode diffing for robust controlled input handling
-          if (appContainer && shadowAppContainer) {
-            const newVNode = createVNodeFromElement(appContainer);
-            const oldVNode = createVNodeFromElement(shadowAppContainer);
-            patchVNode(shadowAppContainer, oldVNode, newVNode);
-            // Clean up refs after patch
-            function cleanupRefs(node: Element) {
-              if (node.hasAttribute && node.hasAttribute('data-refs-processed')) node.removeAttribute('data-refs-processed');
-              Array.from(node.children).forEach(child => cleanupRefs(child as Element));
-            }
-            cleanupRefs(shadowAppContainer);
-            this.processRefs();
+          if (shadowAppContainer && newVNode && this._prevVNode) {
+            // Always patch the [data-root] element itself
+            newVNode.dom = shadowAppContainer;
+            console.debug('[vdom] Patching DOM with VNode diff. Old:', this._prevVNode, 'New:', newVNode);
+            patchVNode(shadowAppContainer, this._prevVNode, newVNode);
+            this._prevVNode = newVNode;
+            this._prevVNode.dom = shadowAppContainer;
             this.refsAttached = true;
+            // Force sync controlled inputs and events after VDOM patch
+            this.forceSyncControlledInputs();
           }
-          // Style node sync
-          let shadowStyle = this.shadowRoot!.querySelector('style');
-          if (!shadowStyle && styleNode) this.shadowRoot!.insertBefore(styleNode.cloneNode(true), this.shadowRoot!.firstChild);
-          else if (shadowStyle && styleNode) shadowStyle.textContent = styleNode.textContent;
         }
-        this.lastHTML = templateResult;
         this.lastCompiledTemplate = null;
       } else {
         const isInitialRender = !this.shadowRoot!.firstElementChild;
@@ -512,7 +750,6 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
           this.refsAttached = false;
         }
         this.lastCompiledTemplate = templateResult;
-        this.lastHTML = '';
       }
       this.lastState = safeClone(this.stateObj);
       this.updateStyle();
@@ -522,6 +759,8 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
       }
       // Automatic event binding after refs and DOM update
       this.bindEvents();
+    // Robust controlled input sync after every render
+    this.syncControlledInputsAndEvents();
     } catch (error) {
       this._handleRenderError(error);
     }
@@ -550,10 +789,12 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
    * Schedule a render using requestAnimationFrame, batching multiple state changes.
    */
   private scheduleRender(): void {
+    console.debug('[vdom] scheduleRender called');
     if (this.rafId !== undefined && this.rafId !== null) {
       cancelAnimationFrame(this.rafId);
     }
     this.rafId = requestAnimationFrame(() => {
+      console.debug('[vdom] scheduleRender: calling render()');
       this.render();
       this.rafId = null;
     });
@@ -693,11 +934,14 @@ export function component<S extends ComponentState, C extends Record<string, any
 
   const ComponentClass = class extends ComponentElement<S, C> {
     constructor() {
-      super(config);
+      super();
     }
   };
   if (!customElements.get(tag)) {
-    customElements.define(tag, ComponentClass);
+  // Store config in a global registry for lookup in connectedCallback
+  (window as any).__componentRegistry = (window as any).__componentRegistry || {};
+  (window as any).__componentRegistry[tag] = config;
+  customElements.define(tag, ComponentClass);
   }
 
   // Accept HMR updates if available

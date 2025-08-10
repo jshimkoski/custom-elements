@@ -12,7 +12,10 @@ export function reactive<T extends object, C extends Record<string, (state: T) =
   const state = { ...initialState } as T;
 
   // Subscribe API
+  // Always notify listeners with the top-level proxy
+  let topProxy: any = null;
   function subscribe(fn: (state: T) => void) {
+    console.debug('[reactive] subscribe called');
     listeners.push(fn);
     return () => {
       const idx = listeners.indexOf(fn);
@@ -22,42 +25,56 @@ export function reactive<T extends object, C extends Record<string, (state: T) =
 
   // Mutation API (for compatibility)
   function set(changes: Partial<T>) {
-    Object.assign(proxy, changes);
-    listeners.forEach(fn => fn(proxy));
+    Object.assign(topProxy, changes);
+    console.debug('[reactive] set called, notifying listeners');
+    listeners.forEach(fn => fn(topProxy));
   }
 
-  // Proxy handler for reactivity and computed properties
-  const proxy = new Proxy(state as T, {
-    get(target, prop, receiver) {
-      if (prop === 'subscribe') return subscribe;
-      if (prop === 'set') return set;
-      if (computedMap && computedKeys.includes(prop as string)) {
-        return computedMap[prop as keyof C](proxy);
-      }
-      return Reflect.get(target, prop, receiver);
-    },
-    set(target, prop, value, receiver) {
-      if (computedMap && computedKeys.includes(prop as string)) {
-        // Computed properties are read-only
-        return false;
-      }
-      const oldValue = target[prop as keyof T];
-      const result = Reflect.set(target, prop, value, receiver);
-      if (oldValue !== value) {
-        listeners.forEach(fn => fn(proxy));
-      }
-      return result;
-    },
-    deleteProperty(target, prop) {
-      if (computedMap && computedKeys.includes(prop as string)) {
-        // Computed properties are read-only
-        return false;
-      }
-      const result = Reflect.deleteProperty(target, prop);
-      listeners.forEach(fn => fn(proxy));
-      return result;
-    }
-  });
+  // Recursive proxy cache to ensure persistent proxies
+  const proxyCache = new WeakMap<object, any>();
 
-  return proxy as T & { subscribe: (fn: (state: T) => void) => () => void; set: (changes: Partial<T>) => void } & { [K in keyof C]: ReturnType<C[K]> };
+  function createReactive(obj: any): any {
+    if (proxyCache.has(obj)) return proxyCache.get(obj);
+    const reactiveProxy = new Proxy(obj, {
+      get(target, prop, receiver) {
+        if (prop === 'subscribe') return subscribe;
+        if (prop === 'set') return set;
+        if (computedMap && computedKeys.includes(prop as string)) {
+          return computedMap[prop as keyof C](topProxy);
+        }
+        const value = Reflect.get(target, prop, receiver);
+        if (typeof value === 'object' && value !== null) {
+          return createReactive(value);
+        }
+        return value;
+      },
+      set(target, prop, value, receiver) {
+        if (computedMap && computedKeys.includes(prop as string)) {
+          // Computed properties are read-only
+          return false;
+        }
+        const oldValue = target[prop as keyof T];
+        const result = Reflect.set(target, prop, value, receiver);
+        if (oldValue !== value) {
+          listeners.forEach(fn => fn(topProxy));
+        }
+        return result;
+      },
+      deleteProperty(target, prop) {
+        if (computedMap && computedKeys.includes(prop as string)) {
+          // Computed properties are read-only
+          return false;
+        }
+        const result = Reflect.deleteProperty(target, prop);
+        listeners.forEach(fn => fn(topProxy));
+        return result;
+      }
+    });
+    proxyCache.set(obj, reactiveProxy);
+    return reactiveProxy;
+  }
+
+  topProxy = createReactive(state);
+
+  return topProxy as T & { subscribe: (fn: (state: T) => void) => () => void; set: (changes: Partial<T>) => void } & { [K in keyof C]: ReturnType<C[K]> };
 }
