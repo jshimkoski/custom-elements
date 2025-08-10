@@ -18,29 +18,25 @@ interface TodoAppComputed {
   completedCount: number;
 }
 
-const initialState: TodoAppState = {
-  todos: [
-    { id: 1, text: 'Learn TypeScript', completed: true },
-    { id: 2, text: 'Build awesome components', completed: false },
-    { id: 3, text: 'Ship to production', completed: false }
-  ],
-  newTodo: '',
-  filter: 'all'
-};
-
-const computedMap = {
-  filteredTodos: (state: TodoAppState) => state.todos.filter((todo: Todo) => {
-    if (state.filter === 'active') return !todo.completed;
-    if (state.filter === 'completed') return todo.completed;
-    return true;
-  }),
-  activeTodos: (state: TodoAppState) => state.todos.filter((todo: Todo) => !todo.completed),
-  completedCount: (state: TodoAppState) => state.todos.filter((todo: Todo) => todo.completed).length
-};
-
 component<TodoAppState, TodoAppComputed>('todo-app', {
-  state: initialState,
-  computed: computedMap,
+  state: {
+    todos: [
+      { id: 1, text: 'Learn TypeScript', completed: true },
+      { id: 2, text: 'Build awesome components', completed: false },
+      { id: 3, text: 'Ship to production', completed: false }
+    ],
+    newTodo: '',
+    filter: 'all'
+  },
+  computed: {
+    filteredTodos: (state: TodoAppState) => state.todos.filter((todo: Todo) => {
+      if (state.filter === 'active') return !todo.completed;
+      if (state.filter === 'completed') return todo.completed;
+      return true;
+    }),
+    activeTodos: (state: TodoAppState) => state.todos.filter((todo: Todo) => !todo.completed),
+    completedCount: (state: TodoAppState) => state.todos.filter((todo: Todo) => todo.completed).length
+  },
   template: (state, api) => html`
     <div class="todo-app">
       <header>

@@ -1,34 +1,40 @@
-import { component, html } from '../../lib/runtime';
+import { component, html, type ComponentState } from '../../lib/runtime';
+
+interface SimpleTestState extends ComponentState {
+  message: string;
+  clicked: boolean;
+  uppercasedMessage: string;
+}
 
 // Simple test component to verify registration
-component({
-  tag: 'simple-test-component',
-  
-  state: (() => {
-    const message = 'Hello from Simple Test Component!';
-    return {
-      message,
-      get uppercasedMessage() {
-        return message.toUpperCase();
-      }
-    };
-  })(),
+component<SimpleTestState>('simple-test-component', {
+  state: {
+    message: 'Hello from Simple Test Component!',
+    clicked: false,
+    get uppercasedMessage() {
+      return this.message.toUpperCase();
+    }
+  },
 
   template: (state) => html`
     <div style="border: 2px solid red; padding: 1rem; margin: 1rem; background: #ffe6e6;">
       <h3>🔴 Simple Test Component</h3>
       <p>${state.message}</p>
-      <p data-ref="uppercasedMessage">${state.uppercasedMessage}</p>
+      <input type="text" value="${state.message}" data-on-input="updateMessage" />
+      <button data-on-click="uppercasedMessage">${state.uppercasedMessage}</button>
+      ${state.clicked ? html`<p>✅ Clicked!</p>` : ''}
     </div>
-  `,
+  `(state),
 
-  refs: {
-    uppercasedMessage: (element, state, api) => {
-      element.addEventListener('click', () => {
-        api.updateKey('message', 'Updated Message');
-        console.log(state.uppercasedMessage);
-      });
-    }
+  updateMessage: (_e: Event, state: SimpleTestState) => {
+    const input = _e.target as HTMLInputElement;
+    state.message = input.value;
+  },
+
+  uppercasedMessage: (_e: Event, state: SimpleTestState) => {
+    state.message = 'Updated Message';
+    state.clicked = !state.clicked;
+    console.log(state.uppercasedMessage);
   }
 });
 

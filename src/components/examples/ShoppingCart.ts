@@ -1,4 +1,4 @@
-import { component, html, css, type ComponentState } from '../../lib/runtime';
+import { component, html, css, type ComponentState, type ComponentAPI } from '../../lib/runtime';
 
 interface CartItem {
   id: number;
@@ -13,78 +13,67 @@ interface ShoppingCartState extends ComponentState {
   isCartOpen: boolean;
 }
 
-component<ShoppingCartState>({
-  tag: 'shopping-cart-demo',
+interface ShoppingCartComputed {
+  subtotal: number;
+  tax: number;
+  discount: number;
+  total: number;
+  itemCount: number;
+}
 
-  state: (() => {
-    const items = [
+component<ShoppingCartState, ShoppingCartComputed>('shopping-cart-demo', {
+  state: {
+    items: [
       { id: 1, name: 'Wireless Headphones', price: 99.99, quantity: 1 },
       { id: 2, name: 'Smartphone Case', price: 24.99, quantity: 2 },
       { id: 3, name: 'USB-C Cable', price: 12.99, quantity: 1 }
-    ];
-    const couponCode = '';
-    const isCartOpen = true;
-    const subtotal = (() => {
-      return items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    })();
-    const tax = (() => {
-      return subtotal * 0.08; // 8% tax
-    })();
-    const discount = (() => {
-      if (couponCode.toLowerCase() === 'save10') return subtotal * 0.1;
-      if (couponCode.toLowerCase() === 'save20') return subtotal * 0.2;
+    ],
+    couponCode: '',
+    isCartOpen: true
+  },
+
+  computed: {
+    subtotal: (state) => state.items.reduce((sum, item) => sum + (item.price * item.quantity), 0),
+    tax: (state) => state.items.reduce((sum, item) => sum + (item.price * item.quantity), 0) * 0.08,
+    discount: (state) => {
+      const subtotal = state.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+      if (state.couponCode.toLowerCase() === 'save10') return subtotal * 0.1;
+      if (state.couponCode.toLowerCase() === 'save20') return subtotal * 0.2;
       return 0;
-    })();
-    return {
-      items,
-      couponCode,
-      isCartOpen,
-      subtotal,
-      tax,
-      discount,
-      get total() {
-        return Math.max(0, subtotal + tax - discount);
-      },
-      get itemCount() {
-        return this.items.reduce((sum, item) => sum + item.quantity, 0);
-      },
-    }
-  })(),
+    },
+    total: (state) => {
+      const subtotal = state.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+      const tax = subtotal * 0.08;
+      let discount = 0;
+      if (state.couponCode.toLowerCase() === 'save10') discount = subtotal * 0.1;
+      if (state.couponCode.toLowerCase() === 'save20') discount = subtotal * 0.2;
+      return Math.max(0, subtotal + tax - discount);
+    },
+    itemCount: (state) => state.items.reduce((sum, item) => sum + item.quantity, 0)
+  },
 
-  template: (state) => {
-    const subtotal = (state as any).subtotal;
-    const tax = (state as any).tax;
-    const discount = (state as any).discount;
-    const total = (state as any).total;
-    const itemCount = (state as any).itemCount;
-
-    return html`
+  template: (state, api) => html`
     <div class="cart-container">
       <div class="cart-header">
         <h2>🛒 Shopping Cart</h2>
-        <button 
-          data-ref="toggleCart" 
-          class="toggle-btn"
-        >
-          ${state.isCartOpen ? 'Hide' : 'Show'} (${itemCount} items)
+        <button data-on-click="toggleCart" class="toggle-btn">
+          ${state.isCartOpen ? `Hide (${state.itemCount} items)` : `Show (${state.itemCount} items)`}
         </button>
       </div>
-
-      ${state.isCartOpen ? `
+      ${state.isCartOpen ? html`
         <div class="cart-panel">
           <div class="cart-header">
             <h3>🛒 Shopping Cart (${state.items.length} items)</h3>
-            <button data-ref="toggleCart" class="toggle-btn">✕</button>
+            <button data-on-click="toggleCart" class="toggle-btn">✕</button>
           </div>
-          
           <div class="cart-content">
             ${state.items.length === 0 ? `
               <div class="empty-cart">
                 <p>Your cart is empty</p>
-                <button data-ref="addSample" class="add-sample-btn">Add Sample Items</button>
+                <button data-on-click="addSample" class="add-sample-btn">Add Sample Items</button>
               </div>
             ` : `
-              <div class="cart-items" data-ref="cartContainer">
+              <div class="cart-items" data-on-click="cartContainer">
                 ${state.items.map(item => `
                   <div class="cart-item" key="${item.id}">
                     <div class="item-info">
@@ -102,65 +91,61 @@ component<ShoppingCartState>({
               </div>
             `}
           </div>
-        ` : ''}
-
-        ${state.items.length > 0 ? html`
-          <div class="coupon-section">
-            <h3>Promo Code</h3>
-            <div class="coupon-input">
-              <input 
-                data-ref="couponInput"
-                type="text" 
-                value="${state.couponCode}"
-                placeholder="Enter coupon code (try SAVE10 or SAVE20)"
-                class="coupon-field"
-              >
-              <button data-ref="applyCoupon" class="apply-btn">
-                Apply
-              </button>
-            </div>
-            ${discount > 0 ? html`
-              <div class="coupon-success">
-                ✅ Coupon applied! You saved $${discount.toFixed(2)}
-              </div>
-            ` : ''}
+        </div>
+      `(state, api) : ''}
+      ${state.items.length > 0 ? html`
+        <div class="coupon-section">
+          <h3>Promo Code</h3>
+          <div class="coupon-input">
+            <input 
+              data-on-input="couponInput"
+              type="text" 
+              value="${state.couponCode}"
+              placeholder="Enter coupon code (try SAVE10 or SAVE20)"
+              class="coupon-field"
+            >
+            <button data-on-click="applyCoupon" class="apply-btn">
+              Apply
+            </button>
           </div>
-
-          <div class="cart-summary">
-            <h3>Order Summary</h3>
-            <div class="summary-line">
-              <span>Subtotal:</span>
-              <span>$${subtotal.toFixed(2)}</span>
+          ${Number(state.discount) > 0 ? `
+            <div class="coupon-success">
+              ✅ Coupon applied! You saved $${Number(state.discount).toFixed(2)}
             </div>
-            <div class="summary-line">
-              <span>Tax (8%):</span>
-              <span>$${tax.toFixed(2)}</span>
-            </div>
-            ${discount > 0 ? html`
-              <div class="summary-line discount">
-                <span>Discount:</span>
-                <span>-$${discount.toFixed(2)}</span>
-              </div>
-            ` : ''}
-            <div class="summary-line total">
-              <span>Total:</span>
-              <span>$${total.toFixed(2)}</span>
-            </div>
-            
-            <div class="cart-actions">
-              <button data-ref="clearCart" class="clear-btn">
-                Clear Cart
-              </button>
-              <button data-ref="checkout" class="checkout-btn">
-                Checkout ($${total.toFixed(2)})
-              </button>
-            </div>
+          ` : ''}
+        </div>
+        <div class="cart-summary">
+          <h3>Order Summary</h3>
+          <div class="summary-line">
+            <span>Subtotal:</span>
+            <span>$${Number(state.subtotal).toFixed(2)}</span>
           </div>
-        ` : ''}
-      </div>
+          <div class="summary-line">
+            <span>Tax (8%):</span>
+            <span>$${Number(state.tax).toFixed(2)}</span>
+          </div>
+          ${Number(state.discount) > 0 ? `
+            <div class="summary-line discount">
+              <span>Discount:</span>
+              <span>-$${Number(state.discount).toFixed(2)}</span>
+            </div>
+          ` : ''}
+          <div class="summary-line total">
+            <span>Total:</span>
+            <span>$${Number(state.total).toFixed(2)}</span>
+          </div>
+          <div class="cart-actions">
+            <button data-on-click="clearCart" class="clear-btn">
+              Clear Cart
+            </button>
+            <button data-on-click="checkout" class="checkout-btn">
+              Checkout ($${Number(state.total).toFixed(2)})
+            </button>
+          </div>
+        </div>
+      `(state, api) : ''}
     </div>
-    `;
-  },
+  `(state, api),
 
   style: css`
     .cart-container {
@@ -428,103 +413,70 @@ component<ShoppingCartState>({
     }
   `,
 
-  refs: {
-    toggleCart: (element, _state, api) => {
-      element.addEventListener('click', () => {
-        api.updateKey('isCartOpen', !api.state.isCartOpen);
-      });
-    },
+  toggleCart: (_e: Event, state: ShoppingCartState) => {
+    state.isCartOpen = !state.isCartOpen;
+  },
 
-    couponInput: (element, _state, api) => {
-      const input = element as HTMLInputElement;
-      
-      input.addEventListener('input', () => {
-        api.updateKey('couponCode', input.value);
-      });
-    },
+  couponInput: (e: Event, state: ShoppingCartState) => {
+    const input = e.target as HTMLInputElement;
+    state.couponCode = input.value;
+  },
 
-    applyCoupon: (element, state, api) => {
-      element.addEventListener('click', () => {
-        // The coupon logic is handled by computed properties
-        // Just trigger a re-render by updating the coupon code
-        const currentCode = state.couponCode.trim();
-        api.updateKey('couponCode', currentCode);
-        
-        if (currentCode.toLowerCase() === 'save10' || currentCode.toLowerCase() === 'save20') {
-          api.emit('coupon-applied', { code: currentCode });
+  applyCoupon: (_e: Event, state: ShoppingCartState, api: ComponentAPI<ShoppingCartState>) => {
+    const currentCode = state.couponCode.trim();
+    if (currentCode.toLowerCase() === 'save10' || currentCode.toLowerCase() === 'save20') {
+      api.emit('coupon-applied', { code: currentCode });
+    }
+  },
+
+  clearCart: (_e: Event, state: ShoppingCartState, api: ComponentAPI<ShoppingCartState>) => {
+    state.items = [];
+    state.couponCode = '';
+    api.emit('cart-cleared');
+  },
+
+  addSample: (_e: Event, state: ShoppingCartState) => {
+    const sampleItems: CartItem[] = [
+      { id: Date.now() + 1, name: 'Wireless Mouse', price: 29.99, quantity: 1 },
+      { id: Date.now() + 2, name: 'Keyboard', price: 79.99, quantity: 1 },
+      { id: Date.now() + 3, name: 'Monitor Stand', price: 49.99, quantity: 1 }
+    ];
+    state.items = sampleItems;
+  },
+
+  checkout: (_e: Event, state: ShoppingCartState, api: ComponentAPI<ShoppingCartState>) => {
+    const total = (state as any).total;
+    api.emit('checkout-initiated', {
+      items: state.items,
+      total: total,
+      couponCode: state.couponCode
+    });
+    alert(`Checkout initiated! Total: $${total.toFixed(2)}`);
+  },
+
+  cartContainer: (e: Event, state: ShoppingCartState, api: ComponentAPI<ShoppingCartState>) => {
+    const target = e.target as HTMLElement;
+    const itemId = parseInt(target.getAttribute('data-item-id') || '0');
+    const action = target.getAttribute('data-action');
+    if (!itemId || !action) return;
+    const itemIndex = state.items.findIndex(item => item.id === itemId);
+    if (itemIndex === -1) return;
+    switch (action) {
+      case 'increase':
+        api.state.items = state.items.map((item, i) => i === itemIndex ? { ...item, quantity: item.quantity + 1 } : item);
+        api.emit('quantity-changed', { itemId, quantity: api.state.items[itemIndex].quantity });
+        break;
+      case 'decrease':
+        if (state.items[itemIndex].quantity > 1) {
+          api.state.items = state.items.map((item, i) => i === itemIndex ? { ...item, quantity: item.quantity - 1 } : item);
+          api.emit('quantity-changed', { itemId, quantity: api.state.items[itemIndex].quantity });
         }
-      });
-    },
-
-    clearCart: (element, _state, api) => {
-      element.addEventListener('click', () => {
-        api.updateKey('items', []);
-        api.updateKey('couponCode', '');
-        api.emit('cart-cleared');
-      });
-    },
-
-    addSample: (element, _state, api) => {
-      element.addEventListener('click', () => {
-        const sampleItems: CartItem[] = [
-          { id: Date.now() + 1, name: 'Wireless Mouse', price: 29.99, quantity: 1 },
-          { id: Date.now() + 2, name: 'Keyboard', price: 79.99, quantity: 1 },
-          { id: Date.now() + 3, name: 'Monitor Stand', price: 49.99, quantity: 1 }
-        ];
-        api.updateKey('items', sampleItems);
-      });
-    },
-
-    checkout: (element, state, api) => {
-      element.addEventListener('click', () => {
-        const total = (state as any).total;
-        api.emit('checkout-initiated', { 
-          items: state.items, 
-          total: total,
-          couponCode: state.couponCode 
-        });
-        alert(`Checkout initiated! Total: $${total.toFixed(2)}`);
-      });
-    },
-
-    // Add a container ref for event delegation
-    cartContainer: (element, state, api) => {
-      // Use event delegation for dynamic cart item buttons
-      element.addEventListener('click', (e: Event) => {
-        const target = e.target as HTMLElement;
-        const itemId = parseInt(target.getAttribute('data-item-id') || '0');
-        const action = target.getAttribute('data-action');
-
-        if (!itemId || !action) return;
-
-        const items = [...state.items];
-        const itemIndex = items.findIndex(item => item.id === itemId);
-
-        if (itemIndex === -1) return;
-
-        switch (action) {
-          case 'increase':
-            items[itemIndex].quantity += 1;
-            api.updateKey('items', items);
-            api.emit('quantity-changed', { itemId, quantity: items[itemIndex].quantity });
-            break;
-
-          case 'decrease':
-            if (items[itemIndex].quantity > 1) {
-              items[itemIndex].quantity -= 1;
-              api.updateKey('items', items);
-              api.emit('quantity-changed', { itemId, quantity: items[itemIndex].quantity });
-            }
-            break;
-
-          case 'remove':
-            const removedItem = items[itemIndex];
-            items.splice(itemIndex, 1);
-            api.updateKey('items', items);
-            api.emit('item-removed', { item: removedItem });
-            break;
-        }
-      });
+        break;
+      case 'remove':
+        const removedItem = state.items[itemIndex];
+        api.state.items = state.items.filter((_, i) => i !== itemIndex);
+        api.emit('item-removed', { item: removedItem });
+        break;
     }
   },
 

@@ -3,8 +3,8 @@ export { eventBus } from './event-bus';
 export { renderToString, renderComponentsToString, generateHydrationScript } from './ssr';
 export type { SSRComponentConfig, SSRRenderOptions, SSRContext } from './ssr';
 export { TemplateParser, DOMDiffer } from './dom-diff';
-export { html, css, classes, styles, ref, on } from './template-helpers';
-export { compileTemplate, compile, renderCompiledTemplate, updateCompiledTemplate } from './template-compiler';
+export { html, compile, css, classes, styles, ref, on } from './template-helpers';
+export { compileTemplate, renderCompiledTemplate, updateCompiledTemplate } from './template-compiler';
 export type { CompiledTemplate, UpdateFunction, UpdateType } from './template-compiler';
 
 /**
@@ -55,10 +55,6 @@ export interface ComponentAPI<T extends ComponentState = ComponentState> {
   readonly state: T;
   /** Emit a custom event from the component */
   emit(eventName: string, detail?: unknown): void;
-  /** Update multiple state keys at once */
-  update(changes: Partial<T>): void;
-  /** Update a single state key */
-  updateKey<K extends keyof T>(key: K, value: T[K]): void;
   /** Listen for a global event (event bus) */
   onGlobal<U = any>(eventName: string, handler: (data: U) => void): () => void;
   /** Remove a global event listener */
@@ -222,20 +218,6 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
     this.api = {
       state: this.stateObj,
       emit: (eventName: string, detail?: unknown) => this.dispatchEvent(new CustomEvent(eventName, { detail, bubbles: true })),
-      update: (changes: Partial<S & C>) => {
-        if (typeof (this.stateObj as any).set === 'function') {
-          (this.stateObj as any).set(changes);
-        } else {
-          Object.assign(this.stateObj, changes);
-        }
-      },
-      updateKey: <K extends keyof (S & C)>(key: K, value: (S & C)[K]) => {
-        if (typeof (this.stateObj as any).set === 'function') {
-          (this.stateObj as any).set({ [key]: value });
-        } else {
-          this.stateObj[key] = value;
-        }
-      },
       onGlobal: <U = any>(eventName: string, handler: (data: U) => void) => {
         const unsub = eventBus.on(eventName, handler);
         this._globalUnsubscribes.push(unsub);
@@ -319,24 +301,29 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
         const fragment = TemplateParser.parseTemplate(templateResult);
         let appContainer: Element | null = Array.from(fragment.childNodes).find(n => n.nodeType === 1 && (n as Element).tagName !== 'STYLE') as Element | null;
         let styleNode: Element | null = Array.from(fragment.childNodes).find(n => n.nodeType === 1 && (n as Element).tagName === 'STYLE') as Element | null;
-        const shadowAppContainer = Array.from(this.shadowRoot!.children).find(el => el.nodeType === 1 && (el as Element).tagName !== 'STYLE') as Element | undefined;
+        // Automatically add data-root to the main app container
+        if (appContainer) appContainer.setAttribute('data-root', '');
+        const shadowAppContainer = this.shadowRoot!.querySelector('[data-root]') as Element | undefined;
         const isInitialRender = !shadowAppContainer;
         if (isInitialRender) {
           if (styleNode) this.shadowRoot!.appendChild(styleNode.cloneNode(true));
           if (appContainer) this.shadowRoot!.appendChild(appContainer.cloneNode(true));
           else {
             const firstEl = Array.from(fragment.childNodes).find(n => n.nodeType === 1) as Element | undefined;
-            if (firstEl) this.shadowRoot!.appendChild(firstEl.cloneNode(true));
+            if (firstEl) {
+              firstEl.setAttribute('data-root', '');
+              this.shadowRoot!.appendChild(firstEl.cloneNode(true));
+            }
           }
           this.refsAttached = false;
         } else {
           let shadowStyle = this.shadowRoot!.querySelector('style');
           if (!shadowStyle && styleNode) this.shadowRoot!.insertBefore(styleNode.cloneNode(true), this.shadowRoot!.firstChild);
           else if (shadowStyle && styleNode) shadowStyle.textContent = styleNode.textContent;
-          let shadowApp = this.shadowRoot!.querySelector('.todo-app');
+          let shadowApp = this.shadowRoot!.querySelector('[data-root]');
           if (shadowApp && appContainer) {
             DOMDiffer.morph(shadowApp, appContainer.outerHTML);
-            shadowApp = this.shadowRoot!.querySelector('.todo-app');
+            shadowApp = this.shadowRoot!.querySelector('[data-root]');
             // Clean up refs after morph
             function cleanupRefs(node: Element) {
               if (node.hasAttribute && node.hasAttribute('data-refs-processed')) node.removeAttribute('data-refs-processed');

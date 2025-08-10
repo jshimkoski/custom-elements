@@ -68,7 +68,7 @@ export function html(
           valuePromises.push(value);
         } else {
           if (/=\s*"?$/.test(prevStatic) && typeof value === 'string' && !isEventHandlerAttr) {
-            value = value.replace(/"/g, '&quot;');
+            value = value.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
             result += value;
           } else if (typeof value === 'string' && !isEventHandlerAttr && !/=\s*"?$/.test(prevStatic)) {
             // Escape any user input from state or arrays of objects
@@ -132,7 +132,7 @@ export function compile(strings: TemplateStringsArray, ...values: any[]): Compil
         // Recursively resolve nested helpers
         if (typeof value === 'function') value = value(state, api);
         if (/=\s*"?$/.test(prevStatic) && typeof value === 'string' && !isEventHandlerAttr) {
-          value = value.replace(/"/g, '&quot;');
+          value = value.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
           result += value;
         } else if (typeof value === 'string' && !isEventHandlerAttr && !/=\s*"?$/.test(prevStatic)) {
           // Escape any user input from state or arrays of objects
