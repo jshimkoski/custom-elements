@@ -116,6 +116,74 @@ export type LifecycleHandler<T extends ComponentState> = (
 // UTILITIES
 // ============================================================================
 
+// Minimal VNode structure for incremental migration
+/**
+ * Virtual Node (VNode) structure for incremental migration
+ */
+interface VNode {
+  type: string; // tag name or '#text'
+  key?: string;
+  props: Record<string, any>;
+  children: VNode[];
+  dom?: Element | Text;
+}
+
+/**
+ * Create a VNode from a DOM ChildNode (Element or Text)
+ */
+function createVNodeFromElement(node: ChildNode): VNode {
+  if (node.nodeType === Node.TEXT_NODE) {
+    return { type: '#text', props: {}, children: [], dom: node as Text };
+  }
+  if (node.nodeType === Node.ELEMENT_NODE) {
+    const elem = node as Element;
+    const props: Record<string, any> = {};
+    Array.from(elem.attributes).forEach(attr => {
+      props[attr.name] = attr.value;
+    });
+    const children: VNode[] = Array.from(elem.childNodes).map(createVNodeFromElement);
+    return {
+      type: elem.tagName.toLowerCase(),
+      key: props['key'],
+      props,
+      children,
+      dom: elem
+    };
+  }
+  // Fallback for unsupported node types
+  // Only Element or Text nodes are supported for VNode.dom
+  return { type: '#unknown', props: {}, children: [], dom: undefined };
+}
+
+/**
+ * Patch two VNodes and update the DOM, preserving controlled inputs
+ */
+function patchVNode(parent: Element, oldVNode: VNode, newVNode: VNode): void {
+  if (oldVNode.key === newVNode.key && oldVNode.type === newVNode.type) {
+    // Controlled input: update value/checked, preserve node
+    if (newVNode.props['data-model']) {
+      const el = oldVNode.dom as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
+      if ('value' in el && 'value' in newVNode.props) el.value = newVNode.props.value;
+      if (el instanceof HTMLInputElement && el.type === 'checkbox' && 'checked' in newVNode.props) el.checked = newVNode.props.checked;
+      if (el instanceof HTMLInputElement && el.type === 'radio' && 'checked' in newVNode.props) el.checked = newVNode.props.checked;
+    }
+    // Update other attributes
+    Object.entries(newVNode.props).forEach(([name, value]) => {
+      if (oldVNode.dom instanceof Element) oldVNode.dom.setAttribute(name, value);
+    });
+    // Patch children
+    for (let i = 0; i < newVNode.children.length; i++) {
+      if (oldVNode.children[i] && newVNode.children[i]) {
+        patchVNode(oldVNode.dom as Element, oldVNode.children[i], newVNode.children[i]);
+      }
+    }
+  } else {
+    // Replace node
+    const newEl = (newVNode.dom as Element) || document.createElement(newVNode.type);
+    parent.replaceChild(newEl, oldVNode.dom!);
+  }
+}
+
 /**
  * useDataModel - Two-way binding helper for input/select/textarea and state property.
  * Enables v-model-like behavior for custom elements.
@@ -379,45 +447,21 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
     try {
       if (typeof templateResult === 'string') {
         if (templateResult === this.lastHTML) return;
-        // Enhanced controlled input preservation
+        // --- VNode-based rendering integration ---
         const fragment = TemplateParser.parseTemplate(templateResult);
-        // Automatically add a unique key to elements with data-model
         let autoKeyCounter = 0;
         fragment.querySelectorAll('[data-model]').forEach(el => {
           if (!el.hasAttribute('key')) {
             el.setAttribute('key', `auto-model-key-${autoKeyCounter++}`);
           }
         });
-        // If shadowAppContainer exists, preserve controlled inputs
-        const shadowAppContainer = this.shadowRoot!.querySelector('[data-root]') as Element | undefined;
-        if (shadowAppContainer) {
-          fragment.querySelectorAll('[data-model]').forEach(newEl => {
-            const keyAttr = newEl.getAttribute('key');
-            if (!keyAttr) return;
-            // Match by key
-            const oldEl = shadowAppContainer.querySelector(`[data-model][key="${keyAttr}"]`);
-            if (oldEl && oldEl.tagName === newEl.tagName) {
-              // Preserve old input node, update value/checked only
-              if (
-                (oldEl instanceof HTMLInputElement || oldEl instanceof HTMLTextAreaElement || oldEl instanceof HTMLSelectElement) &&
-                (newEl instanceof HTMLInputElement || newEl instanceof HTMLTextAreaElement || newEl instanceof HTMLSelectElement)
-              ) {
-                newEl.value = oldEl.value;
-                if (oldEl instanceof HTMLInputElement && newEl instanceof HTMLInputElement && oldEl.type === 'checkbox') {
-                  newEl.checked = oldEl.checked;
-                }
-                if (oldEl instanceof HTMLInputElement && newEl instanceof HTMLInputElement && oldEl.type === 'radio') {
-                  newEl.checked = oldEl.checked;
-                }
-              }
-            }
-          });
-        }
+        // Find main app container and style node
         let appContainer: Element | null = Array.from(fragment.childNodes).find(n => n.nodeType === 1 && (n as Element).tagName !== 'STYLE') as Element | null;
         let styleNode: Element | null = Array.from(fragment.childNodes).find(n => n.nodeType === 1 && (n as Element).tagName === 'STYLE') as Element | null;
-        // Automatically add data-root to the main app container
         if (appContainer) appContainer.setAttribute('data-root', '');
+        const shadowAppContainer = this.shadowRoot!.querySelector('[data-root]') as Element | undefined;
         const isInitialRender = !shadowAppContainer;
+        // --- VNode diffing ---
         if (isInitialRender) {
           if (styleNode) this.shadowRoot!.appendChild(styleNode.cloneNode(true));
           if (appContainer) this.shadowRoot!.appendChild(appContainer.cloneNode(true));
@@ -430,34 +474,24 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
           }
           this.refsAttached = false;
         } else {
-          let shadowStyle = this.shadowRoot!.querySelector('style');
-          if (!shadowStyle && styleNode) this.shadowRoot!.insertBefore(styleNode.cloneNode(true), this.shadowRoot!.firstChild);
-          else if (shadowStyle && styleNode) shadowStyle.textContent = styleNode.textContent;
-          let shadowApp = this.shadowRoot!.querySelector('[data-root]');
-          if (shadowApp && appContainer) {
-            // --- Keyed element preservation ---
-            // For each keyed element in new fragment, try to find and reuse the old one
-            const keyedNew = appContainer.querySelectorAll('[key]');
-            keyedNew.forEach(newEl => {
-              const key = newEl.getAttribute('key');
-              if (!key || !shadowApp) return;
-              const oldEl = shadowApp.querySelector(`[key="${key}"]`);
-              if (oldEl && oldEl.tagName === newEl.tagName) {
-                // Replace newEl in fragment with oldEl (preserve listeners, value, etc.)
-                newEl.replaceWith(oldEl.cloneNode(true));
-              }
-            });
-            DOMDiffer.morph(shadowApp, appContainer.outerHTML);
-            shadowApp = this.shadowRoot!.querySelector('[data-root]');
-            // Clean up refs after morph
+          // Use VNode diffing for robust controlled input handling
+          if (appContainer && shadowAppContainer) {
+            const newVNode = createVNodeFromElement(appContainer);
+            const oldVNode = createVNodeFromElement(shadowAppContainer);
+            patchVNode(shadowAppContainer, oldVNode, newVNode);
+            // Clean up refs after patch
             function cleanupRefs(node: Element) {
               if (node.hasAttribute && node.hasAttribute('data-refs-processed')) node.removeAttribute('data-refs-processed');
               Array.from(node.children).forEach(child => cleanupRefs(child as Element));
             }
-            if (shadowApp) cleanupRefs(shadowApp);
-            if (shadowApp) this.processRefs();
+            cleanupRefs(shadowAppContainer);
+            this.processRefs();
             this.refsAttached = true;
           }
+          // Style node sync
+          let shadowStyle = this.shadowRoot!.querySelector('style');
+          if (!shadowStyle && styleNode) this.shadowRoot!.insertBefore(styleNode.cloneNode(true), this.shadowRoot!.firstChild);
+          else if (shadowStyle && styleNode) shadowStyle.textContent = styleNode.textContent;
         }
         this.lastHTML = templateResult;
         this.lastCompiledTemplate = null;
