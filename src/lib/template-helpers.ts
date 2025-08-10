@@ -1,10 +1,45 @@
-
 import type { CompiledTemplate } from './template-compiler.js';
 
 /**
  * TemplateResult type for template helpers
  */
 export type TemplateResult = string | CompiledTemplate | ((state?: any) => string);
+
+/**
+ * Escape HTML entities for safe rendering of user-generated content.
+ */
+function escapeHTML(str: string): string {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// Escapes any string value that matches a property in state or computed properties
+function escapeIfUserInput(value: unknown, state: any): string {
+  if (typeof value !== 'string' || !state) return String(value);
+  // Check direct state properties
+  for (const key in state) {
+    if (typeof state[key] === 'string' && value === state[key]) {
+      return escapeHTML(value);
+    }
+    // For arrays of objects (e.g., todos), check each object's string properties
+    if (Array.isArray(state[key])) {
+      for (const item of state[key]) {
+        if (item && typeof item === 'object') {
+          for (const prop in item) {
+            if (typeof item[prop] === 'string' && value === item[prop]) {
+              return escapeHTML(value);
+            }
+          }
+        }
+      }
+    }
+  }
+  return String(value);
+}
 
 /**
  * Tagged template literal for HTML strings.
@@ -17,39 +52,57 @@ export function html(
   ...values: unknown[]
 ): (state?: any, api?: any) => string | Promise<string> {
   return (state?: any, api?: any) => {
-      let result = '';
-      let hasAsync = false;
-      const valuePromises: Promise<any>[] = [];
-      for (let i = 0; i < strings.length; i++) {
-        result += strings[i];
-        if (i < values.length) {
-          const value = values[i];
-          if (value instanceof Promise) {
-            hasAsync = true;
-            valuePromises.push(value);
+    let result = '';
+    let hasAsync = false;
+    const valuePromises: Promise<any>[] = [];
+    for (let i = 0; i < strings.length; i++) {
+      result += strings[i];
+      if (i < values.length) {
+        let value = values[i];
+        const prevStatic = strings[i];
+        const isEventHandlerAttr = /data-on-[a-z]+="?$/.test(prevStatic);
+        // Recursively resolve nested helpers
+        if (typeof value === 'function') value = value(state, api);
+        if (value instanceof Promise) {
+          hasAsync = true;
+          valuePromises.push(value);
+        } else {
+          if (/=\s*"?$/.test(prevStatic) && typeof value === 'string' && !isEventHandlerAttr) {
+            value = value.replace(/"/g, '&quot;');
+            result += value;
+          } else if (typeof value === 'string' && !isEventHandlerAttr && !/=\s*"?$/.test(prevStatic)) {
+            // Escape any user input from state or arrays of objects
+            result += escapeIfUserInput(value, state);
           } else {
             result += value;
           }
         }
       }
-      if (!hasAsync) return result;
-      // If any value is a Promise, resolve all and reconstruct
-      return Promise.all(valuePromises).then(resolvedValues => {
-        let asyncResult = '';
-        let asyncIndex = 0;
-        for (let i = 0; i < strings.length; i++) {
-          asyncResult += strings[i];
-          if (i < values.length) {
-            const value = values[i];
-            if (value instanceof Promise) {
-              asyncResult += resolvedValues[asyncIndex++];
-            } else {
-              asyncResult += value;
+    }
+    if (!hasAsync) return result;
+    // If any value is a Promise, resolve all and reconstruct
+    return Promise.all(valuePromises).then(resolvedValues => {
+      let asyncResult = '';
+      let asyncIndex = 0;
+      for (let i = 0; i < strings.length; i++) {
+        asyncResult += strings[i];
+        if (i < values.length) {
+          let value = values[i];
+          if (value instanceof Promise) {
+            asyncResult += resolvedValues[asyncIndex++];
+          } else {
+            const prevStatic = strings[i];
+            const isEventHandlerAttr = /data-on-[a-z]+="?$/.test(prevStatic);
+            // Only escape double quotes, do not filter or remove any other content
+            if (/=\s*"?$/.test(prevStatic) && typeof value === 'string' && !isEventHandlerAttr) {
+              value = value.replace(/"/g, '&quot;');
             }
+            asyncResult += value;
           }
         }
-        return asyncResult;
-      });
+      }
+      return asyncResult;
+    });
   };
 }
 /**
@@ -74,8 +127,19 @@ export function compile(strings: TemplateStringsArray, ...values: any[]): Compil
       result += strings[i];
       if (i < values.length) {
         let value = values[i];
+        const prevStatic = strings[i];
+        const isEventHandlerAttr = /data-on-[a-z]+="?$/.test(prevStatic);
+        // Recursively resolve nested helpers
         if (typeof value === 'function') value = value(state, api);
-        result += value ?? '';
+        if (/=\s*"?$/.test(prevStatic) && typeof value === 'string' && !isEventHandlerAttr) {
+          value = value.replace(/"/g, '&quot;');
+          result += value;
+        } else if (typeof value === 'string' && !isEventHandlerAttr && !/=\s*"?$/.test(prevStatic)) {
+          // Escape any user input from state or arrays of objects
+          result += escapeIfUserInput(value, state);
+        } else {
+          result += value ?? '';
+        }
       }
     }
     return result;

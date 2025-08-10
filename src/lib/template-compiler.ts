@@ -188,12 +188,8 @@ export function compile<T = any>(
   ...expressions: Array<(state: T, api: any) => unknown>
 ): CompiledTemplate<T> {
   // Create statics array directly from strings
-  const statics = [...strings];
-  // Build the template HTML with placeholders to analyze structure
-  const templateHTML = strings.map((str, i) => 
-    str + (i < expressions.length ? `__DYNAMIC_${i}__` : '')
-  ).join('');
-  // Parse the template to find DOM paths for each dynamic value
+  const statics: string[] = Array.from(strings);
+  const templateHTML = strings.map((str, i) => str + (i < expressions.length ? `__DYNAMIC_${i}__` : '')).join('');
   const dynamics: UpdateFunction<T>[] = expressions.map((expr, index) => {
     const path = findDOMPath(templateHTML, `__DYNAMIC_${index}__`);
     return {
@@ -202,11 +198,9 @@ export function compile<T = any>(
       getValue: expr
     };
   });
-  // Generate unique ID
   const templateString = strings.join('{{PLACEHOLDER}}');
   const id = generateTemplateId(templateString);
-  // Render method supporting async output
-  function render(state: T, api: any): string | Promise<string> {
+  const render = (state: T, api: any): string | Promise<string> => {
     let result = '';
     let hasAsync = false;
     const valuePromises: Promise<any>[] = [];
@@ -218,6 +212,11 @@ export function compile<T = any>(
           hasAsync = true;
           valuePromises.push(value);
         } else {
+          // Escape double quotes if previous static ends with attribute=
+          const prevStatic = strings[i];
+          if (/=\s*"?$/.test(prevStatic) && typeof value === 'string') {
+            value = value.replace(/"/g, '&quot;');
+          }
           result += value;
         }
       }
@@ -231,15 +230,19 @@ export function compile<T = any>(
         if (i < expressions.length) {
           let value = expressions[i](state, api);
           if (value instanceof Promise) {
-            asyncResult += resolvedValues[asyncIndex++];
-          } else {
-            asyncResult += value;
+            value = resolvedValues[asyncIndex++];
           }
+          // Escape double quotes if previous static ends with attribute=
+          const prevStatic = strings[i];
+          if (/=\s*"?$/.test(prevStatic) && typeof value === 'string') {
+            value = value.replace(/"/g, '&quot;');
+          }
+          asyncResult += value;
         }
       }
       return asyncResult;
     });
-  }
+  };
   return {
     id,
     statics,

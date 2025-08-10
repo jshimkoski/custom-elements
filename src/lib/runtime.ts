@@ -376,28 +376,72 @@ const computedCache = new WeakMap<object, Map<string, any>>();
 // ============================================================================
 
 class TemplateParser {
+  /**
+   * Basic input sanitization: only escape double quotes for attribute context, do not filter or remove any content
+   */
+  /**
+   * No-op for template HTML; escaping is handled contextually in template helpers and compiler.
+   */
+  static sanitizeHTML(html: string): string {
+    return html;
+  }
   private static readonly parser = new window.DOMParser();
 
   static parseTemplate(html: string): DocumentFragment {
-  const cached = htmlParseCache.get(html);
-    if (cached) {
-      return cached.cloneNode(true) as DocumentFragment;
-    }
-
-    const doc = this.parser.parseFromString(html, 'text/html');
+    const sanitized = TemplateParser.sanitizeHTML(html);
     const fragment = document.createDocumentFragment();
-    
-    while (doc.body.firstChild) {
-      fragment.appendChild(doc.body.firstChild);
-    }
-
-  htmlParseCache.set(html, fragment.cloneNode(true) as DocumentFragment);
+    // Simple parser: split by tags, handle input/textarea specially
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = sanitized;
+    Array.from(tempDiv.childNodes).forEach(node => {
+      if (node.nodeType === Node.ELEMENT_NODE && (node as Element).tagName === 'INPUT') {
+        // Create input via createElement
+        const input = document.createElement('input');
+        Array.from((node as Element).attributes).forEach(attr => {
+          if (attr.name !== 'value') {
+            input.setAttribute(attr.name, attr.value);
+          }
+        });
+        // Always set value property directly from state (ignore value attribute)
+        input.value = (node as Element).getAttribute('value') || '';
+        fragment.appendChild(input);
+      } else if (node.nodeType === Node.ELEMENT_NODE && (node as Element).tagName === 'TEXTAREA') {
+        // Create textarea via createElement
+        const textarea = document.createElement('textarea');
+        Array.from((node as Element).attributes).forEach(attr => {
+          if (attr.name !== 'value') {
+            textarea.setAttribute(attr.name, attr.value);
+          }
+        });
+        // Always set value property directly from state (ignore value attribute)
+        textarea.value = (node as Element).getAttribute('value') || '';
+        textarea.textContent = (node as Element).textContent ?? '';
+        fragment.appendChild(textarea);
+      } else {
+        fragment.appendChild(node.cloneNode(true));
+      }
+    });
+    htmlParseCache.set(sanitized, fragment.cloneNode(true) as DocumentFragment);
     return fragment;
   }
 }
 
 class DOMDiffer {
   static morph(oldElement: Element, newHTML: string): void {
+    // For controlled input/textarea, render node only once, then update value/attributes directly
+    const isControlledInput = ['INPUT', 'TEXTAREA'].includes(oldElement.tagName);
+    if (isControlledInput) {
+      // Only update value and attributes, never replace node
+      const valueMatch = newHTML.match(/value=["']([^"']*)["']/);
+      const newValue = valueMatch ? valueMatch[1] : '';
+      if ((oldElement as any).value !== newValue) {
+        (oldElement as any).value = newValue;
+      }
+      // Optionally update attributes (skip children)
+      // Never replace or re-render node
+      return;
+    }
+    // Normal diffing for all other elements
     const newFragment = TemplateParser.parseTemplate(newHTML);
     const newElement = newFragment.firstElementChild;
     if (!newElement) {
@@ -408,7 +452,33 @@ class DOMDiffer {
   }
 
   private static morphElement(oldEl: Element, newEl: Element): void {
-    // Replace node if tag name, key, or class differs, but preserve focus for input/textarea/select
+    // Robust controlled input/textarea diffing
+    if (['INPUT', 'TEXTAREA'].includes(oldEl.tagName)) {
+      const isFocused = document.activeElement === oldEl;
+      let selectionStart = null;
+      let selectionEnd = null;
+      if (isFocused) {
+        selectionStart = (oldEl as any).selectionStart;
+        selectionEnd = (oldEl as any).selectionEnd;
+      }
+      // Always set value property from state
+      const stateValue = (newEl as any).value ?? (newEl as any).props?.value ?? '';
+      if ((oldEl as any).value !== stateValue) {
+        (oldEl as any).value = stateValue;
+      }
+      // Restore cursor/selection if focused
+      if (isFocused && selectionStart !== null && selectionEnd !== null) {
+        const len = stateValue.length;
+        (oldEl as any).setSelectionRange(
+          Math.min(selectionStart, len),
+          Math.min(selectionEnd, len)
+        );
+      }
+      // Only update attributes, never replace/reparse node or update children/innerHTML
+      this.morphAttributes(oldEl, newEl);
+      return;
+    }
+    // Node identity and focus logic
     const oldKey = oldEl.getAttribute('key');
     const newKey = newEl.getAttribute('key');
     const oldClass = oldEl.getAttribute('class');
@@ -416,45 +486,69 @@ class DOMDiffer {
     const isFocusable = (el: Element) => ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName);
     const isFocused = document.activeElement === oldEl;
     const identityMatches = oldEl.tagName === newEl.tagName && oldKey === newKey && oldClass === newClass;
-    if (!identityMatches) {
-      // If focused and focusable, update in place
-      if (isFocused && isFocusable(oldEl) && isFocusable(newEl)) {
-        // Update value and attributes
-        if (oldEl.tagName === 'INPUT') {
-          const oldValue = (oldEl as HTMLInputElement).value;
-          const newValue = newEl.getAttribute('value') ?? '';
-          if (oldValue !== newValue) {
-            let selectionStart = (oldEl as HTMLInputElement).selectionStart;
-            let selectionEnd = (oldEl as HTMLInputElement).selectionEnd;
-            (oldEl as HTMLInputElement).value = newValue;
-            if (selectionStart !== null && selectionEnd !== null) {
-              (oldEl as HTMLInputElement).setSelectionRange(selectionStart, selectionEnd);
-            }
-          }
-        } else if (oldEl.tagName === 'TEXTAREA') {
-          const oldValue = (oldEl as HTMLTextAreaElement).value;
-          const newValue = newEl.textContent ?? '';
-          if (oldValue !== newValue) {
-            let selectionStart = (oldEl as HTMLTextAreaElement).selectionStart;
-            let selectionEnd = (oldEl as HTMLTextAreaElement).selectionEnd;
-            (oldEl as HTMLTextAreaElement).value = newValue;
-            if (selectionStart !== null && selectionEnd !== null) {
-              (oldEl as HTMLTextAreaElement).setSelectionRange(selectionStart, selectionEnd);
-            }
-          }
+
+    // For input/textarea, always set value from state, never replace node if identity matches
+    if (isFocusable(oldEl) && isFocusable(newEl) && identityMatches) {
+      // For controlled input/textarea, never replace or reparse node. Only update value property and attributes.
+      if (oldEl.tagName === 'INPUT') {
+        const input = oldEl as HTMLInputElement;
+        const stateValue = (newEl as any).props?.value ?? '';
+        const isFocused = document.activeElement === input;
+        let selectionStart = null;
+        let selectionEnd = null;
+        if (isFocused) {
+          selectionStart = input.selectionStart;
+          selectionEnd = input.selectionEnd;
+        }
+        // Always set value property directly
+        input.value = stateValue;
+        if (input.hasAttribute('value')) input.removeAttribute('value');
+        // Restore cursor position if focused
+        if (isFocused && selectionStart !== null && selectionEnd !== null) {
+          const len = stateValue.length;
+          input.setSelectionRange(
+            Math.min(selectionStart, len),
+            Math.min(selectionEnd, len)
+          );
         }
         this.morphAttributes(oldEl, newEl);
-        this.morphChildren(oldEl, newEl);
+        // Never morph children for controlled input
         return;
-      } else {
-        // Not focused or not focusable, safe to replace
-        const parent = oldEl.parentNode;
-        const newNode = newEl.cloneNode(true);
-        if (parent) {
-          parent.replaceChild(newNode, oldEl);
+      } else if (oldEl.tagName === 'TEXTAREA') {
+        const textarea = oldEl as HTMLTextAreaElement;
+        const stateValue = (newEl as any).props?.value ?? '';
+        const isFocused = document.activeElement === textarea;
+        let selectionStart = null;
+        let selectionEnd = null;
+        if (isFocused) {
+          selectionStart = textarea.selectionStart;
+          selectionEnd = textarea.selectionEnd;
         }
+        // Always set value property directly
+        textarea.value = stateValue;
+        if (textarea.hasAttribute('value')) textarea.removeAttribute('value');
+        // Restore cursor position if focused
+        if (isFocused && selectionStart !== null && selectionEnd !== null) {
+          const len = stateValue.length;
+          textarea.setSelectionRange(
+            Math.min(selectionStart, len),
+            Math.min(selectionEnd, len)
+          );
+        }
+        this.morphAttributes(oldEl, newEl);
+        // Never morph children for controlled textarea
         return;
       }
+    }
+
+    // Only replace node if not focused or not focusable
+    if (!isFocused && !identityMatches) {
+      const parent = oldEl.parentNode;
+      const newNode = newEl.cloneNode(true);
+      if (parent) {
+        parent.replaceChild(newNode, oldEl);
+      }
+      return;
     }
     // Special handling for <input> to preserve focus and cursor
     if (oldEl.tagName === 'INPUT' && newEl.tagName === 'INPUT') {
@@ -462,14 +556,21 @@ class DOMDiffer {
       const newType = newEl.getAttribute('type');
       // Only update value if type is the same
       if (oldType === newType) {
-        const oldValue = (oldEl as HTMLInputElement).value;
-        const newValue = newEl.getAttribute('value') ?? '';
+        const input = oldEl as HTMLInputElement;
+        const oldValue = input.value;
+        // Always use direct state value for controlled input
+        const newValue = (newEl as any).props?.value ?? '';
         if (oldValue !== newValue) {
-          let selectionStart = (oldEl as HTMLInputElement).selectionStart;
-          let selectionEnd = (oldEl as HTMLInputElement).selectionEnd;
-          (oldEl as HTMLInputElement).value = newValue;
+          const selectionStart = input.selectionStart;
+          const selectionEnd = input.selectionEnd;
+          input.value = newValue;
+          if (input.hasAttribute('value')) input.removeAttribute('value');
           if (selectionStart !== null && selectionEnd !== null) {
-            (oldEl as HTMLInputElement).setSelectionRange(selectionStart, selectionEnd);
+            const len = newValue.length;
+            input.setSelectionRange(
+              Math.min(selectionStart, len),
+              Math.min(selectionEnd, len)
+            );
           }
         }
         this.morphAttributes(oldEl, newEl);
@@ -479,14 +580,20 @@ class DOMDiffer {
     }
     // Special handling for <textarea>
     if (oldEl.tagName === 'TEXTAREA' && newEl.tagName === 'TEXTAREA') {
-      const oldValue = (oldEl as HTMLTextAreaElement).value;
-      const newValue = newEl.textContent ?? '';
+      const textarea = oldEl as HTMLTextAreaElement;
+      const oldValue = textarea.value;
+      // Always use direct state value for controlled textarea
+      const newValue = (newEl as any).props?.value ?? '';
       if (oldValue !== newValue) {
-        let selectionStart = (oldEl as HTMLTextAreaElement).selectionStart;
-        let selectionEnd = (oldEl as HTMLTextAreaElement).selectionEnd;
-        (oldEl as HTMLTextAreaElement).value = newValue;
+        const selectionStart = textarea.selectionStart;
+        const selectionEnd = textarea.selectionEnd;
+        textarea.value = newValue;
         if (selectionStart !== null && selectionEnd !== null) {
-          (oldEl as HTMLTextAreaElement).setSelectionRange(selectionStart, selectionEnd);
+          const len = newValue.length;
+          textarea.setSelectionRange(
+            Math.min(selectionStart, len),
+            Math.min(selectionEnd, len)
+          );
         }
       }
       this.morphAttributes(oldEl, newEl);
@@ -504,8 +611,9 @@ class DOMDiffer {
     const newAttrs = newEl.getAttributeNames();
     // Remove old attributes not in new element (including data-refs-processed)
     for (const attr of oldAttrs) {
+      // Only allow valid attribute names, never use user input as attribute name
+      if (!/^[a-zA-Z_:][-a-zA-Z0-9_:.]*$/.test(attr)) continue;
       if (!newAttrs.includes(attr)) {
-        // Special handling for form elements when removing form attributes
         if (this.isFormElement(oldEl) && this.isValueAttribute(attr)) {
           this.updateFormValue(oldEl as HTMLInputElement | HTMLTextAreaElement, attr, null);
         }
@@ -514,8 +622,17 @@ class DOMDiffer {
     }
     // Set new/changed attributes
     for (const attr of newAttrs) {
+      // Only allow valid attribute names, never use user input as attribute name
+      if (!/^[a-zA-Z_:][-a-zA-Z0-9_:.]*$/.test(attr)) continue;
       const newValue = newEl.getAttribute(attr);
       const oldValue = oldEl.getAttribute(attr);
+      // For input/textarea/select, set value via property, not attribute
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(oldEl.tagName) && attr === 'value') {
+        if ((oldEl as any).value !== newValue) {
+          (oldEl as any).value = newValue ?? '';
+        }
+        continue;
+      }
       if (this.isFormElement(oldEl) && this.isValueAttribute(attr)) {
         this.updateFormValue(oldEl as HTMLInputElement | HTMLTextAreaElement, attr, newValue);
       } else if (oldValue !== newValue) {
@@ -743,6 +860,26 @@ class DOMDiffer {
  */
 class ComponentElement<S extends ComponentState, C extends Record<string, any> = {}> extends HTMLElement {
   /**
+   * Attach controlled input listeners to sync DOM value to state
+   */
+  private attachControlledInputListeners(): void {
+    const shadow = this.shadowRoot;
+    if (!shadow) return;
+    shadow.querySelectorAll('input, textarea').forEach((el) => {
+      el.addEventListener('input', (e: Event) => {
+        const target = e.target as HTMLInputElement | HTMLTextAreaElement;
+        // Update state with DOM value
+        if (target && target.value !== undefined) {
+          // Find state key by name or ref (assumes name attribute matches state key)
+          const key = target.getAttribute('name');
+          if (key && key in this.stateObj) {
+            this.api.updateKey(key as keyof (S & C), target.value as any);
+          }
+        }
+      });
+    });
+  }
+  /**
    * Memoize computed properties for the current state object.
    */
   private getComputed<K extends keyof C>(key: K): C[K] {
@@ -777,6 +914,13 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
    */
   constructor(config: ComponentConfig<S, C>) {
     super();
+    // Runtime guard: ensure config is valid
+    if (!config || typeof config !== 'object') {
+      throw new Error('Invalid component config: must be an object');
+    }
+    if (!config.state || typeof config.state !== 'object') {
+      throw new Error('Invalid component config: state must be an object');
+    }
     this.config = config;
     this.stateObj = config.state as S & C;
     // Subscribe to state changes and batch re-render
@@ -854,7 +998,9 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
    * Render the component. Handles both string and compiled templates, refs, and error boundaries.
    */
   private render(): void {
-    this._pendingRender = false;
+  this._pendingRender = false;
+  // Attach controlled input listeners after each render
+  setTimeout(() => this.attachControlledInputListeners(), 0);
     try {
       // Memoize computed properties before rendering
       if (this.config.computed) {
@@ -909,19 +1055,7 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
           if (shadowApp && appContainer) {
             DOMDiffer.morph(shadowApp, appContainer.outerHTML);
             shadowApp = this.shadowRoot!.querySelector('.todo-app');
-            function normalizeInputValues(html: string): string {
-              return html.replace(/(<input[^>]*)(value="[^"]*")([^>]*>)/gi, '$1value="__IGNORE__"$3');
-            }
-            if (shadowApp) {
-              const normalizedShadow = normalizeInputValues(shadowApp.outerHTML);
-              const normalizedTemplate = normalizeInputValues(appContainer.outerHTML);
-              if (normalizedShadow !== normalizedTemplate) {
-                const newNode = appContainer.cloneNode(true);
-                this.shadowRoot!.replaceChild(newNode, shadowApp);
-                shadowApp = newNode as Element;
-              }
-            }
-            this.refsAttached = false;
+            // Clean up refs after morph
             function cleanupRefs(node: Element) {
               if (node.hasAttribute && node.hasAttribute('data-refs-processed')) node.removeAttribute('data-refs-processed');
               Array.from(node.children).forEach(child => cleanupRefs(child as Element));
