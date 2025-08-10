@@ -196,19 +196,15 @@ component<TodoAppState, TodoAppComputed>('todo-app', {
     state.newTodo = input.value;
   },
   handleKeydown(e: Event, state: TodoAppState, api: any) {
-    const input = e.target as HTMLInputElement;
     if ('key' in e && (e as KeyboardEvent).key === 'Enter' && state.newTodo.trim()) {
       const newId = Math.max(0, ...state.todos.map((t: Todo) => t.id)) + 1;
       const todoText = state.newTodo.trim();
-      api.update({
-        todos: [...state.todos, {
-          id: newId,
-          text: todoText,
-          completed: false
-        }],
-        newTodo: ''
+      state.newTodo = ''; // Clear input after adding
+      state.todos.push({
+        id: newId,
+        text: todoText,
+        completed: false
       });
-      input.value = '';
       api.emit('todo-added', { id: newId, text: todoText });
     }
   },
