@@ -147,20 +147,25 @@ export function useDataModel<T extends Record<string, any>>(
     (inputEl as HTMLInputElement).checked = inputEl.value === String(state[key]);
   }
 
-  // Update logic with modifiers
+  // Batched update logic with modifiers
+  let rafId: number | null = null;
   const updateState = (_e: Event) => {
-    let value: any = inputEl.type === 'checkbox'
-      ? (inputEl as HTMLInputElement).checked
-      : inputEl.value;
-    if (valueModifiers.includes('trim') && typeof value === 'string') value = value.trim();
-    if (valueModifiers.includes('number')) value = Number(value);
-    if (inputEl.type === 'radio') {
-      if ((inputEl as HTMLInputElement).checked) {
+    if (rafId !== null) cancelAnimationFrame(rafId);
+    rafId = requestAnimationFrame(() => {
+      let value: any = inputEl.type === 'checkbox'
+        ? (inputEl as HTMLInputElement).checked
+        : inputEl.value;
+      if (valueModifiers.includes('trim') && typeof value === 'string') value = value.trim();
+      if (valueModifiers.includes('number')) value = Number(value);
+      if (inputEl.type === 'radio') {
+        if ((inputEl as HTMLInputElement).checked) {
+          state[key as keyof T] = value as unknown as T[keyof T];
+        }
+      } else {
         state[key as keyof T] = value as unknown as T[keyof T];
       }
-    } else {
-      state[key as keyof T] = value as unknown as T[keyof T];
-    }
+      rafId = null;
+    });
   };
   events.forEach(event => inputEl.addEventListener(event, updateState));
 
@@ -376,15 +381,21 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
         if (templateResult === this.lastHTML) return;
         // Enhanced controlled input preservation
         const fragment = TemplateParser.parseTemplate(templateResult);
+        // Automatically add a unique key to elements with data-model
+        let autoKeyCounter = 0;
+        fragment.querySelectorAll('[data-model]').forEach(el => {
+          if (!el.hasAttribute('key')) {
+            el.setAttribute('key', `auto-model-key-${autoKeyCounter++}`);
+          }
+        });
         // If shadowAppContainer exists, preserve controlled inputs
         const shadowAppContainer = this.shadowRoot!.querySelector('[data-root]') as Element | undefined;
         if (shadowAppContainer) {
           fragment.querySelectorAll('[data-model]').forEach(newEl => {
-            const keyWithModifiers = newEl.getAttribute('data-model');
-            if (!keyWithModifiers) return;
-            // Try to find matching input in shadow DOM by data-model and type
-            const selector = `[data-model="${keyWithModifiers}"][type="${(newEl as HTMLInputElement).type}"]`;
-            const oldEl = shadowAppContainer.querySelector(selector);
+            const keyAttr = newEl.getAttribute('key');
+            if (!keyAttr) return;
+            // Match by key
+            const oldEl = shadowAppContainer.querySelector(`[data-model][key="${keyAttr}"]`);
             if (oldEl && oldEl.tagName === newEl.tagName) {
               // Preserve old input node, update value/checked only
               if (
