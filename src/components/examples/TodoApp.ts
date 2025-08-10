@@ -43,10 +43,9 @@ component<TodoAppState, TodoAppComputed>('todo-app', {
         <h1>📝 Todo App</h1>
         <input 
           type="text" 
-          value="${state.newTodo}"
+          data-model="newTodo"
           placeholder="What needs to be done?"
           class="new-todo"
-          data-on-input="handleInput"
           data-on-keydown="handleKeydown"
         >
       </header>
@@ -186,11 +185,6 @@ component<TodoAppState, TodoAppComputed>('todo-app', {
       color: #888;
     }
   `,
-  // Event handler methods for automatic binding
-  handleInput(e: Event, state: TodoAppState) {
-    const input = e.target as HTMLInputElement;
-    state.newTodo = input.value;
-  },
   handleKeydown(e: Event, state: TodoAppState, api: any) {
     if ('key' in e && (e as KeyboardEvent).key === 'Enter' && state.newTodo.trim()) {
       const newId = Math.max(0, ...state.todos.map((t: Todo) => t.id)) + 1;

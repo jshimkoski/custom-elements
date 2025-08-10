@@ -117,6 +117,57 @@ export type LifecycleHandler<T extends ComponentState> = (
 // ============================================================================
 
 /**
+ * useDataModel - Two-way binding helper for input/select/textarea and state property.
+ * Enables v-model-like behavior for custom elements.
+ *
+ * @template T - State type
+ * @param inputEl - The input/select/textarea element to bind
+ * @param state - The reactive state object
+ * @param key - The property name in state to bind
+ */
+export function useDataModel<T extends Record<string, any>>(
+  inputEl: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement,
+  state: T,
+  key: keyof T
+): void {
+  // Initial value sync
+  if ('value' in inputEl && typeof state[key] !== 'undefined') {
+    inputEl.value = String(state[key] ?? '');
+  }
+  if (inputEl.type === 'checkbox') {
+    (inputEl as HTMLInputElement).checked = Boolean(state[key]);
+  }
+  if (inputEl.type === 'radio') {
+    (inputEl as HTMLInputElement).checked = inputEl.value === String(state[key]);
+  }
+  // Listen for user input
+  inputEl.addEventListener('input', (e) => {
+    const el = e.target as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
+    if (el.type === 'checkbox') {
+      state[key] = (el as HTMLInputElement).checked as unknown as T[keyof T];
+    } else if (el.type === 'radio') {
+      if ((el as HTMLInputElement).checked) state[key] = el.value as unknown as T[keyof T];
+    } else {
+      state[key] = el.value as unknown as T[keyof T];
+    }
+  });
+  // Listen for state changes (reactive)
+  if (typeof state.subscribe === 'function') {
+    state.subscribe(() => {
+      if ('value' in inputEl && typeof state[key] !== 'undefined') {
+        inputEl.value = String(state[key] ?? '');
+      }
+      if (inputEl.type === 'checkbox') {
+        (inputEl as HTMLInputElement).checked = Boolean(state[key]);
+      }
+      if (inputEl.type === 'radio') {
+        (inputEl as HTMLInputElement).checked = inputEl.value === String(state[key]);
+      }
+    });
+  }
+}
+
+/**
  * Safe deep clone that handles functions and circular references
  * For performance comparison, we'll use a JSON-safe approach
  */
@@ -182,6 +233,16 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
         }
       });
       (el as any)._listenerAttached = true;
+    });
+    // --- Auto data-model binding ---
+    shadow.querySelectorAll('[data-model]').forEach((el) => {
+      const key = el.getAttribute('data-model');
+      if (!key || !(key in this.stateObj)) return;
+      // Only bind once per element
+      if ((el as any)._dataModelBound) return;
+      // @ts-ignore
+      useDataModel(el, this.stateObj, key);
+      (el as any)._dataModelBound = true;
     });
   }
   private readonly config: ComponentConfig<S, C>;
