@@ -3,7 +3,9 @@
 > **A modern, ultra-lightweight TypeScript runtime for building fast, reactive, and maintainable web components.**
 
 ## ✨ Features
-
+- **Smart DOM batching**: State-triggered renders are batched via requestAnimationFrame for optimal performance
+- **Error boundaries & diagnostics**: Robust error handling with fallback UI and clear logs
+- **Template & computed caching**: Memoization for templates and computed properties
 - **Direct DOM performance**: No virtual DOM, no diffing overhead
 - **Strict TypeScript**: Type-safe, developer-friendly
 - **Zero dependencies**: Pure TypeScript/JavaScript
@@ -45,10 +47,8 @@
 
 ## ⚡ Performance Features
 
-- **Advanced DOM Morphing**: Only updates what actually changed
-- **Template Caching**: Parsed templates are cached for reuse
 - **Batched Updates**: Multiple state changes are batched using RAF
-- **Computed Property Caching**: Expensive calculations are cached
+- **Template & Computed Property Caching**: Expensive calculations are cached
 - **Memory Management**: Automatic cleanup prevents memory leaks
 - **Focus Preservation**: Smart input focus handling during updates
 
