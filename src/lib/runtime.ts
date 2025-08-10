@@ -385,7 +385,6 @@ class TemplateParser {
   static sanitizeHTML(html: string): string {
     return html;
   }
-  private static readonly parser = new window.DOMParser();
 
   static parseTemplate(html: string): DocumentFragment {
     const sanitized = TemplateParser.sanitizeHTML(html);
@@ -905,7 +904,6 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
   private lastHTML = '';
   private lastCompiledTemplate: CompiledTemplate<S & C> | null = null;
   private lastState: (S & C) | null = null;
-  private _pendingRender = false;
   private rafId: number | null = null;
 
   /**
@@ -998,7 +996,6 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
    * Render the component. Handles both string and compiled templates, refs, and error boundaries.
    */
   private render(): void {
-  this._pendingRender = false;
   // Attach controlled input listeners after each render
   setTimeout(() => this.attachControlledInputListeners(), 0);
     try {

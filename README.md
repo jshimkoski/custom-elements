@@ -1043,6 +1043,64 @@ template: (state) => `
 - Clean, maintainable dynamic class/style logic is needed
 - Especially useful in interactive or stateful components
 
+## 🛡️ Security & Escaping
+
+All user-generated content (state and computed properties) is automatically escaped when rendered in templates using the `html` and `compile` helpers. This prevents XSS and ensures that user input is always displayed as plain text, even in nested or mapped scenarios.
+
+**How it works:**
+- The runtime detects and escapes any string value from state or computed properties, including values in arrays of objects (e.g., todos).
+- Escaping is applied at interpolation, so you never need to manually escape user input in your templates.
+- Static content and developer-controlled HTML are not escaped, allowing for intentional markup.
+
+**Best Practice:**
+- Always interpolate user input via state or computed properties; the framework will handle escaping automatically.
+- Do not manually escape values in your templates—let the helpers do it for you.
+
+### html
+Tagged template literal for readable, multi-line templates. Automatically escapes user input from state/computed properties. Supports nesting and async values.
+
+```typescript
+import { html } from './lib/template-helpers.ts';
+
+component({
+  tag: 'safe-todo',
+  state: { todos: ['<script>alert(1)</script>', 'Buy milk'] },
+  template: (state) => html`
+    <ul>
+      ${state.todos.map(todo => html`<li>${todo}</li>`).join('')}
+    </ul>
+  `
+});
+```
+
+### compile
+Compile-time optimized template literal for large or complex templates. Escapes user input just like `html`, but with additional DOM optimization.
+
+```typescript
+import { compile } from './lib/template-helpers.ts';
+
+component({
+  tag: 'super-list',
+  state: { items: ['<img src=x onerror=alert(1)>', 'B', 'C'] },
+  template: (state) => compile`
+    <ul>
+      ${state.items.map(item => html`<li>${item}</li>`).join('')}
+    </ul>
+  `
+});
+```
+
+### css
+Tagged template literal for styles. No escaping needed.
+
+### classes & styles
+Helpers for dynamic class and style generation. Use for clean, maintainable logic in interactive components.
+
+### Security Summary
+- All user input is escaped by default in templates.
+- No manual escaping required for state/computed values.
+- Static HTML and developer markup are not escaped, allowing for intentional HTML.
+
 ## 🔥 Advanced Features
 
 ### Global State Management
