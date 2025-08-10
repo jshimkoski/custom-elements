@@ -27,44 +27,71 @@ import { renderCompiledTemplate, updateCompiledTemplate } from './template-compi
 
 export interface ComponentState extends Record<string, unknown> {}
 
+/**
+ * API exposed to component logic for state, events, and updates.
+ * @template T - Component state type
+ */
 export interface ComponentAPI<T extends ComponentState = ComponentState> {
+  /** Reactive state proxy */
   readonly state: T;
+  /** Emit a custom event from the component */
   emit(eventName: string, detail?: unknown): void;
+  /** Update multiple state keys at once */
   update(changes: Partial<T>): void;
+  /** Update a single state key */
   updateKey<K extends keyof T>(key: K, value: T[K]): void;
+  /** Listen for a global event (event bus) */
   onGlobal<U = any>(eventName: string, handler: (data: U) => void): () => void;
+  /** Remove a global event listener */
   offGlobal<U = any>(eventName: string, handler: (data: U) => void): void;
+  /** Emit a global event (event bus) */
   emitGlobal<U = any>(eventName: string, data?: U): void;
 }
 
+/**
+ * Component configuration object for defining custom elements.
+ * @template S - State type
+ * @template C - Computed type
+ */
 export interface ComponentConfig<S extends ComponentState, C extends Record<string, any> = {}> {
+  /** Template function returning HTML or compiled template */
   readonly template: (state: S & C, api: ComponentAPI<S & C>) => string | CompiledTemplate<S & C>;
-  /**
-   * State must be a plain object. Reactivity is handled automatically.
-   */
+  /** Initial state object (reactivity handled automatically) */
   readonly state: S;
-  /**
-   * Computed values can be defined as a map of functions that accept merged state.
-   */
+  /** Computed values as a map of functions (optional) */
   readonly computed?: { [K in keyof C]: (state: S) => C[K] };
+  /** CSS styles as string or function (optional) */
   readonly style?: string | ((state: S & C) => string);
+  /** DOM element refs for direct access (optional) */
   readonly refs?: Record<string, RefHandler<S & C>>;
+  /** Called when component is mounted (optional) */
   readonly onMounted?: LifecycleHandler<S & C>;
+  /** Called when component is unmounted (optional) */
   readonly onUnmounted?: LifecycleHandler<S & C>;
-  /**
-   * Arbitrary event handler methods for automatic event binding
-   */
+  /** Arbitrary event handler methods for automatic event binding */
   [handler: string]: any;
 }
 
+/**
+ * Ref handler for direct DOM access.
+ * @template T - State type
+ */
 export type RefHandler<T extends ComponentState> = (
   element: Element,
   state: T,
   api: ComponentAPI<T>
 ) => void;
 
+/**
+ * Computed property handler.
+ * @template T - State type
+ */
 export type ComputedHandler<T extends ComponentState> = (state: T) => unknown;
 
+/**
+ * Lifecycle handler for mount/unmount.
+ * @template T - State type
+ */
 export type LifecycleHandler<T extends ComponentState> = (
   state: T,
   api: ComponentAPI<T>
@@ -340,6 +367,9 @@ function safeClone<T>(obj: T): T {
 
 // Efficient string template cache
 const templateCache = new Map<string, DocumentFragment>();
+
+// Memoization cache for computed properties
+const computedCache = new WeakMap<object, Map<string, any>>();
 
 // ============================================================================
 // OPTIMIZED DOM MORPHING
@@ -670,6 +700,23 @@ class DOMDiffer {
  * Handles state, rendering, refs, and lifecycle hooks.
  */
 class ComponentElement<S extends ComponentState, C extends Record<string, any> = {}> extends HTMLElement {
+  /**
+   * Memoize computed properties for the current state object.
+   */
+  private getComputed<K extends keyof C>(key: K): C[K] {
+    if (!this.config.computed) return undefined as any;
+    let cache = computedCache.get(this.stateObj);
+    if (!cache) {
+      cache = new Map<string, any>();
+      computedCache.set(this.stateObj, cache);
+    }
+    if (cache.has(key as string)) {
+      return cache.get(key as string);
+    }
+    const value = this.config.computed[key](this.stateObj as S);
+    cache.set(key as string, value);
+    return value;
+  }
   private readonly config: ComponentConfig<S, C>;
   private readonly stateObj!: S & C;
   private readonly api: ComponentAPI<S & C>;
@@ -679,6 +726,7 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
   private lastHTML = '';
   private lastCompiledTemplate: CompiledTemplate<S & C> | null = null;
   private lastState: (S & C) | null = null;
+  private _pendingRender = false;
 
   /**
    * Construct a new runtime component element.
@@ -688,9 +736,9 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
     super();
     this.config = config;
     this.stateObj = config.state as S & C;
-    // Subscribe to state changes and re-render
+    // Subscribe to state changes and batch re-render
     if (typeof (this.stateObj as any).subscribe === 'function') {
-      this.unsubscribes.push((this.stateObj as any).subscribe(() => this.render()));
+      this.unsubscribes.push((this.stateObj as any).subscribe(() => this.scheduleRender()));
     }
     // Create API
     this.api = {
@@ -762,7 +810,18 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
    * Render the component. Handles both string and compiled templates, refs, and error boundaries.
    */
   private render(): void {
+    this._pendingRender = false;
     try {
+      // Memoize computed properties before rendering
+      if (this.config.computed) {
+        Object.keys(this.config.computed).forEach(key => {
+          const descriptor = Object.getOwnPropertyDescriptor(this.stateObj, key);
+          // Only assign if not a getter
+          if (!descriptor || !descriptor.get) {
+            (this.stateObj as any)[key] = this.getComputed(key as keyof C);
+          }
+        });
+      }
       const templateResult = this.config.template(this.stateObj, this.api);
       if (typeof templateResult === 'string') {
         if (templateResult === this.lastHTML) return;
@@ -839,12 +898,28 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
       // Automatic event binding after refs and DOM update
       this.bindEvents();
     } catch (error) {
+      // Improved error boundary: log details and allow fallback UI
+      console.error(`[runtime] Render error in <${this.tagName.toLowerCase()}>:`, error);
       if ('onError' in this.config && typeof (this.config as any).onError === 'function') {
-        (this.config as any).onError(error as Error, this.api.state, this.api);
+        try {
+          (this.config as any).onError(error as Error, this.api.state, this.api);
+        } catch (fallbackError) {
+          console.error(`[runtime] Error in onError handler:`, fallbackError);
+          this.renderError(error as Error);
+        }
       } else {
         this.renderError(error as Error);
       }
     }
+  }
+
+  /**
+   * Schedule a render using requestAnimationFrame, batching multiple state changes.
+   */
+  private scheduleRender(): void {
+    if (this._pendingRender) return;
+    this._pendingRender = true;
+    requestAnimationFrame(() => this.render());
   }
 
   private updateStyle(): void {
@@ -943,6 +1018,13 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
 // PUBLIC API
 // ============================================================================
 
+/**
+ * Register a new custom element component.
+ * @template S - State type
+ * @template C - Computed type
+ * @param tag - Custom element tag name
+ * @param config - Component configuration
+ */
 export function component<S extends ComponentState, C extends Record<string, any> = {}>(tag: string, config: ComponentConfig<S, C>): void {
   // Validate config
   if (!tag || !config.template || !config.state) {
