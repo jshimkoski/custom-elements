@@ -57,21 +57,29 @@ Import only the features you need. SSR, hydration, and DOM diffing are modular a
 > **A modern, ultra-lightweight TypeScript runtime for building fast, reactive, and maintainable web components.**
 
 ## ✨ Features
-- **Fine-grained DOM diffing**: Efficiently updates only changed parts of the DOM, preserving input/textarea/select focus and selection state
-- **Async rendering**: Template functions can return Promises for seamless async data fetching and rendering
-- **Selective hydration**: Hydrate only marked regions (e.g., with `data-hydrate`), enabling partial SSR hydration
-- **Focus preservation**: Input, textarea, and select fields retain focus and cursor/selection during updates
-- **Smart DOM batching**: State-triggered renders are batched via requestAnimationFrame for optimal performance
-- **Error boundaries & diagnostics**: Robust error handling with fallback UI and clear logs
-- **Template & computed caching**: Memoization for templates and computed properties
-- **Direct DOM performance**: No virtual DOM, no diffing overhead
-- **Strict TypeScript**: Type-safe, developer-friendly
-- **Zero dependencies**: Pure TypeScript/JavaScript
-- **SSR & Hydration**: Universal rendering, seamless client takeover
-- **Tree-shakable & modular**: Only ship what you use
-- **Functional API**: One function, no classes
-- **Automatic event binding**: Declarative event handlers via `data-on-*` attributes
-- **Event bus & global store**: Built-in communication and state
+- **Reactive State:** ES6 Proxy-based state triggers automatic re-renders; direct assignment is fully supported.
+- **Template Functions:** Use plain functions, tagged helpers (`html`, `compile`), or async Promises for templates.
+- **Refs System:** Direct DOM access via `refs` with single-attach event logic; no complex selectors needed.
+- **Computed Properties:** Use the `computed` property for derived, reactive values.
+- **Automatic Event Binding:** Declarative event handlers via `data-on-*` attributes; only one handler per event type per element, with automatic cleanup on rerender.
+- **Controlled Input Sync:** Inputs with `data-model` stay in sync with state, supporting modifiers like `trim` and `number`; user typing always wins over state updates.
+- **SSR & Hydration:** Universal rendering and opt-in hydration via the `hydrate` property; templates must match for hydration.
+- **Error Boundaries:** Optional `onError` handler for fallback UI and diagnostics.
+- **Global State & Event Bus:** Built-in store and event bus for cross-component communication and shared state.
+- **Devtools & Performance Monitoring:** Inspect components, track state changes, and measure render performance in development.
+- **Focus Preservation:** Input, textarea, and select fields retain focus and selection during updates.
+- **Smart DOM Batching:** State-triggered renders are batched via requestAnimationFrame for optimal performance.
+- **Strict TypeScript:** Type-safe, developer-friendly, zero dependencies.
+- **Tree-shakable & Modular:** Import only what you use; no external dependencies.
+- **Functional API:** One function, no classes.
+
+### Limitations & Edge Cases
+- Fragment templates are supported, but reconciliation is strict and positional; use keys for robust updates.
+- Only one event handler per event type per element is attached; previous handlers are removed on rerender.
+- Controlled input sync prioritizes user typing (focused/dirty inputs) over state updates.
+- SSR hydration is opt-in via the `hydrate` property; fallback hydrates the entire shadow root if no region is marked.
+- All user-generated content is escaped in templates using `html` and `compile` helpers; static HTML is not escaped.
+- Only features documented here and in `src/lib/runtime.ts` are supported; undocumented features may not work as expected.
 
 ## 🚀 Getting Started
 
@@ -139,8 +147,8 @@ component('simple-counter', {
   template: (state) => `
     <button data-on-click="increment">Count: ${state.count}</button>
   `,
-  increment(_e, state, api) {
-    api.updateKey('count', state.count + 1);
+  increment(_e, state) {
+    state.count++;
   }
 });
 ```
@@ -154,14 +162,13 @@ component('simple-counter', {
 ```typescript
 import { component } from './lib/runtime.ts';
 
-const AsyncDemo = component({
+component('async-demo', {
   state: {},
   template: async () => {
     const data = await fetch('/api/data').then(r => r.json());
     return `<div>Loaded: ${data.value}</div>`;
   }
 });
-customElements.define('async-demo', AsyncDemo);
 ```
 
 ### Selective Hydration Example
@@ -175,68 +182,18 @@ customElements.define('async-demo', AsyncDemo);
 ### Focus Preservation Example
 
 ```typescript
-const FocusDemo = component({
+// Typing in either field will preserve focus and cursor position
+component('focus-demo', {
   state: { text: '' },
   template: (state) => `
-    <input type="text" value="${state.text}" />
-    <textarea>${state.text}</textarea>
+    ${state.text}
+    <input type="text" data-model="text" />
+    <textarea data-model="text"></textarea>
   `
 });
-// Typing in either field will preserve focus and cursor position
 ```
 
-### Todo App with Notifications Example
-
-```typescript
-import { component, emit, on } from './lib/runtime.ts';
-
-component('todo-app', {
-  state: { todos: [], newTodo: '' },
-  template: (state) => `
-    <input value="${state.newTodo}" placeholder="Add todo" data-on-input="handleInput" />
-    <button data-on-click="handleAdd">Add</button>
-    <ul>
-      ${state.todos.map((t: string) => `<li>${t}</li>`).join('')}
-    </ul>
-    <notification-display></notification-display>
-  `,
-  handleInput(e, state, api) {
-    api.updateKey('newTodo', (e.target as HTMLInputElement).value);
-  },
-  handleAdd(_e, state, api) {
-    if (state.newTodo.trim()) {
-      api.updateKey('todos', [...state.todos, state.newTodo.trim()]);
-      emit('notify', { message: `Added: ${state.newTodo}` });
-      api.updateKey('newTodo', '');
-    }
-  }
-});
-
-component('notification-display', {
-  state: { notifications: [] },
-  template: (state) => `
-    <div>
-      ${state.notifications.map((n: any) => `<div>${n.message}</div>`).join('')}
-    </div>
-  `,
-  onMounted: (state, api) => {
-    on('notify', (n) => {
-      api.updateKey('notifications', [...state.notifications, n]);
-      setTimeout(() => {
-        api.updateKey('notifications', state.notifications.filter(x => x !== n));
-      }, 2000);
-    });
-  }
-});
-```
-
-```html
-<todo-app></todo-app>
-```
-
-### 🍳 Kitchen Sink Example
-
-A comprehensive todo app showcasing all features:
+### Todo App Example
 
 ```typescript
 import { component, html, css, type ComponentState } from '../../lib/runtime';
@@ -251,14 +208,15 @@ interface TodoAppState extends ComponentState {
   todos: Todo[];
   newTodo: string;
   filter: 'all' | 'active' | 'completed';
-  filteredTodos?: Todo[];
-  activeTodos?: Todo[];
-  completedCount?: number;
 }
 
-component<TodoAppState>({
-  tag: 'todo-app',
-  
+interface TodoAppComputed {
+  filteredTodos: Todo[];
+  activeTodos: Todo[];
+  completedCount: number;
+}
+
+component<TodoAppState, TodoAppComputed>('todo-app', {
   state: {
     todos: [
       { id: 1, text: 'Learn TypeScript', completed: true },
@@ -266,103 +224,93 @@ component<TodoAppState>({
       { id: 3, text: 'Ship to production', completed: false }
     ],
     newTodo: '',
-    filter: 'all',
-    get filteredTodos() {
-      switch (this.filter) {
-        case 'active': return this.todos.filter(todo => !todo.completed);
-        case 'completed': return this.todos.filter(todo => todo.completed);
-        default: return this.todos;
-      }
-    },
-    get activeTodos() {
-      return this.todos.filter(todo => !todo.completed);
-    },
-    get completedCount() {
-      return this.todos.filter(todo => todo.completed).length;
-    }
+    filter: 'all'
   },
-
-  template: (state) => compiled`
+  computed: {
+    filteredTodos: (state: TodoAppState) => state.todos.filter((todo: Todo) => {
+      if (state.filter === 'active') return !todo.completed;
+      if (state.filter === 'completed') return todo.completed;
+      return true;
+    }),
+    activeTodos: (state: TodoAppState) => state.todos.filter((todo: Todo) => !todo.completed),
+    completedCount: (state: TodoAppState) => state.todos.filter((todo: Todo) => todo.completed).length
+  },
+  template: (state, api) => html`
     <div class="todo-app">
       <header>
         <h1>📝 Todo App</h1>
         <input 
-          data-ref="newTodoInput"
           type="text" 
-          value="${state => state.newTodo}"
+          data-model="newTodo"
           placeholder="What needs to be done?"
           class="new-todo"
+          data-on-keydown="handleKeydown"
         >
       </header>
-
       <main>
         <div class="filters">
-          <button 
-            data-ref="allFilter"
-            class="${state => state.filter === 'all' ? 'active' : ''}"
+          <button
+            class="${state.filter === 'all' ? 'active' : ''}"
+            data-on-click="handleAllFilter"
           >
-            All (${state => state.todos.length})
+            All (${state.todos.length})
           </button>
           <button 
-            data-ref="activeFilter"
-            class="${state => state.filter === 'active' ? 'active' : ''}"
+            class="${state.filter === 'active' ? 'active' : ''}"
+            data-on-click="handleActiveFilter"
           >
-            Active (${state => state.activeTodos?.length})
+            Active (${state.activeTodos.length})
           </button>
           <button 
-            data-ref="completedFilter"
-            class="${state => state.filter === 'completed' ? 'active' : ''}"
+            class="${state.filter === 'completed' ? 'active' : ''}"
+            data-on-click="handleCompletedFilter"
           >
-            Completed (${state => state.completedCount})
+            Completed (${state.completedCount})
           </button>
         </div>
-
-        <ul class="todo-list" data-ref="todoList">
-          ${state => state.filteredTodos?.map((todo: Todo) => html`
+        <ul class="todo-list">
+          ${state.filteredTodos.map((todo: Todo) => html`
             <li key="${todo.id}" class="${todo.completed ? 'completed' : ''}">
               <input 
                 type="checkbox" 
                 ${todo.completed ? 'checked' : ''}
                 data-todo-id="${todo.id}"
                 data-action="toggle"
+                data-on-change="handleToggle"
               >
               <span class="text">${todo.text}</span>
               <button 
                 class="delete"
                 data-todo-id="${todo.id}"
                 data-action="delete"
+                data-on-click="handleDelete"
               >
                 ×
               </button>
             </li>
-          `).join('')}
+          `(state, api)).join('')}
         </ul>
       </main>
-
       <footer>
         <small>
-          ${state => state.activeTodos?.length} item${state => state.activeTodos?.length !== 1 ? 's' : ''} left
+          ${state.activeTodos.length} items left
         </small>
       </footer>
     </div>
-  `,
-
+  `(state, api),
   style: css`
     .todo-app {
       max-width: 400px;
       margin: 2rem auto;
       padding: 1rem;
-      border: 1px solid #ddd;
       border-radius: 8px;
       font-family: system-ui, sans-serif;
     }
-
     header h1 {
       margin: 0 0 1rem 0;
       text-align: center;
       color: #333;
     }
-
     .new-todo {
       width: 100%;
       padding: 0.75rem;
@@ -371,13 +319,11 @@ component<TodoAppState>({
       font-size: 1rem;
       box-sizing: border-box;
     }
-
     .filters {
       display: flex;
       gap: 0.5rem;
       margin: 1rem 0;
     }
-
     .filters button {
       flex: 1;
       padding: 0.5rem;
@@ -387,27 +333,22 @@ component<TodoAppState>({
       cursor: pointer;
       transition: all 0.2s;
     }
-
     .filters button.active {
       background: #007bff;
       color: white;
       border-color: #007bff;
     }
-
     .filters button:hover {
       background: #f8f9fa;
     }
-
     .filters button.active:hover {
       background: #0056b3;
     }
-
     .todo-list {
       list-style: none;
       padding: 0;
       margin: 0;
     }
-
     .todo-list li {
       display: flex;
       align-items: center;
@@ -415,16 +356,13 @@ component<TodoAppState>({
       padding: 0.75rem 0;
       border-bottom: 1px solid #eee;
     }
-
     .todo-list li.completed .text {
       text-decoration: line-through;
       color: #888;
     }
-
     .todo-list .text {
       flex: 1;
     }
-
     .delete {
       background: #dc3545;
       color: white;
@@ -436,103 +374,57 @@ component<TodoAppState>({
       font-size: 16px;
       line-height: 1;
     }
-
     .delete:hover {
       background: #c82333;
     }
-
     footer {
       text-align: center;
       margin-top: 1rem;
       color: #888;
     }
   `,
-
-  refs: {
-    newTodoInput: (element, state, api) => {
-      const input = element as HTMLInputElement;
-      
-      // Two-way binding
-      input.addEventListener('input', () => {
-        api.updateKey('newTodo', input.value);
+  handleKeydown(e: Event, state: TodoAppState, api: any) {
+    if ('key' in e && (e as KeyboardEvent).key === 'Enter' && state.newTodo.trim()) {
+      const newId = Math.max(0, ...state.todos.map((t: Todo) => t.id)) + 1;
+      const todoText = state.newTodo.trim();
+      state.newTodo = ''; // Clear input after adding
+      state.todos.push({
+        id: newId,
+        text: todoText,
+        completed: false
       });
-
-      // Add todo on Enter
-      input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && state.newTodo.trim()) {
-          const newId = Math.max(0, ...state.todos.map(t => t.id)) + 1;
-          const todoText = state.newTodo.trim();
-          
-          api.update({
-            todos: [...state.todos, {
-              id: newId,
-              text: todoText,
-              completed: false
-            }],
-            newTodo: ''
-          });
-          
-          // Manually clear the input to ensure it updates immediately
-          input.value = '';
-          
-          // Emit custom event
-          api.emit('todo-added', { id: newId, text: todoText });
-        }
-      });
-    },
-
-    allFilter: (element, _state, api) => {
-      element.addEventListener('click', () => {
-        api.updateKey('filter', 'all');
-      });
-    },
-
-    activeFilter: (element, _state, api) => {
-      element.addEventListener('click', () => {
-        api.updateKey('filter', 'active');
-      });
-    },
-
-    completedFilter: (element, _state, api) => {
-      element.addEventListener('click', () => {
-        api.updateKey('filter', 'completed');
-      });
-    },
-
-    todoList: (element, state, api) => {
-      // Event delegation for todo items
-      element.addEventListener('click', (e) => {
-        const target = e.target as HTMLElement;
-        const todoId = parseInt(target.getAttribute('data-todo-id') || '0');
-        const action = target.getAttribute('data-action');
-
-        if (action === 'delete') {
-          api.updateKey('todos', state.todos.filter(t => t.id !== todoId));
-          api.emit('todo-removed', { id: todoId });
-        }
-      });
-
-      element.addEventListener('change', (e) => {
-        const target = e.target as HTMLInputElement;
-        const todoId = parseInt(target.getAttribute('data-todo-id') || '0');
-        const action = target.getAttribute('data-action');
-
-        if (action === 'toggle') {
-          api.updateKey('todos', state.todos.map(t =>
-            t.id === todoId ? { ...t, completed: target.checked } : t
-          ));
-          api.emit('todo-toggled', { id: todoId, completed: target.checked });
-        }
-      });
+      api.emit('todo-added', { id: newId, text: todoText });
     }
   },
-
-  onMounted: () => {
-    console.log('📝 Todo App mounted');
+  handleAllFilter(_e: Event, state: TodoAppState) {
+    state.filter = 'all';
   },
-
-  onUnmounted: () => {
-    console.log('📝 Todo App unmounted');
+  handleActiveFilter(_e: Event, state: TodoAppState) {
+    state.filter = 'active';
+  },
+  handleCompletedFilter(_e: Event, state: TodoAppState) {
+    state.filter = 'completed';
+  },
+  handleDelete(e: Event, state: TodoAppState, api: any) {
+    const target = e.target as HTMLElement;
+    const todoId = parseInt(target.getAttribute('data-todo-id') || '0');
+    state.todos = state.todos.filter((t: Todo) => t.id !== todoId);
+    api.emit('todo-removed', { id: todoId });
+  },
+  handleToggle(e: Event, state: TodoAppState, api: any) {
+    const target = e.target as HTMLInputElement;
+    const todoId = parseInt(target.getAttribute('data-todo-id') || '0');
+    state.todos = state.todos.map((t: Todo) =>
+      t.id === todoId ? { ...t, completed: target.checked } : t
+    );
+    api.emit('todo-toggled', { id: todoId, completed: target.checked });
+  },
+  onMounted: (state, api) => {
+    console.log('📝 Todo App mounted', state);
+    // Subscribe to global event using runtime API
+    api.onGlobal?.('todo-toggled', (data: any) => {
+      console.log('🔄 Todo toggled:', data);
+    });
   }
 });
 ```
@@ -541,27 +433,27 @@ component<TodoAppState>({
 
 | Feature                | Custom Elements Runtime | React   | Vue     | Angular | Svelte  | Lit     |
 |------------------------|------------------------|---------|---------|---------|---------|---------|
-| **Bundle Size**        | ~8KB                   | ~45KB   | ~35KB   | ~60KB   | ~10KB   | ~7KB    |
-| **SSR**                | Built-in               | Yes     | Yes     | Yes     | Yes     | Yes     |
-| **TypeScript**         | Strict                 | Opt     | Opt     | Strict  | Opt     | Strict  |
-| **State Mgmt**         | Manual/Store           | Redux   | Pinia   | RxJS    | Store   | Manual  |
-| **Routing**            | Manual                 | Router  | Router  | Router  | SvelteKit| Manual  |
-| **HMR**                | Built-in               | Yes     | Yes     | Yes     | Yes     | Yes     |
-| **Error Boundaries**   | Built-in               | Yes     | Yes     | Yes     | Yes     | Manual  |
+| **Bundle Size**        | ~8KB (runtime only)    | ~45KB+  | ~35KB+  | ~60KB+  | ~10KB+  | ~7KB+   |
+| **SSR**                | Built-in (HTML, styles, hydration) | Yes     | Yes     | Yes     | Yes     | Yes     |
+| **TypeScript**         | Strict, enforced       | Optional| Optional| Strict  | Optional| Strict  |
+| **State Mgmt**         | Direct assignment, Store, Event Bus | Redux   | Pinia   | RxJS    | Store   | Manual  |
+| **Routing**            | Manual (userland)      | React Router | Vue Router | Angular Router | SvelteKit| Manual  |
+| **HMR**                | Built-in (Vite, etc.)  | Yes     | Yes     | Yes     | Yes     | Yes     |
+| **Error Boundaries**   | Built-in (onError)     | Yes     | Yes     | Yes     | Yes     | Manual  |
 | **Learning Curve**     | Low                    | Medium  | Medium  | High    | Medium  | Low     |
-| **Event Binding**      | Declarative (data-on-*)| JSX     | v-on    | (ng)    | on:     | @event  |
-| **Reactivity**         | ES6 Proxy              | setState| Proxy   | Zone.js | Compiler| LitElement|
+| **Event Binding**      | Declarative (`data-on-*`) | JSX     | v-on    | (ng)    | on:     | @event  |
+| **Reactivity**         | ES6 Proxy, computed, direct assignment | setState| Proxy   | Zone.js | Compiler| LitElement|
 | **Dependencies**       | None                   | Many    | Some    | Many    | None    | None    |
-| **SSR Hydration**      | Seamless               | Yes     | Yes     | Yes     | Yes     | Yes     |
-| **Tree-shaking**       | Yes                    | Partial | Partial | Partial | Yes     | Yes     |
-| **Custom Elements**    | Native                 | No      | No      | No      | No      | Yes     |
-| **DevTools**           | Minimal                | Advanced| Advanced| Advanced| Basic   | Basic   |
+| **SSR Hydration**      | Opt-in, seamless if templates match | Yes     | Yes     | Yes     | Yes     | Yes     |
+| **Tree-shaking**       | Yes (modular)          | Partial | Partial | Partial | Yes     | Yes     |
+| **Custom Elements**    | Native, standards-based| No      | No      | No      | No      | Yes     |
+| **DevTools**           | Minimal (runtime only) | Advanced| Advanced| Advanced| Basic   | Basic   |
 
 ### Key Strengths of Custom Elements Runtime
 - **Smallest bundle size**: ~8KB, zero dependencies, tree-shakable
 - **Direct DOM updates**: No virtual DOM, fastest rendering
 - **Strict TypeScript**: Type-safe by default, no config required
-- **SSR & Hydration**: Universal rendering, seamless client takeover
+- **SSR & Hydration**: Universal rendering, opt-in hydration, seamless client takeover if templates match
 - **Declarative event binding**: `data-on-*` attributes, no manual listeners
 - **Functional API**: No classes, easy onboarding
 - **Built-in error boundaries, HMR, and global event bus**
@@ -569,9 +461,9 @@ component<TodoAppState>({
 
 ### Weaknesses / Tradeoffs
 - Smaller ecosystem, fewer plugins/integrations
-- Manual state management (no context API, no built-in store)
-- No built-in router, forms, or animation system
+- Manual state management (no context API, no built-in router, forms, or animation system)
 - Minimal devtools and CLI support
+- SSR does not support refs, event listeners, or lifecycle hooks during server rendering
 
 ### When to Choose Custom Elements Runtime
 - Micro-frontends, design systems, performance-critical apps, progressive enhancement, SSR sites, web standards projects
@@ -639,8 +531,8 @@ component('user-profile', {
     password: ''
   },
   computed: {
-    fullName: (state) => `${state.firstName} ${state.lastName}`,
-    isValid: (state) => state.email.includes('@') && state.password.length >= 8
+    fullName: (state: ComponentState) => `${state.firstName} ${state.lastName}`,
+    isValid: (state: ComponentState) => state.email.includes('@') && state.password.length >= 8
   },
   template: (state, computed) => `
     <div>Name: ${computed.fullName}</div>
@@ -660,13 +552,10 @@ component('my-form', {
   state: { name: '' },
   template: (state) => `
     <form>
-      <input type="text" value="${state.name}" data-on-input="handleInput">
+      <input data-model="name" type="text">
       <button type="submit" data-on-click="handleSubmit">Submit</button>
     </form>
   `,
-  handleInput(e, state, api) {
-    state.name = (e.target as HTMLInputElement).value;
-  },
   handleSubmit(e, state, api) {
     e.preventDefault();
     api.emit('form-submitted', { name: state.name });
@@ -690,109 +579,68 @@ See the TodoApp example for advanced usage.
 
 ## 🌐 Server-Side Rendering (SSR)
 
-Complete SSR example with hydration:
+**SSR Support:**
+- Use `renderToString`, `renderComponentsToString`, and `generateHydrationScript` from `src/lib/runtime.ts` for server-side rendering and hydration.
+- Hydration is opt-in via the `hydrate` property in your component config. If no region is marked, the entire shadow root is hydrated.
+- SSR templates must match client templates for correct hydration.
+
+Complete SSR example with hydration (using helpers):
 
 ```typescript
-// server.ts - Server-side rendering
-import { 
-  renderToString, 
-  renderComponentsToString, 
+// server-example.js (or .ts)
+import {
+  renderToString,
+  renderComponentsToString,
   generateHydrationScript,
-  type SSRComponentConfig 
-} from './lib/runtime.ts';
+  compile,
+  css,
+  type SSRComponentConfig
+} from './src/lib/runtime.ts';
 
-// Define components that work on both server and client
-const userCardConfig: SSRComponentConfig<{
-  name: string;
-  email: string;
-  avatar: string;
-  isOnline: boolean;
-  statusText: string;
-  statusClass: string;
-}> = {
-  tag: 'user-card',
+const userCardConfig: SSRComponentConfig<{ name: string; email: string; avatar: string; isOnline: boolean }> = {
   state: {
     name: 'John Doe',
     email: 'john@example.com',
     avatar: 'https://via.placeholder.com/80x80',
-    isOnline: true,
-    get statusText() { return this.isOnline ? 'Online' : 'Offline'; },
-    get statusClass() { return `status ${this.isOnline ? 'online' : 'offline'}`; }
+    isOnline: true
   },
-  template: (state) => `
+  template: compile(({ name, email, avatar, isOnline }) => `
     <div class="user-card">
-      <img src="${state.avatar}" alt="${state.name}" class="avatar" />
+      <img src="${avatar}" alt="${name}" class="avatar" />
       <div class="info">
-        <h3>${state.name}</h3>
-        <p>${state.email}</p>
-        <span class="${state.statusClass}">${state.statusText}</span>
+        <h3>${name}</h3>
+        <p>${email}</p>
+        <span class="status ${isOnline ? 'online' : 'offline'}">
+          ${isOnline ? 'Online' : 'Offline'}
+        </span>
       </div>
     </div>
-  `,
-  style: `
-    .user-card {
-      display: flex;
-      align-items: center;
-      padding: 1rem;
-      border: 1px solid #e0e0e0;
-      border-radius: 8px;
-      background: white;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    .avatar {
-      width: 60px;
-      height: 60px;
-      border-radius: 50%;
-      margin-right: 1rem;
-    }
-    .info h3 {
-      margin: 0 0 0.5rem 0;
-      color: #333;
-    }
-    .info p {
-      margin: 0 0 0.5rem 0;
-      color: #666;
-      font-size: 0.9rem;
-    }
-    .status {
-      padding: 0.25rem 0.5rem;
-      border-radius: 12px;
-      font-size: 0.8rem;
-      font-weight: bold;
-    }
-    .status.online {
-      background: #d4edda;
-      color: #155724;
-    }
-    .status.offline {
-      background: #f8d7da;
-      color: #721c24;
-    }
+  `),
+  style: css`
+    .user-card { display: flex; align-items: center; padding: 1rem; border: 1px solid #e0e0e0; border-radius: 8px; background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .avatar { width: 60px; height: 60px; border-radius: 50%; margin-right: 1rem; }
+    .info h3 { margin: 0 0 1rem 0; color: #333; }
+    .info p { margin: 0 0 0.5rem 0; color: #666; font-size: 0.9rem; }
+    .status { padding: 0.25rem 0.5rem; border-radius: 12px; font-size: 0.8rem; font-weight: bold; }
+    .status.online { background: #d4edda; color: #155724; }
+    .status.offline { background: #f8d7da; color: #721c24; }
   `
 };
 
-const dashboardConfig: SSRComponentConfig<{
-  title: string;
-  widgets: Array<{ id: number; name: string; value: number }>;
-  totalValue: number;
-}> = {
-  tag: 'dashboard',
+const dashboardConfig: SSRComponentConfig<{ title: string; widgets: Array<{ id: number; name: string; value: number }> }> = {
   state: {
     title: 'Analytics Dashboard',
     widgets: [
       { id: 1, name: 'Users', value: 1234 },
       { id: 2, name: 'Revenue', value: 56789 },
       { id: 3, name: 'Orders', value: 432 }
-    ],
-    get totalValue() {
-      return this.widgets.reduce((sum, w) => sum + w.value, 0);
-    }
+    ]
   },
-  template: (state) => `
+  template: compile(({ title, widgets }) => `
     <div class="dashboard">
-      <h1>${state.title}</h1>
+      <h1>${title}</h1>
       <div class="widgets">
-        ${state.widgets.map(widget => `
+        ${widgets.map(widget => `
           <div class="widget">
             <h3>${widget.name}</h3>
             <div class="value">${widget.value.toLocaleString()}</div>
@@ -800,58 +648,30 @@ const dashboardConfig: SSRComponentConfig<{
         `).join('')}
       </div>
       <div class="summary">
-        Total: ${state.totalValue.toLocaleString()}
+        Total: ${widgets.reduce((sum, w) => sum + w.value, 0).toLocaleString()}
       </div>
     </div>
-  `,
-  style: `
-    .dashboard {
-      padding: 2rem;
-      font-family: system-ui, sans-serif;
-    }
-    .widgets {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 1rem;
-      margin: 2rem 0;
-    }
-    .widget {
-      padding: 1.5rem;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      border-radius: 8px;
-      text-align: center;
-    }
-    .widget h3 {
-      margin: 0 0 1rem 0;
-      font-size: 1rem;
-      opacity: 0.9;
-    }
-    .value {
-      font-size: 2rem;
-      font-weight: bold;
-    }
-    .summary {
-      text-align: center;
-      font-size: 1.2rem;
-      font-weight: bold;
-      color: #333;
-    }
+  `),
+  style: css`
+    .dashboard { padding: 2rem; font-family: system-ui, sans-serif; }
+    .widgets { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin: 2rem 0; }
+    .widget { padding: 1.5rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 8px; text-align: center; }
+    .widget h3 { margin: 0 0 1rem 0; font-size: 1rem; opacity: 0.9; }
+    .value { font-size: 2rem; font-weight: bold; }
+    .summary { text-align: center; font-size: 1.2rem; font-weight: bold; color: #333; }
   `
 };
 
-// Render multiple components with shared context
 const { html, styles, context } = renderComponentsToString([
   userCardConfig,
   dashboardConfig
 ], {
-  includeStyles: false, // We'll include styles separately
+  includeStyles: false,
   prettyPrint: true
 });
 
 const hydrationScript = generateHydrationScript(context);
 
-// Complete HTML page
 const fullPage = `
 <!DOCTYPE html>
 <html lang="en">
@@ -860,29 +680,22 @@ const fullPage = `
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SSR Demo</title>
   <style>
-    body {
-      margin: 0;
-      padding: 2rem;
-      background: #f5f5f5;
-      font-family: system-ui, sans-serif;
-    }
+    body { margin: 0; padding: 2rem; background: #f5f5f5; font-family: system-ui, sans-serif; }
     ${styles}
   </style>
 </head>
 <body>
   <h1>Server-Side Rendered Components</h1>
   ${html}
-  
   <!-- Hydration script for client-side takeover -->
   ${hydrationScript}
-  
   <!-- Your client-side JavaScript -->
   <script type="module" src="/main.js"></script>
 </body>
 </html>
 `;
 
-// In a real server (Express, Fastify, etc.)
+// Example server handler (Express, Fastify, etc.)
 export function handleSSR(req: any, res: any) {
   res.setHeader('Content-Type', 'text/html');
   res.send(fullPage);
@@ -893,82 +706,82 @@ export function handleSSR(req: any, res: any) {
 
 See [`src/lib/runtime.ts`](src/lib/runtime.ts) for full API docs and advanced usage.
 
-### Core Function
-
-```typescript
-component<T extends ComponentState>(config: ComponentConfig<T>): void
-```
+**Only the documented API is supported. If a feature is not listed here or in `src/lib/runtime.ts`, it is not guaranteed to work.**
 
 ### Component Configuration
 
 ```typescript
-interface ComponentConfig<T> {
-  tag: string;                    // Custom element tag name
-  state: T;                       // Initial state object
-  template: (state: T, api: ComponentAPI<T>) => string;
-  style?: string | ((state: T) => string);     // CSS styles
-  refs?: Record<string, RefHandler<T>>;         // DOM element refs
-  onMounted?: (state: T, api: ComponentAPI<T>) => void;
-  onUnmounted?: (state: T, api: ComponentAPI<T>) => void;
-  onError?: (error: Error, state: T, api: ComponentAPI<T>) => void; // Error boundary
+export interface ComponentConfig<S extends ComponentState, C extends Record<string, any> = {}> {
+  template: (state: S & C, api: ComponentAPI<S & C>) => string | Promise<string> | CompiledTemplate<S & C>;
+  state: S;
+  computed?: { [K in keyof C]: (state: S) => C[K] };
+  style?: string | ((state: S & C) => string);
+  refs?: Record<string, RefHandler<S & C>>;
+  onMounted?: LifecycleHandler<S & C>;
+  onUnmounted?: LifecycleHandler<S & C>;
+  onError?: (error: Error, state: S & C, api: ComponentAPI<S & C>) => void;
+  [handler: string]: any; // Event handlers for data-on-*
 }
 ```
+
+**Notes:**
+- All event handlers (for `data-on-*` and `refs`) must be defined on the config object.
+- Only one event handler per event type per element is attached; previous handlers are removed on rerender.
+- `computed` is for derived, reactive values.
 
 ### Component API
 
 ```typescript
-interface ComponentAPI<T> {
-  readonly state: T;              // Reactive state proxy
-  emit(eventName: string, detail?: any): void;
-  update(changes: Partial<T>): void;
-  updateKey<K extends keyof T>(key: K, value: T[K]): void;
+export interface ComponentAPI<T extends ComponentState = ComponentState> {
+  readonly state: T;
+  emit(eventName: string, detail?: unknown): void;
   onGlobal<U = any>(eventName: string, handler: (data: U) => void): () => void;
   offGlobal<U = any>(eventName: string, handler: (data: U) => void): void;
   emitGlobal<U = any>(eventName: string, data?: U): void;
 }
 ```
 
+### Plugin System
+
+```typescript
+export function useRuntimePlugin<S extends ComponentState, C extends Record<string, any>>(
+  plugin: {
+    onInit?: (config: ComponentConfig<S, C>) => void;
+    onRender?: (state: S & C, api: ComponentAPI<S & C>) => void;
+    onError?: (error: Error, state: S & C, api: ComponentAPI<S & C>) => void;
+  }
+): void;
+```
+
 ### SSR Functions
 
 ```typescript
-// Render single component to HTML string
 renderToString<T>(config: SSRComponentConfig<T>, options?: SSRRenderOptions): string;
-
-// Render multiple components with shared context
 renderComponentsToString(components: SSRComponentConfig<any>[], options?: SSRRenderOptions): {
   html: string;
   styles: string;
   context: SSRContext;
 };
-
-// Generate hydration script for client-side takeover
 generateHydrationScript(context: SSRContext): string;
 ```
 
 ### Template Helpers
 
 ```typescript
-// Template literal tags for syntax highlighting
 html(strings: TemplateStringsArray, ...values: any[]): string;
 css(strings: TemplateStringsArray, ...values: any[]): string;
-
-// Compile-time optimized template literal
 compile<T = any>(strings: TemplateStringsArray, ...expressions: Array<(state: T, api: any) => unknown>): CompiledTemplate<T>;
-
-// Utility functions
 classes(obj: Record<string, boolean>): string;
 styles(obj: Record<string, string | number>): string;
 ```
 
-### Global State & Events
+### Event Bus & Store
 
 ```typescript
-// Event bus
 emit<T = any>(eventName: string, data?: T): void;
 on<T = any>(eventName: string, handler: (data: T) => void): () => void;
 once<T = any>(eventName: string, handler: (data: T) => void): Promise<T>;
 
-// Global store
 class Store<T extends object> {
   constructor(initial: T);
   subscribe(listener: (state: T) => void): void;
@@ -976,383 +789,104 @@ class Store<T extends object> {
 }
 ```
 
-## How and When to Use Template Helpers
-
-### Template Helper Usage Overview
-
-#### 1. Plain String Literals
-
-Use for very simple, static templates with no dynamic values or logic. Fastest and smallest code.
+### Types
 
 ```typescript
-component({
-  tag: 'static-banner',
-  template: '<div class="banner">Welcome!</div>'
-});
+export interface ComponentState extends Record<string, unknown> {}
+export type RefHandler<T extends ComponentState> = (
+  element: Element,
+  state: T,
+  api: ComponentAPI<T>
+) => void;
+export type LifecycleHandler<T extends ComponentState> = (
+  state: T,
+  api: ComponentAPI<T>
+) => void;
+export type CompiledTemplate<S extends ComponentState = ComponentState> = {
+  id: string;
+  render: (state: S, api: ComponentAPI<S>) => DocumentFragment;
+};
 ```
 
-**Use when:**
-- Template is short and static
-- No dynamic values or logic
-- Absolute minimal code is desired
+## 🧩 Advanced Use Cases
 
-#### 2. `html` and `css` Helpers
+The runtime supports advanced component patterns for scalable, maintainable apps:
 
-Use for multi-line, readable templates and styles. Provides syntax highlighting and editor support. Ideal for most components.
+- **Computed Properties**: Use the `computed` field for derived, reactive state.
+- **Refs**: Attach refs via the `refs` field for direct DOM access and imperative logic.
+- **Lifecycle Hooks**: Use `onMounted` and `onUnmounted` for setup/teardown logic.
+- **Error Boundaries**: Handle errors with `onError` for robust components.
+- **Async Templates**: Return a Promise from `template` for async rendering.
+- **Plugin System**: Extend runtime behavior with `useRuntimePlugin`.
+- **Custom Event Handlers**: Define any number of event handlers directly on the config object, mapped to `data-on-*` attributes.
 
-```typescript
-import { html, css } from './lib/template-helpers.ts';
-
-component({
-  tag: 'fancy-card',
-  state: { title: 'Card Title' },
-  template: (state) => html`
-    <div class="card">
-      <h2>${state.title}</h2>
-    </div>
-  `,
-  styles: css`
-    .card { padding: 1rem; border-radius: 8px; background: #fff; }
-    h2 { color: #333; }
-  `
-});
-```
-
-**Use when:**
-- Template is simple or moderate in complexity
-- Readability and maintainability are priorities
-- You want editor syntax highlighting
-
-#### 3. `compile` Helper
-
-Use for advanced, performance-critical templates. Parses and optimizes DOM structure at definition time for faster updates and lower runtime overhead.
+### Example: Advanced Component
 
 ```typescript
-import { compile } from './lib/runtime.ts';
+import { component, html, css, compile, type ComponentAPI } from './lib/runtime.ts';
 
-component({
-  tag: 'super-list',
-  state: { items: ['A', 'B', 'C'] },
-  template: (state) => compile`
-    <ul>
-      ${state.items.map(item => `<li>${item}</li>`).join('')}
-    </ul>
-  `
-});
-```
-
-**Use when:**
-- Template is large or complex with many dynamic regions
-- Maximum runtime performance is needed
-- Fine-grained DOM updates and caching are desired
-
-### Comparison & Best Practices
-
-- Use `html` for most templates; it's simple, readable, and flexible.
-- Use `compile` only when profiling shows a real performance benefit for large or complex templates.
-- Use a plain string literal for static, minimal templates.
-
-#### Why not always use `compile`?
-- Adds overhead for template analysis and caching, unnecessary for simple/static templates.
-- Less flexible for highly dynamic or programmatically generated templates.
-- `html` is easier to debug and more flexible for changing template structures.
-
-### SSR Compatibility
-
-Both `html` and `compile` templates work seamlessly with server-side rendering (SSR) in the runtime. SSR functions like `renderToString` and `renderComponentsToString` will handle either approach correctly.
-
-### Nesting and Composition
-
-You can nest `html` and `compile` calls within template expressions for modularity, but only the outermost helper determines parsing/optimization. Avoid deep nesting for performance-critical templates; prefer a single top-level `compile` for best optimization.
-
-```typescript
-const itemTemplate = html`<li>${item}</li>`;
-component({
-  tag: 'item-list',
-  state: { items: ['A', 'B', 'C'] },
-  template: (state) => compile`
-    <ul>
-      ${state.items.map(item => itemTemplate).join('')}
-    </ul>
-  `
-});
-```
-
-#### Utility Helpers: `classes` and `styles`
-
-Use for dynamic class and style generation. Conditionally apply classes or inline styles based on component state.
-
-```typescript
-import { classes, styles } from './lib/template-helpers.ts';
-
-template: (state) => `
-  <button
-    class="${classes({ active: state.isActive, disabled: state.isDisabled })}"
-    style="${styles({ color: state.color, fontSize: state.size + 'px' })}"
-  >Click Me</button>
-`
-```
-
-**Use when:**
-- Clean, maintainable dynamic class/style logic is needed
-- Especially useful in interactive or stateful components
-
-## 🛡️ Security & Escaping
-
-All user-generated content (state and computed properties) is automatically escaped when rendered in templates using the `html` and `compile` helpers. This prevents XSS and ensures that user input is always displayed as plain text, even in nested or mapped scenarios.
-
-**How it works:**
-- The runtime detects and escapes any string value from state or computed properties, including values in arrays of objects (e.g., todos).
-- Escaping is applied at interpolation, so you never need to manually escape user input in your templates.
-- Static content and developer-controlled HTML are not escaped, allowing for intentional markup.
-
-**Best Practice:**
-- Always interpolate user input via state or computed properties; the framework will handle escaping automatically.
-- Do not manually escape values in your templates—let the helpers do it for you.
-
-### html
-Tagged template literal for readable, multi-line templates. Automatically escapes user input from state/computed properties. Supports nesting and async values.
-
-```typescript
-import { html } from './lib/template-helpers.ts';
-
-component({
-  tag: 'safe-todo',
-  state: { todos: ['<script>alert(1)</script>', 'Buy milk'] },
-  template: (state) => html`
-    <ul>
-      ${state.todos.map(todo => html`<li>${todo}</li>`).join('')}
-    </ul>
-  `
-});
-```
-
-### compile
-Compile-time optimized template literal for large or complex templates. Escapes user input just like `html`, but with additional DOM optimization.
-
-```typescript
-import { compile } from './lib/template-helpers.ts';
-
-component({
-  tag: 'super-list',
-  state: { items: ['<img src=x onerror=alert(1)>', 'B', 'C'] },
-  template: (state) => compile`
-    <ul>
-      ${state.items.map(item => html`<li>${item}</li>`).join('')}
-    </ul>
-  `
-});
-```
-
-### css
-Tagged template literal for styles. No escaping needed.
-
-### classes & styles
-Helpers for dynamic class and style generation. Use for clean, maintainable logic in interactive components.
-
-### Security Summary
-- All user input is escaped by default in templates.
-- No manual escaping required for state/computed values.
-- Static HTML and developer markup are not escaped, allowing for intentional HTML.
-
-## 🔥 Advanced Features
-
-### Global State Management
-
-```typescript
-import { Store } from './lib/runtime.ts';
-
-// Create global store
-export const appStore = new Store({
-  user: null,
-  theme: 'light',
-  notifications: []
-});
-
-// Use in components
-component({
-  tag: 'theme-toggle',
-  state: { currentTheme: 'light' },
-  onMount: (state) => {
-    appStore.subscribe((globalState) => {
-      state.currentTheme = globalState.theme;
-    });
+component('advanced-demo', {
+  state: { count: 0 },
+  computed: {
+    doubled: (state) => state.count * 2
   },
-  template: (state) => `
-    <button data-ref="toggle">
-      Current theme: ${state.currentTheme}
-    </button>
-  `,
-  refs: {
-    toggle: (el) => {
-      el.addEventListener('click', () => {
-        const store = appStore.getState();
-        store.theme = store.theme === 'light' ? 'dark' : 'light';
-      });
-    }
-  }
-});
-```
-
-### Event Bus Communication
-
-```typescript
-import { emit, on } from './lib/runtime.ts';
-
-// Component A emits events
-component({
-  tag: 'notification-sender',
-  template: () => `<button data-ref="button">Send Notification</button>`,
-  refs: {
-    button: (el) => {
-      el.addEventListener('click', () => {
-        emit('show-notification', {
-          message: 'Hello from Component A!',
-          type: 'success'
-        });
-      });
-    }
-  }
-});
-
-// Component B listens to events
-component({
-  tag: 'notification-display',
-  state: { notifications: [] },
-  template: (state) => `
-    <div class="notifications">
-      ${state.notifications.map(n => `
-        <div class="notification ${n.type}">${n.message}</div>
-      `).join('')}
+  template: compile(({ count, doubled }, api) => html`
+    <div>
+      <button data-on-click="increment">
+        Count: ${count} (Doubled: ${doubled})
+      </button>
     </div>
+  `),
+  style: css`
+    button { font-size: 1.2rem; padding: 0.5rem 1rem; }
   `,
-  onMount: (state) => {
-    on('show-notification', (notification) => {
-      state.notifications.push(notification);
-      setTimeout(() => {
-        state.notifications = state.notifications.filter(n => n !== notification);
-      }, 3000);
-    });
-  }
-});
-```
-
-### Development Tools
-
-## Hot Module Replacement (HMR)
-
-The runtime supports hot-module replacement in development environments. When using Vite or similar tools, component definitions will update in place without requiring a full page reload. HMR is automatic and safe—custom elements are only defined once per tag.
-
-## Error Boundaries
-
-You can provide an `onError` handler in your `ComponentConfig` to catch and handle errors during rendering. This allows you to display fallback UI or log errors for diagnostics:
-
-```typescript
-component('my-component', {
-  state: { ... },
-  template: (state) => {
-    // ...
-    throw new Error('Something went wrong!');
+  increment(_e, state) {
+    state.count++;
   },
-  onError: (error, state, api) => {
-    api.emit('component-error', { error });
-    // Optionally render fallback UI
+  onMounted(state, api) {
+    console.log('Mounted!', state);
+  },
+  onUnmounted(state, api) {
+    console.log('Unmounted!', state);
+  },
+  onError(error, state, api) {
+    console.error('Component error:', error);
   }
 });
 ```
-## Performance & Monitoring
+
+### Example: Async Template
 
 ```typescript
-import { Performance, DevTools } from './lib/dev-tools.ts';
-
-// Performance monitoring
-const renderTime = Performance.measureRender('my-component', () => {
-  // Component render logic
-});
-
-// Component inspection
-const element = document.querySelector('my-component');
-const inspection = DevTools.inspectComponent(element);
-console.log('Component state:', inspection.state);
-
-// State change tracking
-DevTools.trackStateChanges(element, (changes) => {
-  console.log('State updated:', changes);
+component('async-advanced', {
+  state: { loading: true, data: null },
+  template: async (state) => {
+    if (state.loading) {
+      const data = await fetch('/api/data').then(r => r.json());
+      state.data = data;
+      state.loading = false;
+    }
+    return `<div>Loaded: ${state.data ? state.data.value : '...'}</div>`;
+  }
 });
 ```
 
-## 🚀 Advanced Patterns
-
-### 1. Build-Time Template Compilation
-
-Use compile-time template optimization for better runtime performance and smaller bundles.
+### Example: Plugin Usage
 
 ```typescript
-import { compile } from './lib/template-helpers';
-
-const template = compile`<div>${state.name}</div>`;
-component({
-  tag: 'user-card',
-  template,
-  state: { name: 'Alice' }
-});
-```
-
-### 2. Plugin Extensibility
-
-Extend the runtime with plugins for custom lifecycle hooks, error boundaries, or analytics.
-
-```typescript
-import { useRuntimePlugin } from './lib/runtime';
+import { useRuntimePlugin } from './lib/runtime.ts';
 
 useRuntimePlugin({
+  onInit: (config) => {
+    // Add analytics, logging, etc.
+  },
   onRender: (state, api) => {
-    // Custom analytics or logging
-    logRender(state);
+    // Custom render logic
   },
   onError: (error, state, api) => {
-    // Custom error reporting
-    reportError(error);
+    // Global error handling
   }
 });
 ```
 
-### 3. Selective Hydration
-
-Hydrate only marked regions for SSR, enabling partial client takeover and improved performance.
-
-```typescript
-component({
-  tag: 'my-component',
-  template: (state) => `<div data-hydrate>${state.content}</div>`,
-  hydrate: (el, state, api) => {
-    // Custom hydration logic for this region
-    hydrateRegion(el, state);
-  }
-});
-```
-
-### 4. Devtools Integration
-
-Monitor performance, inspect components, and track state changes in development.
-
-```typescript
-import { Performance, DevTools } from './lib/dev-tools';
-
-const renderTime = Performance.measureRender('my-component', () => {
-  // Component render logic
-});
-
-const inspection = DevTools.inspectComponent(element);
-console.log('Component state:', inspection.state);
-
-DevTools.trackStateChanges(element, (changes) => {
-  console.log('State updated:', changes);
-});
-```
-
-## That's a Wrap!
-
-**Ready to build lightning-fast, universal web components?** 🚀
-
-Start with the minimal example above and gradually explore the advanced features as you need them. The runtime grows with your complexity!
+**See [`src/lib/runtime.ts`](src/lib/runtime.ts) for full API docs and advanced usage.**

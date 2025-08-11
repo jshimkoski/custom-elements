@@ -60,6 +60,7 @@ component<TodoAppState, TodoAppComputed>('todo-app', {
           class="new-todo"
           data-on-keydown="handleKeydown"
         >
+        <textarea data-model="newTodo"></textarea>
       </header>
       <main>
         <div class="filters">
