@@ -74,6 +74,7 @@ Import only the features you need. SSR, hydration, and DOM diffing are modular a
 - **Functional API:** One function, no classes.
 
 ### Limitations & Edge Cases
+- Templates must have a single root node.
 - Fragment templates are supported, but reconciliation is strict and positional; use keys for robust updates.
 - Only one event handler per event type per element is attached; previous handlers are removed on rerender.
 - Controlled input sync prioritizes user typing (focused/dirty inputs) over state updates.

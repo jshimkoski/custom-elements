@@ -4,6 +4,7 @@ import './components/examples/TodoAppCompiled';
 import './components/examples/ShoppingCart';
 import './components/examples/TemplateCompilationDemo';
 import './components/examples/SimpleTest';
+import './components/examples/DataModelDemo';
 // import './components/examples/Examples';
 // import './components/examples/NotificationSystem';
 
@@ -21,6 +22,7 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
       <todo-app></todo-app>
       <todo-app-compiled></todo-app-compiled>
       <perf-counter></perf-counter>
+      <data-model-demo></data-model-demo>
     </div>
     
     <h2 style="margin-top: 3rem; margin-bottom: 1rem; color: #4f46e5;">Template Compilation Comparison</h2>
