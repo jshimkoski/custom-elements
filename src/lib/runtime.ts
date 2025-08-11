@@ -1042,7 +1042,6 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
    * Automatically bind events for elements with data-on-* attributes.
    * Ensures events are not attached multiple times after rerender.
    */
-  private _eventListenerMap: WeakMap<Element, Set<string>> = new WeakMap();
   private bindEvents(): void {
     if (!this.shadowRoot) return;
     const walker = document.createTreeWalker(this.shadowRoot, NodeFilter.SHOW_ELEMENT);
