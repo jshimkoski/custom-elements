@@ -807,11 +807,14 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
         const handlerName = el.getAttribute(attr);
         if (!handlerName || typeof this.config[handlerName] !== 'function') return;
         // Remove previous listener if any
-        el.removeEventListener(eventType, (el as any)._boundHandler);
+        if ((el as any)._boundHandlers && (el as any)._boundHandlers[eventType]) {
+          el.removeEventListener(eventType, (el as any)._boundHandlers[eventType]);
+        }
         // Bind new handler
         const boundHandler = (e: Event) => this.config[handlerName](e, this.stateObj, this.api);
         el.addEventListener(eventType, boundHandler);
-        (el as any)._boundHandler = boundHandler;
+        if (!(el as any)._boundHandlers) (el as any)._boundHandlers = {};
+        (el as any)._boundHandlers[eventType] = boundHandler;
       });
     });
   }
@@ -1053,19 +1056,19 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
           // Look for handler on config, not api
           const handler = (this.config as any)[handlerName];
           if (typeof handler === 'function') {
-            let attached = this._eventListenerMap.get(el);
-            if (!attached) {
-              attached = new Set();
-              this._eventListenerMap.set(el, attached);
+            // Remove previous handler if present
+            if ((el as any)._boundHandlers && (el as any)._boundHandlers[eventType]) {
+              el.removeEventListener(eventType, (el as any)._boundHandlers[eventType]);
             }
-            if (!attached.has(eventType)) {
-              el.addEventListener(eventType, (e: Event) => {
-                handler.call(this.config, e, this.api.state, this.api);
-                // Immediately sync controlled inputs after handler runs
-                this.syncControlledInputsAndEvents();
-              });
-              attached.add(eventType);
-            }
+            // Bind new handler
+            const boundHandler = (e: Event) => {
+              handler.call(this.config, e, this.api.state, this.api);
+              // Immediately sync controlled inputs after handler runs
+              this.syncControlledInputsAndEvents();
+            };
+            el.addEventListener(eventType, boundHandler);
+            if (!(el as any)._boundHandlers) (el as any)._boundHandlers = {};
+            (el as any)._boundHandlers[eventType] = boundHandler;
           } else {
             console.warn(`[bindEvents] Handler '${handlerName}' not found on config for event '${eventType}'`, el);
           }

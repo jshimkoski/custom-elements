@@ -45,12 +45,23 @@ component<TodoAppState, TodoAppComputed>('todo-app-compiled', {
     <div class="todo-app">
       <header>
         <h1>📝 Todo App</h1>
+        <div>
+          ${state.newTodo}
+        </div>
+        <div>
+          <p>${state.newTodo}</p>
+        </div>
+        <div>
+          Text node 1: ${state.newTodo}
+        </div>
+        Text node 2: ${state.newTodo}
+        <span>Span: ${state.newTodo}</span>
+        <div>Div: ${state.newTodo}</div>
         <input 
           type="text" 
-          value="${state.newTodo}"
+          data-model="newTodo"
           placeholder="What needs to be done?"
           class="new-todo"
-          data-on-input="handleInput"
           data-on-keydown="handleKeydown"
         >
       </header>
