@@ -330,6 +330,8 @@ function patchVNode(parent: Element, oldVNode: VNode, newVNode: VNode): void {
   }
   const oldChildren: VNode[] = Array.isArray(oldVNode.children) ? oldVNode.children.filter(isMeaningfulVNode) : [];
   const newChildren: VNode[] = Array.isArray(newVNode.children) ? newVNode.children.filter(isMeaningfulVNode) : [];
+  // Symbol for storing keys on DOM nodes
+  const DOM_KEY = Symbol('vdom-key');
   const oldKeyed: Record<string, VNode> = {};
   const newKeyed: Record<string, VNode> = {};
   let hasKeys = false;
@@ -373,10 +375,46 @@ function patchVNode(parent: Element, oldVNode: VNode, newVNode: VNode): void {
         newChildren,
         domChildren: Array.from(oldDom.childNodes)
       });
-      // Strict positional reconciliation
+      // Build keyed maps for DOM and VDOM children
+      const domChildren = Array.from(oldDom.childNodes);
+      const domKeyed: Record<string, ChildNode> = {};
+      domChildren.forEach((node) => {
+        const key = (node as any)[DOM_KEY];
+        if (key) domKeyed[key] = node;
+      });
+      const vdomKeyed: Record<string, VNode> = {};
+      newChildren.forEach((vnode) => {
+        if (vnode.key) vdomKeyed[vnode.key] = vnode;
+      });
+      // Reconcile keyed children first
+      let usedDomIndexes = new Set<number>();
+      newChildren.forEach((newChild, i) => {
+        if (newChild.key && domKeyed[newChild.key]) {
+          const domNode = domKeyed[newChild.key];
+          usedDomIndexes.add(domChildren.indexOf(domNode));
+          // Patch or replace if type mismatch
+          const vdomType = newChild.type;
+          const domType = domNode.nodeType === Node.TEXT_NODE ? '#text' : domNode.nodeName.toLowerCase();
+          if (vdomType !== domType) {
+            const newDom = mountVNode(newChild);
+            if (newDom) {
+              oldDom.replaceChild(newDom, domNode);
+              (newDom as any)[DOM_KEY] = newChild.key;
+              newChild.dom = newDom;
+            }
+          } else {
+            patchVNode(oldDom, oldChildren[i], newChild);
+          }
+        }
+      });
+      // Reconcile unkeyed children by position
+      let domIdx = 0;
       for (let i = 0; i < newChildren.length; i++) {
         const newChild = newChildren[i];
-        const domChild = oldDom.childNodes[i];
+        if (newChild.key) continue; // Already handled
+        // Find next unused DOM node
+        while (usedDomIndexes.has(domIdx) && domIdx < domChildren.length) domIdx++;
+        const domChild = domChildren[domIdx];
         if (!domChild) {
           // No DOM node at this position, append
           console.debug('[VDOM][patchVNode][append]', { index: i, newChild });
@@ -386,36 +424,30 @@ function patchVNode(parent: Element, oldVNode: VNode, newVNode: VNode): void {
             newChild.dom = newDom;
           }
         } else {
-          // If type or key mismatch, or text/element mismatch, replace
-          const oldChild = oldChildren[i];
+          // If type mismatch, replace
           const vdomType = newChild.type;
           const domType = domChild.nodeType === Node.TEXT_NODE ? '#text' : domChild.nodeName.toLowerCase();
-          const keyMismatch = oldChild && oldChild.key !== newChild.key;
-          const typeMismatch = oldChild && oldChild.type !== newChild.type;
-          const nodeTypeMismatch = vdomType === '#text' ? domChild.nodeType !== Node.TEXT_NODE : domChild.nodeType === Node.TEXT_NODE;
-          if (!oldChild || keyMismatch || typeMismatch || nodeTypeMismatch) {
-            console.debug('[VDOM][patchVNode][replace]', {
-              index: i,
-              oldChild,
-              newChild,
-              domChild,
-              vdomType,
-              domType,
-              keyMismatch,
-              typeMismatch,
-              nodeTypeMismatch
-            });
+          if (vdomType !== domType) {
             const newDom = mountVNode(newChild);
             if (newDom) {
               oldDom.replaceChild(newDom, domChild);
               newChild.dom = newDom;
             }
           } else {
-            console.debug('[VDOM][patchVNode][patch]', { index: i, oldChild, newChild, domChild });
-            patchVNode(oldDom, oldChild, newChild);
+            patchVNode(oldDom, oldChildren[i], newChild);
           }
         }
+        domIdx++;
       }
+      // Remove orphaned DOM nodes (not matched by key or position)
+      const validKeys = new Set(Object.keys(vdomKeyed));
+      domChildren.forEach((node, idx) => {
+        const key = (node as any)[DOM_KEY];
+        if (key && !validKeys.has(key)) {
+          console.debug('[VDOM][patchVNode][remove-orphan-key]', { index: idx, node, key });
+          oldDom.removeChild(node);
+        }
+      });
       // Remove any extra DOM nodes
       while (oldDom.childNodes.length > newChildren.length) {
         console.debug('[VDOM][patchVNode][remove-extra]', {
