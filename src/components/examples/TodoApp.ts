@@ -52,7 +52,7 @@ component<TodoAppState, TodoAppComputed>('todo-app', {
       </header>
       <main>
         <div class="filters">
-          <button 
+          <button
             class="${state.filter === 'all' ? 'active' : ''}"
             data-on-click="handleAllFilter"
           >
