@@ -20,7 +20,7 @@ component<SimpleTestState>('simple-test-component', {
     <div style="border: 2px solid red; padding: 1rem; margin: 1rem; background: #ffe6e6;">
       <h3>🔴 Simple Test Component</h3>
       <p>${state.message}</p>
-      <input type="text" value="${state.message}" data-on-input="updateMessage" />
+      <input type="text" data-model="message" />
       <button data-on-click="uppercasedMessage">${state.uppercasedMessage}</button>
       ${state.clicked ? html`<p>✅ Clicked!</p>` : ''}
     </div>

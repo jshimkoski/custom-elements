@@ -98,9 +98,8 @@ component<ShoppingCartState, ShoppingCartComputed>('shopping-cart-demo', {
           <h3>Promo Code</h3>
           <div class="coupon-input">
             <input 
-              data-on-input="couponInput"
-              type="text" 
-              value="${state.couponCode}"
+              data-model="couponCode"
+              type="text"
               placeholder="Enter coupon code (try SAVE10 or SAVE20)"
               class="coupon-field"
             >
