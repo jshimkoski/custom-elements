@@ -26,7 +26,7 @@ export function reactive<T extends object, C extends Record<string, (state: T) =
   // Mutation API (for compatibility)
   function set(changes: Partial<T>) {
     Object.assign(topProxy, changes);
-    console.debug('[reactive] set called, notifying listeners');
+    console.debug('[reactive] set called, notifying listeners', changes);
     listeners.forEach(fn => fn(topProxy));
   }
 

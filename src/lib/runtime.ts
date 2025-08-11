@@ -26,7 +26,7 @@ import { eventBus } from './event-bus';
 function useDataModel(el: Element, stateObj: any, keyWithModifiers: string) {
   const [key, ...modifiers] = keyWithModifiers.split('|').map(s => s.trim());
   if (!key) return;
-  const updateState = (_e: Event) => {
+  const updateState = (e: Event) => {
     let value: any;
     if (el instanceof HTMLInputElement && el.type === 'checkbox') {
       value = el.checked;
@@ -50,10 +50,22 @@ function useDataModel(el: Element, stateObj: any, keyWithModifiers: string) {
     if ((el as any)._vnode) {
       (el as any)._vnode.props.value = value;
     }
+    // Mark as dirty on input
+    if (e.type === 'input') {
+      (el as any)._isDirty = true;
+    }
+    // Clear dirty flag on Enter or blur
+    if (e.type === 'keydown' && (e as KeyboardEvent).key === 'Enter') {
+      (el as any)._isDirty = false;
+    }
+    if (e.type === 'blur') {
+      (el as any)._isDirty = false;
+    }
   };
-  // After patching, ensure VNode.dom and value are updated to match DOM for controlled inputs
   el.addEventListener('input', updateState);
   el.addEventListener('change', updateState);
+  el.addEventListener('keydown', updateState);
+  el.addEventListener('blur', updateState);
 }
 
 // PLUGIN SYSTEM (Experimental)
@@ -163,7 +175,12 @@ function mountVNode(vnode: VNode): Element | Text | null {
   }
   const el = document.createElement(vnode.type);
   for (const [k, v] of Object.entries(vnode.props)) {
-    el.setAttribute(k, v as string);
+    // For text input, set value property directly
+    if (k === 'value' && el instanceof HTMLInputElement && el.type === 'text') {
+      el.value = v as string;
+    } else {
+      el.setAttribute(k, v as string);
+    }
   }
   vnode.dom = el;
   for (const child of vnode.children) {
@@ -211,8 +228,8 @@ interface VNode {
  * Assigns a stable, deterministic key to every element for VDOM reconciliation
  */
 function createVNodeFromElement(node: ChildNode, parentPath: string = '', childIndex: number = 0): VNode {
-  let debugType = '';
-  let debugKey = undefined;
+  // let debugType = '';
+  // let debugKey = undefined;
   if (!node) {
     // Guard: skip undefined/null nodes
     return { type: '#unknown', key: undefined, props: {}, children: [], dom: undefined };
@@ -222,9 +239,9 @@ function createVNodeFromElement(node: ChildNode, parentPath: string = '', childI
     if (!node.nodeValue || /^\s*$/.test(node.nodeValue)) {
       return { type: '#whitespace', key: undefined, props: {}, children: [], dom: undefined };
     }
-    debugType = '#text';
-    debugKey = undefined;
-    console.debug('[VNode]', debugType, 'key:', debugKey);
+    // debugType = '#text';
+    // debugKey = undefined;
+    // console.debug('[VNode]', debugType, 'key:', debugKey);
     return { type: '#text', key: undefined, props: { nodeValue: node.nodeValue }, children: [], dom: node as Text };
   }
   if (node.nodeType === Node.ELEMENT_NODE) {
@@ -241,13 +258,13 @@ function createVNodeFromElement(node: ChildNode, parentPath: string = '', childI
       props['data-uid'] = model;
       elem.setAttribute('data-uid', model);
       vnodeKey = model;
-      console.debug(`[VNode] input[data-model] assigned stable data-uid and key:`, model);
+      // console.debug(`[VNode] input[data-model] assigned stable data-uid and key:`, model);
     } else if (tagName === 'input' || tagName === 'textarea' || elem.hasAttribute('contenteditable')) {
       // Use path-based key for uncontrolled user-typed elements
       vnodeKey = `${parentPath}.${tagName}[${childIndex}]`;
       props['data-uid'] = vnodeKey;
       elem.setAttribute('data-uid', vnodeKey);
-      console.debug(`[VNode] ${tagName} user-typed element assigned data-uid and key:`, vnodeKey);
+      // console.debug(`[VNode] ${tagName} user-typed element assigned data-uid and key:`, vnodeKey);
     } else {
       // Non-user-typed element: assign deterministic key based on tree path
       vnodeKey = `${parentPath}.${tagName}[${childIndex}]`;
@@ -256,9 +273,9 @@ function createVNodeFromElement(node: ChildNode, parentPath: string = '', childI
     const children: VNode[] = Array.from(elem.childNodes).map((child, idx) => {
       return createVNodeFromElement(child, vnodeKey, idx);
     });
-    debugType = tagName;
-    debugKey = vnodeKey;
-    console.debug('[VNode]', debugType, 'key:', debugKey);
+    // debugType = tagName;
+    // debugKey = vnodeKey;
+    // console.debug('[VNode]', debugType, 'key:', debugKey);
     return {
       type: tagName,
       key: vnodeKey,
@@ -276,24 +293,25 @@ function createVNodeFromElement(node: ChildNode, parentPath: string = '', childI
  */
 function patchVNode(parent: Element, oldVNode: VNode, newVNode: VNode): void {
   // --- VDOM diagnostics ---
-  console.debug('[VDOM][patchVNode][ENTER]', {
-    parent,
-    oldVNodeType: oldVNode.type,
-    oldVNodeKey: oldVNode.key,
-    newVNodeType: newVNode.type,
-    newVNodeKey: newVNode.key,
-    oldDom: oldVNode.dom,
-    newDom: newVNode.dom
-  });
+  // console.debug('[VDOM][patchVNode][ENTER]', {
+  //   parent,
+  //   oldVNodeType: oldVNode.type,
+  //   oldVNodeKey: oldVNode.key,
+  //   newVNodeType: newVNode.type,
+  //   newVNodeKey: newVNode.key,
+  //   oldDom: oldVNode.dom,
+  //   newDom: newVNode.dom
+  // });
   // If type or key differ, replace node
   if (oldVNode.type !== newVNode.type || oldVNode.key !== newVNode.key) {
     const newDom = mountVNode(newVNode);
-    if (oldVNode.dom && parent.contains(oldVNode.dom)) {
-      parent.replaceChild(newDom!, oldVNode.dom);
-    } else {
-      parent.appendChild(newDom!);
-    }
-    newVNode.dom = newDom!;
+    // Only replace if both are valid Node instances
+    if (newDom instanceof Node && oldVNode.dom instanceof Node && parent.contains(oldVNode.dom)) {
+      parent.replaceChild(newDom, oldVNode.dom);
+    } else if (newDom instanceof Node) {
+      parent.appendChild(newDom);
+    } // else: skip invalid node replacement
+    newVNode.dom = newDom instanceof Node ? newDom : undefined;
     return;
   }
   // Patch props for Element
@@ -314,21 +332,62 @@ function patchVNode(parent: Element, oldVNode: VNode, newVNode: VNode): void {
   if (newVNode.type === '#text' && oldDom && newVNode.props.nodeValue !== oldVNode.props.nodeValue) {
     (oldDom as Text).nodeValue = newVNode.props.nodeValue;
   }
-  // Patch children
+  // Patch children with duplicate key detection
   const oldChildren: VNode[] = Array.isArray(oldVNode.children) ? oldVNode.children : [];
   const newChildren: VNode[] = Array.isArray(newVNode.children) ? newVNode.children : [];
-  for (let i = 0; i < Math.max(oldChildren.length, newChildren.length); i++) {
-    if (oldChildren[i] && newChildren[i]) {
-      patchVNode(oldDom as Element, oldChildren[i], newChildren[i]);
-    } else if (newChildren[i]) {
-      const childDom = mountVNode(newChildren[i]);
-      if (childDom) (oldDom as Element).appendChild(childDom);
-    } else if (oldChildren[i]) {
-      const childDom = oldChildren[i].dom;
-      if (childDom && childDom instanceof Node && oldDom instanceof Element && oldDom.contains(childDom)) {
-        oldDom.removeChild(childDom);
+  // Detect duplicate keys in newChildren
+  const keyCount: Record<string, number> = {};
+  newChildren.forEach(child => {
+    if (child.key) {
+      keyCount[child.key] = (keyCount[child.key] || 0) + 1;
+    }
+  });
+  const hasDuplicateKeys = Object.values(keyCount).some(count => count > 1);
+  if (hasDuplicateKeys) {
+    console.warn('[VDOM] Duplicate keys detected among siblings. Falling back to index-based reconciliation.');
+  }
+  // If duplicate keys, ignore keys and use index-based patching
+  if (hasDuplicateKeys) {
+    for (let i = 0; i < Math.max(oldChildren.length, newChildren.length); i++) {
+      if (oldChildren[i] && newChildren[i]) {
+        patchVNode(oldDom as Element, oldChildren[i], newChildren[i]);
+      } else if (newChildren[i]) {
+        const childDom = mountVNode(newChildren[i]);
+        if (childDom) (oldDom as Element).appendChild(childDom);
+      } else if (oldChildren[i]) {
+        const childDom = oldChildren[i].dom;
+        if (childDom && childDom instanceof Node && oldDom instanceof Element && oldDom.contains(childDom)) {
+          oldDom.removeChild(childDom);
+        }
       }
     }
+  } else {
+    // Keyed patching (default)
+    const oldKeyed: Record<string, VNode> = {};
+    oldChildren.forEach(child => {
+      if (child.key) oldKeyed[child.key] = child;
+    });
+    for (let i = 0; i < newChildren.length; i++) {
+      const newChild = newChildren[i];
+      if (newChild.key && oldKeyed[newChild.key]) {
+        patchVNode(oldDom as Element, oldKeyed[newChild.key], newChild);
+      } else if (oldChildren[i]) {
+        patchVNode(oldDom as Element, oldChildren[i], newChild);
+      } else {
+        const childDom = mountVNode(newChild);
+        if (childDom) (oldDom as Element).appendChild(childDom);
+      }
+    }
+    // Remove old children not present in newChildren
+    const newKeys = newChildren.map(c => c.key).filter(Boolean);
+    oldChildren.forEach(child => {
+      if (child.key && !newKeys.includes(child.key)) {
+        const childDom = child.dom;
+        if (childDom && childDom instanceof Node && oldDom instanceof Element && oldDom.contains(childDom)) {
+          oldDom.removeChild(childDom);
+        }
+      }
+    });
   }
   newVNode.dom = oldDom;
 }
@@ -345,68 +404,68 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
       const inputEl = input as HTMLInputElement;
       const stateValue = String(this.stateObj[modelAttr]);
       const isFocused = document.activeElement === inputEl;
-      const selectionStart = inputEl.selectionStart;
-      const selectionEnd = inputEl.selectionEnd;
+      // const selectionStart = inputEl.selectionStart;
+      // const selectionEnd = inputEl.selectionEnd;
       // Ensure dirty flag is set on input event
       if (!(inputEl as any)._hasDirtyListener) {
         inputEl.addEventListener('input', () => {
           (inputEl as any)._isDirty = true;
-          console.debug('[forceSync][diagnostic] Input event: set _isDirty = true', { inputEl });
+          // console.debug('[forceSync][diagnostic] Input event: set _isDirty = true', { inputEl });
         });
         inputEl.addEventListener('blur', () => {
           (inputEl as any)._isDirty = false;
-          console.debug('[forceSync][diagnostic] Blur event: set _isDirty = false', { inputEl });
+          // console.debug('[forceSync][diagnostic] Blur event: set _isDirty = false', { inputEl });
         });
         (inputEl as any)._hasDirtyListener = true;
       }
       const isDirty = Boolean((inputEl as any)._isDirty);
       // Log all relevant info before any assignment
-      console.debug('[forceSync][diagnostic] Input:', {
-        modelAttr,
-        inputEl,
-        stateValue,
-        currentValue: inputEl.value,
-        isFocused,
-        isDirty,
-        selectionStart,
-        selectionEnd,
-        callStack: new Error().stack
-      });
+      // console.debug('[forceSync][diagnostic] Input:', {
+      //   modelAttr,
+      //   inputEl,
+      //   stateValue,
+      //   currentValue: inputEl.value,
+      //   isFocused,
+      //   isDirty,
+      //   selectionStart,
+      //   selectionEnd,
+      //   callStack: new Error().stack
+      // });
       // Never set value for focused or dirty inputs—let user typing win
       if (isFocused || isDirty) {
-        console.debug('[forceSync][diagnostic] Skipping value assignment for focused/dirty input', {
-          modelAttr,
-          isFocused,
-          isDirty,
-          currentValue: inputEl.value,
-          stateValue,
-          stack: new Error().stack
-        });
+        // console.debug('[forceSync][diagnostic] Skipping value assignment for focused/dirty input', {
+        //   modelAttr,
+        //   isFocused,
+        //   isDirty,
+        //   currentValue: inputEl.value,
+        //   stateValue,
+        //   stack: new Error().stack
+        // });
         return;
       }
       // Only set value for unfocused and clean inputs if it differs
       if (inputEl.value !== stateValue) {
-        console.debug('[forceSync][diagnostic] Forcing value assignment for unfocused/clean input:', {
-          modelAttr,
-          oldValue: inputEl.value,
-          newValue: stateValue,
-          stack: new Error().stack
-        });
+        // console.debug('[forceSync][diagnostic] Forcing value assignment for unfocused/clean input:', {
+        //   modelAttr,
+        //   oldValue: inputEl.value,
+        //   newValue: stateValue,
+        //   stack: new Error().stack
+        // });
         inputEl.value = stateValue;
-        console.debug('[forceSync][diagnostic] Forced input value for', modelAttr, 'to', stateValue, {
-          afterAssignment: inputEl.value,
-          inputRef: inputEl,
-          stack: new Error().stack
-        });
+        // console.debug('[forceSync][diagnostic] Forced input value for', modelAttr, 'to', stateValue, {
+        //   afterAssignment: inputEl.value,
+        //   inputRef: inputEl,
+        //   stack: new Error().stack
+        // });
       } else {
-        console.debug('[forceSync][diagnostic] Unfocused input value matches state:', {
-          modelAttr,
-          value: inputEl.value,
-          stateValue,
-          selectionStart,
-          selectionEnd,
-          stack: new Error().stack
-        });
+        // console.debug('[forceSync][diagnostic] Unfocused input value matches state:', {
+        //   modelAttr,
+        //   value: inputEl.value,
+        //   stateValue,
+        //   selectionStart,
+        //   selectionEnd,
+        //   stack: new Error().stack
+        // });
       }
     });
     // Rebind other events (e.g., data-on-click)
@@ -423,9 +482,17 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
       if (!modelAttr || !this.stateObj || typeof this.stateObj[modelAttr] === 'undefined') return;
       const inputEl = input as HTMLInputElement;
       const stateValue = String(this.stateObj[modelAttr]);
-      if (inputEl.value !== stateValue) {
-        inputEl.value = stateValue;
-      }
+      console.debug('[syncControlledInputsAndEvents][diagnostic] Syncing input:', {
+        modelAttr,
+        inputEl,
+        stateValue,
+        currentValue: inputEl.value,
+        isFocused: document.activeElement === inputEl,
+        isDirty: Boolean((inputEl as any)._isDirty),
+        stack: new Error().stack
+      });
+      // Always set value from state, regardless of previous value or VNode props
+      inputEl.value = stateValue;
       if (inputEl.type === 'checkbox') {
         inputEl.checked = Boolean(this.stateObj[modelAttr]);
       }
@@ -489,7 +556,7 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
   }
 
   private initializeConfig() {
-    console.debug('[vdom] initializeConfig called for', this.tagName);
+    // console.debug('[vdom] initializeConfig called for', this.tagName);
     if (this.config) return;
     const tag = this.tagName.toLowerCase();
     const registry = (window as any).__componentRegistry || {};
@@ -506,11 +573,14 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
       ? reactive(config.state, config.computed)
       : reactive(config.state);
     this.stateObj = computedState as S & C;
-    console.debug('[vdom] Assigned reactive stateObj:', this.stateObj);
+    // console.debug('[vdom] Assigned reactive stateObj:', this.stateObj);
     // Subscribe to state changes and batch re-render
     if (typeof (this.stateObj as any).subscribe === 'function') {
       this.unsubscribes.push((this.stateObj as any).subscribe(() => {
-        console.debug('[vdom] state subscription fired, calling scheduleRender');
+        console.debug('[vdom][diagnostic] state subscription fired:', {
+          newTodo: this.stateObj['newTodo'],
+          state: this.stateObj
+        });
         this.scheduleRender();
       }));
     }
@@ -556,7 +626,7 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
   }
 
   connectedCallback(): void {
-    console.debug('[vdom] connectedCallback called for', this.tagName);
+    // console.debug('[vdom] connectedCallback called for', this.tagName);
     this.initializeConfig();
   }
 
@@ -575,24 +645,27 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
    * Render the component. Handles both string and compiled templates, refs, and error boundaries.
    */
   private render(): void {
-    console.debug('[runtime] render() called');
+    // console.debug('[runtime] render() called');
     // Robust controlled input sync after every render
     this.syncControlledInputsAndEvents();
     setTimeout(() => this.attachControlledInputListeners(), 0);
     try {
       // Plugin hook: onRender
       runtimePlugins.forEach(p => p.onRender?.(this.stateObj, this.api));
-      console.debug('[runtime] Calling template function with state:', JSON.stringify(this.stateObj));
+      console.debug('[runtime][diagnostic] render() called with state:', {
+        newTodo: this.stateObj['newTodo'],
+        state: this.stateObj
+      });
       const templateResultOrPromise = this.config.template(this.stateObj, this.api);
       if (templateResultOrPromise instanceof Promise) {
         templateResultOrPromise.then(templateResult => {
-          console.debug('[runtime] Template function resolved to:', templateResult);
+          // console.debug('[runtime] Template function resolved to:', templateResult);
           this._renderTemplateResult(templateResult);
         }).catch(error => {
           this._handleRenderError(error);
         });
       } else {
-        console.debug('[runtime] Template function returned:', templateResultOrPromise);
+        // console.debug('[runtime] Template function returned:', templateResultOrPromise);
         this._renderTemplateResult(templateResultOrPromise);
       }
     } catch (error) {
@@ -628,9 +701,9 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
   private _renderTemplateResult(templateResult: any): void {
     try {
       if (typeof templateResult === 'string') {
-        console.debug('[vdom] _renderTemplateResult called with string template:', templateResult);
+        // console.debug('[vdom] _renderTemplateResult called with string template:', templateResult);
         const newVNode = parseVNodeFromHTML(templateResult);
-        console.debug('[vdom] Generated new VNode:', newVNode);
+        // console.debug('[vdom] Generated new VNode:', newVNode);
         // Recursively assign DOM nodes to all VNodes
         function assignDomRecursive(vnode: VNode, domNode: Element | Text) {
           vnode.dom = domNode;
@@ -777,12 +850,12 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
    * Schedule a render using requestAnimationFrame, batching multiple state changes.
    */
   private scheduleRender(): void {
-    console.debug('[vdom] scheduleRender called');
+    // console.debug('[vdom] scheduleRender called');
     if (this.rafId !== undefined && this.rafId !== null) {
       cancelAnimationFrame(this.rafId);
     }
     this.rafId = requestAnimationFrame(() => {
-      console.debug('[vdom] scheduleRender: calling render()');
+      // console.debug('[vdom] scheduleRender: calling render()');
       this.render();
       this.rafId = null;
     });
