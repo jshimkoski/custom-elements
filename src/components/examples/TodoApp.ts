@@ -41,7 +41,18 @@ component<TodoAppState, TodoAppComputed>('todo-app', {
     <div class="todo-app">
       <header>
         <h1>📝 Todo App</h1>
-        ${state.newTodo}
+        <div>
+          ${state.newTodo}
+        </div>
+        <div>
+          <p>${state.newTodo}</p>
+        </div>
+        <div>
+          Text node 1: ${state.newTodo}
+        </div>
+        Text node 2: ${state.newTodo}
+        <span>Span: ${state.newTodo}</span>
+        <div>Div: ${state.newTodo}</div>
         <input 
           type="text" 
           data-model="newTodo"

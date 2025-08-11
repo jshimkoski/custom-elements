@@ -1,3 +1,56 @@
+// ============================================================================
+// CORE TYPES (move to top for type safety)
+// ============================================================================
+
+export interface ComponentState extends Record<string, unknown> {}
+
+export interface ComponentAPI<T extends ComponentState = ComponentState> {
+  readonly state: T;
+  emit(eventName: string, detail?: unknown): void;
+  onGlobal<U = any>(eventName: string, handler: (data: U) => void): () => void;
+  offGlobal<U = any>(eventName: string, handler: (data: U) => void): void;
+  emitGlobal<U = any>(eventName: string, data?: U): void;
+}
+
+export interface ComponentConfig<S extends ComponentState, C extends Record<string, any> = {}> {
+  readonly template: (state: S & C, api: ComponentAPI<S & C>) => string | Promise<string> | CompiledTemplate<S & C>;
+  readonly state: S;
+  readonly computed?: { [K in keyof C]: (state: S) => C[K] };
+  readonly style?: string | ((state: S & C) => string);
+  readonly refs?: Record<string, RefHandler<S & C>>;
+  readonly onMounted?: LifecycleHandler<S & C>;
+  readonly onUnmounted?: LifecycleHandler<S & C>;
+  [handler: string]: any;
+}
+
+export type RefHandler<T extends ComponentState> = (
+  element: Element,
+  state: T,
+  api: ComponentAPI<T>
+) => void;
+
+export type ComputedHandler<T extends ComponentState> = (state: T) => unknown;
+export type LifecycleHandler<T extends ComponentState> = (
+  state: T,
+  api: ComponentAPI<T>
+) => void;
+
+export type CompiledTemplate<S extends ComponentState = ComponentState> = {
+  id: string;
+  render: (state: S, api: ComponentAPI<S>) => DocumentFragment;
+};
+
+// PLUGIN SYSTEM (move up for order)
+type RuntimePlugin<S extends ComponentState, C extends Record<string, any>> = {
+  onInit?: (config: ComponentConfig<S, C>) => void;
+  onRender?: (state: S & C, api: ComponentAPI<S & C>) => void;
+  onError?: (error: Error, state: S & C, api: ComponentAPI<S & C>) => void;
+};
+const runtimePlugins: RuntimePlugin<any, any>[] = [];
+export function useRuntimePlugin<S extends ComponentState, C extends Record<string, any>>(plugin: RuntimePlugin<S, C>) {
+  runtimePlugins.push(plugin);
+}
+
 export { Store } from './store';
 export { eventBus } from './event-bus';
 export { renderToString, renderComponentsToString, generateHydrationScript } from './ssr';
@@ -5,7 +58,6 @@ export type { SSRComponentConfig, SSRRenderOptions, SSRContext } from './ssr';
 export { TemplateParser, DOMDiffer } from './dom-diff';
 export { html, compile, css, classes, styles, ref, on } from './template-helpers';
 export { compileTemplate, renderCompiledTemplate, updateCompiledTemplate } from './template-compiler';
-export type { CompiledTemplate, UpdateFunction, UpdateType } from './template-compiler';
 
 /**
  * Modern Web Component Runtime - v2.0
@@ -20,8 +72,9 @@ export type { CompiledTemplate, UpdateFunction, UpdateType } from './template-co
 
 import { reactive } from './computed-state';
 import { eventBus } from './event-bus';
+// Use local types declared in this file, not imported
+import { renderCompiledTemplate, updateCompiledTemplate } from './template-compiler';
 
-// =============================
 // Minimal controlled input binding helper
 function useDataModel(el: Element, stateObj: any, keyWithModifiers: string) {
   const [key, ...modifiers] = keyWithModifiers.split('|').map(s => s.trim());
@@ -46,17 +99,23 @@ function useDataModel(el: Element, stateObj: any, keyWithModifiers: string) {
       value = Number(value);
     }
     stateObj[key] = value;
-    // Bidirectional sync: update VNode value if available
     if ((el as any)._vnode) {
       (el as any)._vnode.props.value = value;
     }
-    // Mark as dirty on input
     if (e.type === 'input') {
       (el as any)._isDirty = true;
     }
-    // Clear dirty flag on Enter or blur
     if (e.type === 'keydown' && (e as KeyboardEvent).key === 'Enter') {
       (el as any)._isDirty = false;
+      if (el instanceof HTMLElement && el.isConnected) {
+        let parent = el.parentElement;
+        while (parent && !(parent instanceof HTMLElement && parent.shadowRoot)) {
+          parent = parent.parentElement;
+        }
+        if (parent && typeof (parent as any).render === 'function') {
+          (parent as any).render();
+        }
+      }
     }
     if (e.type === 'blur') {
       (el as any)._isDirty = false;
@@ -67,95 +126,6 @@ function useDataModel(el: Element, stateObj: any, keyWithModifiers: string) {
   el.addEventListener('keydown', updateState);
   el.addEventListener('blur', updateState);
 }
-
-// PLUGIN SYSTEM (Experimental)
-// =============================
-
-type RuntimePlugin<S extends ComponentState, C extends Record<string, any>> = {
-  onInit?: (config: ComponentConfig<S, C>) => void;
-  onRender?: (state: S & C, api: ComponentAPI<S & C>) => void;
-  onError?: (error: Error, state: S & C, api: ComponentAPI<S & C>) => void;
-};
-
-const runtimePlugins: RuntimePlugin<any, any>[] = [];
-export function useRuntimePlugin<S extends ComponentState, C extends Record<string, any>>(plugin: RuntimePlugin<S, C>) {
-  runtimePlugins.push(plugin);
-}
-
-// ============================================================================
-// CORE TYPES
-// ============================================================================
-
-import type { CompiledTemplate } from './template-compiler.js';
-import { renderCompiledTemplate, updateCompiledTemplate } from './template-compiler.js';
-
-export interface ComponentState extends Record<string, unknown> {}
-
-/**
- * API exposed to component logic for state, events, and updates.
- * @template T - Component state type
- */
-export interface ComponentAPI<T extends ComponentState = ComponentState> {
-  /** Reactive state proxy */
-  readonly state: T;
-  /** Emit a custom event from the component */
-  emit(eventName: string, detail?: unknown): void;
-  /** Listen for a global event (event bus) */
-  onGlobal<U = any>(eventName: string, handler: (data: U) => void): () => void;
-  /** Remove a global event listener */
-  offGlobal<U = any>(eventName: string, handler: (data: U) => void): void;
-  /** Emit a global event (event bus) */
-  emitGlobal<U = any>(eventName: string, data?: U): void;
-}
-
-/**
- * Component configuration object for defining custom elements.
- * @template S - State type
- * @template C - Computed type
- */
-export interface ComponentConfig<S extends ComponentState, C extends Record<string, any> = {}> {
-  /** Template function returning HTML, compiled template, or Promise<string> */
-  readonly template: (state: S & C, api: ComponentAPI<S & C>) => string | Promise<string> | CompiledTemplate<S & C>;
-  /** Initial state object (reactivity handled automatically) */
-  readonly state: S;
-  /** Computed values as a map of functions (optional) */
-  readonly computed?: { [K in keyof C]: (state: S) => C[K] };
-  /** CSS styles as string or function (optional) */
-  readonly style?: string | ((state: S & C) => string);
-  /** DOM element refs for direct access (optional) */
-  readonly refs?: Record<string, RefHandler<S & C>>;
-  /** Called when component is mounted (optional) */
-  readonly onMounted?: LifecycleHandler<S & C>;
-  /** Called when component is unmounted (optional) */
-  readonly onUnmounted?: LifecycleHandler<S & C>;
-  /** Arbitrary event handler methods for automatic event binding */
-  [handler: string]: any;
-}
-
-/**
- * Ref handler for direct DOM access.
- * @template T - State type
- */
-export type RefHandler<T extends ComponentState> = (
-  element: Element,
-  state: T,
-  api: ComponentAPI<T>
-) => void;
-
-/**
- * Computed property handler.
- * @template T - State type
- */
-export type ComputedHandler<T extends ComponentState> = (state: T) => unknown;
-
-/**
- * Lifecycle handler for mount/unmount.
- * @template T - State type
- */
-export type LifecycleHandler<T extends ComponentState> = (
-  state: T,
-  api: ComponentAPI<T>
-) => void;
 
 // ============================================================================
 // UTILITIES
@@ -328,26 +298,51 @@ function patchVNode(parent: Element, oldVNode: VNode, newVNode: VNode): void {
       }
     }
   }
-  // Patch text
-  if (newVNode.type === '#text' && oldDom && newVNode.props.nodeValue !== oldVNode.props.nodeValue) {
-    (oldDom as Text).nodeValue = newVNode.props.nodeValue;
+  // Patch text: always update nodeValue for text nodes
+  if (newVNode.type === '#text' && oldDom) {
+    if ((oldDom as Text).nodeValue !== newVNode.props.nodeValue) {
+      (oldDom as Text).nodeValue = newVNode.props.nodeValue;
+    }
   }
-  // Patch children with duplicate key detection
+  // --- Robust keyed reconciliation ---
   const oldChildren: VNode[] = Array.isArray(oldVNode.children) ? oldVNode.children : [];
   const newChildren: VNode[] = Array.isArray(newVNode.children) ? newVNode.children : [];
-  // Detect duplicate keys in newChildren
-  const keyCount: Record<string, number> = {};
-  newChildren.forEach(child => {
+  const oldKeyed: Record<string, VNode> = {};
+  const newKeyed: Record<string, VNode> = {};
+  let hasKeys = false;
+  oldChildren.forEach(child => {
     if (child.key) {
-      keyCount[child.key] = (keyCount[child.key] || 0) + 1;
+      oldKeyed[child.key] = child;
+      hasKeys = true;
     }
   });
-  const hasDuplicateKeys = Object.values(keyCount).some(count => count > 1);
-  if (hasDuplicateKeys) {
-    console.warn('[VDOM] Duplicate keys detected among siblings. Falling back to index-based reconciliation.');
-  }
-  // If duplicate keys, ignore keys and use index-based patching
-  if (hasDuplicateKeys) {
+  newChildren.forEach(child => {
+    if (child.key) {
+      newKeyed[child.key] = child;
+      hasKeys = true;
+    }
+  });
+  if (hasKeys) {
+    // Remove old keyed children not present in newChildren
+    Object.keys(oldKeyed).forEach(key => {
+      if (!newKeyed[key]) {
+        const childDom = oldKeyed[key].dom;
+        if (childDom && childDom instanceof Node && oldDom instanceof Element && oldDom.contains(childDom)) {
+          oldDom.removeChild(childDom);
+        }
+      }
+    });
+    // Insert or patch new keyed children
+    newChildren.forEach((newChild) => {
+      if (newChild.key && oldKeyed[newChild.key]) {
+        patchVNode(oldDom as Element, oldKeyed[newChild.key], newChild);
+      } else {
+        const childDom = mountVNode(newChild);
+        if (childDom) (oldDom as Element).appendChild(childDom);
+      }
+    });
+  } else {
+    // Fallback: index-based reconciliation
     for (let i = 0; i < Math.max(oldChildren.length, newChildren.length); i++) {
       if (oldChildren[i] && newChildren[i]) {
         patchVNode(oldDom as Element, oldChildren[i], newChildren[i]);
@@ -361,33 +356,6 @@ function patchVNode(parent: Element, oldVNode: VNode, newVNode: VNode): void {
         }
       }
     }
-  } else {
-    // Keyed patching (default)
-    const oldKeyed: Record<string, VNode> = {};
-    oldChildren.forEach(child => {
-      if (child.key) oldKeyed[child.key] = child;
-    });
-    for (let i = 0; i < newChildren.length; i++) {
-      const newChild = newChildren[i];
-      if (newChild.key && oldKeyed[newChild.key]) {
-        patchVNode(oldDom as Element, oldKeyed[newChild.key], newChild);
-      } else if (oldChildren[i]) {
-        patchVNode(oldDom as Element, oldChildren[i], newChild);
-      } else {
-        const childDom = mountVNode(newChild);
-        if (childDom) (oldDom as Element).appendChild(childDom);
-      }
-    }
-    // Remove old children not present in newChildren
-    const newKeys = newChildren.map(c => c.key).filter(Boolean);
-    oldChildren.forEach(child => {
-      if (child.key && !newKeys.includes(child.key)) {
-        const childDom = child.dom;
-        if (childDom && childDom instanceof Node && oldDom instanceof Element && oldDom.contains(childDom)) {
-          oldDom.removeChild(childDom);
-        }
-      }
-    });
   }
   newVNode.dom = oldDom;
 }
@@ -703,30 +671,14 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
       if (typeof templateResult === 'string') {
         // console.debug('[vdom] _renderTemplateResult called with string template:', templateResult);
         const newVNode = parseVNodeFromHTML(templateResult);
-        // console.debug('[vdom] Generated new VNode:', newVNode);
-        // Recursively assign DOM nodes to all VNodes
-        function assignDomRecursive(vnode: VNode, domNode: Element | Text) {
-          vnode.dom = domNode;
-          if (vnode.children && vnode.children.length && domNode instanceof Element) {
-            const domChildren = Array.from(domNode.childNodes) as (Element | Text)[];
-            for (let i = 0; i < vnode.children.length; i++) {
-              if (domChildren[i]) {
-                assignDomRecursive(vnode.children[i], domChildren[i]);
-              }
-            }
-          }
+        const shadowRoot = this.shadowRoot;
+        if (!shadowRoot) {
+          return;
         }
-        // Assign DOM nodes to VNode tree
-        const tempContainer = document.createElement('div');
-        tempContainer.innerHTML = templateResult.trim();
-        const actualRootNode = tempContainer.firstElementChild as Element;
-        assignDomRecursive(newVNode, actualRootNode);
-        // --- Key-based granular patching: persistent root node, child reconciliation by key ---
-        // Always ensure <style> element is present and up-to-date
-        let styleEl = this.shadowRoot!.querySelector('style');
+        let styleEl = shadowRoot.querySelector('style');
         if (!styleEl) {
           styleEl = document.createElement('style');
-          this.shadowRoot!.appendChild(styleEl);
+          shadowRoot.appendChild(styleEl);
         }
         if (this.config.style) {
           styleEl.textContent = typeof this.config.style === 'function' ? this.config.style(this.stateObj) : this.config.style;
@@ -735,15 +687,15 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
         }
         // If fragment, reconcile all children
         if (newVNode.type === '#fragment') {
+          // Patch or replace all children except style
+          const shadowChildren = Array.from(shadowRoot.childNodes).filter(node => node !== styleEl);
           // Remove all non-style children
-          Array.from(this.shadowRoot!.childNodes).forEach(node => {
-            if (node !== styleEl) this.shadowRoot!.removeChild(node);
-          });
-          // Append all fragment children
+          shadowChildren.forEach(node => shadowRoot.removeChild(node));
+          // Append all new fragment children in order
           newVNode.children.forEach(childVNode => {
-            if (childVNode.dom) {
-              this.shadowRoot!.appendChild(childVNode.dom);
-            }
+            const dom = mountVNode(childVNode);
+            if (dom) shadowRoot.appendChild(dom);
+            childVNode.dom = dom ?? undefined;
           });
           // Do not assign shadowRoot to VNode.dom; fragment VNode's dom remains undefined
         } else {
@@ -754,16 +706,22 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
           if (rootEl) {
             // If type or key differ, replace root node
             if (this._prevVNode && (this._prevVNode.type !== newVNode.type || this._prevVNode.key !== newVNode.key)) {
-              this.shadowRoot!.replaceChild(actualRootNode, rootEl);
-              rootEl = actualRootNode;
+              const actualRootNode = mountVNode(newVNode);
+              if (actualRootNode) {
+                this.shadowRoot!.replaceChild(actualRootNode, rootEl);
+                rootEl = actualRootNode as Element;
+              }
             } else {
               // Patch root node in place
               patchVNode(rootEl, this._prevVNode!, newVNode);
             }
           } else {
             // No root node, append new
-            rootEl = actualRootNode;
-            this.shadowRoot!.appendChild(rootEl);
+            const actualRootNode = mountVNode(newVNode);
+            rootEl = actualRootNode as Element;
+            if (rootEl) {
+              this.shadowRoot!.appendChild(rootEl);
+            }
           }
           newVNode.dom = rootEl;
         }
@@ -931,7 +889,11 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
               this._eventListenerMap.set(el, attached);
             }
             if (!attached.has(eventType)) {
-              el.addEventListener(eventType, (e: Event) => handler.call(this.config, e, this.api.state, this.api));
+              el.addEventListener(eventType, (e: Event) => {
+                handler.call(this.config, e, this.api.state, this.api);
+                // Immediately sync controlled inputs after handler runs
+                this.syncControlledInputsAndEvents();
+              });
               attached.add(eventType);
             }
           } else {
