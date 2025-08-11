@@ -299,14 +299,37 @@ function patchVNode(parent: Element, oldVNode: VNode, newVNode: VNode): void {
     }
   }
   // Patch text: always update nodeValue for text nodes
-  if (newVNode.type === '#text' && oldDom) {
-    if ((oldDom as Text).nodeValue !== newVNode.props.nodeValue) {
-      (oldDom as Text).nodeValue = newVNode.props.nodeValue;
+  if (newVNode.type === '#text') {
+    if (oldDom && oldDom.nodeType === Node.TEXT_NODE) {
+      if ((oldDom as Text).nodeValue !== newVNode.props.nodeValue) {
+        (oldDom as Text).nodeValue = newVNode.props.nodeValue;
+      }
+      newVNode.dom = oldDom;
+    } else {
+      // Replace or insert text node at correct position
+      const newTextNode = document.createTextNode(newVNode.props.nodeValue ?? '');
+      if (oldDom && parent.contains(oldDom)) {
+        parent.replaceChild(newTextNode, oldDom);
+      } else {
+        // Try to insert at the correct index
+        const siblings = Array.from(parent.childNodes) as ChildNode[];
+        if (oldDom && siblings.includes(oldDom as ChildNode)) {
+          parent.replaceChild(newTextNode, oldDom as ChildNode);
+        } else {
+          parent.appendChild(newTextNode);
+        }
+      }
+      newVNode.dom = newTextNode;
     }
+    return;
   }
   // --- Robust keyed reconciliation ---
-  const oldChildren: VNode[] = Array.isArray(oldVNode.children) ? oldVNode.children : [];
-  const newChildren: VNode[] = Array.isArray(newVNode.children) ? newVNode.children : [];
+  // Filter out whitespace-only VDOM nodes for robust reconciliation
+  function isMeaningfulVNode(v: VNode) {
+    return v.type !== '#whitespace' && !(v.type === '#text' && (!v.props.nodeValue || /^\s*$/.test(v.props.nodeValue)));
+  }
+  const oldChildren: VNode[] = Array.isArray(oldVNode.children) ? oldVNode.children.filter(isMeaningfulVNode) : [];
+  const newChildren: VNode[] = Array.isArray(newVNode.children) ? newVNode.children.filter(isMeaningfulVNode) : [];
   const oldKeyed: Record<string, VNode> = {};
   const newKeyed: Record<string, VNode> = {};
   let hasKeys = false;
@@ -343,18 +366,68 @@ function patchVNode(parent: Element, oldVNode: VNode, newVNode: VNode): void {
     });
   } else {
     // Fallback: index-based reconciliation
-    for (let i = 0; i < Math.max(oldChildren.length, newChildren.length); i++) {
-      if (oldChildren[i] && newChildren[i]) {
-        patchVNode(oldDom as Element, oldChildren[i], newChildren[i]);
-      } else if (newChildren[i]) {
-        const childDom = mountVNode(newChildren[i]);
-        if (childDom) (oldDom as Element).appendChild(childDom);
-      } else if (oldChildren[i]) {
-        const childDom = oldChildren[i].dom;
-        if (childDom && childDom instanceof Node && oldDom instanceof Element && oldDom.contains(childDom)) {
-          oldDom.removeChild(childDom);
+    if (oldDom instanceof Element) {
+      // Debug: log VDOM and DOM child arrays before reconciliation
+      console.debug('[VDOM][patchVNode][before]', {
+        oldChildren,
+        newChildren,
+        domChildren: Array.from(oldDom.childNodes)
+      });
+      // Strict positional reconciliation
+      for (let i = 0; i < newChildren.length; i++) {
+        const newChild = newChildren[i];
+        const domChild = oldDom.childNodes[i];
+        if (!domChild) {
+          // No DOM node at this position, append
+          console.debug('[VDOM][patchVNode][append]', { index: i, newChild });
+          const newDom = mountVNode(newChild);
+          if (newDom) {
+            oldDom.appendChild(newDom);
+            newChild.dom = newDom;
+          }
+        } else {
+          // If type or key mismatch, or text/element mismatch, replace
+          const oldChild = oldChildren[i];
+          const vdomType = newChild.type;
+          const domType = domChild.nodeType === Node.TEXT_NODE ? '#text' : domChild.nodeName.toLowerCase();
+          const keyMismatch = oldChild && oldChild.key !== newChild.key;
+          const typeMismatch = oldChild && oldChild.type !== newChild.type;
+          const nodeTypeMismatch = vdomType === '#text' ? domChild.nodeType !== Node.TEXT_NODE : domChild.nodeType === Node.TEXT_NODE;
+          if (!oldChild || keyMismatch || typeMismatch || nodeTypeMismatch) {
+            console.debug('[VDOM][patchVNode][replace]', {
+              index: i,
+              oldChild,
+              newChild,
+              domChild,
+              vdomType,
+              domType,
+              keyMismatch,
+              typeMismatch,
+              nodeTypeMismatch
+            });
+            const newDom = mountVNode(newChild);
+            if (newDom) {
+              oldDom.replaceChild(newDom, domChild);
+              newChild.dom = newDom;
+            }
+          } else {
+            console.debug('[VDOM][patchVNode][patch]', { index: i, oldChild, newChild, domChild });
+            patchVNode(oldDom, oldChild, newChild);
+          }
         }
       }
+      // Remove any extra DOM nodes
+      while (oldDom.childNodes.length > newChildren.length) {
+        console.debug('[VDOM][patchVNode][remove-extra]', {
+          index: oldDom.childNodes.length - 1,
+          node: oldDom.lastChild
+        });
+        oldDom.removeChild(oldDom.lastChild!);
+      }
+      // Debug: log DOM child array after reconciliation
+      console.debug('[VDOM][patchVNode][after]', {
+        domChildren: Array.from(oldDom.childNodes)
+      });
     }
   }
   newVNode.dom = oldDom;
