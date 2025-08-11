@@ -369,6 +369,13 @@ function patchVNode(parent: Element, oldVNode: VNode, newVNode: VNode): void {
   } else {
     // Fallback: index-based reconciliation
     if (oldDom instanceof Element) {
+      // If newChildren is empty, clear all DOM children
+      if (newChildren.length === 0 && oldDom.childNodes.length > 0) {
+        console.debug('[VDOM][patchVNode][clear-all]', { domChildren: Array.from(oldDom.childNodes) });
+        while (oldDom.firstChild) oldDom.removeChild(oldDom.firstChild);
+        newVNode.dom = oldDom;
+        return;
+      }
       // Debug: log VDOM and DOM child arrays before reconciliation
       console.debug('[VDOM][patchVNode][before]', {
         oldChildren,
