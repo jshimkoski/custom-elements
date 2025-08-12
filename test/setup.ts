@@ -7,3 +7,6 @@ if (!window.customElements) {
     get: () => undefined,
   } as any;
 }
+import { getTestConfig } from './runtime/getTestConfig';
+// @ts-ignore
+globalThis.getTestConfig = getTestConfig;
