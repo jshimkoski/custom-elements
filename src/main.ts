@@ -1,4 +1,7 @@
 import './style.css';
+import './docs-site/docs-app.ts';
+import './docs-site/docs-nav.ts';
+import './docs-site/docs-content.ts';
 import './components/examples/MinimalExample';
 import './components/examples/TodoApp';
 import './components/examples/TodoAppCompiled';
@@ -14,6 +17,7 @@ import './components/examples/DataModelDemo';
 
 document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
   <div>
+  <docs-app></docs-app>
     <h1>🚀 Modern TypeScript Runtime</h1>
     <p style="font-size: 1.1em; color: #666; margin-bottom: 2rem;">
       ✨ Performant • Type-Safe • Developer-Friendly ✨

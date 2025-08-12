@@ -15,6 +15,38 @@ state.count++; // Automatically re-renders the component
 
 ---
 
+## Attribute-State Reactivity
+
+**How attributes sync with state:**
+
+- All primitive keys in your component's `state` (string, number, boolean) are automatically observed as attributes.
+- When an attribute changes (via parent, VDOM, or direct DOM mutation), the runtime updates the corresponding state value and triggers a re-render—no manual wiring needed.
+- On initial connection, any attributes present on the element are merged into state for a seamless initial sync.
+- This makes parent-to-child communication and declarative reactivity easy:
+
+```html
+<my-counter count="5"></my-counter>
+```
+
+```typescript
+component('my-counter', {
+  state: { count: 0 },
+  template: ({ count }) => `<span>Count: ${count}</span>`
+});
+```
+
+- Changing the `count` attribute instantly updates the state and UI.
+- Only primitive state keys are observed as attributes; objects and arrays are not synced via attributes.
+- No need to manually declare `observedAttributes`—the runtime does it for you.
+- If you override `attributeChangedCallback`, always call `super.attributeChangedCallback` to keep reactivity working.
+
+## Best practices
+
+- Use attributes for parent-to-child communication and initial state, and use state for internal logic and reactivity.
+- Always define a state object in your component to enable attribute-state merging and type inference.
+
+---
+
 ## Functional Templates
 
 - Templates are JavaScript functions that return HTML strings or use tagged helpers.

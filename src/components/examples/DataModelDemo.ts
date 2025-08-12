@@ -21,10 +21,16 @@ component('data-model-demo', {
         <label>
           Checkbox:
           <input type="checkbox" value="checked1" data-model="checked" />
+        </label>
+        <label>
           <input type="checkbox" value="checked2" data-model="checked" />
           <span>${state.checked.join(', ')}</span>
+        </label>
+        <label>
           Checkbox single:
           <input type="checkbox" data-model="checkedSingle" />
+        </label>
+        <label>
           Checkbox single custom:
           <input
             type="checkbox"

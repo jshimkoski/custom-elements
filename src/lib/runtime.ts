@@ -512,6 +512,7 @@ function patchVNode(parent: Element, oldVNode: VNode, newVNode: VNode): void {
   }
   if (oldDom && oldDom instanceof Element && newVNode.props) {
     const inputType = oldDom.tagName.toLowerCase() === 'input' ? oldDom.getAttribute('type') : undefined;
+    const isCustomElement = oldDom.tagName.includes('-');
     for (const [k, v] of Object.entries(newVNode.props)) {
       if (inputType === 'radio' && k === 'value') {
         // Never set value for radios
@@ -522,7 +523,12 @@ function patchVNode(parent: Element, oldVNode: VNode, newVNode: VNode): void {
         oldDom.setAttribute('value', v as string);
         continue;
       }
-      if (oldDom.getAttribute(k) !== v) {
+      // Always set attribute to ensure attributeChangedCallback fires
+      oldDom.setAttribute(k, v as string);
+    }
+    // For custom elements, explicitly set all attributes again to guarantee reactivity
+    if (isCustomElement) {
+      for (const [k, v] of Object.entries(newVNode.props)) {
         oldDom.setAttribute(k, v as string);
       }
     }
@@ -701,7 +707,9 @@ function patchVNode(parent: Element, oldVNode: VNode, newVNode: VNode): void {
           const domType = domChild.nodeType === Node.TEXT_NODE ? '#text' : domChild.nodeName.toLowerCase();
           const vKey = newChild.key;
           const domKey = (domChild as any)[DOM_KEY];
-          if (vdomType !== domType || (vKey && domKey !== vKey)) {
+          const isCustomElement = domType.includes('-');
+          if (vdomType !== domType || (vKey && domKey !== vKey) || isCustomElement) {
+            // Always replace custom elements when key changes or type differs
             const newDom = mountVNode(newChild);
             if (newDom && oldDom instanceof Element && oldDom.contains(domChild)) {
               if (oldDom.contains(domChild)) {
@@ -726,6 +734,46 @@ function patchVNode(parent: Element, oldVNode: VNode, newVNode: VNode): void {
 }
 
 class ComponentElement<S extends ComponentState, C extends Record<string, any> = {}> extends HTMLElement {
+  /**
+   * observedAttributes automatically returns all primitive keys from static state.
+   * This enables automatic attribute observation for all primitive state properties.
+   */
+  static get observedAttributes() {
+    // @ts-ignore: allow dynamic static property access
+  const state = this.stateObj || {};
+    return Object.keys(state).filter(
+      key => ['string', 'number', 'boolean'].includes(typeof state[key])
+    );
+  }
+
+  attributeChangedCallback(name: string, _oldValue: string, newValue: string) {
+    if (this.config?.debug) {
+      console.debug(`[CustomElement] attributeChangedCallback: '${name}' changed to '${newValue}' on`, this);
+    }
+    // Guard against stateObj being undefined
+    if (!this.stateObj) return;
+    // Merge attribute value into state, then re-render
+    if (name in this.stateObj) {
+      const initialType = typeof (this.config?.state?.[name]);
+      let value: any = newValue;
+      if (initialType === 'number') {
+        if (value === null || value === undefined || value === '') {
+          value = this.config?.state?.[name];
+        } else {
+          const num = Number(value);
+          value = isNaN(num) ? this.config?.state?.[name] : num;
+        }
+      } else if (initialType === 'boolean') {
+        value = value === 'true';
+      }
+      if (this.config?.debug) {
+        console.log('[runtime] state update:', { name, value });
+      }
+      (this.stateObj as any)[name] = value;
+    }
+    this.render();
+  }
+
   /**
    * Force sync all controlled input values and event listeners after VDOM patching.
    */
@@ -964,6 +1012,19 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
 
   connectedCallback(): void {
     this.initializeConfig();
+    // Merge all attributes into state for initial sync
+    if (this.stateObj) {
+      for (const attr of this.getAttributeNames()) {
+        if (attr in this.stateObj) {
+          const initialType = typeof (this.config?.state?.[attr]);
+          let value: any = this.getAttribute(attr);
+          if (initialType === 'number') value = Number(value);
+          else if (initialType === 'boolean') value = value === 'true';
+          (this.stateObj as any)[attr] = value;
+        }
+      }
+    }
+    if (typeof this.render === 'function') this.render();
   }
 
   /**
@@ -987,7 +1048,7 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
     try {
       // Plugin hook: onRender
       runtimePlugins.forEach(p => p.onRender?.(this.stateObj, this.api));
-      const templateResultOrPromise = this.config.template(this.stateObj, this.api);
+      const templateResultOrPromise = this.config.template(this.stateObj as S & C, this.api);
       if (templateResultOrPromise instanceof Promise) {
         templateResultOrPromise.then(templateResult => {
           this._renderTemplateResult(templateResult);
@@ -1350,7 +1411,13 @@ export function component<S extends ComponentState, C extends Record<string, any
   (config as any).state = state;
   (config as any)._subscribe = state.subscribe;
 
+  const primitiveKeys = Object.keys(config.state).filter(
+    key => ['string', 'number', 'boolean'].includes(typeof config.state[key])
+  );
   const ComponentClass = class extends ComponentElement<S, C> {
+    static get observedAttributes() {
+      return primitiveKeys;
+    }
     constructor() {
       super();
     }
