@@ -1,4 +1,12 @@
+/**
+ * Represents the state object for a component.
+ * Extend this interface for custom state typing.
+ */
 export interface ComponentState extends Record<string, unknown> {}
+/**
+ * API exposed to component templates and lifecycle handlers.
+ * Includes state, event emitters, and global event bus methods.
+ */
 export interface ComponentAPI<T extends ComponentState = ComponentState> {
   readonly state: T;
   emit(eventName: string, detail?: unknown): void;
@@ -6,6 +14,12 @@ export interface ComponentAPI<T extends ComponentState = ComponentState> {
   offGlobal<U = any>(eventName: string, handler: (data: U) => void): void;
   emitGlobal<U = any>(eventName: string, data?: U): void;
 }
+/**
+ * Configuration object for a custom element component.
+ * Defines template, state, computed properties, styles, refs, and lifecycle hooks.
+ * @template S - State type
+ * @template C - Computed type
+ */
 export interface ComponentConfig<S extends ComponentState, C extends Record<string, any> = {}> {
   readonly template: (state: S & C, api: ComponentAPI<S & C>) => string | Promise<string> | CompiledTemplate<S & C>;
   readonly state: S;
@@ -15,30 +29,52 @@ export interface ComponentConfig<S extends ComponentState, C extends Record<stri
   readonly onMounted?: LifecycleHandler<S & C>;
   readonly onUnmounted?: LifecycleHandler<S & C>;
   readonly debug?: boolean;
-  [handler: string]: any;
+  [handler: string]: ((...args: unknown[]) => unknown) | unknown;
+  hydrate?: (el: Element | ShadowRoot, state: S & C, api: ComponentAPI<S & C>) => void;
 }
+/**
+ * Handler for a ref element in the template.
+ * @param element - The DOM element with data-ref
+ * @param state - Current component state
+ * @param api - Component API
+ */
 export type RefHandler<T extends ComponentState> = (
   element: Element,
   state: T,
   api: ComponentAPI<T>
 ) => void;
 export type ComputedHandler<T extends ComponentState> = (state: T) => unknown;
+/**
+ * Lifecycle handler for mounted/unmounted events.
+ * @param state - Current component state
+ * @param api - Component API
+ */
 export type LifecycleHandler<T extends ComponentState> = (
   state: T,
   api: ComponentAPI<T>
 ) => void;
+/**
+ * Represents a compiled template for fast rendering and hydration.
+ */
 export type CompiledTemplate<S extends ComponentState = ComponentState> = {
   id: string;
   render: (state: S, api: ComponentAPI<S>) => DocumentFragment;
 };
+/**
+ * Plugin interface for runtime hooks (init, render, error).
+ */
 export type RuntimePlugin<S extends ComponentState, C extends Record<string, any>> = {
   onInit?: (config: ComponentConfig<S, C>) => void;
   onRender?: (state: S & C, api: ComponentAPI<S & C>) => void;
   onError?: (error: Error, state: S & C, api: ComponentAPI<S & C>) => void;
 };
-export const runtimePlugins: RuntimePlugin<any, any>[] = [];
+export const runtimePlugins: RuntimePlugin<ComponentState, Record<string, unknown>>[] = [];
+/**
+ * Registers a runtime plugin for hooks (init, render, error).
+ * @param plugin - RuntimePlugin instance
+ */
 export function useRuntimePlugin<S extends ComponentState, C extends Record<string, any>>(plugin: RuntimePlugin<S, C>) {
-  runtimePlugins.push(plugin);
+  runtimePlugins.push(plugin as RuntimePlugin<ComponentState, Record<string, unknown>>);
 }
 
 export { Store } from './store';
@@ -68,78 +104,81 @@ import { renderCompiledTemplate, updateCompiledTemplate } from './template-compi
 // Data/Event Binding
 // ============================================================================
 
-// Minimal controlled input binding helper
-function useDataModel(el: Element, stateObj: any, keyWithModifiers: string) {
+/**
+ * Minimal controlled input binding helper for data-model attributes.
+ * Handles checkboxes, radios, text, and modifiers (trim, number).
+ * @param el - Input/select/textarea element
+ * @param stateObj - State object to bind
+ * @param keyWithModifiers - Key and optional modifiers (e.g. 'name|trim|number')
+ */
+function useDataModel<T extends Record<string, unknown>>(el: Element, stateObj: T, keyWithModifiers: string) {
   const [key, ...modifiers] = keyWithModifiers.split('|').map(s => s.trim());
   if (!key) return;
   const updateState = (e: Event) => {
-    let value: any;
+    let value: unknown;
     if (el instanceof HTMLInputElement && el.type === 'checkbox') {
-      // Support single checkbox with data-true-value and data-false-value
       const trueValue = el.getAttribute('data-true-value');
       const falseValue = el.getAttribute('data-false-value');
       value = el.value;
-      if (Array.isArray(stateObj[key])) {
-        const arr = stateObj[key] as any[];
+      if (Array.isArray((stateObj as Record<string, unknown>)[key])) {
+        const arr = ((stateObj as Record<string, unknown>)[key] as unknown[]);
         if (el.checked) {
           if (!arr.includes(value)) arr.push(value);
         } else {
           const idx = arr.indexOf(value);
           if (idx !== -1) arr.splice(idx, 1);
         }
-        stateObj[key] = arr;
+        (stateObj as Record<string, unknown>)[key] = arr;
       } else {
-        // Single checkbox: set true/false or custom values
         if (trueValue !== null || falseValue !== null) {
           if (el.checked) {
-            stateObj[key] = trueValue;
+            (stateObj as Record<string, unknown>)[key] = trueValue;
           } else {
-            stateObj[key] = falseValue !== null ? falseValue : false;
+            (stateObj as Record<string, unknown>)[key] = falseValue !== null ? falseValue : false;
           }
         } else {
-          stateObj[key] = el.checked;
+          (stateObj as Record<string, unknown>)[key] = el.checked;
         }
       }
     } else if (el instanceof HTMLInputElement && el.type === 'radio') {
       value = el.value;
-      stateObj[key] = value;
-      // On initialization, ensure checked property matches state
+      (stateObj as Record<string, unknown>)[key] = value;
       const radios = (el.form || el.closest('form') || el.getRootNode()) instanceof Element
         ? ((el.form || el.closest('form') || el.getRootNode()) as Element).querySelectorAll(`input[type="radio"][name="${el.name}"][data-model="${keyWithModifiers}"]`)
         : [];
-      radios.forEach((radio: any) => {
-        radio.checked = radio.value === String(stateObj[key]);
+      radios.forEach((radio: Element) => {
+        (radio as HTMLInputElement).checked = (radio as HTMLInputElement).value === String((stateObj as Record<string, unknown>)[key]);
       });
     } else {
-      value = (el as any).value;
+      value = (el as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement).value;
       if (modifiers.includes('trim') && typeof value === 'string') {
         value = value.trim();
       }
       if (modifiers.includes('number')) {
         value = Number(value);
       }
-      stateObj[key] = value;
+      (stateObj as Record<string, unknown>)[key] = value;
     }
-    if ((el as any)._vnode) {
+    if ('_vnode' in el && typeof (el as any)._vnode === 'object' && (el as any)._vnode?.props) {
       (el as any)._vnode.props.value = value;
     }
     if (e.type === 'input') {
-      (el as any)._isDirty = true;
+      (el as { _isDirty?: boolean })._isDirty = true;
     }
     if (e.type === 'keydown' && (e as KeyboardEvent).key === 'Enter') {
-      (el as any)._isDirty = false;
+      (el as { _isDirty?: boolean })._isDirty = false;
       if (el instanceof HTMLElement && el.isConnected) {
         let parent = el.parentElement;
         while (parent && !(parent instanceof HTMLElement && parent.shadowRoot)) {
           parent = parent.parentElement;
         }
-        if (parent && typeof (parent as any).render === 'function') {
-          (parent as any).render();
+        if (parent && typeof parent === 'object' && parent !== null && 'render' in parent && typeof (parent as any).render === 'function') {
+          (parent as HTMLElement & { render: () => void }).render();
         }
       }
     }
     if (e.type === 'blur') {
-      (el as any)._isDirty = false;
+      (el as { _isDirty?: boolean })._isDirty = false;
     }
   };
   el.addEventListener('input', updateState);
@@ -166,13 +205,16 @@ interface VNode {
 /**
  * Safely replaces a child node, guarding against NotFoundError and out-of-sync trees.
  * Falls back to appendChild if oldChild is not present.
- * Logs mutation for debugging.
+ * Logs mutation for debugging if enabled.
+ * @param parent - Parent node
+ * @param newChild - New node to insert
+ * @param oldChild - Old node to replace
  */
 function safeReplaceChild(parent: Node | null, newChild: Node, oldChild: Node): void {
   // Get debug flag from parent custom element instance if available
   let debug = false;
   if (parent && parent instanceof Element && 'debug' in parent) {
-    debug = (parent as any).debug === true;
+    debug = (parent as Element & { debug?: boolean }).debug === true;
   }
   if (!parent || !(parent instanceof Element)) {
     if (debug) console.warn('[runtime] safeReplaceChild: parent is missing or not an Element', { parent, newChild, oldChild });
@@ -206,7 +248,10 @@ function safeReplaceChild(parent: Node | null, newChild: Node, oldChild: Node): 
 }
 
 /**
- * Mount a VNode to the DOM and return the created node
+ * Mounts a VNode to the DOM and returns the created node.
+ * Handles text, fragment, and element nodes.
+ * @param vnode - Virtual node to mount
+ * @returns DOM node or null
  */
 function mountVNode(vnode: VNode): Element | Text | null {
   if (vnode.type === '#whitespace') {
@@ -244,8 +289,10 @@ function mountVNode(vnode: VNode): Element | Text | null {
 }
 
 /**
- * Minimal template-to-VNode parser for HTML strings
- * Only supports basic tags, attributes, text, and key/data-model
+ * Parses an HTML string into a VNode tree.
+ * Supports basic tags, attributes, text, and key/data-model.
+ * @param html - HTML string
+ * @returns VNode tree
  */
 function parseVNodeFromHTML(html: string): VNode {
   const template = document.createElement('template');
@@ -266,8 +313,12 @@ function parseVNodeFromHTML(html: string): VNode {
 }
 
 /**
- * Create a VNode from a DOM ChildNode (Element or Text)
- * Assigns a stable, deterministic key to every element for VDOM reconciliation
+ * Creates a VNode from a DOM ChildNode (Element or Text).
+ * Assigns a stable, deterministic key for VDOM reconciliation.
+ * @param node - DOM node
+ * @param parentPath - Path for key generation
+ * @param childIndex - Index for key generation
+ * @returns VNode
  */
 function createVNodeFromElement(node: ChildNode, parentPath: string = '', childIndex: number = 0): VNode {
   // Log all input elements and their attributes at VNode creation
@@ -352,7 +403,11 @@ function createVNodeFromElement(node: ChildNode, parentPath: string = '', childI
 }
 
 /**
- * Patch two VNodes and update the DOM, preserving controlled inputs
+ * Patches two VNodes and updates the DOM, preserving controlled inputs.
+ * Handles keyed and index-based reconciliation.
+ * @param parent - Parent DOM element
+ * @param oldVNode - Previous VNode
+ * @param newVNode - New VNode
  */
 function patchVNode(parent: Element, oldVNode: VNode, newVNode: VNode): void {
   // Guard clause: if either VNode is undefined, return early
@@ -462,6 +517,7 @@ function patchVNode(parent: Element, oldVNode: VNode, newVNode: VNode): void {
   const oldDom = oldVNode.dom;
 
   // --- Robust keyed reconciliation ---
+
   // Filter out whitespace-only VDOM nodes for robust reconciliation
   function isMeaningfulVNode(v: VNode | undefined): v is VNode {
     return !!v && v.type !== '#whitespace' && !(v.type === '#text' && (!v.props?.nodeValue || /^\s*$/.test(v.props.nodeValue)));
@@ -568,7 +624,7 @@ function patchVNode(parent: Element, oldVNode: VNode, newVNode: VNode): void {
     return;
   }
   // Symbol for storing keys on DOM nodes
-  const DOM_KEY = Symbol('vdom-key');
+  const DOM_KEY: unique symbol = Symbol('vdom-key');
   const oldKeyed: Record<string, VNode> = {};
   const newKeyed: Record<string, VNode> = {};
   let hasKeys = false;
@@ -730,6 +786,12 @@ function patchVNode(parent: Element, oldVNode: VNode, newVNode: VNode): void {
 // Component Lifecycle
 // ============================================================================
 
+/**
+ * Base class for runtime custom elements.
+ * Handles lifecycle, rendering, controlled input sync, refs, and event binding.
+ * @template S - State type
+ * @template C - Computed type
+ */
 class ComponentElement<S extends ComponentState, C extends Record<string, any> = {}> extends HTMLElement {
   /**
    * observedAttributes automatically returns all primitive keys from static state.
@@ -737,12 +799,15 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
    */
   static get observedAttributes() {
     // @ts-ignore: allow dynamic static property access
-  const state = this.stateObj || {};
+    const state = this.stateObj || {};
     return Object.keys(state).filter(
       key => ['string', 'number', 'boolean'].includes(typeof state[key])
     );
   }
 
+  /**
+   * Called when an observed attribute changes. Syncs attribute to state and triggers render.
+   */
   attributeChangedCallback(name: string, _oldValue: string, newValue: string) {
     if (this.config?.debug) {
       console.debug(`[CustomElement] attributeChangedCallback: '${name}' changed to '${newValue}' on`, this);
@@ -811,7 +876,6 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
    */
   private syncControlledInputsAndEvents(): void {
     if (!this.shadowRoot) return;
-    // --- Text, Checkbox, Radio ---
     // --- Radio Groups ---
     this.shadowRoot.querySelectorAll('input[type="radio"][data-model]').forEach((input) => {
       const modelAttr = input.getAttribute('data-model');
@@ -886,7 +950,6 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
       if (!keyWithModifiers) return;
       // Only bind once per element
       if ((el as any)._dataModelBound) return;
-      // @ts-ignore
       useDataModel(el, this.stateObj, keyWithModifiers);
       (el as any)._dataModelBound = true;
     });
@@ -987,15 +1050,14 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
       this.shadowRoot!.appendChild(styleEl);
     }
     // SSR hydration support (selective)
-    if (this.config.hydrate) {
+    if (typeof this.config.hydrate === 'function') {
       const hydrateEls = this.shadowRoot?.querySelectorAll('[data-hydrate]');
       if (hydrateEls && hydrateEls.length > 0) {
         hydrateEls.forEach(el => {
-          this.config.hydrate(el, this.stateObj, this.api);
+          this.config.hydrate!(el, this.stateObj, this.api);
         });
       } else {
-        // Fallback: hydrate entire shadow root
-        this.config.hydrate(this.shadowRoot!, this.stateObj, this.api);
+        this.config.hydrate!(this.shadowRoot!, this.stateObj, this.api);
       }
     }
     const isSSRHydration = this.hasAttribute('data-hydrated');
@@ -1081,13 +1143,23 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
           el.removeEventListener(eventType, (el as any)._boundHandlers[eventType]);
         }
         // Bind new handler
-        const boundHandler = (e: Event) => this.config[handlerName](e, this.stateObj, this.api);
+        const boundHandler = (e: Event) => {
+          const handler = this.config[handlerName];
+          if (typeof handler === 'function') {
+            handler(e, this.stateObj, this.api);
+          }
+        };
         el.addEventListener(eventType, boundHandler);
         if (!(el as any)._boundHandlers) (el as any)._boundHandlers = {};
         (el as any)._boundHandlers[eventType] = boundHandler;
       });
     });
   }
+  /**
+   * Internal: render a template result (string or compiled template).
+   * Handles VDOM patching, style updates, refs, and event binding.
+   * @param templateResult - HTML string or compiled template
+   */
   private _renderTemplateResult(templateResult: any): void {
     try {
       if (typeof templateResult === 'string') {
@@ -1234,25 +1306,27 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
   }
 
   /**
-   * Internal: handle render errors and error boundaries
+   * Internal: handle render errors and error boundaries.
+   * Logs details and allows fallback UI.
+   * @param error - Error object
    */
   private _handleRenderError(error: any): void {
     // Improved error boundary: log details and allow fallback UI
     if (this.config.debug) {
       console.error(`[runtime] Render error in <${this.tagName.toLowerCase()}>:`, error);
     }
-    runtimePlugins.forEach(p => p.onError?.(error, this.stateObj, this.api));
-    if ('onError' in this.config && typeof (this.config as any).onError === 'function') {
+    runtimePlugins.forEach(p => p.onError?.(error instanceof Error ? error : new Error(String(error)), this.stateObj, this.api));
+    if ('onError' in this.config && typeof (this.config.onError) === 'function') {
       try {
-        (this.config as any).onError(error as Error, this.api.state, this.api);
+        this.config.onError(error instanceof Error ? error : new Error(String(error)), this.api.state, this.api);
       } catch (fallbackError) {
         if (this.config.debug) {
           console.error(`[runtime] Error in onError handler:`, fallbackError);
         }
-        this.renderError(error as Error);
+        this.renderError(error instanceof Error ? error : new Error(String(error)));
       }
     } else {
-      this.renderError(error as Error);
+      this.renderError(error instanceof Error ? error : new Error(String(error)));
     }
   }
 
@@ -1269,6 +1343,9 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
     });
   }
 
+  /**
+   * Updates the style element in the shadow root based on the current state.
+   */
   private updateStyle(): void {
     const styleEl = this.shadowRoot!.querySelector('style');
     if (!styleEl || !this.config.style) return;
@@ -1280,6 +1357,9 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
     styleEl.textContent = css;
   }
 
+  /**
+   * Processes and attaches ref handlers for elements with data-ref attributes.
+   */
   private processRefs(): void {
     if (!this.config.refs) return;
     // Track attached listeners per element/type
@@ -1354,6 +1434,10 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
     }
   }
 
+  /**
+   * Renders a fallback error UI in the shadow root.
+   * @param error - Error object
+   */
   private renderError(error: Error): void {
     this.shadowRoot!.innerHTML = `
       <div style="color: red; border: 1px solid red; padding: 1rem; border-radius: 4px;">
@@ -1369,7 +1453,9 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
 // ============================================================================
 
 /**
- * Register a new custom element component.
+ * Registers a new custom element component.
+ * Validates config, sets up reactive state, and defines the custom element.
+ * Supports HMR and SSR hydration.
  * @template S - State type
  * @template C - Computed type
  * @param tag - Custom element tag name
@@ -1405,9 +1491,10 @@ export function component<S extends ComponentState, C extends Record<string, any
   }
 
   // Create reactive state with computed properties
-  const state = reactive(config.state, config.computed as Record<string, (state: S) => any>);
-  (config as any).state = state;
-  (config as any)._subscribe = state.subscribe;
+  const state = reactive(config.state, config.computed as Record<string, (state: S) => unknown>);
+  // @ts-expect-error: Overriding readonly property for runtime assignment
+  (config as { state: S & C }).state = state;
+  (config as { _subscribe?: unknown })._subscribe = state.subscribe;
 
   const primitiveKeys = Object.keys(config.state).filter(
     key => ['string', 'number', 'boolean'].includes(typeof config.state[key])
