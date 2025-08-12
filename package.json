@@ -3,18 +3,29 @@
   "description": "A powerful, modern, and lightweight runtime for creating reactive web components with TypeScript",
   "version": "1.0.0",
   "type": "module",
-  "keywords": ["web-components", "custom-elements", "reactive", "typescript", "frontend", "ui"],
+  "keywords": [
+    "web-components",
+    "custom-elements",
+    "reactive",
+    "typescript",
+    "frontend",
+    "ui"
+  ],
   "author": "Josh Shimkoski",
   "license": "MIT",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "test": "echo \"Tests coming soon\" && exit 0"
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.6.4",
+    "jsdom": "^26.1.0",
     "typescript": "~5.8.3",
-    "vite": "^7.0.4"
+    "vite": "^7.0.4",
+    "vitest": "^3.2.4"
   },
   "main": "./src/lib/runtime.ts",
   "exports": {

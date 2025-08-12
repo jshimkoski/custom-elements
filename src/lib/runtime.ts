@@ -128,7 +128,7 @@ function useDataModel<T extends Record<string, unknown>>(el: Element, stateObj: 
           const idx = arr.indexOf(value);
           if (idx !== -1) arr.splice(idx, 1);
         }
-        (stateObj as Record<string, unknown>)[key] = arr;
+        (stateObj as Record<string, unknown>)[key] = [...arr];
       } else {
         if (trueValue !== null || falseValue !== null) {
           if (el.checked) {
