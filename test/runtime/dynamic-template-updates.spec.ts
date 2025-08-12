@@ -10,10 +10,17 @@ describe('Dynamic Template Updates', () => {
     document.body.appendChild(el);
     // @ts-ignore
     expect(el.shadowRoot?.innerHTML).toContain('Hello World');
-    config.template = () => `<div>Changed</div>`;
+    // Use runtime API to update template
     // @ts-ignore
-    el['render']();
-    expect(el.shadowRoot?.innerHTML).toContain('Changed');
+    el['updateTemplate'](() => `<div>Changed</div>`);
+    // Wait for DOM update after scheduled render
+    return new Promise(resolve => {
+      requestAnimationFrame(() => {
+        expect(el.shadowRoot?.innerHTML).toContain('Changed');
+        document.body.removeChild(el);
+        resolve(undefined);
+      });
+    });
     document.body.removeChild(el);
   });
 });
