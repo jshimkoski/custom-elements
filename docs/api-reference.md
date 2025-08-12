@@ -17,14 +17,32 @@ export interface ComponentConfig<S extends ComponentState, C extends Record<stri
   onMounted?: LifecycleHandler<S & C>;
   onUnmounted?: LifecycleHandler<S & C>;
   onError?: (error: Error, state: S & C, api: ComponentAPI<S & C>) => void;
+  debug?: boolean; // Enable detailed runtime logs for this component
   [handler: string]: any; // Event handlers for data-on-*
 }
 ```
 
 **Notes:**
+- `debug` (optional): If true, enables detailed runtime logs (warnings, errors, mutation diagnostics) for this component only. Default is false.
 - Event handlers for `data-on-*` and `refs` must be defined on the config object.
 - Only one event handler per event type per element is attached; previous handlers are removed on rerender.
 - `computed` is for derived, reactive values.
+---
+
+## Debug Mode Example
+
+Enable runtime logs for a component:
+
+```typescript
+component('my-debug-demo', {
+  debug: true,
+  state: { count: 0 },
+  template: ({ count }) => `<button data-on-click="increment">Count: ${count}</button>`,
+  increment(_e, state) { state.count++; }
+});
+```
+
+All internal warnings and errors will only appear if `debug` is set to true.
 
 ---
 

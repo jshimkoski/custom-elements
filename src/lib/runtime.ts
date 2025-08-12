@@ -5,23 +5,20 @@
  * Logs mutation for debugging.
  */
 function safeReplaceChild(parent: Node | null, newChild: Node, oldChild: Node): void {
+  // Get debug flag from parent custom element instance if available
+  let debug = false;
+  if (parent && parent instanceof Element && 'debug' in parent) {
+    debug = (parent as any).debug === true;
+  }
   if (!parent || !(parent instanceof Element)) {
-    console.warn('[runtime] safeReplaceChild: parent is missing or not an Element', { parent, newChild, oldChild });
+    if (debug) console.warn('[runtime] safeReplaceChild: parent is missing or not an Element', { parent, newChild, oldChild });
     return;
   }
   if (parent.contains(oldChild) && oldChild.parentNode === parent) {
     try {
       parent.replaceChild(newChild, oldChild);
-      console.debug('[runtime] safeReplaceChild: replaced', {
-        parent,
-        newChild,
-        oldChild,
-        parentHTML: (parent as Element).outerHTML,
-        newChildHTML: (newChild as Element).outerHTML,
-        oldChildHTML: (oldChild as Element).outerHTML
-      });
     } catch (err) {
-      console.error('[runtime] safeReplaceChild: error replacing child', err, {
+      if (debug) console.error('[runtime] safeReplaceChild: error replacing child', err, {
         parent,
         newChild,
         oldChild,
@@ -32,7 +29,7 @@ function safeReplaceChild(parent: Node | null, newChild: Node, oldChild: Node): 
     }
   } else {
     // Do NOT append newChild if oldChild is missing during patching
-    console.warn('[runtime] safeReplaceChild: attempted to replace missing child, skipping mutation', {
+    if (debug) console.warn('[runtime] safeReplaceChild: attempted to replace missing child, skipping mutation', {
       parent,
       newChild,
       oldChild,
@@ -64,6 +61,7 @@ export interface ComponentConfig<S extends ComponentState, C extends Record<stri
   readonly refs?: Record<string, RefHandler<S & C>>;
   readonly onMounted?: LifecycleHandler<S & C>;
   readonly onUnmounted?: LifecycleHandler<S & C>;
+  readonly debug?: boolean;
   [handler: string]: any;
 }
 
@@ -151,25 +149,15 @@ function useDataModel(el: Element, stateObj: any, keyWithModifiers: string) {
           stateObj[key] = el.checked;
         }
       }
-      console.debug('[useDataModel] Checkbox change:', { key, value, stateObj });
     } else if (el instanceof HTMLInputElement && el.type === 'radio') {
       value = el.value;
       stateObj[key] = value;
-      console.debug('[useDataModel] Radio change:', { key, value, stateObj, el });
       // On initialization, ensure checked property matches state
       const radios = (el.form || el.closest('form') || el.getRootNode()) instanceof Element
         ? ((el.form || el.closest('form') || el.getRootNode()) as Element).querySelectorAll(`input[type="radio"][name="${el.name}"][data-model="${keyWithModifiers}"]`)
         : [];
-      radios.forEach((radio: any, idx: number) => {
+      radios.forEach((radio: any) => {
         radio.checked = radio.value === String(stateObj[key]);
-        console.debug(`[useDataModel] Radio sync [${idx}]:`, {
-          name: radio.name,
-          value: radio.value,
-          checked: radio.checked,
-          dataModel: radio.getAttribute('data-model'),
-          dataUid: radio.getAttribute('data-uid'),
-          outerHTML: radio.outerHTML
-        });
       });
     } else {
       value = (el as any).value;
@@ -180,11 +168,9 @@ function useDataModel(el: Element, stateObj: any, keyWithModifiers: string) {
         value = Number(value);
       }
       stateObj[key] = value;
-      console.debug('[useDataModel] Input change:', { key, value, stateObj });
     }
     if ((el as any)._vnode) {
       (el as any)._vnode.props.value = value;
-      console.debug('[useDataModel] VNode value assignment:', { vnode: (el as any)._vnode, value });
     }
     if (e.type === 'input') {
       (el as any)._isDirty = true;
@@ -237,13 +223,6 @@ function mountVNode(vnode: VNode): Element | Text | null {
         // Always set value property and attribute for checkboxes
         el.value = v as string;
         el.setAttribute('value', v as string);
-        // Debug log
-        console.debug('[mountVNode] Checkbox value assignment:', {
-          type: el.type,
-          value: el.value,
-          dataUid: el.getAttribute('data-uid'),
-          outerHTML: el.outerHTML
-        });
       } else {
         el.value = v as string;
         el.setAttribute('value', v as string);
@@ -251,17 +230,6 @@ function mountVNode(vnode: VNode): Element | Text | null {
     } else {
       el.setAttribute(k, v as string);
     }
-  }
-  // Debug log for input elements after creation
-  if (el instanceof HTMLInputElement) {
-    console.debug('[mountVNode] Input created:', {
-      type: el.type,
-      name: el.name,
-      value: el.value,
-      dataModel: el.getAttribute('data-model'),
-      dataUid: el.getAttribute('data-uid'),
-      outerHTML: el.outerHTML
-    });
   }
   vnode.dom = el;
   for (const child of vnode.children) {
@@ -278,9 +246,6 @@ function mountVNode(vnode: VNode): Element | Text | null {
 function parseVNodeFromHTML(html: string): VNode {
   const template = document.createElement('template');
   template.innerHTML = html.trim();
-  Array.from(template.content.querySelectorAll('input')).forEach((input, idx) => {
-    console.debug(`[TemplateParse] Input[${idx}]:`, input.outerHTML, 'value:', input.getAttribute('value'));
-  });
   const nodes = Array.from(template.content.childNodes);
   // If only one root node, return as before
   if (nodes.length === 1) {
@@ -319,12 +284,6 @@ function createVNodeFromElement(node: ChildNode, parentPath: string = '', childI
       const attrs: Record<string, string> = {};
       Array.from(elem.attributes).forEach(attr => {
         attrs[attr.name] = attr.value;
-      });
-      console.debug('[VNode] Input element at creation:', {
-        tagName: elem.tagName,
-        childIndex,
-        attrs,
-        outerHTML: elem.outerHTML
       });
     }
   }
@@ -366,20 +325,9 @@ function createVNodeFromElement(node: ChildNode, parentPath: string = '', childI
           elem.setAttribute('value', valueAttr);
         }
         vnodeKey = `${model}:${valueAttr}`;
-        console.debug('[VNodeKey] Assigned:', { vnodeKey, valueAttr, outerHTML: elem.outerHTML });
         props['data-uid'] = vnodeKey;
         elem.setAttribute('data-uid', vnodeKey);
         props['value'] = valueAttr;
-        console.debug(`[VDOM] ${inputType} input:`, {
-          model,
-          valueAttr,
-          childIndex,
-          name: elem.getAttribute('name'),
-          dataModel: elem.getAttribute('data-model'),
-          dataUid: vnodeKey,
-          assignedValue: props['value'],
-          outerHTML: elem.outerHTML
-        });
       } else {
         props['data-uid'] = model;
         elem.setAttribute('data-uid', model);
@@ -431,7 +379,9 @@ function patchVNode(parent: Element, oldVNode: VNode, newVNode: VNode): void {
       const grandparent = parent.parentNode;
       if (grandparent && grandparent instanceof Element) {
         grandparent.replaceChild(newDom, parent);
-        console.warn('[runtime] patchVNode: replaced parent in grandparent due to out-of-sync DOM', {
+        let debug = false;
+        if (parent && 'debug' in parent) debug = (parent as any).debug === true;
+        if (debug) console.warn('[runtime] patchVNode: replaced parent in grandparent due to out-of-sync DOM', {
           grandparent,
           parent,
           newDom,
@@ -440,7 +390,9 @@ function patchVNode(parent: Element, oldVNode: VNode, newVNode: VNode): void {
       } else {
         if (parent !== newDom && parent.parentNode) {
           parent.replaceWith(newDom);
-          console.warn('[runtime] patchVNode: replaced parent node directly (no grandparent)', {
+          let debug = false;
+          if (parent && 'debug' in parent) debug = (parent as any).debug === true;
+          if (debug) console.warn('[runtime] patchVNode: replaced parent node directly (no grandparent)', {
             parent,
             newDom,
             oldDom: oldVNode.dom
@@ -451,7 +403,9 @@ function patchVNode(parent: Element, oldVNode: VNode, newVNode: VNode): void {
             parent.removeChild(parent.firstChild);
           }
           parent.appendChild(newDom);
-          console.warn('[runtime] patchVNode: replaced host children for root node', {
+          let debug = false;
+          if (parent && 'debug' in parent) debug = (parent as any).debug === true;
+          if (debug) console.warn('[runtime] patchVNode: replaced host children for root node', {
             parent,
             newDom,
             oldDom: oldVNode.dom
@@ -461,7 +415,9 @@ function patchVNode(parent: Element, oldVNode: VNode, newVNode: VNode): void {
           const grandparent = parent.parentNode;
           if (grandparent) {
             grandparent.replaceChild(newDom, parent);
-            console.warn('[runtime] patchVNode: replaced parent in grandparent for root node', {
+            let debug = false;
+            if (parent && 'debug' in parent) debug = (parent as any).debug === true;
+            if (debug) console.warn('[runtime] patchVNode: replaced parent in grandparent for root node', {
               grandparent,
               parent,
               newDom,
@@ -481,7 +437,9 @@ function patchVNode(parent: Element, oldVNode: VNode, newVNode: VNode): void {
             }
             if (host && typeof (host as Node).replaceChild === 'function') {
               (host as Node).replaceChild(newDom, parent);
-              console.warn('[runtime] patchVNode: replaced old root in host with new root', {
+              let debug = false;
+              if (parent && 'debug' in parent) debug = (parent as any).debug === true;
+              if (debug) console.warn('[runtime] patchVNode: replaced old root in host with new root', {
                 host,
                 parent,
                 newDom,
@@ -489,7 +447,9 @@ function patchVNode(parent: Element, oldVNode: VNode, newVNode: VNode): void {
               });
             } else if ('replaceWith' in parent && typeof parent.replaceWith === 'function') {
               parent.replaceWith(newDom);
-              console.warn('[runtime] patchVNode: fallback replaced parent with newDom for root node', {
+              let debug = false;
+              if (parent && 'debug' in parent) debug = (parent as any).debug === true;
+              if (debug) console.warn('[runtime] patchVNode: fallback replaced parent with newDom for root node', {
                 parent,
                 newDom,
                 oldDom: oldVNode.dom
@@ -528,7 +488,9 @@ function patchVNode(parent: Element, oldVNode: VNode, newVNode: VNode): void {
         const grandparent = parent.parentNode;
         if (grandparent && grandparent instanceof Element) {
           grandparent.replaceChild(newDom, parent);
-          console.warn('[runtime] patchVNode: replaced parent in grandparent due to out-of-sync DOM', {
+          let debug = false;
+          if (parent && 'debug' in parent) debug = (parent as any).debug === true;
+          if (debug) console.warn('[runtime] patchVNode: replaced parent in grandparent due to out-of-sync DOM', {
             grandparent,
             parent,
             newDom,
@@ -539,26 +501,8 @@ function patchVNode(parent: Element, oldVNode: VNode, newVNode: VNode): void {
           const host = parent.parentNode;
           if (host && typeof (host as Node).replaceChild === 'function') {
             (host as Node).replaceChild(newDom, parent);
-            console.warn('[runtime] patchVNode: replaced host root node using replaceChild', {
-              host,
-              parent,
-              newDom,
-              oldDom: oldVNode.dom
-            });
           } else if ('replaceWith' in parent && typeof parent.replaceWith === 'function') {
             parent.replaceWith(newDom);
-            console.warn('[runtime] patchVNode: replaced host root node using replaceWith', {
-              parent,
-              newDom,
-              oldDom: oldVNode.dom
-            });
-          } else {
-            // If neither method is available, log error
-            console.error('[patchVNode] Fallback: could not replace host root node', {
-              parent,
-              newDom,
-              oldDom: oldVNode.dom
-            });
           }
         }
       }
@@ -575,13 +519,6 @@ function patchVNode(parent: Element, oldVNode: VNode, newVNode: VNode): void {
       }
       // For checkboxes, always set value attribute
       if (inputType === 'checkbox' && k === 'value') {
-    console.debug('[patchVNode] Checkbox value assignment (patch):', {
-            key: newVNode.key,
-            value: v,
-            oldValue: oldDom.getAttribute('value'),
-            props: newVNode.props,
-            outerHTML: oldDom.outerHTML
-          });
         oldDom.setAttribute('value', v as string);
         continue;
       }
@@ -614,21 +551,10 @@ function patchVNode(parent: Element, oldVNode: VNode, newVNode: VNode): void {
         const grandparent = parent.parentNode;
         if (grandparent && grandparent instanceof Element) {
           grandparent.replaceChild(newTextNode, parent);
-          console.warn('[runtime] patchVNode: replaced parent in grandparent for text node', {
-            grandparent,
-            parent,
-            newTextNode,
-            oldDom
-          });
         } else {
           parent.innerHTML = '';
           while (parent.firstChild) parent.removeChild(parent.firstChild);
           parent.appendChild(newTextNode);
-          console.warn('[runtime] patchVNode: forced full subtree replacement for text node (no grandparent)', {
-            parent,
-            newTextNode,
-            oldDom
-          });
         }
       }
       newVNode.dom = newTextNode;
@@ -839,35 +765,17 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
    * Sync all controlled inputs and event listeners after render
    */
   private syncControlledInputsAndEvents(): void {
-    // Log the entire shadow DOM after each update
-    if (this.shadowRoot) {
-      console.debug('[sync] Shadow DOM after update:', this.shadowRoot.innerHTML);
-    }
     if (!this.shadowRoot) return;
     // --- Text, Checkbox, Radio ---
     // --- Radio Groups ---
-    this.shadowRoot.querySelectorAll('input[type="radio"][data-model]').forEach((input, idx) => {
+    this.shadowRoot.querySelectorAll('input[type="radio"][data-model]').forEach((input) => {
       const modelAttr = input.getAttribute('data-model');
       if (!modelAttr || !this.stateObj || typeof this.stateObj[modelAttr] === 'undefined') {
-        console.debug(`[sync] Radio input [${idx}] skipped: missing modelAttr or state`, { input });
         return;
       }
       const inputEl = input as HTMLInputElement;
       const stateValue = String(this.stateObj[modelAttr]);
-      const beforeChecked = inputEl.checked;
-      const beforeValue = inputEl.value;
       inputEl.checked = inputEl.value === stateValue;
-      console.debug(`[sync] Radio input [${idx}]`, {
-        name: inputEl.name,
-        modelAttr,
-        value: inputEl.value,
-        checked: inputEl.checked,
-        beforeChecked,
-        beforeValue,
-        stateValue,
-        dataUid: inputEl.getAttribute('data-uid'),
-        outerHTML: inputEl.outerHTML
-      });
     });
     // --- Checkbox, Text, Number ---
     this.shadowRoot.querySelectorAll('input[data-model]').forEach(input => {
@@ -895,29 +803,9 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
             } else {
               inputEl.checked = false;
             }
-            console.debug('[checkbox-sync] Custom value:', {
-              modelAttr,
-              value: inputEl.value,
-              checked: inputEl.checked,
-              checkedAttr: inputEl.getAttribute('checked'),
-              stateVal,
-              typeofStateVal: typeof stateVal,
-              trueValue,
-              falseValue,
-              outerHTML: inputEl.outerHTML
-            });
           } else {
             // Boolean: checked if stateVal is truthy or strictly true
             inputEl.checked = stateVal === true || stateVal === 'true' || stateVal === 1;
-            console.debug('[checkbox-sync] Boolean:', {
-              modelAttr,
-              value: inputEl.value,
-              checked: inputEl.checked,
-              checkedAttr: inputEl.getAttribute('checked'),
-              stateVal,
-              typeofStateVal: typeof stateVal,
-              outerHTML: inputEl.outerHTML
-            });
           }
         }
         // Never set value for checkboxes after mount
@@ -978,28 +866,8 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
             } else {
               el.checked = false;
             }
-            console.debug('[post-sync] Custom value:', {
-              key,
-              value: el.value,
-              checked: el.checked,
-              checkedAttr: el.getAttribute('checked'),
-              stateVal,
-              typeofStateVal: typeof stateVal,
-              trueValue,
-              falseValue,
-              outerHTML: el.outerHTML
-            });
           } else {
             el.checked = stateVal === true || stateVal === 'true' || stateVal === 1;
-            console.debug('[post-sync] Boolean:', {
-              key,
-              value: el.value,
-              checked: el.checked,
-              checkedAttr: el.getAttribute('checked'),
-              stateVal,
-              typeofStateVal: typeof stateVal,
-              outerHTML: el.outerHTML
-            });
           }
         } else if (el.type === 'radio') {
           el.checked = el.value === String(this.stateObj[key]);
@@ -1165,19 +1033,8 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
   private _renderTemplateResult(templateResult: any): void {
     try {
       if (typeof templateResult === 'string') {
-          // Debug: log template string before parsing
-          console.debug('[TemplateString] Before VNode parse:', templateResult);
         const newVNode = parseVNodeFromHTML(templateResult);
-          // Debug: log VNode tree after parsing for all input[type=checkbox]
           function logCheckboxVNodes(vnode: VNode) {
-            if (vnode.type === 'input' && vnode.props?.type === 'checkbox') {
-              console.debug('[VNodeTree] Checkbox VNode after parse:', {
-                key: vnode.key,
-                value: vnode.props?.value,
-                dataUid: vnode.props?.['data-uid'],
-                outerHTML: vnode.dom instanceof Element ? vnode.dom.outerHTML : undefined
-              });
-            }
             vnode.children.forEach(logCheckboxVNodes);
           }
           logCheckboxVNodes(newVNode);
@@ -1323,13 +1180,17 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
    */
   private _handleRenderError(error: any): void {
     // Improved error boundary: log details and allow fallback UI
-    console.error(`[runtime] Render error in <${this.tagName.toLowerCase()}>:`, error);
+    if (this.config.debug) {
+      console.error(`[runtime] Render error in <${this.tagName.toLowerCase()}>:`, error);
+    }
     runtimePlugins.forEach(p => p.onError?.(error, this.stateObj, this.api));
     if ('onError' in this.config && typeof (this.config as any).onError === 'function') {
       try {
         (this.config as any).onError(error as Error, this.api.state, this.api);
       } catch (fallbackError) {
-        console.error(`[runtime] Error in onError handler:`, fallbackError);
+        if (this.config.debug) {
+          console.error(`[runtime] Error in onError handler:`, fallbackError);
+        }
         this.renderError(error as Error);
       }
     } else {
@@ -1427,7 +1288,7 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
             if (!(el as any)._boundHandlers) (el as any)._boundHandlers = {};
             (el as any)._boundHandlers[eventType] = boundHandler;
           } else {
-            console.warn(`[bindEvents] Handler '${handlerName}' not found on config for event '${eventType}'`, el);
+            if (this.config.debug) console.warn(`[bindEvents] Handler '${handlerName}' not found on config for event '${eventType}'`, el);
           }
         }
       });
@@ -1457,6 +1318,10 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
  * @param config - Component configuration
  */
 export function component<S extends ComponentState, C extends Record<string, any> = {}>(tag: string, config: ComponentConfig<S, C>): void {
+  if (config.debug) {
+    console.log(`[runtime] Debugging component: ${tag}`, config);
+  }
+
   // Validate config
   if (!tag || !config.template || !config.state) {
     throw new Error('Component requires tag, template, and state');
@@ -1476,7 +1341,7 @@ export function component<S extends ComponentState, C extends Record<string, any
   }
 
   if (customElements.get(tag)) {
-    console.warn(`Component "${tag}" already registered`);
+    if (config.debug) console.warn(`Component "${tag}" already registered`);
     return;
   }
 

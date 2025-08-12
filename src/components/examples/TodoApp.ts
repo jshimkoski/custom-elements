@@ -202,9 +202,7 @@ component<TodoAppState, TodoAppComputed>('todo-app', {
     if ('key' in e && (e as KeyboardEvent).key === 'Enter' && state.newTodo.trim()) {
       const newId = Math.max(0, ...state.todos.map((t: Todo) => t.id)) + 1;
       const todoText = state.newTodo.trim();
-      console.debug('[todo-added] before clearing newTodo', state.newTodo);
       state.newTodo = ''; // Clear input after adding
-      console.debug('[todo-added] after clearing newTodo', state.newTodo);
       state.todos.push({
         id: newId,
         text: todoText,

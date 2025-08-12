@@ -380,17 +380,11 @@ class TemplateAnalyzer {
         // If the expression is a function, call it with state
         if (expression && typeof expression === 'function') {
           const value = (expression as (s: any) => any)(state);
-          if (typeof window !== 'undefined') {
-            console.debug(`[template-compiler] [function expr] called, value:`, value);
-          }
           return value;
         }
         if (typeof expression === 'string' && expression.startsWith('state.')) {
           const prop = expression.slice(6);
           const value = state[prop];
-          if (typeof window !== 'undefined') {
-            console.debug(`[template-compiler] [getter] '${prop}' called, value:`, value);
-          }
           return value;
         }
         if (typeof expression === 'string' && expression.includes('(')) {

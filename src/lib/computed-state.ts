@@ -15,7 +15,6 @@ export function reactive<T extends object, C extends Record<string, (state: T) =
   // Always notify listeners with the top-level proxy
   let topProxy: any = null;
   function subscribe(fn: (state: T) => void) {
-    console.debug('[reactive] subscribe called');
     listeners.push(fn);
     return () => {
       const idx = listeners.indexOf(fn);
@@ -26,7 +25,6 @@ export function reactive<T extends object, C extends Record<string, (state: T) =
   // Mutation API (for compatibility)
   function set(changes: Partial<T>) {
     Object.assign(topProxy, changes);
-    console.debug('[reactive] set called, notifying listeners', changes);
     listeners.forEach(fn => fn(topProxy));
   }
 
