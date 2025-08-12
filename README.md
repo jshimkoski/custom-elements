@@ -38,17 +38,21 @@ Build modern web components with strict TypeScript, zero dependencies, and a fun
 ## Minimal Example
 
 ```typescript
-import { component, html, css } from './lib/runtime.ts';
+import { html, css, component } from '../../lib/runtime';
+
+interface MinimalExampleState {
+  count: number;
+}
 
 component('minimal-example', {
   state: { count: 0 },
-  template: ({ count }) => html`
+  template: ({ count }: MinimalExampleState) => html`
     <button data-on-click="increment">Count: ${count}</button>
-  `,
+  `({ count }),
   style: css`
     button { font-size: 1.2rem; padding: 0.5rem 1rem; }
   `,
-  increment(_e, state) {
+  increment(_e: Event, state: MinimalExampleState) {
     state.count++;
   }
 });

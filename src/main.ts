@@ -1,4 +1,5 @@
 import './style.css';
+import './components/examples/MinimalExample';
 import './components/examples/TodoApp';
 import './components/examples/TodoAppCompiled';
 import './components/examples/ShoppingCart';
@@ -19,6 +20,7 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
     </p>
     
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 2rem; margin: 2rem 0;">
+      <minimal-example></minimal-example>
       <todo-app></todo-app>
       <todo-app-compiled></todo-app-compiled>
       <perf-counter></perf-counter>
