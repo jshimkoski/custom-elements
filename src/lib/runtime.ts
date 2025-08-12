@@ -126,6 +126,9 @@ function useDataModel(el: Element, stateObj: any, keyWithModifiers: string) {
   const updateState = (e: Event) => {
     let value: any;
     if (el instanceof HTMLInputElement && el.type === 'checkbox') {
+      // Support single checkbox with data-true-value and data-false-value
+      const trueValue = el.getAttribute('data-true-value');
+      const falseValue = el.getAttribute('data-false-value');
       value = el.value;
       if (Array.isArray(stateObj[key])) {
         const arr = stateObj[key] as any[];
@@ -137,7 +140,16 @@ function useDataModel(el: Element, stateObj: any, keyWithModifiers: string) {
         }
         stateObj[key] = arr;
       } else {
-        stateObj[key] = el.checked ? value : false;
+        // Single checkbox: set true/false or custom values
+        if (trueValue !== null || falseValue !== null) {
+          if (el.checked) {
+            stateObj[key] = trueValue;
+          } else {
+            stateObj[key] = falseValue !== null ? falseValue : false;
+          }
+        } else {
+          stateObj[key] = el.checked;
+        }
       }
       console.debug('[useDataModel] Checkbox change:', { key, value, stateObj });
     } else if (el instanceof HTMLInputElement && el.type === 'radio') {
@@ -341,6 +353,11 @@ function createVNodeFromElement(node: ChildNode, parentPath: string = '', childI
     if (tagName === 'input' && elem.hasAttribute('data-model')) {
       const model = elem.getAttribute('data-model')!;
       const inputType = elem.getAttribute('type');
+      // Always assign value 'on' for single checkbox if missing
+      if (inputType === 'checkbox' && !elem.hasAttribute('value')) {
+        elem.setAttribute('value', 'on');
+        props['value'] = 'on';
+      }
       if (inputType === 'radio' || inputType === 'checkbox') {
         // Always use DOM value attribute, fallback to 'on' if missing
         let valueAttr = elem.getAttribute('value');
@@ -864,7 +881,44 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
         if (Array.isArray(stateVal)) {
           inputEl.checked = stateVal.includes(inputEl.value);
         } else {
-          inputEl.checked = inputEl.value === String(stateVal);
+          // Single checkbox: support boolean and custom true/false values
+          const trueValue = inputEl.getAttribute('data-true-value');
+          const falseValue = inputEl.getAttribute('data-false-value');
+          if (trueValue !== null || falseValue !== null) {
+            // Custom true/false values
+            if (String(stateVal) === trueValue) {
+              inputEl.checked = true;
+            } else if (String(stateVal) === falseValue) {
+              inputEl.checked = false;
+            } else if (stateVal === true) {
+              inputEl.checked = true;
+            } else {
+              inputEl.checked = false;
+            }
+            console.debug('[checkbox-sync] Custom value:', {
+              modelAttr,
+              value: inputEl.value,
+              checked: inputEl.checked,
+              checkedAttr: inputEl.getAttribute('checked'),
+              stateVal,
+              typeofStateVal: typeof stateVal,
+              trueValue,
+              falseValue,
+              outerHTML: inputEl.outerHTML
+            });
+          } else {
+            // Boolean: checked if stateVal is truthy or strictly true
+            inputEl.checked = stateVal === true || stateVal === 'true' || stateVal === 1;
+            console.debug('[checkbox-sync] Boolean:', {
+              modelAttr,
+              value: inputEl.value,
+              checked: inputEl.checked,
+              checkedAttr: inputEl.getAttribute('checked'),
+              stateVal,
+              typeofStateVal: typeof stateVal,
+              outerHTML: inputEl.outerHTML
+            });
+          }
         }
         // Never set value for checkboxes after mount
       } else if (inputEl.type === 'radio') {
@@ -907,26 +961,53 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
     shadow.querySelectorAll('[data-model]').forEach((el) => {
       const [key] = el.getAttribute('data-model')?.split('|').map(s => s.trim()) ?? [];
       if (!key || !(key in this.stateObj)) return;
-      // Only set value/checked for input, textarea, select
-      if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement) {
-        if (typeof this.stateObj[key] !== 'undefined') {
-          // Never set value for radio or checkbox inputs
-          if (!(el instanceof HTMLInputElement && (el.type === 'radio' || el.type === 'checkbox'))) {
-            el.value = String(this.stateObj[key] ?? '');
-          }
-        }
-        if (el instanceof HTMLInputElement && el.type === 'checkbox') {
-          // Multi-checkbox group: checked if value is in array, else match string
+      if (el instanceof HTMLInputElement) {
+        if (el.type === 'checkbox') {
           const stateVal = this.stateObj[key];
+          const trueValue = el.getAttribute('data-true-value');
+          const falseValue = el.getAttribute('data-false-value');
           if (Array.isArray(stateVal)) {
             el.checked = stateVal.includes(el.value);
+          } else if (trueValue !== null || falseValue !== null) {
+            if (String(stateVal) === trueValue) {
+              el.checked = true;
+            } else if (String(stateVal) === falseValue) {
+              el.checked = false;
+            } else if (stateVal === true) {
+              el.checked = true;
+            } else {
+              el.checked = false;
+            }
+            console.debug('[post-sync] Custom value:', {
+              key,
+              value: el.value,
+              checked: el.checked,
+              checkedAttr: el.getAttribute('checked'),
+              stateVal,
+              typeofStateVal: typeof stateVal,
+              trueValue,
+              falseValue,
+              outerHTML: el.outerHTML
+            });
           } else {
-            el.checked = el.value === String(stateVal);
+            el.checked = stateVal === true || stateVal === 'true' || stateVal === 1;
+            console.debug('[post-sync] Boolean:', {
+              key,
+              value: el.value,
+              checked: el.checked,
+              checkedAttr: el.getAttribute('checked'),
+              stateVal,
+              typeofStateVal: typeof stateVal,
+              outerHTML: el.outerHTML
+            });
           }
-        }
-        if (el instanceof HTMLInputElement && el.type === 'radio') {
+        } else if (el.type === 'radio') {
           el.checked = el.value === String(this.stateObj[key]);
+        } else {
+          el.value = String(this.stateObj[key] ?? '');
         }
+      } else if (el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement) {
+        el.value = String(this.stateObj[key] ?? '');
       }
     });
   }

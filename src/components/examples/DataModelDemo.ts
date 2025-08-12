@@ -4,6 +4,8 @@ component('data-model-demo', {
   state: {
     text: '',
     checked: ['checked1'],
+    checkedSingle: true,
+    checkedSingleCustom: 'awesome',
     radio: 'option1',
     textarea: '',
     select: 'b',
@@ -21,6 +23,15 @@ component('data-model-demo', {
           <input type="checkbox" value="checked1" data-model="checked" />
           <input type="checkbox" value="checked2" data-model="checked" />
           <span>${state.checked.join(', ')}</span>
+          Checkbox single:
+          <input type="checkbox" data-model="checkedSingle" />
+          Checkbox single custom:
+          <input
+            type="checkbox"
+            data-model="checkedSingleCustom"
+            data-true-value="awesome"
+            data-false-value="not awesome"
+          />
         </label>
         <fieldset>
           <legend>Radio Group:</legend>
