@@ -793,6 +793,9 @@ function patchVNode(parent: Element, oldVNode: VNode, newVNode: VNode): void {
  * @template C - Computed type
  */
 class ComponentElement<S extends ComponentState, C extends Record<string, any> = {}> extends HTMLElement {
+  private _mountedCalled = false;
+  private _unmountedCalled = false;
+
   /**
    * observedAttributes automatically returns all primitive keys from static state.
    * This enables automatic attribute observation for all primitive state properties.
@@ -818,8 +821,10 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
     if (name in this.stateObj) {
       const initialType = typeof (this.config?.state?.[name]);
       let value: any = newValue;
-      if (initialType === 'number') {
-        if (value === null || value === undefined || value === '') {
+      if (newValue === null) {
+        value = undefined;
+      } else if (initialType === 'number') {
+        if (value === undefined || value === '') {
           value = this.config?.state?.[name];
         } else {
           const num = Number(value);
@@ -1079,9 +1084,20 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
           let value: any = this.getAttribute(attr);
           if (initialType === 'number') value = Number(value);
           else if (initialType === 'boolean') value = value === 'true';
-          (this.stateObj as any)[attr] = value;
+          (this.stateObj as any)[attr] = value === null ? undefined : value;
         }
       }
+    }
+    if (!this._mountedCalled && typeof this.config.onMounted === 'function') {
+      try {
+        this.config.onMounted(this.api.state, this.api);
+      } catch (err) {
+        if (typeof this.config.onError === 'function') {
+          this.config.onError(err, this.api.state, this.api);
+        }
+        this._handleRenderError(err);
+      }
+      this._mountedCalled = true;
     }
     if (typeof this.render === 'function') this.render();
   }
@@ -1094,7 +1110,17 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
     this.unsubscribes = [];
     this._globalUnsubscribes.forEach(fn => fn());
     this._globalUnsubscribes = [];
-    this.config.onUnmounted?.(this.api.state, this.api);
+    if (!this._unmountedCalled && typeof this.config.onUnmounted === 'function') {
+      try {
+        this.config.onUnmounted(this.api.state, this.api);
+      } catch (err) {
+        if (typeof this.config.onError === 'function') {
+          this.config.onError(err, this.api.state, this.api);
+        }
+        this._handleRenderError(err);
+      }
+      this._unmountedCalled = true;
+    }
   }
 
   /**
@@ -1107,6 +1133,17 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
     try {
       // Plugin hook: onRender
       runtimePlugins.forEach(p => p.onRender?.(this.stateObj, this.api));
+      // Error boundary for computed properties
+      if (this.config.computed) {
+        Object.values(this.config.computed).forEach(fn => {
+          try {
+            fn(this.stateObj);
+          } catch (err) {
+            this._handleRenderError(err);
+          }
+        });
+      }
+      // Do not call lifecycle hooks here; only call in connected/disconnectedCallback
       const templateResultOrPromise = this.config.template(this.stateObj as S & C, this.api);
       if (templateResultOrPromise instanceof Promise) {
         templateResultOrPromise.then(templateResult => {
@@ -1163,11 +1200,21 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
   private _renderTemplateResult(templateResult: any): void {
     try {
       if (typeof templateResult === 'string') {
-        const newVNode = parseVNodeFromHTML(templateResult);
-          function logCheckboxVNodes(vnode: VNode) {
-            vnode.children.forEach(logCheckboxVNodes);
-          }
-          logCheckboxVNodes(newVNode);
+        // --- Sanitize HTML for XSS ---
+        function sanitizeHTML(html: string): string {
+          // Remove all on* attributes (e.g., onclick, onerror)
+          return html.replace(/<([a-zA-Z0-9]+)([^>]*)>/g, (_match, tag, attrs) => {
+            // Remove dangerous attributes
+            const safeAttrs = attrs.replace(/\s+on[a-zA-Z]+\s*=\s*(['"][^'"]*['"]|[^\s>]*)/gi, '');
+            return `<${tag}${safeAttrs}>`;
+          });
+        }
+        const sanitizedHTML = sanitizeHTML(templateResult);
+        const newVNode = parseVNodeFromHTML(sanitizedHTML);
+        function logCheckboxVNodes(vnode: VNode) {
+          vnode.children.forEach(logCheckboxVNodes);
+        }
+        logCheckboxVNodes(newVNode);
         const shadowRoot = this.shadowRoot;
         if (!shadowRoot) {
           return;
@@ -1468,8 +1515,38 @@ export function component<S extends ComponentState, C extends Record<string, any
 
   // Validate config
   if (!tag || !config.template || !config.state) {
-    throw new Error('Component requires tag, template, and state');
+    if (config && typeof config.onError === 'function') {
+      config.onError(new Error('Component requires tag, template, and state'), config.state, {
+        state: config.state,
+        emit: () => {},
+        onGlobal: () => () => {},
+        offGlobal: () => {},
+        emitGlobal: () => {}
+      });
+    }
+    if (config && config.debug) {
+      console.error('[runtime] Malformed config:', { tag, config });
+    }
+    return;
   }
+
+  // Plugin System: Call all plugins' onInit in registration order
+  runtimePlugins.forEach(p => {
+    try {
+      p.onInit?.(config as any);
+    } catch (err) {
+      if (config && typeof config.onError === 'function') {
+        config.onError(err instanceof Error ? err : new Error(String(err)), config.state, {
+          state: config.state,
+          emit: () => {},
+          onGlobal: () => () => {},
+          offGlobal: () => {},
+          emitGlobal: () => {}
+        });
+      }
+      if (config && config.debug) console.error('[runtime] Plugin onInit error:', err);
+    }
+  });
 
   // HMR support: unregister previous definition if in dev and module.hot is available
   const isDev = typeof window !== 'undefined' && (window as any).VITE_DEV_HMR;

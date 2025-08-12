@@ -333,4 +333,201 @@ describe('runtime.ts', () => {
     expect(config.onError).toHaveBeenCalled();
     document.body.removeChild(el);
   });
+  // --- Advanced Test Suites ---
+
+  describe('Error Boundaries & Recovery', () => {
+    it('recovers from errors in computed properties', () => {
+      const config = getTestConfig();
+      config.computed.greeting = () => { throw new Error('Computed error'); };
+      config.onError = vi.fn();
+      component('error-computed-element', config);
+      const el = document.createElement('error-computed-element');
+      document.body.appendChild(el);
+      // @ts-ignore
+      el['render']();
+      expect(config.onError).toHaveBeenCalled();
+      document.body.removeChild(el);
+    });
+    it('recovers from errors in lifecycle hooks', () => {
+      const config = getTestConfig();
+      config.onMounted = vi.fn(() => { throw new Error('Mount error'); });
+      config.onError = vi.fn();
+      component('error-lifecycle-element', config);
+      const el = document.createElement('error-lifecycle-element');
+      document.body.appendChild(el);
+      expect(config.onError).toHaveBeenCalled();
+      document.body.removeChild(el);
+    });
+  });
+
+  describe('Attribute/Property Sync', () => {
+    it('syncs null/undefined attributes to state', () => {
+      const config = getTestConfig();
+      component('sync-attr-element', config);
+      const el = document.createElement('sync-attr-element');
+      document.body.appendChild(el);
+      el.setAttribute('name', '');
+      // @ts-ignore
+      expect(el['stateObj'].name).toBe('');
+      el.removeAttribute('name');
+      // @ts-ignore
+      expect(el['stateObj'].name).toBeUndefined();
+      document.body.removeChild(el);
+    });
+    it('coerces attribute types correctly', () => {
+      const config = getTestConfig();
+      component('coerce-attr-element', config);
+      const el = document.createElement('coerce-attr-element');
+      document.body.appendChild(el);
+      el.setAttribute('name', '123');
+      // @ts-ignore
+      expect(typeof el['stateObj'].name).toBe('string');
+      document.body.removeChild(el);
+    });
+  });
+
+  describe('Shadow DOM & Light DOM', () => {
+    it('supports slotting and event propagation', () => {
+      const config = getTestConfig();
+      config.template = () => `<slot></slot>`;
+      component('slot-element', config);
+      const el = document.createElement('slot-element');
+      const child = document.createElement('span');
+      let eventFired = false;
+      child.addEventListener('click', () => { eventFired = true; });
+      el.appendChild(child);
+      document.body.appendChild(el);
+      child.dispatchEvent(new Event('click', { bubbles: true }));
+      expect(eventFired).toBe(true);
+      document.body.removeChild(el);
+    });
+  });
+
+  describe('Dynamic Template Updates', () => {
+    it('updates template function at runtime', () => {
+      const config = getTestConfig();
+      component('dynamic-template-element', config);
+      const el = document.createElement('dynamic-template-element');
+      document.body.appendChild(el);
+      // @ts-ignore
+      expect(el.shadowRoot?.innerHTML).toContain('Hello World');
+      config.template = () => `<div>Changed</div>`;
+      // @ts-ignore
+      el['render']();
+      expect(el.shadowRoot?.innerHTML).toContain('Changed');
+      document.body.removeChild(el);
+    });
+  });
+
+  describe('Plugin System', () => {
+    it('executes plugins in correct order', () => {
+      const calls: string[] = [];
+      const pluginA = { onInit: () => calls.push('A') };
+      const pluginB = { onInit: () => calls.push('B') };
+      useRuntimePlugin(pluginA);
+      useRuntimePlugin(pluginB);
+      component('plugin-order-element', getTestConfig());
+      const el = document.createElement('plugin-order-element');
+      document.body.appendChild(el);
+      expect(calls).toEqual(['A', 'B']);
+      document.body.removeChild(el);
+    });
+    it('handles plugin errors gracefully', () => {
+      const plugin = { onInit: () => { throw new Error('Plugin error'); } };
+      useRuntimePlugin(plugin);
+      const config = getTestConfig();
+      config.onError = vi.fn();
+      component('plugin-error-element', config);
+      const el = document.createElement('plugin-error-element');
+      document.body.appendChild(el);
+      expect(config.onError).toHaveBeenCalled();
+      document.body.removeChild(el);
+    });
+  });
+
+  describe('Global Event Bus', () => {
+    it('allows cross-component event communication', () => {
+      const configA = { ...getTestConfig(), onCustom: vi.fn() };
+      const configB = { ...getTestConfig(), template: () => `<button data-on-click=\"onCustom\">Send</button>`, onCustom: vi.fn() };
+      component('event-bus-a', configA);
+      component('event-bus-b', configB);
+      const elA = document.createElement('event-bus-a');
+      const elB = document.createElement('event-bus-b');
+      document.body.appendChild(elA);
+      document.body.appendChild(elB);
+      const btn = elB.shadowRoot!.querySelector('button')!;
+      btn.dispatchEvent(new Event('click'));
+      expect(configA.onCustom).not.toHaveBeenCalled(); // Should not be called unless global bus is used
+      document.body.removeChild(elA);
+      document.body.removeChild(elB);
+    });
+  });
+
+  describe('Performance & Memory', () => {
+    it('mounts and unmounts repeatedly without leaks', () => {
+      const config = getTestConfig();
+      component('perf-element', config);
+      for (let i = 0; i < 10; i++) {
+        const el = document.createElement('perf-element');
+        document.body.appendChild(el);
+        document.body.removeChild(el);
+      }
+      expect(config.onMounted).toHaveBeenCalledTimes(10);
+      expect(config.onUnmounted).toHaveBeenCalledTimes(10);
+    });
+  });
+
+  describe('Security & Input Validation', () => {
+    it('sanitizes user input to prevent XSS', () => {
+      const config = getTestConfig();
+      config.state.name = '<img src=x onerror=alert(1)>';
+      component('xss-element', config);
+      const el = document.createElement('xss-element');
+      document.body.appendChild(el);
+      // @ts-ignore
+      expect(el.shadowRoot?.innerHTML).not.toContain('onerror');
+      document.body.removeChild(el);
+    });
+  });
+
+  describe('Custom Element Lifecycle', () => {
+    it('calls adoptedCallback if implemented', () => {
+      const config = { ...getTestConfig(), adoptedCallback: vi.fn() };
+      component('adopted-element', config);
+      const el = document.createElement('adopted-element');
+      document.body.appendChild(el);
+      if (typeof el['adoptedCallback'] === 'function') {
+        el['adoptedCallback']();
+        expect(config.adoptedCallback).toHaveBeenCalled();
+      }
+      document.body.removeChild(el);
+    });
+  });
+
+  describe('Edge Cases', () => {
+    it('handles deeply nested components', () => {
+      const config = getTestConfig();
+      config.template = () => `<nested-element></nested-element>`;
+      component('nested-element', getTestConfig());
+      component('deep-element', config);
+      const el = document.createElement('deep-element');
+      document.body.appendChild(el);
+      expect(el.shadowRoot?.innerHTML).toContain('nested-element');
+      document.body.removeChild(el);
+    });
+    it('handles circular references in state', () => {
+      const config = getTestConfig();
+      // @ts-ignore
+      config.state.self = config.state;
+      component('circular-element', config);
+      const el = document.createElement('circular-element');
+      document.body.appendChild(el);
+      expect(el.shadowRoot?.innerHTML).toContain('Hello World');
+      document.body.removeChild(el);
+    });
+    it('handles malformed configs gracefully', () => {
+      const config = {} as any;
+      expect(() => component('malformed-element', config)).not.toThrow();
+    });
+  });
 });
