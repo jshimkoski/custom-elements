@@ -1,50 +1,4 @@
-// ============================================================================
-/**
- * Safely replaces a child node, guarding against NotFoundError and out-of-sync trees.
- * Falls back to appendChild if oldChild is not present.
- * Logs mutation for debugging.
- */
-function safeReplaceChild(parent: Node | null, newChild: Node, oldChild: Node): void {
-  // Get debug flag from parent custom element instance if available
-  let debug = false;
-  if (parent && parent instanceof Element && 'debug' in parent) {
-    debug = (parent as any).debug === true;
-  }
-  if (!parent || !(parent instanceof Element)) {
-    if (debug) console.warn('[runtime] safeReplaceChild: parent is missing or not an Element', { parent, newChild, oldChild });
-    return;
-  }
-  if (parent.contains(oldChild) && oldChild.parentNode === parent) {
-    try {
-      parent.replaceChild(newChild, oldChild);
-    } catch (err) {
-      if (debug) console.error('[runtime] safeReplaceChild: error replacing child', err, {
-        parent,
-        newChild,
-        oldChild,
-        parentHTML: (parent as Element).outerHTML,
-        newChildHTML: (newChild as Element).outerHTML,
-        oldChildHTML: (oldChild as Element).outerHTML
-      });
-    }
-  } else {
-    // Do NOT append newChild if oldChild is missing during patching
-    if (debug) console.warn('[runtime] safeReplaceChild: attempted to replace missing child, skipping mutation', {
-      parent,
-      newChild,
-      oldChild,
-      parentChildren: Array.from(parent.childNodes).map(n => n.nodeName),
-      parentHTML: (parent as Element).outerHTML,
-      newChildHTML: (newChild as Element).outerHTML,
-      oldChildHTML: (oldChild as Element).outerHTML
-    });
-  }
-}
-// CORE TYPES (move to top for type safety)
-// ============================================================================
-
 export interface ComponentState extends Record<string, unknown> {}
-
 export interface ComponentAPI<T extends ComponentState = ComponentState> {
   readonly state: T;
   emit(eventName: string, detail?: unknown): void;
@@ -52,7 +6,6 @@ export interface ComponentAPI<T extends ComponentState = ComponentState> {
   offGlobal<U = any>(eventName: string, handler: (data: U) => void): void;
   emitGlobal<U = any>(eventName: string, data?: U): void;
 }
-
 export interface ComponentConfig<S extends ComponentState, C extends Record<string, any> = {}> {
   readonly template: (state: S & C, api: ComponentAPI<S & C>) => string | Promise<string> | CompiledTemplate<S & C>;
   readonly state: S;
@@ -64,31 +17,26 @@ export interface ComponentConfig<S extends ComponentState, C extends Record<stri
   readonly debug?: boolean;
   [handler: string]: any;
 }
-
 export type RefHandler<T extends ComponentState> = (
   element: Element,
   state: T,
   api: ComponentAPI<T>
 ) => void;
-
 export type ComputedHandler<T extends ComponentState> = (state: T) => unknown;
 export type LifecycleHandler<T extends ComponentState> = (
   state: T,
   api: ComponentAPI<T>
 ) => void;
-
 export type CompiledTemplate<S extends ComponentState = ComponentState> = {
   id: string;
   render: (state: S, api: ComponentAPI<S>) => DocumentFragment;
 };
-
-// PLUGIN SYSTEM (move up for order)
-type RuntimePlugin<S extends ComponentState, C extends Record<string, any>> = {
+export type RuntimePlugin<S extends ComponentState, C extends Record<string, any>> = {
   onInit?: (config: ComponentConfig<S, C>) => void;
   onRender?: (state: S & C, api: ComponentAPI<S & C>) => void;
   onError?: (error: Error, state: S & C, api: ComponentAPI<S & C>) => void;
 };
-const runtimePlugins: RuntimePlugin<any, any>[] = [];
+export const runtimePlugins: RuntimePlugin<any, any>[] = [];
 export function useRuntimePlugin<S extends ComponentState, C extends Record<string, any>>(plugin: RuntimePlugin<S, C>) {
   runtimePlugins.push(plugin);
 }
@@ -114,8 +62,11 @@ export { compileTemplate, renderCompiledTemplate, updateCompiledTemplate } from 
 
 import { reactive } from './computed-state';
 import { eventBus } from './event-bus';
-// Use local types declared in this file, not imported
 import { renderCompiledTemplate, updateCompiledTemplate } from './template-compiler';
+
+// ============================================================================
+// Data/Event Binding
+// ============================================================================
 
 // Minimal controlled input binding helper
 function useDataModel(el: Element, stateObj: any, keyWithModifiers: string) {
@@ -198,8 +149,61 @@ function useDataModel(el: Element, stateObj: any, keyWithModifiers: string) {
 }
 
 // ============================================================================
-// UTILITIES
+// VDOM
 // ============================================================================
+
+/**
+ * Virtual Node (VNode) structure for incremental migration
+ */
+interface VNode {
+  type: string; // tag name or '#text'
+  key?: string;
+  props: Record<string, any>;
+  children: VNode[];
+  dom?: Element | Text;
+}
+
+/**
+ * Safely replaces a child node, guarding against NotFoundError and out-of-sync trees.
+ * Falls back to appendChild if oldChild is not present.
+ * Logs mutation for debugging.
+ */
+function safeReplaceChild(parent: Node | null, newChild: Node, oldChild: Node): void {
+  // Get debug flag from parent custom element instance if available
+  let debug = false;
+  if (parent && parent instanceof Element && 'debug' in parent) {
+    debug = (parent as any).debug === true;
+  }
+  if (!parent || !(parent instanceof Element)) {
+    if (debug) console.warn('[runtime] safeReplaceChild: parent is missing or not an Element', { parent, newChild, oldChild });
+    return;
+  }
+  if (parent.contains(oldChild) && oldChild.parentNode === parent) {
+    try {
+      parent.replaceChild(newChild, oldChild);
+    } catch (err) {
+      if (debug) console.error('[runtime] safeReplaceChild: error replacing child', err, {
+        parent,
+        newChild,
+        oldChild,
+        parentHTML: (parent as Element).outerHTML,
+        newChildHTML: (newChild as Element).outerHTML,
+        oldChildHTML: (oldChild as Element).outerHTML
+      });
+    }
+  } else {
+    // Do NOT append newChild if oldChild is missing during patching
+    if (debug) console.warn('[runtime] safeReplaceChild: attempted to replace missing child, skipping mutation', {
+      parent,
+      newChild,
+      oldChild,
+      parentChildren: Array.from(parent.childNodes).map(n => n.nodeName),
+      parentHTML: (parent as Element).outerHTML,
+      newChildHTML: (newChild as Element).outerHTML,
+      oldChildHTML: (oldChild as Element).outerHTML
+    });
+  }
+}
 
 /**
  * Mount a VNode to the DOM and return the created node
@@ -259,17 +263,6 @@ function parseVNodeFromHTML(html: string): VNode {
     children: nodes.map((node, idx) => createVNodeFromElement(node, '#fragment', idx)),
     dom: undefined
   };
-}
-
-/**
- * Virtual Node (VNode) structure for incremental migration
- */
-interface VNode {
-  type: string; // tag name or '#text'
-  key?: string;
-  props: Record<string, any>;
-  children: VNode[];
-  dom?: Element | Text;
 }
 
 /**
@@ -732,6 +725,10 @@ function patchVNode(parent: Element, oldVNode: VNode, newVNode: VNode): void {
   }
   newVNode.dom = oldDom;
 }
+
+// ============================================================================
+// Component Lifecycle
+// ============================================================================
 
 class ComponentElement<S extends ComponentState, C extends Record<string, any> = {}> extends HTMLElement {
   /**
@@ -1391,6 +1388,7 @@ export function component<S extends ComponentState, C extends Record<string, any
   // HMR support: unregister previous definition if in dev and module.hot is available
   const isDev = typeof window !== 'undefined' && (window as any).VITE_DEV_HMR;
   const hasHMR = typeof import.meta !== 'undefined' && (import.meta as any).hot;
+
   if ((isDev || hasHMR) && customElements.get(tag)) {
     try {
       document.querySelectorAll(tag).forEach(el => el.remove());
@@ -1414,6 +1412,7 @@ export function component<S extends ComponentState, C extends Record<string, any
   const primitiveKeys = Object.keys(config.state).filter(
     key => ['string', 'number', 'boolean'].includes(typeof config.state[key])
   );
+
   const ComponentClass = class extends ComponentElement<S, C> {
     static get observedAttributes() {
       return primitiveKeys;
@@ -1422,11 +1421,12 @@ export function component<S extends ComponentState, C extends Record<string, any
       super();
     }
   };
+
   if (!customElements.get(tag)) {
-  // Store config in a global registry for lookup in connectedCallback
-  (window as any).__componentRegistry = (window as any).__componentRegistry || {};
-  (window as any).__componentRegistry[tag] = config;
-  customElements.define(tag, ComponentClass);
+    // Store config in a global registry for lookup in connectedCallback
+    (window as any).__componentRegistry = (window as any).__componentRegistry || {};
+    (window as any).__componentRegistry[tag] = config;
+    customElements.define(tag, ComponentClass);
   }
 
   // Accept HMR updates if available
