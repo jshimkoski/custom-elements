@@ -1071,7 +1071,18 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
     } else {
       this.processRefs();
     }
-    this.config.onMounted?.(this.api.state, this.api);
+    // Only call onMounted here if not already called
+    if (!this._mountedCalled && typeof this.config.onMounted === 'function') {
+      try {
+        this.config.onMounted(this.api.state, this.api);
+      } catch (err) {
+        if (typeof this.config.onError === 'function') {
+          this.config.onError(err, this.api.state, this.api);
+        }
+        this._handleRenderError(err);
+      }
+      this._mountedCalled = true;
+    }
   }
 
   connectedCallback(): void {
@@ -1088,6 +1099,7 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
         }
       }
     }
+    // Only call onMounted if not already called
     if (!this._mountedCalled && typeof this.config.onMounted === 'function') {
       try {
         this.config.onMounted(this.api.state, this.api);
@@ -1121,6 +1133,9 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
       }
       this._unmountedCalled = true;
     }
+    // Reset flags for future re-mounts
+    this._mountedCalled = false;
+    this._unmountedCalled = false;
   }
 
   /**
