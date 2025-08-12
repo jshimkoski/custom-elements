@@ -119,17 +119,19 @@ describe('data-model binding', () => {
       (checkboxes[0] as HTMLInputElement).checked = true;
       (checkboxes[0] as HTMLInputElement).dispatchEvent(new Event('change'));
       await new Promise(requestAnimationFrame);
-      // @ts-ignore
+      expect(Array.isArray(el['stateObj'].multiValue)).toBe(true);
       expect(el['stateObj'].multiValue.map(String)).toContain('a');
+
       (checkboxes[1] as HTMLInputElement).checked = true;
       (checkboxes[1] as HTMLInputElement).dispatchEvent(new Event('change'));
       await new Promise(requestAnimationFrame);
-      // @ts-ignore
+      expect(Array.isArray(el['stateObj'].multiValue)).toBe(true);
       expect(el['stateObj'].multiValue.map(String)).toContain('b');
+
       (checkboxes[0] as HTMLInputElement).checked = false;
       (checkboxes[0] as HTMLInputElement).dispatchEvent(new Event('change'));
       await new Promise(requestAnimationFrame);
-      // @ts-ignore
+      expect(Array.isArray(el['stateObj'].multiValue)).toBe(true);
       expect(el['stateObj'].multiValue.map(String)).not.toContain('a');
       document.body.removeChild(el);
     });
