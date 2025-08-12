@@ -1,8 +1,9 @@
-# 📖 API Reference
 
-See [`src/lib/runtime.ts`](src/lib/runtime.ts) for full API docs and advanced usage.
+# Runtime API Reference
 
-**Only the documented API is supported. If a feature is not listed here or in `src/lib/runtime.ts`, it is not guaranteed to work.**
+All APIs are strictly typed and match the implementation in `runtime.ts`. Only documented features are supported.
+
+---
 
 ## Component Configuration
 
@@ -21,9 +22,11 @@ export interface ComponentConfig<S extends ComponentState, C extends Record<stri
 ```
 
 **Notes:**
-- All event handlers (for `data-on-*` and `refs`) must be defined on the config object.
+- Event handlers for `data-on-*` and `refs` must be defined on the config object.
 - Only one event handler per event type per element is attached; previous handlers are removed on rerender.
 - `computed` is for derived, reactive values.
+
+---
 
 ## Component API
 
@@ -37,6 +40,8 @@ export interface ComponentAPI<T extends ComponentState = ComponentState> {
 }
 ```
 
+---
+
 ## Plugin System
 
 ```typescript
@@ -48,6 +53,8 @@ export function useRuntimePlugin<S extends ComponentState, C extends Record<stri
   }
 ): void;
 ```
+
+---
 
 ## SSR Functions
 
@@ -61,6 +68,8 @@ renderComponentsToString(components: SSRComponentConfig<any>[], options?: SSRRen
 generateHydrationScript(context: SSRContext): string;
 ```
 
+---
+
 ## Template Helpers
 
 ```typescript
@@ -70,6 +79,8 @@ compile<T = any>(strings: TemplateStringsArray, ...expressions: Array<(state: T,
 classes(obj: Record<string, boolean>): string;
 styles(obj: Record<string, string | number>): string;
 ```
+
+---
 
 ## Event Bus & Store
 
@@ -84,6 +95,8 @@ class Store<T extends object> {
   getState(): T;
 }
 ```
+
+---
 
 ## Types
 

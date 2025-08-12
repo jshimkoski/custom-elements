@@ -1,4 +1,9 @@
-# 🧐 Examples
+
+# Examples
+
+Quick, readable examples for common patterns. All code matches the runtime API and is type-safe.
+
+---
 
 ## Hello World
 
@@ -14,6 +19,8 @@ component('hello-world', {
 ```html
 <hello-world></hello-world>
 ```
+
+---
 
 ## Simple Counter
 
@@ -35,6 +42,8 @@ component('simple-counter', {
 <simple-counter></simple-counter>
 ```
 
+---
+
 ## Async Rendering Example
 
 ```typescript
@@ -49,6 +58,8 @@ component('async-demo', {
 });
 ```
 
+---
+
 ## Selective Hydration Example
 
 ```html
@@ -56,6 +67,8 @@ component('async-demo', {
   <!-- Only this region will be hydrated on the client -->
 </div>
 ```
+
+---
 
 ## Focus Preservation Example
 
@@ -70,6 +83,8 @@ component('focus-demo', {
   `
 });
 ```
+
+---
 
 ## Todo App Example
 
@@ -105,13 +120,13 @@ component<TodoAppState, TodoAppComputed>('todo-app', {
     filter: 'all'
   },
   computed: {
-    filteredTodos: (state: TodoAppState) => state.todos.filter((todo: Todo) => {
+    filteredTodos: (state) => state.todos.filter((todo) => {
       if (state.filter === 'active') return !todo.completed;
       if (state.filter === 'completed') return todo.completed;
       return true;
     }),
-    activeTodos: (state: TodoAppState) => state.todos.filter((todo: Todo) => !todo.completed),
-    completedCount: (state: TodoAppState) => state.todos.filter((todo: Todo) => todo.completed).length
+    activeTodos: (state) => state.todos.filter((todo) => !todo.completed),
+    completedCount: (state) => state.todos.filter((todo) => todo.completed).length
   },
   template: (state, api) => html`
     <div class="todo-app">
@@ -147,7 +162,7 @@ component<TodoAppState, TodoAppComputed>('todo-app', {
           </button>
         </div>
         <ul class="todo-list">
-          ${state.filteredTodos.map((todo: Todo) => html`
+          ${state.filteredTodos.map((todo) => html`
             <li key="${todo.id}" class="${todo.completed ? 'completed' : ''}">
               <input 
                 type="checkbox" 
@@ -261,11 +276,11 @@ component<TodoAppState, TodoAppComputed>('todo-app', {
       color: #888;
     }
   `,
-  handleKeydown(e: Event, state: TodoAppState, api: any) {
-    if ('key' in e && (e as KeyboardEvent).key === 'Enter' && state.newTodo.trim()) {
-      const newId = Math.max(0, ...state.todos.map((t: Todo) => t.id)) + 1;
+  handleKeydown(e, state, api) {
+    if ('key' in e && e.key === 'Enter' && state.newTodo.trim()) {
+      const newId = Math.max(0, ...state.todos.map((t) => t.id)) + 1;
       const todoText = state.newTodo.trim();
-      state.newTodo = ''; // Clear input after adding
+      state.newTodo = '';
       state.todos.push({
         id: newId,
         text: todoText,
@@ -274,33 +289,32 @@ component<TodoAppState, TodoAppComputed>('todo-app', {
       api.emit('todo-added', { id: newId, text: todoText });
     }
   },
-  handleAllFilter(_e: Event, state: TodoAppState) {
+  handleAllFilter(_e, state) {
     state.filter = 'all';
   },
-  handleActiveFilter(_e: Event, state: TodoAppState) {
+  handleActiveFilter(_e, state) {
     state.filter = 'active';
   },
-  handleCompletedFilter(_e: Event, state: TodoAppState) {
+  handleCompletedFilter(_e, state) {
     state.filter = 'completed';
   },
-  handleDelete(e: Event, state: TodoAppState, api: any) {
-    const target = e.target as HTMLElement;
+  handleDelete(e, state, api) {
+    const target = e.target;
     const todoId = parseInt(target.getAttribute('data-todo-id') || '0');
-    state.todos = state.todos.filter((t: Todo) => t.id !== todoId);
+    state.todos = state.todos.filter((t) => t.id !== todoId);
     api.emit('todo-removed', { id: todoId });
   },
-  handleToggle(e: Event, state: TodoAppState, api: any) {
-    const target = e.target as HTMLInputElement;
+  handleToggle(e, state, api) {
+    const target = e.target;
     const todoId = parseInt(target.getAttribute('data-todo-id') || '0');
-    state.todos = state.todos.map((t: Todo) =>
+    state.todos = state.todos.map((t) =>
       t.id === todoId ? { ...t, completed: target.checked } : t
     );
     api.emit('todo-toggled', { id: todoId, completed: target.checked });
   },
   onMounted: (state, api) => {
     console.log('📝 Todo App mounted', state);
-    // Subscribe to global event using runtime API
-    api.onGlobal?.('todo-toggled', (data: any) => {
+    api.onGlobal?.('todo-toggled', (data) => {
       console.log('🔄 Todo toggled:', data);
     });
   }

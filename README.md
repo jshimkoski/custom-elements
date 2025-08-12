@@ -1,24 +1,28 @@
+
 # Custom Elements Runtime
 
-> **A modern, ultra-lightweight TypeScript runtime for building fast, reactive, and maintainable web components.**
+> **Ultra-lightweight, type-safe runtime for fast, reactive, and maintainable web components.**
+
+Build modern web components with strict TypeScript, zero dependencies, and a functional API. Designed for performance, standards compliance, and developer productivity.
+
 
 ## ✨ Features
 
-- **Reactive State:** ES6 Proxy-based state triggers automatic re-renders; direct assignment is fully supported.
-- **Template Functions:** Use plain functions, tagged helpers (`html`, `compile`), or async Promises for templates.
-- **Refs System:** Direct DOM access via `refs` with single-attach event logic; no complex selectors needed.
-- **Computed Properties:** Use the `computed` property for derived, reactive values.
-- **Automatic Event Binding:** Declarative event handlers via `data-on-*` attributes; only one handler per event type per element, with automatic cleanup on rerender.
-- **Controlled Input Sync:** Inputs with `data-model` stay in sync with state, supporting modifiers like `trim` and `number`; user typing always wins over state updates.
-- **SSR & Hydration:** Universal rendering and opt-in hydration via the `hydrate` property; templates must match for hydration.
-- **Error Boundaries:** Optional `onError` handler for fallback UI and diagnostics.
-- **Global State & Event Bus:** Built-in store and event bus for cross-component communication and shared state.
-- **Devtools & Performance Monitoring:** Inspect components, track state changes, and measure render performance in development.
-- **Focus Preservation:** Input, textarea, and select fields retain focus and selection during updates.
-- **Smart DOM Batching:** State-triggered renders are batched via requestAnimationFrame for optimal performance.
+- **Reactive State:** Automatic re-renders using ES6 Proxy; direct assignment supported.
+- **Functional Templates:** Use plain functions, tagged helpers (`html`, `compile`), or async Promises.
+- **Refs:** Direct DOM access via `refs`; no complex selectors.
+- **Computed Properties:** Define derived, reactive values with `computed`.
+- **Automatic Event Binding:** Declarative, type-safe handlers via `data-on-*`; auto cleanup on rerender.
+- **Controlled Input Sync:** Inputs with `data-model` stay in sync with state; user typing always wins.
+- **SSR & Hydration:** Universal rendering and opt-in hydration; templates must match for hydration.
+- **Error Boundaries:** Optional `onError` for fallback UI and diagnostics.
+- **Global State & Event Bus:** Built-in store and event bus for cross-component communication.
+- **Focus Preservation:** Inputs retain focus and selection during updates.
+- **Smart DOM Batching:** State-triggered renders are batched for performance.
 - **Strict TypeScript:** Type-safe, developer-friendly, zero dependencies.
-- **Tree-shakable & Modular:** Import only what you use; no external dependencies.
-- **Functional API:** One function, no classes.
+- **Tree-shakable & Modular:** Import only what you use.
+- **Functional API:** No classes, no boilerplate.
+
 
 ### Limitations & Edge Cases
 
@@ -28,7 +32,8 @@
 - Controlled input sync prioritizes user typing (focused/dirty inputs) over state updates.
 - SSR hydration is opt-in via the `hydrate` property; fallback hydrates the entire shadow root if no region is marked.
 - All user-generated content is escaped in templates using `html` and `compile` helpers; static HTML is not escaped.
-- Only features documented here and in `src/lib/runtime.ts` are supported; undocumented features may not work as expected.
+- Only features documented here and in [`src/lib/runtime.ts`](src/lib/runtime.ts) are supported; undocumented features may not work as expected.
+
 
 ## Minimal Example
 
@@ -38,9 +43,7 @@ import { component, html, css } from './lib/runtime.ts';
 component('minimal-example', {
   state: { count: 0 },
   template: ({ count }) => html`
-    <div>
-      <button data-on-click="increment">Count: ${count}</button>
-    </div>
+    <button data-on-click="increment">Count: ${count}</button>
   `,
   style: css`
     button { font-size: 1.2rem; padding: 0.5rem 1rem; }
@@ -90,6 +93,15 @@ component('minimal-example', {
 - **Async rendering**: Supports Promises in templates for async data and UI
 - **Selective hydration**: Hydrate only regions marked with `data-hydrate` for efficient SSR
 
+
 ## Documentation
 
-See the [API Reference](docs/api-reference.md) for detailed usage, configuration options, and advanced patterns.
+- [API Reference](docs/api-reference.md)
+- [Core Concepts](docs/core-concepts.md)
+- [Advanced Use Cases](docs/advanced-use-cases.md)
+- [Form Input Bindings](docs/form-input-bindings.md)
+- [SSR Guide](docs/ssr.md)
+- [Framework Comparison](docs/framework-comparison.md)
+- [Examples](docs/examples.md)
+
+See the [API Reference](docs/api-reference.md) for detailed usage, configuration options, and advanced patterns. For advanced topics, see the linked docs above.

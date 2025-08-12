@@ -1,31 +1,34 @@
-# 🧩 Advanced Use Cases
 
-The runtime supports advanced component patterns for scalable, maintainable apps:
+# Advanced Use Cases
 
-- **Computed Properties**: Use the `computed` field for derived, reactive state.
-- **Refs**: Attach refs via the `refs` field for direct DOM access and imperative logic.
-- **Lifecycle Hooks**: Use `onMounted` and `onUnmounted` for setup/teardown logic.
-- **Error Boundaries**: Handle errors with `onError` for robust components.
-- **Async Templates**: Return a Promise from `template` for async rendering.
-- **Plugin System**: Extend runtime behavior with `useRuntimePlugin`.
-- **Custom Event Handlers**: Define any number of event handlers directly on the config object, mapped to `data-on-*` attributes.
+Explore powerful patterns for scalable, maintainable components. All examples use the functional, type-safe API from `runtime.ts`.
+
+## Key Patterns
+
+- **Computed Properties:** Use `computed` for derived, reactive state.
+- **Refs:** Attach refs for direct DOM access and imperative logic.
+- **Lifecycle Hooks:** Use `onMounted` and `onUnmounted` for setup/teardown.
+- **Error Boundaries:** Handle errors with `onError` for robust components.
+- **Async Templates:** Return a Promise from `template` for async rendering.
+- **Plugin System:** Extend runtime behavior with `useRuntimePlugin`.
+- **Custom Event Handlers:** Map event handlers to `data-on-*` attributes in your template.
+
+---
 
 ## Example: Advanced Component
 
 ```typescript
-import { component, html, css, compile, type ComponentAPI } from './lib/runtime.ts';
+import { component, html, css, compile } from './lib/runtime.ts';
 
 component('advanced-demo', {
   state: { count: 0 },
   computed: {
     doubled: (state) => state.count * 2
   },
-  template: compile(({ count, doubled }, api) => html`
-    <div>
-      <button data-on-click="increment">
-        Count: ${count} (Doubled: ${doubled})
-      </button>
-    </div>
+  template: compile(({ count, doubled }) => html`
+    <button data-on-click="increment">
+      Count: ${count} (Doubled: ${doubled})
+    </button>
   `),
   style: css`
     button { font-size: 1.2rem; padding: 0.5rem 1rem; }
@@ -33,17 +36,19 @@ component('advanced-demo', {
   increment(_e, state) {
     state.count++;
   },
-  onMounted(state, api) {
+  onMounted(state) {
     console.log('Mounted!', state);
   },
-  onUnmounted(state, api) {
+  onUnmounted(state) {
     console.log('Unmounted!', state);
   },
-  onError(error, state, api) {
+  onError(error, state) {
     console.error('Component error:', error);
   }
 });
 ```
+
+---
 
 ## Example: Async Template
 
@@ -60,6 +65,8 @@ component('async-advanced', {
   }
 });
 ```
+
+---
 
 ## Example: Plugin Usage
 

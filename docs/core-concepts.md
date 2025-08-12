@@ -1,27 +1,33 @@
-# 🧩 Core Concepts
 
-- **Reactive state**: Automatic updates via ES6 Proxy
-- **Functional templates**: Just return HTML strings
-- **Refs**: Direct DOM access, no selectors
-- **Computed properties**: ES6 getters in state, recalculated on access
-- **Event bus**: Cross-component communication
-- **Global store**: Shared state, subscriptions
+# Core Concepts
 
-## 1. State changes automatically trigger re-renders using ES6 Proxies:
+Essential building blocks for every component. All features are strictly typed and match the runtime implementation.
+
+---
+
+## Reactive State
+
+- State changes automatically trigger re-renders using ES6 Proxy.
 
 ```typescript
 state.count++; // Automatically re-renders the component
 ```
 
-## 2. Template Functions
-Templates are just JavaScript functions that return HTML strings:
+---
+
+## Functional Templates
+
+- Templates are JavaScript functions that return HTML strings or use tagged helpers.
 
 ```typescript
 template: (state, api) => `<div>Hello ${state.name}!</div>`
 ```
 
-## 3. Refs System
-Direct DOM access without complex selectors:
+---
+
+## Refs System
+
+- Direct DOM access without complex selectors.
 
 ```typescript
 refs: {
@@ -34,9 +40,11 @@ refs: {
 }
 ```
 
-## 4. Computed Properties
+---
 
-Define computed properties using the `computed` property in `ComponentConfig`. This ensures correct reactivity and separation of state and derived values:
+## Computed Properties
+
+- Use the `computed` property for derived, reactive values.
 
 ```typescript
 component('user-profile', {
@@ -47,8 +55,8 @@ component('user-profile', {
     password: ''
   },
   computed: {
-    fullName: (state: ComponentState) => `${state.firstName} ${state.lastName}`,
-    isValid: (state: ComponentState) => state.email.includes('@') && state.password.length >= 8
+    fullName: (state) => `${state.firstName} ${state.lastName}`,
+    isValid: (state) => state.email.includes('@') && state.password.length >= 8
   },
   template: (state, computed) => `
     <div>Name: ${computed.fullName}</div>
@@ -57,11 +65,12 @@ component('user-profile', {
 });
 ```
 
-## 5. Automatic Event Binding
+---
 
-Define event handlers directly in your component config and use `data-on-*` attributes in your template for declarative, type-safe event handling. The runtime automatically attaches listeners after each render, ensuring no duplicate bindings and robust updates.
+## Automatic Event Binding
 
-**Usage Example:**
+- Define event handlers in your config and use `data-on-*` attributes for declarative, type-safe event handling.
+- Listeners are attached after each render, with no duplicates.
 
 ```typescript
 component('my-form', {
