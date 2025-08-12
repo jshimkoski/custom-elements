@@ -3,7 +3,7 @@ import { component, html, css } from '../../lib/runtime';
 component('data-model-demo', {
   state: {
     text: '',
-    checked: false,
+    checked: ['checked1'],
     radio: 'option1',
     textarea: '',
     select: 'b',
@@ -18,8 +18,9 @@ component('data-model-demo', {
         </label>
         <label>
           Checkbox:
-          <input type="checkbox" data-model="checked" />
-          <span>${state.checked ? 'Checked' : 'Unchecked'}</span>
+          <input type="checkbox" value="checked1" data-model="checked" />
+          <input type="checkbox" value="checked2" data-model="checked" />
+          <span>${state.checked.join(', ')}</span>
         </label>
         <fieldset>
           <legend>Radio Group:</legend>

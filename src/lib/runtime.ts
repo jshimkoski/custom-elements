@@ -82,25 +82,53 @@ function useDataModel(el: Element, stateObj: any, keyWithModifiers: string) {
   const updateState = (e: Event) => {
     let value: any;
     if (el instanceof HTMLInputElement && el.type === 'checkbox') {
-      value = el.checked;
-    } else if (el instanceof HTMLInputElement && el.type === 'radio') {
-      if (el.checked) {
-        value = el.value;
+      value = el.value;
+      if (Array.isArray(stateObj[key])) {
+        const arr = stateObj[key] as any[];
+        if (el.checked) {
+          if (!arr.includes(value)) arr.push(value);
+        } else {
+          const idx = arr.indexOf(value);
+          if (idx !== -1) arr.splice(idx, 1);
+        }
+        stateObj[key] = arr;
       } else {
-        return;
+        stateObj[key] = el.checked ? value : false;
       }
+      console.debug('[useDataModel] Checkbox change:', { key, value, stateObj });
+    } else if (el instanceof HTMLInputElement && el.type === 'radio') {
+      value = el.value;
+      stateObj[key] = value;
+      console.debug('[useDataModel] Radio change:', { key, value, stateObj, el });
+      // On initialization, ensure checked property matches state
+      const radios = (el.form || el.closest('form') || el.getRootNode()) instanceof Element
+        ? ((el.form || el.closest('form') || el.getRootNode()) as Element).querySelectorAll(`input[type="radio"][name="${el.name}"][data-model="${keyWithModifiers}"]`)
+        : [];
+      radios.forEach((radio: any, idx: number) => {
+        radio.checked = radio.value === String(stateObj[key]);
+        console.debug(`[useDataModel] Radio sync [${idx}]:`, {
+          name: radio.name,
+          value: radio.value,
+          checked: radio.checked,
+          dataModel: radio.getAttribute('data-model'),
+          dataUid: radio.getAttribute('data-uid'),
+          outerHTML: radio.outerHTML
+        });
+      });
     } else {
       value = (el as any).value;
+      if (modifiers.includes('trim') && typeof value === 'string') {
+        value = value.trim();
+      }
+      if (modifiers.includes('number')) {
+        value = Number(value);
+      }
+      stateObj[key] = value;
+      console.debug('[useDataModel] Input change:', { key, value, stateObj });
     }
-    if (modifiers.includes('trim') && typeof value === 'string') {
-      value = value.trim();
-    }
-    if (modifiers.includes('number')) {
-      value = Number(value);
-    }
-    stateObj[key] = value;
     if ((el as any)._vnode) {
       (el as any)._vnode.props.value = value;
+      console.debug('[useDataModel] VNode value assignment:', { vnode: (el as any)._vnode, value });
     }
     if (e.type === 'input') {
       (el as any)._isDirty = true;
@@ -145,12 +173,39 @@ function mountVNode(vnode: VNode): Element | Text | null {
   }
   const el = document.createElement(vnode.type);
   for (const [k, v] of Object.entries(vnode.props)) {
-    // For text input, set value property directly
-    if (k === 'value' && el instanceof HTMLInputElement && el.type === 'text') {
-      el.value = v as string;
+    if (k === 'value' && el instanceof HTMLInputElement) {
+      if (el.type === 'radio') {
+        // Always set value attribute for radios, never assign to property
+        el.setAttribute('value', v as string);
+      } else if (el.type === 'checkbox') {
+        // Always set value property and attribute for checkboxes
+        el.value = v as string;
+        el.setAttribute('value', v as string);
+        // Debug log
+        console.debug('[mountVNode] Checkbox value assignment:', {
+          type: el.type,
+          value: el.value,
+          dataUid: el.getAttribute('data-uid'),
+          outerHTML: el.outerHTML
+        });
+      } else {
+        el.value = v as string;
+        el.setAttribute('value', v as string);
+      }
     } else {
       el.setAttribute(k, v as string);
     }
+  }
+  // Debug log for input elements after creation
+  if (el instanceof HTMLInputElement) {
+    console.debug('[mountVNode] Input created:', {
+      type: el.type,
+      name: el.name,
+      value: el.value,
+      dataModel: el.getAttribute('data-model'),
+      dataUid: el.getAttribute('data-uid'),
+      outerHTML: el.outerHTML
+    });
   }
   vnode.dom = el;
   for (const child of vnode.children) {
@@ -167,6 +222,9 @@ function mountVNode(vnode: VNode): Element | Text | null {
 function parseVNodeFromHTML(html: string): VNode {
   const template = document.createElement('template');
   template.innerHTML = html.trim();
+  Array.from(template.content.querySelectorAll('input')).forEach((input, idx) => {
+    console.debug(`[TemplateParse] Input[${idx}]:`, input.outerHTML, 'value:', input.getAttribute('value'));
+  });
   const nodes = Array.from(template.content.childNodes);
   // If only one root node, return as before
   if (nodes.length === 1) {
@@ -198,6 +256,22 @@ interface VNode {
  * Assigns a stable, deterministic key to every element for VDOM reconciliation
  */
 function createVNodeFromElement(node: ChildNode, parentPath: string = '', childIndex: number = 0): VNode {
+  // Log all input elements and their attributes at VNode creation
+  if (node.nodeType === Node.ELEMENT_NODE) {
+    const elem = node as Element;
+    if (elem.tagName.toLowerCase() === 'input') {
+      const attrs: Record<string, string> = {};
+      Array.from(elem.attributes).forEach(attr => {
+        attrs[attr.name] = attr.value;
+      });
+      console.debug('[VNode] Input element at creation:', {
+        tagName: elem.tagName,
+        childIndex,
+        attrs,
+        outerHTML: elem.outerHTML
+      });
+    }
+  }
   // let debugType = '';
   // let debugKey = undefined;
   if (!node) {
@@ -222,9 +296,34 @@ function createVNodeFromElement(node: ChildNode, parentPath: string = '', childI
     // User-typed element: input, textarea, contenteditable
     if (tagName === 'input' && elem.hasAttribute('data-model')) {
       const model = elem.getAttribute('data-model')!;
-      props['data-uid'] = model;
-      elem.setAttribute('data-uid', model);
-      vnodeKey = model;
+      const inputType = elem.getAttribute('type');
+      if (inputType === 'radio' || inputType === 'checkbox') {
+        // Always use DOM value attribute, fallback to 'on' if missing
+        let valueAttr = elem.getAttribute('value');
+        if (!valueAttr) {
+          valueAttr = 'on';
+          elem.setAttribute('value', valueAttr);
+        }
+        vnodeKey = `${model}:${valueAttr}`;
+        console.debug('[VNodeKey] Assigned:', { vnodeKey, valueAttr, outerHTML: elem.outerHTML });
+        props['data-uid'] = vnodeKey;
+        elem.setAttribute('data-uid', vnodeKey);
+        props['value'] = valueAttr;
+        console.debug(`[VDOM] ${inputType} input:`, {
+          model,
+          valueAttr,
+          childIndex,
+          name: elem.getAttribute('name'),
+          dataModel: elem.getAttribute('data-model'),
+          dataUid: vnodeKey,
+          assignedValue: props['value'],
+          outerHTML: elem.outerHTML
+        });
+      } else {
+        props['data-uid'] = model;
+        elem.setAttribute('data-uid', model);
+        vnodeKey = model;
+      }
     } else if (tagName === 'input' || tagName === 'textarea' || elem.hasAttribute('contenteditable')) {
       // Use path-based key for uncontrolled user-typed elements
       vnodeKey = `${parentPath}.${tagName}[${childIndex}]`;
@@ -273,14 +372,54 @@ function patchVNode(parent: Element, oldVNode: VNode, newVNode: VNode): void {
   }
   // Patch props for Element
   const oldDom = oldVNode.dom;
+
+  // --- Robust keyed reconciliation ---
+  // Filter out whitespace-only VDOM nodes for robust reconciliation
+  function isMeaningfulVNode(v: VNode | undefined): v is VNode {
+    return !!v && v.type !== '#whitespace' && !(v.type === '#text' && (!v.props?.nodeValue || /^\s*$/.test(v.props.nodeValue)));
+  }
+  const oldChildren: VNode[] = Array.isArray(oldVNode.children) ? oldVNode.children.filter(isMeaningfulVNode) : [];
+  const newChildren: VNode[] = Array.isArray(newVNode.children) ? newVNode.children.filter(isMeaningfulVNode) : [];
+
+  // If children keys or count differ, replace parent node
+  const oldKeys = oldChildren.map(c => c.key).join(',');
+  const newKeys = newChildren.map(c => c.key).join(',');
+  if (oldKeys !== newKeys || oldChildren.length !== newChildren.length) {
+    const newDom = mountVNode(newVNode);
+    if (newDom && oldVNode.dom && parent.contains(oldVNode.dom)) {
+      parent.replaceChild(newDom, oldVNode.dom);
+      newVNode.dom = newDom;
+      return;
+    }
+  }
   if (oldDom && oldDom instanceof Element && newVNode.props) {
+    const inputType = oldDom.tagName.toLowerCase() === 'input' ? oldDom.getAttribute('type') : undefined;
     for (const [k, v] of Object.entries(newVNode.props)) {
+      if (inputType === 'radio' && k === 'value') {
+        // Never set value for radios
+        continue;
+      }
+      // For checkboxes, always set value attribute
+      if (inputType === 'checkbox' && k === 'value') {
+    console.debug('[patchVNode] Checkbox value assignment (patch):', {
+            key: newVNode.key,
+            value: v,
+            oldValue: oldDom.getAttribute('value'),
+            props: newVNode.props,
+            outerHTML: oldDom.outerHTML
+          });
+        oldDom.setAttribute('value', v as string);
+        continue;
+      }
       if (oldDom.getAttribute(k) !== v) {
         oldDom.setAttribute(k, v as string);
       }
     }
+    // Remove attributes not present in newVNode.props, except value for radios/checkboxes
     for (const k of Array.from(oldDom.attributes).map(a => a.name)) {
       if (!(k in newVNode.props)) {
+        if (inputType === 'radio' && k === 'value') continue;
+        if (inputType === 'checkbox' && k === 'value') continue;
         oldDom.removeAttribute(k);
       }
     }
@@ -310,19 +449,13 @@ function patchVNode(parent: Element, oldVNode: VNode, newVNode: VNode): void {
     }
     return;
   }
-  // --- Robust keyed reconciliation ---
-  // Filter out whitespace-only VDOM nodes for robust reconciliation
-  function isMeaningfulVNode(v: VNode | undefined): v is VNode {
-    return !!v && v.type !== '#whitespace' && !(v.type === '#text' && (!v.props?.nodeValue || /^\s*$/.test(v.props.nodeValue)));
+
+  // Always reconcile the full set of children for the parent element
+  if (parent !== oldVNode.dom && oldVNode.dom instanceof Element) {
+    // If patchVNode is called on a child, redirect to parent with full children
+    patchVNode(oldVNode.dom, oldVNode, newVNode);
+    return;
   }
-  const oldChildren: VNode[] = Array.isArray(oldVNode.children) ? oldVNode.children.filter(isMeaningfulVNode) : [];
-  const newChildren: VNode[] = Array.isArray(newVNode.children) ? newVNode.children.filter(isMeaningfulVNode) : [];
-    // Always reconcile the full set of children for the parent element
-    if (parent !== oldVNode.dom && oldVNode.dom instanceof Element) {
-        // If patchVNode is called on a child, redirect to parent with full children
-        patchVNode(oldVNode.dom, oldVNode, newVNode);
-        return;
-    }
   // Symbol for storing keys on DOM nodes
   const DOM_KEY = Symbol('vdom-key');
   const oldKeyed: Record<string, VNode> = {};
@@ -353,7 +486,21 @@ function patchVNode(parent: Element, oldVNode: VNode, newVNode: VNode): void {
     // Insert or patch new keyed children
     newChildren.forEach((newChild) => {
       if (newChild.key && oldKeyed[newChild.key]) {
-        patchVNode(oldDom as Element, oldKeyed[newChild.key], newChild);
+        const oldChild = oldKeyed[newChild.key];
+        let isCheckbox = false;
+        if (oldChild.dom && oldChild.dom instanceof Element) {
+          isCheckbox = oldChild.dom.tagName.toLowerCase() === 'input' && oldChild.dom.getAttribute('type') === 'checkbox';
+        }
+        if (isCheckbox) {
+          // Always replace checkbox DOM node to ensure unique value
+          const newDom = mountVNode(newChild);
+          if (newDom && oldChild.dom && oldDom instanceof Element && oldDom.contains(oldChild.dom)) {
+            oldDom.replaceChild(newDom, oldChild.dom);
+            newChild.dom = newDom;
+          }
+        } else {
+          patchVNode(oldDom as Element, oldChild, newChild);
+        }
       } else {
         const childDom = mountVNode(newChild);
         if (childDom) (oldDom as Element).appendChild(childDom);
@@ -366,46 +513,91 @@ function patchVNode(parent: Element, oldVNode: VNode, newVNode: VNode): void {
       }
     }
   } else {
-    // Fallback: index-based reconciliation
-    if (oldDom instanceof Element) {
-      // If newChildren is empty, clear all DOM children
-      if (newChildren.length === 0 && oldDom.childNodes.length > 0) {
-        while (oldDom.firstChild) oldDom.removeChild(oldDom.firstChild);
-        newVNode.dom = oldDom;
-        return;
+    // Fallback: index-based reconciliation ONLY if no keys at all
+    if (!oldDom) return; // Guard for undefined oldDom
+
+    if (
+      oldChildren.length > 0 &&
+      newChildren.length > 0 &&
+      (oldChildren.some(c => c.key) || newChildren.some(c => c.key))
+    ) {
+      // If any child has a key, do keyed reconciliation
+      Object.keys(oldKeyed).forEach(key => {
+        if (!newKeyed[key]) {
+          const childDom = oldKeyed[key].dom;
+          if (childDom && childDom instanceof Node && oldDom instanceof Element && oldDom.contains(childDom)) {
+            oldDom.removeChild(childDom);
+          }
+        }
+      });
+      newChildren.forEach((newChild) => {
+        if (newChild.key && oldKeyed[newChild.key]) {
+          const oldChild = oldKeyed[newChild.key];
+          let isCheckbox = false;
+          if (oldChild.dom && oldChild.dom instanceof Element) {
+            isCheckbox = oldChild.dom.tagName.toLowerCase() === 'input' && oldChild.dom.getAttribute('type') === 'checkbox';
+          }
+          if (isCheckbox) {
+            // Always replace checkbox DOM node to ensure unique value
+            const newDom = mountVNode(newChild);
+            if (newDom && oldChild.dom && oldDom instanceof Element && oldDom.contains(oldChild.dom)) {
+              oldDom.replaceChild(newDom, oldChild.dom);
+              newChild.dom = newDom;
+            }
+          } else {
+            patchVNode(oldDom as Element, oldChild, newChild);
+          }
+        } else {
+          const childDom = mountVNode(newChild);
+          if (childDom && oldDom instanceof Element) oldDom.appendChild(childDom);
+        }
+      });
+      if (oldDom instanceof Element) {
+        while (oldDom.childNodes.length > newChildren.length) {
+          oldDom.removeChild(oldDom.lastChild!);
+        }
       }
-      // Strict positional reconciliation for all children (keyed and unkeyed)
+    } else {
+      // True fallback: index-based reconciliation for children with no keys
       for (let i = 0; i < newChildren.length; i++) {
         const newChild = newChildren[i];
         const domChild = oldDom.childNodes[i];
         const nextSibling = oldDom.childNodes[i + 1] || null;
+        const isCheckbox = newChild.type === 'input' && newChild.props?.type === 'checkbox';
         if (!domChild) {
-          // No DOM node at this position, insert at correct index
           const newDom = mountVNode(newChild);
-          if (newDom) {
+          if (newDom && oldDom instanceof Element) {
             oldDom.insertBefore(newDom, nextSibling);
             newChild.dom = newDom;
           }
+        } else if (isCheckbox) {
+          // Always replace checkbox DOM node to guarantee unique value
+          const newDom = mountVNode(newChild);
+          if (newDom && oldDom instanceof Element) {
+            oldDom.replaceChild(newDom, domChild);
+            if (newChild.key) (newDom as any)[DOM_KEY] = newChild.key;
+            newChild.dom = newDom;
+          }
         } else {
-          // If type or key mismatch, replace
           const vdomType = newChild.type;
           const domType = domChild.nodeType === Node.TEXT_NODE ? '#text' : domChild.nodeName.toLowerCase();
           const vKey = newChild.key;
           const domKey = (domChild as any)[DOM_KEY];
           if (vdomType !== domType || (vKey && domKey !== vKey)) {
             const newDom = mountVNode(newChild);
-            if (newDom) {
+            if (newDom && oldDom instanceof Element) {
               oldDom.replaceChild(newDom, domChild);
               if (vKey) (newDom as any)[DOM_KEY] = vKey;
               newChild.dom = newDom;
             }
           } else {
-            patchVNode(oldDom, oldChildren[i], newChild);
+            if (oldDom instanceof Element) {
+              patchVNode(oldDom, oldChildren[i], newChild);
+            }
           }
         }
       }
-      // Remove any extra DOM nodes beyond the VDOM child count
-      while (oldDom.childNodes.length > newChildren.length) {
+      while (oldDom instanceof Element && oldDom.childNodes.length > newChildren.length) {
         oldDom.removeChild(oldDom.lastChild!);
       }
     }
@@ -425,8 +617,6 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
       const inputEl = input as HTMLInputElement;
       const stateValue = String(this.stateObj[modelAttr]);
       const isFocused = document.activeElement === inputEl;
-      // const selectionStart = inputEl.selectionStart;
-      // const selectionEnd = inputEl.selectionEnd;
       // Ensure dirty flag is set on input event
       if (!(inputEl as any)._hasDirtyListener) {
         inputEl.addEventListener('input', () => {
@@ -442,8 +632,8 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
       if (isFocused || isDirty) {
         return;
       }
-      // Only set value for unfocused and clean inputs if it differs
-      if (inputEl.value !== stateValue) {
+      // Only set value for unfocused and clean inputs if it differs and is not a radio or checkbox
+      if (inputEl.type !== 'radio' && inputEl.type !== 'checkbox' && inputEl.value !== stateValue) {
         inputEl.value = stateValue;
       }
     });
@@ -455,20 +645,68 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
    * Sync all controlled inputs and event listeners after render
    */
   private syncControlledInputsAndEvents(): void {
+    // Log the entire shadow DOM after each update
+    if (this.shadowRoot) {
+      console.debug('[sync] Shadow DOM after update:', this.shadowRoot.innerHTML);
+    }
     if (!this.shadowRoot) return;
+    // --- Text, Checkbox, Radio ---
+    // --- Radio Groups ---
+    this.shadowRoot.querySelectorAll('input[type="radio"][data-model]').forEach((input, idx) => {
+      const modelAttr = input.getAttribute('data-model');
+      if (!modelAttr || !this.stateObj || typeof this.stateObj[modelAttr] === 'undefined') {
+        console.debug(`[sync] Radio input [${idx}] skipped: missing modelAttr or state`, { input });
+        return;
+      }
+      const inputEl = input as HTMLInputElement;
+      const stateValue = String(this.stateObj[modelAttr]);
+      const beforeChecked = inputEl.checked;
+      const beforeValue = inputEl.value;
+      inputEl.checked = inputEl.value === stateValue;
+      console.debug(`[sync] Radio input [${idx}]`, {
+        name: inputEl.name,
+        modelAttr,
+        value: inputEl.value,
+        checked: inputEl.checked,
+        beforeChecked,
+        beforeValue,
+        stateValue,
+        dataUid: inputEl.getAttribute('data-uid'),
+        outerHTML: inputEl.outerHTML
+      });
+    });
+    // --- Checkbox, Text, Number ---
     this.shadowRoot.querySelectorAll('input[data-model]').forEach(input => {
       const modelAttr = input.getAttribute('data-model');
       if (!modelAttr || !this.stateObj || typeof this.stateObj[modelAttr] === 'undefined') return;
       const inputEl = input as HTMLInputElement;
       const stateValue = String(this.stateObj[modelAttr]);
-      // Always set value from state, regardless of previous value or VNode props
-      inputEl.value = stateValue;
       if (inputEl.type === 'checkbox') {
-        inputEl.checked = Boolean(this.stateObj[modelAttr]);
+        // Multi-checkbox group: checked if value is in array, else match string
+        const stateVal = this.stateObj[modelAttr];
+        if (Array.isArray(stateVal)) {
+          inputEl.checked = stateVal.includes(inputEl.value);
+        } else {
+          inputEl.checked = inputEl.value === String(stateVal);
+        }
+        // Never set value for checkboxes after mount
+      } else if (inputEl.type === 'radio') {
+        // Do not set value for radios
+      } else {
+        inputEl.value = stateValue;
       }
-      if (inputEl.type === 'radio') {
-        inputEl.checked = inputEl.value === stateValue;
-      }
+    });
+    // --- Textarea ---
+    this.shadowRoot.querySelectorAll('textarea[data-model]').forEach(textarea => {
+      const modelAttr = textarea.getAttribute('data-model');
+      if (!modelAttr || !this.stateObj || typeof this.stateObj[modelAttr] === 'undefined') return;
+      (textarea as HTMLTextAreaElement).value = String(this.stateObj[modelAttr]);
+    });
+    // --- Select ---
+    this.shadowRoot.querySelectorAll('select[data-model]').forEach(select => {
+      const modelAttr = select.getAttribute('data-model');
+      if (!modelAttr || !this.stateObj || typeof this.stateObj[modelAttr] === 'undefined') return;
+      (select as HTMLSelectElement).value = String(this.stateObj[modelAttr]);
     });
   }
 
@@ -495,10 +733,19 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
       // Only set value/checked for input, textarea, select
       if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement) {
         if (typeof this.stateObj[key] !== 'undefined') {
-          el.value = String(this.stateObj[key] ?? '');
+          // Never set value for radio or checkbox inputs
+          if (!(el instanceof HTMLInputElement && (el.type === 'radio' || el.type === 'checkbox'))) {
+            el.value = String(this.stateObj[key] ?? '');
+          }
         }
         if (el instanceof HTMLInputElement && el.type === 'checkbox') {
-          el.checked = Boolean(this.stateObj[key]);
+          // Multi-checkbox group: checked if value is in array, else match string
+          const stateVal = this.stateObj[key];
+          if (Array.isArray(stateVal)) {
+            el.checked = stateVal.includes(el.value);
+          } else {
+            el.checked = el.value === String(stateVal);
+          }
         }
         if (el instanceof HTMLInputElement && el.type === 'radio') {
           el.checked = el.value === String(this.stateObj[key]);
@@ -660,7 +907,22 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
   private _renderTemplateResult(templateResult: any): void {
     try {
       if (typeof templateResult === 'string') {
+          // Debug: log template string before parsing
+          console.debug('[TemplateString] Before VNode parse:', templateResult);
         const newVNode = parseVNodeFromHTML(templateResult);
+          // Debug: log VNode tree after parsing for all input[type=checkbox]
+          function logCheckboxVNodes(vnode: VNode) {
+            if (vnode.type === 'input' && vnode.props?.type === 'checkbox') {
+              console.debug('[VNodeTree] Checkbox VNode after parse:', {
+                key: vnode.key,
+                value: vnode.props?.value,
+                dataUid: vnode.props?.['data-uid'],
+                outerHTML: vnode.dom instanceof Element ? vnode.dom.outerHTML : undefined
+              });
+            }
+            vnode.children.forEach(logCheckboxVNodes);
+          }
+          logCheckboxVNodes(newVNode);
         const shadowRoot = this.shadowRoot;
         if (!shadowRoot) {
           return;
