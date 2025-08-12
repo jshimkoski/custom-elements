@@ -1,4 +1,48 @@
 // ============================================================================
+/**
+ * Safely replaces a child node, guarding against NotFoundError and out-of-sync trees.
+ * Falls back to appendChild if oldChild is not present.
+ * Logs mutation for debugging.
+ */
+function safeReplaceChild(parent: Node | null, newChild: Node, oldChild: Node): void {
+  if (!parent || !(parent instanceof Element)) {
+    console.warn('[runtime] safeReplaceChild: parent is missing or not an Element', { parent, newChild, oldChild });
+    return;
+  }
+  if (parent.contains(oldChild) && oldChild.parentNode === parent) {
+    try {
+      parent.replaceChild(newChild, oldChild);
+      console.debug('[runtime] safeReplaceChild: replaced', {
+        parent,
+        newChild,
+        oldChild,
+        parentHTML: (parent as Element).outerHTML,
+        newChildHTML: (newChild as Element).outerHTML,
+        oldChildHTML: (oldChild as Element).outerHTML
+      });
+    } catch (err) {
+      console.error('[runtime] safeReplaceChild: error replacing child', err, {
+        parent,
+        newChild,
+        oldChild,
+        parentHTML: (parent as Element).outerHTML,
+        newChildHTML: (newChild as Element).outerHTML,
+        oldChildHTML: (oldChild as Element).outerHTML
+      });
+    }
+  } else {
+    // Do NOT append newChild if oldChild is missing during patching
+    console.warn('[runtime] safeReplaceChild: attempted to replace missing child, skipping mutation', {
+      parent,
+      newChild,
+      oldChild,
+      parentChildren: Array.from(parent.childNodes).map(n => n.nodeName),
+      parentHTML: (parent as Element).outerHTML,
+      newChildHTML: (newChild as Element).outerHTML,
+      oldChildHTML: (oldChild as Element).outerHTML
+    });
+  }
+}
 // CORE TYPES (move to top for type safety)
 // ============================================================================
 
@@ -363,7 +407,81 @@ function patchVNode(parent: Element, oldVNode: VNode, newVNode: VNode): void {
     const newDom = mountVNode(newVNode);
     // Only replace if both are valid Node instances
     if (newDom instanceof Node && oldVNode.dom instanceof Node && parent.contains(oldVNode.dom)) {
-      parent.replaceChild(newDom, oldVNode.dom);
+    if (parent.contains(oldVNode.dom) && oldVNode.dom.parentNode === parent) {
+      safeReplaceChild(parent, newDom, oldVNode.dom);
+    } else {
+      // If replacement fails, replace parent in its grandparent if possible
+      const grandparent = parent.parentNode;
+      if (grandparent && grandparent instanceof Element) {
+        grandparent.replaceChild(newDom, parent);
+        console.warn('[runtime] patchVNode: replaced parent in grandparent due to out-of-sync DOM', {
+          grandparent,
+          parent,
+          newDom,
+          oldDom: oldVNode.dom
+        });
+      } else {
+        if (parent !== newDom && parent.parentNode) {
+          parent.replaceWith(newDom);
+          console.warn('[runtime] patchVNode: replaced parent node directly (no grandparent)', {
+            parent,
+            newDom,
+            oldDom: oldVNode.dom
+          });
+        } else if (parent instanceof ShadowRoot || parent instanceof HTMLElement) {
+          // Remove all children from host
+          while (parent.firstChild) {
+            parent.removeChild(parent.firstChild);
+          }
+          parent.appendChild(newDom);
+          console.warn('[runtime] patchVNode: replaced host children for root node', {
+            parent,
+            newDom,
+            oldDom: oldVNode.dom
+          });
+        } else {
+          // Replace parent node in its grandparent if possible
+          const grandparent = parent.parentNode;
+          if (grandparent) {
+            grandparent.replaceChild(newDom, parent);
+            console.warn('[runtime] patchVNode: replaced parent in grandparent for root node', {
+              grandparent,
+              parent,
+              newDom,
+              oldDom: oldVNode.dom
+            });
+          } else {
+            // Fallback: never replace the host node itself
+            // If no grandparent, replace parent in its host (custom element or ShadowRoot)
+            let host: Node | null = null;
+            const parentNode = parent.parentNode as Node | null;
+            if (parentNode) {
+              if ((parentNode as ShadowRoot).host !== undefined) {
+                host = parentNode;
+              } else if (parentNode instanceof HTMLElement) {
+                host = parentNode;
+              }
+            }
+            if (host && typeof (host as Node).replaceChild === 'function') {
+              (host as Node).replaceChild(newDom, parent);
+              console.warn('[runtime] patchVNode: replaced old root in host with new root', {
+                host,
+                parent,
+                newDom,
+                oldDom: oldVNode.dom
+              });
+            } else if ('replaceWith' in parent && typeof parent.replaceWith === 'function') {
+              parent.replaceWith(newDom);
+              console.warn('[runtime] patchVNode: fallback replaced parent with newDom for root node', {
+                parent,
+                newDom,
+                oldDom: oldVNode.dom
+              });
+            } // Remove fallback that appends newDom to parent after clearing children
+          }
+        }
+      }
+    }
     } else if (newDom instanceof Node) {
       parent.appendChild(newDom);
     } // else: skip invalid node replacement
@@ -386,8 +504,47 @@ function patchVNode(parent: Element, oldVNode: VNode, newVNode: VNode): void {
   const newKeys = newChildren.map(c => c.key).join(',');
   if (oldKeys !== newKeys || oldChildren.length !== newChildren.length) {
     const newDom = mountVNode(newVNode);
-    if (newDom && oldVNode.dom && parent.contains(oldVNode.dom)) {
-      parent.replaceChild(newDom, oldVNode.dom);
+    if (newDom && oldVNode.dom) {
+      if (parent.contains(oldVNode.dom) && oldVNode.dom.parentNode === parent) {
+        safeReplaceChild(parent, newDom, oldVNode.dom);
+      } else {
+        const grandparent = parent.parentNode;
+        if (grandparent && grandparent instanceof Element) {
+          grandparent.replaceChild(newDom, parent);
+          console.warn('[runtime] patchVNode: replaced parent in grandparent due to out-of-sync DOM', {
+            grandparent,
+            parent,
+            newDom,
+            oldDom: oldVNode.dom
+          });
+        } else {
+          // Fallback: replace parent node in its host using replaceChild or replaceWith
+          const host = parent.parentNode;
+          if (host && typeof (host as Node).replaceChild === 'function') {
+            (host as Node).replaceChild(newDom, parent);
+            console.warn('[runtime] patchVNode: replaced host root node using replaceChild', {
+              host,
+              parent,
+              newDom,
+              oldDom: oldVNode.dom
+            });
+          } else if ('replaceWith' in parent && typeof parent.replaceWith === 'function') {
+            parent.replaceWith(newDom);
+            console.warn('[runtime] patchVNode: replaced host root node using replaceWith', {
+              parent,
+              newDom,
+              oldDom: oldVNode.dom
+            });
+          } else {
+            // If neither method is available, log error
+            console.error('[patchVNode] Fallback: could not replace host root node', {
+              parent,
+              newDom,
+              oldDom: oldVNode.dom
+            });
+          }
+        }
+      }
       newVNode.dom = newDom;
       return;
     }
@@ -434,15 +591,27 @@ function patchVNode(parent: Element, oldVNode: VNode, newVNode: VNode): void {
     } else {
       // Replace or insert text node at correct position
       const newTextNode = document.createTextNode(newVNode.props.nodeValue ?? '');
-      if (oldDom && parent.contains(oldDom)) {
-        parent.replaceChild(newTextNode, oldDom);
+      if (oldDom && parent.contains(oldDom) && oldDom.parentNode === parent) {
+        safeReplaceChild(parent, newTextNode, oldDom);
       } else {
-        // Try to insert at the correct index
-        const siblings = Array.from(parent.childNodes) as ChildNode[];
-        if (oldDom && siblings.includes(oldDom as ChildNode)) {
-          parent.replaceChild(newTextNode, oldDom as ChildNode);
+        const grandparent = parent.parentNode;
+        if (grandparent && grandparent instanceof Element) {
+          grandparent.replaceChild(newTextNode, parent);
+          console.warn('[runtime] patchVNode: replaced parent in grandparent for text node', {
+            grandparent,
+            parent,
+            newTextNode,
+            oldDom
+          });
         } else {
+          parent.innerHTML = '';
+          while (parent.firstChild) parent.removeChild(parent.firstChild);
           parent.appendChild(newTextNode);
+          console.warn('[runtime] patchVNode: forced full subtree replacement for text node (no grandparent)', {
+            parent,
+            newTextNode,
+            oldDom
+          });
         }
       }
       newVNode.dom = newTextNode;
@@ -495,7 +664,9 @@ function patchVNode(parent: Element, oldVNode: VNode, newVNode: VNode): void {
           // Always replace checkbox DOM node to ensure unique value
           const newDom = mountVNode(newChild);
           if (newDom && oldChild.dom && oldDom instanceof Element && oldDom.contains(oldChild.dom)) {
-            oldDom.replaceChild(newDom, oldChild.dom);
+            if (oldDom.contains(oldChild.dom)) {
+              oldDom.replaceChild(newDom, oldChild.dom);
+            }
             newChild.dom = newDom;
           }
         } else {
@@ -541,7 +712,9 @@ function patchVNode(parent: Element, oldVNode: VNode, newVNode: VNode): void {
             // Always replace checkbox DOM node to ensure unique value
             const newDom = mountVNode(newChild);
             if (newDom && oldChild.dom && oldDom instanceof Element && oldDom.contains(oldChild.dom)) {
-              oldDom.replaceChild(newDom, oldChild.dom);
+              if (oldDom.contains(oldChild.dom)) {
+                oldDom.replaceChild(newDom, oldChild.dom);
+              }
               newChild.dom = newDom;
             }
           } else {
@@ -573,8 +746,10 @@ function patchVNode(parent: Element, oldVNode: VNode, newVNode: VNode): void {
         } else if (isCheckbox) {
           // Always replace checkbox DOM node to guarantee unique value
           const newDom = mountVNode(newChild);
-          if (newDom && oldDom instanceof Element) {
-            oldDom.replaceChild(newDom, domChild);
+          if (newDom && oldDom instanceof Element && oldDom.contains(domChild)) {
+            if (oldDom.contains(domChild)) {
+              oldDom.replaceChild(newDom, domChild);
+            }
             if (newChild.key) (newDom as any)[DOM_KEY] = newChild.key;
             newChild.dom = newDom;
           }
@@ -585,8 +760,10 @@ function patchVNode(parent: Element, oldVNode: VNode, newVNode: VNode): void {
           const domKey = (domChild as any)[DOM_KEY];
           if (vdomType !== domType || (vKey && domKey !== vKey)) {
             const newDom = mountVNode(newChild);
-            if (newDom && oldDom instanceof Element) {
-              oldDom.replaceChild(newDom, domChild);
+            if (newDom && oldDom instanceof Element && oldDom.contains(domChild)) {
+              if (oldDom.contains(domChild)) {
+                oldDom.replaceChild(newDom, domChild);
+              }
               if (vKey) (newDom as any)[DOM_KEY] = vKey;
               newChild.dom = newDom;
             }
@@ -981,7 +1158,9 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
             if (this._prevVNode && (this._prevVNode.type !== newVNode.type || this._prevVNode.key !== newVNode.key)) {
               const actualRootNode = mountVNode(newVNode);
               if (actualRootNode) {
-                this.shadowRoot!.replaceChild(actualRootNode, rootEl);
+                if (this.shadowRoot!.contains(rootEl)) {
+                  this.shadowRoot!.replaceChild(actualRootNode, rootEl);
+                }
                 rootEl = actualRootNode as Element;
               }
             } else {
