@@ -824,6 +824,7 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
     this.render();
   }
 
+  private _hasError = false;
   private _mountedCalled = false;
   private _unmountedCalled = false;
   /**
@@ -1132,6 +1133,7 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
               if (typeof this.config.onError === 'function') {
                 this.config.onError(err instanceof Error ? err : new Error(String(err)), this.api.state, this.api);
               }
+              this._handleRenderError(err);
             }
           });
         } else {
@@ -1141,6 +1143,7 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
         if (typeof this.config.onError === 'function') {
           this.config.onError(err instanceof Error ? err : new Error(String(err)), this.api.state, this.api);
         }
+        this._handleRenderError(err);
       }
     }
     const isSSRHydration = this.hasAttribute('data-hydrated');
@@ -1263,6 +1266,7 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
    * Render the component. Handles both string and compiled templates, refs, and error boundaries.
    */
   private render(): void {
+    if (this._hasError) return;
     // Robust controlled input sync after every render
     this.syncControlledInputsAndEvents();
     setTimeout(() => this.attachControlledInputListeners(), 0);
@@ -1283,12 +1287,12 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
       const templateResultOrPromise = this.config.template(this.stateObj as S & C, this.api);
       if (templateResultOrPromise instanceof Promise) {
         templateResultOrPromise.then(templateResult => {
-          this._renderTemplateResult(templateResult);
+          if (!this._hasError) this._renderTemplateResult(templateResult);
         }).catch(error => {
           this._handleRenderError(error);
         });
       } else {
-        this._renderTemplateResult(templateResultOrPromise);
+        if (!this._hasError) this._renderTemplateResult(templateResultOrPromise);
       }
     } catch (error) {
       this._handleRenderError(error);
@@ -1334,6 +1338,7 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
    * @param templateResult - HTML string or compiled template
    */
   private _renderTemplateResult(templateResult: any): void {
+    if (this._hasError) return;
     try {
       if (typeof templateResult === 'string') {
         // --- Sanitize HTML for XSS ---
@@ -1494,7 +1499,8 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
    * @param error - Error object
    */
   private _handleRenderError(error: any): void {
-    // Improved error boundary: log details and allow fallback UI
+    this._hasError = true;
+    // Improved error boundary: log details and always render fallback UI
     if (this.config.debug) {
       console.error(`[runtime] Render error in <${this.tagName.toLowerCase()}>:`, error);
     }
@@ -1506,11 +1512,9 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
         if (this.config.debug) {
           console.error(`[runtime] Error in onError handler:`, fallbackError);
         }
-        this.renderError(error instanceof Error ? error : new Error(String(error)));
       }
-    } else {
-      this.renderError(error instanceof Error ? error : new Error(String(error)));
     }
+    this.renderError(error instanceof Error ? error : new Error(String(error)));
   }
 
   /**
@@ -1628,10 +1632,14 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
    * @param error - Error object
    */
   private renderError(error: Error): void {
+    const styleContent = this.config.style
+      ? (typeof this.config.style === 'function' ? this.config.style(this.api.state) : this.config.style)
+      : '';
     this.shadowRoot!.innerHTML = `
+      <style>${styleContent}</style>
       <div style="color: red; border: 1px solid red; padding: 1rem; border-radius: 4px;">
-        <h3>Component Error</h3>
-        <p><strong>Component:</strong> ${error.message}</p>
+        <h3>Error Boundary</h3>
+        <div>Error: ${error.message}</div>
       </div>
     `;
   }
