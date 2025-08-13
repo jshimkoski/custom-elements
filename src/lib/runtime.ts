@@ -1512,7 +1512,29 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
         }
         this.lastCompiledTemplate = templateResult;
       }
-      this.lastState = JSON.parse(JSON.stringify(this.stateObj));
+      // Safe deep clone for lastState, ignoring circular references
+      this.lastState = safeClone(this.stateObj);
+      /**
+       * Safely deep clones an object, ignoring circular references.
+       * @param obj - Object to clone
+       */
+      function safeClone<T>(obj: T): T {
+        const seen = new WeakSet();
+        function clone(val: any): any {
+          if (val === null || typeof val !== 'object') return val;
+          if (seen.has(val)) return undefined;
+          seen.add(val);
+          if (Array.isArray(val)) return val.map(clone);
+          const out: any = {};
+          for (const key in val) {
+            if (Object.prototype.hasOwnProperty.call(val, key)) {
+              out[key] = clone(val[key]);
+            }
+          }
+          return out;
+        }
+        return clone(obj);
+      }
       this.updateStyle();
       if (!this.refsAttached) {
         this.processRefs();
