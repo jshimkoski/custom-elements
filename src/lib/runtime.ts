@@ -1572,7 +1572,13 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
 
         // Mark as processed and call handler
         element.setAttribute('data-refs-processed', 'true');
-        handler(element, this.api.state, this.api);
+        try {
+          handler(element, this.api.state, this.api);
+        } catch (err) {
+          if (typeof this.config.onError === 'function') {
+            this.config.onError(err instanceof Error ? err : new Error(String(err)), this.api.state, this.api);
+          }
+        }
       }
       // Silently skip missing refs as they may be conditionally rendered
     });
