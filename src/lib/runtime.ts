@@ -787,6 +787,13 @@ function patchVNode(parent: Element, oldVNode: VNode, newVNode: VNode): void {
 // ============================================================================
 
 /**
+ * Type guard to check if a value is Promise-like.
+ */
+function isPromise(val: unknown): val is Promise<unknown> {
+  return !!val && typeof (val as any).then === 'function';
+}
+
+/**
  * Base class for runtime custom elements.
  * Handles lifecycle, rendering, controlled input sync, refs, and event binding.
  * @template S - State type
@@ -1074,14 +1081,26 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
     // Only call onMounted here if not already called
     if (!this._mountedCalled && typeof this.config.onMounted === 'function') {
       try {
-        this.config.onMounted(this.api.state, this.api);
+        const result: unknown = this.config.onMounted(this.api.state, this.api);
+        if (isPromise(result)) {
+          result.catch((err: any) => {
+            if (typeof this.config.onError === 'function') {
+              this.config.onError(err, this.api.state, this.api);
+            }
+            this._handleRenderError(err);
+          }).finally(() => {
+            this._mountedCalled = true;
+          });
+        } else {
+          this._mountedCalled = true;
+        }
       } catch (err) {
         if (typeof this.config.onError === 'function') {
           this.config.onError(err, this.api.state, this.api);
         }
         this._handleRenderError(err);
+        this._mountedCalled = true;
       }
-      this._mountedCalled = true;
     }
   }
 
@@ -1102,14 +1121,26 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
     // Only call onMounted if not already called
     if (!this._mountedCalled && typeof this.config.onMounted === 'function') {
       try {
-        this.config.onMounted(this.api.state, this.api);
+        const result: unknown = this.config.onMounted(this.api.state, this.api);
+        if (isPromise(result)) {
+          result.catch((err: any) => {
+            if (typeof this.config.onError === 'function') {
+              this.config.onError(err, this.api.state, this.api);
+            }
+            this._handleRenderError(err);
+          }).finally(() => {
+            this._mountedCalled = true;
+          });
+        } else {
+          this._mountedCalled = true;
+        }
       } catch (err) {
         if (typeof this.config.onError === 'function') {
           this.config.onError(err, this.api.state, this.api);
         }
         this._handleRenderError(err);
+        this._mountedCalled = true;
       }
-      this._mountedCalled = true;
     }
     if (typeof this.render === 'function') this.render();
   }
@@ -1124,14 +1155,26 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
     this._globalUnsubscribes = [];
     if (!this._unmountedCalled && typeof this.config.onUnmounted === 'function') {
       try {
-        this.config.onUnmounted(this.api.state, this.api);
+        const result: unknown = this.config.onUnmounted(this.api.state, this.api);
+        if (isPromise(result)) {
+          result.catch((err: any) => {
+            if (typeof this.config.onError === 'function') {
+              this.config.onError(err, this.api.state, this.api);
+            }
+            this._handleRenderError(err);
+          }).finally(() => {
+            this._unmountedCalled = true;
+          });
+        } else {
+          this._unmountedCalled = true;
+        }
       } catch (err) {
         if (typeof this.config.onError === 'function') {
           this.config.onError(err, this.api.state, this.api);
         }
         this._handleRenderError(err);
+        this._unmountedCalled = true;
       }
-      this._unmountedCalled = true;
     }
     // Reset flags for future re-mounts
     this._mountedCalled = false;
