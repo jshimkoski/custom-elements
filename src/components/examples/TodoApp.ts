@@ -84,26 +84,26 @@ component<TodoAppState, TodoAppComputed>('todo-app', {
           </button>
         </div>
         <ul class="todo-list">
-          ${state.filteredTodos.map((todo: Todo) => html`
-            <li key="${todo.id}" class="${todo.completed ? 'completed' : ''}">
-              <input 
-                type="checkbox" 
-                ${todo.completed ? 'checked' : ''}
-                data-todo-id="${todo.id}"
-                data-action="toggle"
-                data-on-change="handleToggle"
-              >
-              <span class="text">${todo.text}</span>
-              <button 
-                class="delete"
-                data-todo-id="${todo.id}"
-                data-action="delete"
-                data-on-click="handleDelete"
-              >
-                ×
-              </button>
-            </li>
-          `(state, api)).join('')}
+          ${state.filteredTodos.map((todo: Todo) => {
+            const idx = state.todos.findIndex(t => t.id === todo.id);
+            return html`
+              <li key="${todo.id}" class="${todo.completed ? 'completed' : ''}">
+                <input 
+                  type="checkbox"
+                  data-bind="todos[${idx}].completed"
+                >
+                <span class="text">${todo.text}</span>
+                <button 
+                  class="delete"
+                  data-todo-id="${todo.id}"
+                  data-action="delete"
+                  data-on-click="handleDelete"
+                >
+                  ×
+                </button>
+              </li>
+            `(state, api);
+          }).join('')}
         </ul>
       </main>
       <footer>
@@ -225,14 +225,6 @@ component<TodoAppState, TodoAppComputed>('todo-app', {
     const todoId = parseInt(target.getAttribute('data-todo-id') || '0');
     state.todos = state.todos.filter((t: Todo) => t.id !== todoId);
     api.emit('todo-removed', { id: todoId });
-  },
-  handleToggle(e: Event, state: TodoAppState, api: any) {
-    const target = e.target as HTMLInputElement;
-    const todoId = parseInt(target.getAttribute('data-todo-id') || '0');
-    state.todos = state.todos.map((t: Todo) =>
-      t.id === todoId ? { ...t, completed: target.checked } : t
-    );
-    api.emit('todo-toggled', { id: todoId, completed: target.checked });
   },
   onMounted: (state, api) => {
     console.log('📝 Todo App mounted', state);

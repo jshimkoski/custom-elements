@@ -713,8 +713,16 @@ function patchVNode(parent: Element, oldVNode: VNode, newVNode: VNode): void {
         if (oldChild.dom && oldChild.dom instanceof Element) {
           isCheckbox = oldChild.dom.tagName.toLowerCase() === 'input' && oldChild.dom.getAttribute('type') === 'checkbox';
         }
-        if (isCheckbox) {
-          // Always replace checkbox DOM node to ensure unique value
+        if (
+          isCheckbox &&
+          oldChild.dom &&
+          oldChild.dom instanceof Element &&
+          oldChild.dom.hasAttribute('data-bind')
+        ) {
+          // Patch checkbox in place, do not replace node, to preserve listeners
+          patchVNode(oldDom as Element, oldChild, newChild);
+        } else if (isCheckbox) {
+          // Only replace if not data-bind controlled
           const newDom = mountVNode(newChild);
           if (newDom && oldChild.dom && oldChild.dom instanceof Element && oldChild.dom.contains(oldChild.dom)) {
             if (oldDom && oldDom.contains && oldDom.contains(oldChild.dom)) {
@@ -1032,16 +1040,13 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
       const inputEl = input as HTMLInputElement;
       const stateValue = String(this.stateObj[modelAttr]);
       if (inputEl.type === 'checkbox') {
-        // Multi-checkbox group: checked if value is in array, else match string
         const stateVal = this.stateObj[modelAttr];
         if (Array.isArray(stateVal)) {
           inputEl.checked = stateVal.includes(inputEl.value);
         } else {
-          // Single checkbox: support boolean and custom true/false values
           const trueValue = inputEl.getAttribute('data-true-value');
           const falseValue = inputEl.getAttribute('data-false-value');
           if (trueValue !== null || falseValue !== null) {
-            // Custom true/false values
             if (String(stateVal) === trueValue) {
               inputEl.checked = true;
             } else if (String(stateVal) === falseValue) {
@@ -1052,11 +1057,9 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
               inputEl.checked = false;
             }
           } else {
-            // Boolean: checked if stateVal is truthy or strictly true
             inputEl.checked = stateVal === true || stateVal === 'true' || stateVal === 1;
           }
         }
-        // Never set value for checkboxes after mount
       } else if (inputEl.type === 'radio') {
         // Do not set value for radios
       } else {
@@ -1074,6 +1077,43 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
       const modelAttr = select.getAttribute('data-model');
       if (!modelAttr || !this.stateObj || typeof this.stateObj[modelAttr] === 'undefined') return;
       (select as HTMLSelectElement).value = String(this.stateObj[modelAttr]);
+    });
+  }
+
+  /**
+   * Attach event listeners for input[data-bind] after VDOM patching
+   */
+  private attachListItemModelListeners(): void {
+    if (!this.shadowRoot) return;
+    this.shadowRoot.querySelectorAll('input[data-bind]').forEach(input => {
+      const bindExpr = input.getAttribute('data-bind');
+      if (!bindExpr) return;
+      // Remove previous listener if present
+      if ((input as any)._listItemModelListener) {
+        input.removeEventListener('change', (input as any)._listItemModelListener);
+        delete (input as any)._listItemModelListener;
+      }
+      // Attach new listener and store reference
+      const match = bindExpr.match(/^([a-zA-Z0-9_]+)\[(\d+)\]\.([a-zA-Z0-9_]+)$/);
+      if (match) {
+        const [, arrKey, idxStr, propKey] = match;
+        const idx = parseInt(idxStr, 10);
+        const arr = this.stateObj[arrKey];
+        // Always sync checked property for checkboxes
+        if (input instanceof HTMLInputElement && input.type === 'checkbox') {
+          input.checked = !!(Array.isArray(arr) && arr[idx] && arr[idx][propKey]);
+        }
+        const handler = (_e: Event) => {
+          if (!Array.isArray(arr) || !arr[idx]) return;
+          if (input instanceof HTMLInputElement && input.type === 'checkbox') {
+            arr[idx][propKey] = input.checked;
+          } else {
+            arr[idx][propKey] = (input as any).value;
+          }
+        };
+        input.addEventListener('change', handler);
+        (input as any)._listItemModelListener = handler;
+      }
     });
   }
 
@@ -1367,16 +1407,24 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
       const templateResultOrPromise = this.config.template(this.stateObj as S & C, this.api);
       if (templateResultOrPromise instanceof Promise) {
         templateResultOrPromise.then(templateResult => {
-          if (!this._hasError) this._renderTemplateResult(templateResult);
-           // Sync state to attributes after render
-           this.syncStateToAttributes();
+          if (!this._hasError) {
+            this._renderTemplateResult(templateResult);
+            // Sync state to attributes after render
+            this.syncStateToAttributes();
+            // Attach list item listeners after VDOM patching
+            setTimeout(() => this.attachListItemModelListeners(), 0);
+          }
         }).catch(error => {
           this._handleRenderError(error);
         });
       } else {
-        if (!this._hasError) this._renderTemplateResult(templateResultOrPromise);
-         // Sync state to attributes after render
-         this.syncStateToAttributes();
+        if (!this._hasError) {
+          this._renderTemplateResult(templateResultOrPromise);
+          // Sync state to attributes after render
+          this.syncStateToAttributes();
+          // Attach list item listeners after VDOM patching
+          setTimeout(() => this.attachListItemModelListeners(), 0);
+        }
       }
     } catch (error) {
       this._handleRenderError(error);
