@@ -800,6 +800,21 @@ function isPromise(val: unknown): val is Promise<unknown> {
  * @template C - Computed type
  */
 class ComponentElement<S extends ComponentState, C extends Record<string, any> = {}> extends HTMLElement {
+  /**
+   * Allows updating the template function at runtime and triggers a re-render.
+   * @param newTemplate - New template function or string
+   */
+  public updateTemplate(newTemplate: ((state: S & C, api: ComponentAPI<S & C>) => string | Promise<string> | CompiledTemplate<S & C>) | string): void {
+    // Override readonly via type assertion for runtime mutability
+    const config = this.config as any;
+    if (typeof newTemplate === 'function') {
+      config.template = newTemplate;
+    } else {
+      config.template = () => newTemplate;
+    }
+    this.render();
+  }
+
   private _mountedCalled = false;
   private _unmountedCalled = false;
   /**
