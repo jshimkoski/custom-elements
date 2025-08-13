@@ -713,16 +713,12 @@ function patchVNode(parent: Element, oldVNode: VNode, newVNode: VNode): void {
         if (oldChild.dom && oldChild.dom instanceof Element) {
           isCheckbox = oldChild.dom.tagName.toLowerCase() === 'input' && oldChild.dom.getAttribute('type') === 'checkbox';
         }
-        if (
-          isCheckbox &&
-          oldChild.dom &&
-          oldChild.dom instanceof Element &&
-          oldChild.dom.hasAttribute('data-bind')
-        ) {
-          // Patch checkbox in place, do not replace node, to preserve listeners
+        const isControlledCheckbox = isCheckbox && oldChild.dom && oldChild.dom instanceof Element && (oldChild.dom.hasAttribute('data-bind') || oldChild.dom.hasAttribute('data-model'));
+        if (isControlledCheckbox) {
+          // Always patch in place for controlled checkboxes
           patchVNode(oldDom as Element, oldChild, newChild);
         } else if (isCheckbox) {
-          // Only replace if not data-bind controlled
+          // Only replace if not controlled
           const newDom = mountVNode(newChild);
           if (newDom && oldChild.dom && oldChild.dom instanceof Element && oldChild.dom.contains(oldChild.dom)) {
             if (oldDom && oldDom.contains && oldDom.contains(oldChild.dom)) {
