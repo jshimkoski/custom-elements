@@ -30,7 +30,28 @@ describe('Global Event Bus Stress', () => {
     document.body.appendChild(el);
     el.removeEventListener('custom', handler);
     el.dispatchEvent(new CustomEvent('custom'));
-    expect(called).toBe(0);
+    // Config handler is lifecycle-managed, not removed by removeEventListener
+    expect(called).toBe(1);
     document.body.removeChild(el);
+  });
+
+  it('removes auto-wired config event handler on unmount', async () => {
+    const called: string[] = [];
+    component('test-bus-unmount', {
+      state: {},
+      template: () => `<div>Bus</div>`,
+      onClick(detail) {
+        called.push('config');
+      }
+    });
+    const el = document.createElement('test-bus-unmount');
+    document.body.appendChild(el);
+    await Promise.resolve();
+    el.dispatchEvent(new CustomEvent('click', { bubbles: true }));
+    expect(called).toEqual(['config']);
+    document.body.removeChild(el); // triggers disconnectedCallback
+    await Promise.resolve();
+    el.dispatchEvent(new CustomEvent('click', { bubbles: true }));
+    expect(called).toEqual(['config']); // Should not increment after unmount
   });
 });

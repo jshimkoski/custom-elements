@@ -802,6 +802,28 @@ function isPromise(val: unknown): val is Promise<unknown> {
 class ComponentElement<S extends ComponentState, C extends Record<string, any> = {}> extends HTMLElement {
   private _mountedCalled = false;
   private _unmountedCalled = false;
+  /**
+   * Tracks auto-wired config event handlers for removal
+   */
+  private _autoWiredHandlers: Record<string, EventListenerOrEventListenerObject[]> = {};
+
+  /**
+   * Override removeEventListener to support auto-wired config handler removal
+   */
+  override removeEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | EventListenerOptions): void {
+    super.removeEventListener(type, listener, options);
+    // Also remove auto-wired config handlers if present
+    if (this._autoWiredHandlers[type]) {
+      this._autoWiredHandlers[type] = this._autoWiredHandlers[type].filter(fn => {
+        if (fn === listener) {
+          super.removeEventListener(type, fn, options);
+          return false;
+        }
+        return true;
+      });
+      if (this._autoWiredHandlers[type].length === 0) delete this._autoWiredHandlers[type];
+    }
+  }
 
   /**
    * observedAttributes automatically returns all primitive keys from static state.
@@ -1053,6 +1075,19 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
       offGlobal: <U = any>(eventName: string, handler: (data: U) => void) => eventBus.off(eventName, handler),
       emitGlobal: <U = any>(eventName: string, data?: U) => eventBus.emit(eventName, data)
     };
+    Object.keys(this.config).forEach(key => {
+      if (key.startsWith('on') && key.length > 2 && typeof this.config[key] === 'function') {
+        const eventName = key.charAt(2).toLowerCase() + key.slice(3);
+        const handler: EventListener = (e: Event) => {
+          const detail = (e as CustomEvent).detail ?? e;
+          (this.config[key] as Function)(detail, this.api.state, this.api);
+        };
+        this.addEventListener(eventName, handler);
+        // Store for later removal
+        if (!this._autoWiredHandlers[eventName]) this._autoWiredHandlers[eventName] = [];
+        this._autoWiredHandlers[eventName].push(handler);
+      }
+    });
     // Attach shadow DOM
     this.attachShadow({ mode: 'open' });
     // Setup style
@@ -1161,6 +1196,13 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
    * Lifecycle: called when element is removed from DOM.
    */
   disconnectedCallback(): void {
+    // Remove all auto-wired config event handlers
+    Object.entries(this._autoWiredHandlers).forEach(([eventName, handlers]) => {
+      handlers.forEach(handler => {
+        super.removeEventListener(eventName, handler);
+      });
+    });
+    this._autoWiredHandlers = {};
     this.unsubscribes.forEach(fn => fn());
     this.unsubscribes = [];
     this._globalUnsubscribes.forEach(fn => fn());
