@@ -813,7 +813,7 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
    * Allows updating the template function at runtime and triggers a re-render.
    * @param newTemplate - New template function or string
    */
-  public updateTemplate(newTemplate: ((state: S & C, api: ComponentAPI<S & C>) => string | Promise<string> | CompiledTemplate<S & C>) | string): void {
+  public setTemplate(newTemplate: ((state: S & C, api: ComponentAPI<S & C>) => string | Promise<string> | CompiledTemplate<S & C>) | string): void {
     // Override readonly via type assertion for runtime mutability
     const config = this.config as any;
     if (typeof newTemplate === 'function') {

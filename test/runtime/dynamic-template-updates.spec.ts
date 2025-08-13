@@ -3,7 +3,7 @@ import { vi, describe, it, expect } from 'vitest';
 import { getTestConfig } from './getTestConfig';
 
 describe('Dynamic Template Updates', () => {
-  it('updates template function at runtime', () => {
+  it('set template function at runtime', () => {
     const config = getTestConfig();
     component('dynamic-template-element', config);
     const el = document.createElement('dynamic-template-element');
@@ -12,7 +12,7 @@ describe('Dynamic Template Updates', () => {
     expect(el.shadowRoot?.innerHTML).toContain('Hello World');
     // Use runtime API to update template
     // @ts-ignore
-    el['updateTemplate'](() => `<div>Changed</div>`);
+    el['setTemplate'](() => `<div>Changed</div>`);
     // Wait for DOM update after scheduled render
     return new Promise(resolve => {
       requestAnimationFrame(() => {
