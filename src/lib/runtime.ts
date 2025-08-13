@@ -801,6 +801,15 @@ function isPromise(val: unknown): val is Promise<unknown> {
  */
 class ComponentElement<S extends ComponentState, C extends Record<string, any> = {}> extends HTMLElement {
   /**
+   * Allows updating the state object and triggers a re-render.
+   * @param newState - Partial state to merge
+   */
+  public setState(newState: Partial<S & C>): void {
+    Object.assign(this.stateObj, newState);
+    this.render();
+  }
+
+  /**
    * Allows updating the template function at runtime and triggers a re-render.
    * @param newTemplate - New template function or string
    */
