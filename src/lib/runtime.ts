@@ -29,8 +29,12 @@ export interface ComponentConfig<S extends ComponentState, C extends Record<stri
   readonly onMounted?: LifecycleHandler<S & C>;
   readonly onUnmounted?: LifecycleHandler<S & C>;
   readonly debug?: boolean;
-  [handler: string]: ((...args: unknown[]) => unknown) | unknown;
+  /**
+   * Whitelist of state keys to reflect as attributes. If omitted, no keys are reflected.
+   */
+  readonly reflect?: string[];
   hydrate?: (el: Element | ShadowRoot, state: S & C, api: ComponentAPI<S & C>) => void;
+  [handler: string]: ((...args: unknown[]) => unknown) | unknown;
 }
 /**
  * Handler for a ref element in the template.
@@ -507,11 +511,17 @@ function patchVNode(parent: Element, oldVNode: VNode, newVNode: VNode): void {
         }
       }
     }
-    } else if (newDom instanceof Node) {
-      parent.appendChild(newDom);
-    } // else: skip invalid node replacement
-    newVNode.dom = newDom instanceof Node ? newDom : undefined;
-    return;
+    } else if ((newDom as any) instanceof Node) {
+      if (newDom) {
+        parent.appendChild(newDom);
+        newVNode.dom = newDom;
+      }
+      return;
+    } else {
+      // else: skip invalid node replacement
+      newVNode.dom = undefined;
+      return;
+    }
   }
   // Patch props for Element
   const oldDom = oldVNode.dom;
@@ -661,8 +671,8 @@ function patchVNode(parent: Element, oldVNode: VNode, newVNode: VNode): void {
         if (isCheckbox) {
           // Always replace checkbox DOM node to ensure unique value
           const newDom = mountVNode(newChild);
-          if (newDom && oldChild.dom && oldDom instanceof Element && oldDom.contains(oldChild.dom)) {
-            if (oldDom.contains(oldChild.dom)) {
+          if (newDom && oldChild.dom && oldChild.dom instanceof Element && oldChild.dom.contains(oldChild.dom)) {
+            if (oldDom && oldDom.contains && oldDom.contains(oldChild.dom)) {
               oldDom.replaceChild(newDom, oldChild.dom);
             }
             newChild.dom = newDom;
@@ -709,7 +719,7 @@ function patchVNode(parent: Element, oldVNode: VNode, newVNode: VNode): void {
           if (isCheckbox) {
             // Always replace checkbox DOM node to ensure unique value
             const newDom = mountVNode(newChild);
-            if (newDom && oldChild.dom && oldDom instanceof Element && oldDom.contains(oldChild.dom)) {
+            if (newDom && oldChild.dom && oldChild.dom instanceof Element && oldChild.dom.contains(oldChild.dom)) {
               if (oldDom.contains(oldChild.dom)) {
                 oldDom.replaceChild(newDom, oldChild.dom);
               }
@@ -810,6 +820,24 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
   }
 
   /**
+   * Syncs whitelisted state properties to attributes after render.
+   * Only keys listed in config.reflect are reflected.
+   */
+  private syncStateToAttributes(): void {
+    if (!this.stateObj || !this.config?.reflect || !Array.isArray(this.config.reflect)) return;
+    this.config.reflect.forEach(key => {
+      const value = this.stateObj[key];
+      if (["string", "number", "boolean"].includes(typeof value)) {
+        if (value === undefined || value === null) {
+          this.removeAttribute(key);
+        } else {
+          this.setAttribute(key, String(value));
+        }
+      }
+    });
+  }
+
+  /**
    * Allows updating the template function at runtime and triggers a re-render.
    * @param newTemplate - New template function or string
    */
@@ -871,7 +899,7 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
     }
     // Guard against stateObj being undefined
     if (!this.stateObj) return;
-    // Merge attribute value into state, then re-render
+    // Only update state and trigger render if value differs
     if (name in this.stateObj) {
       const initialType = typeof (this.config?.state?.[name]);
       let value: any = newValue;
@@ -887,12 +915,14 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
       } else if (initialType === 'boolean') {
         value = value === 'true';
       }
-      if (this.config?.debug) {
-        console.log('[runtime] state update:', { name, value });
+      if ((this.stateObj as any)[name] !== value) {
+        if (this.config?.debug) {
+          console.log('[runtime] state update:', { name, value });
+        }
+        (this.stateObj as any)[name] = value;
+        this.render();
       }
-      (this.stateObj as any)[name] = value;
     }
-    this.render();
   }
 
   /**
@@ -1288,11 +1318,15 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
       if (templateResultOrPromise instanceof Promise) {
         templateResultOrPromise.then(templateResult => {
           if (!this._hasError) this._renderTemplateResult(templateResult);
+           // Sync state to attributes after render
+           this.syncStateToAttributes();
         }).catch(error => {
           this._handleRenderError(error);
         });
       } else {
         if (!this._hasError) this._renderTemplateResult(templateResultOrPromise);
+         // Sync state to attributes after render
+         this.syncStateToAttributes();
       }
     } catch (error) {
       this._handleRenderError(error);

@@ -18,5 +18,6 @@ export function getTestConfig() {
     onUnmounted: vi.fn(),
     onError: vi.fn(),
     debug: true,
+    reflect: [] as string[],
   };
 }

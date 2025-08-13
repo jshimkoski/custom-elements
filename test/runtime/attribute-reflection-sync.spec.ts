@@ -5,6 +5,7 @@ import { getTestConfig } from './getTestConfig';
 describe('Attribute Reflection and Sync', () => {
   it('reflects state changes as attributes', () => {
     const config = getTestConfig();
+    config.reflect = ['name'];
     component('attr-reflect-element', config);
     const el = document.createElement('attr-reflect-element');
     document.body.appendChild(el);
@@ -18,6 +19,7 @@ describe('Attribute Reflection and Sync', () => {
 
   it('reflects attribute changes in state', () => {
     const config = getTestConfig();
+    config.reflect = ['name'];
     component('attr-sync-element', config);
     const el = document.createElement('attr-sync-element');
     document.body.appendChild(el);
@@ -29,6 +31,7 @@ describe('Attribute Reflection and Sync', () => {
 
   it('handles null, undefined, and empty string attributes', () => {
     const config = getTestConfig();
+    config.reflect = ['name'];
     component('attr-edge-element', config);
     const el = document.createElement('attr-edge-element');
     document.body.appendChild(el);
