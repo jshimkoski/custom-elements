@@ -105,6 +105,34 @@ import { eventBus } from './event-bus';
 import { renderCompiledTemplate, updateCompiledTemplate } from './template-compiler';
 
 // ============================================================================
+// Sanitation
+// ============================================================================
+
+/**
+ * Recursively sanitizes an object, removing dangerous keys and prototype pollution.
+ * Handles circular references using a WeakSet.
+ * @param obj - Object to sanitize
+ * @param seen - WeakSet to track visited objects
+ */
+function deepSanitizeObject<T>(obj: T, seen = new WeakSet()): T {
+  if (obj === null || typeof obj !== 'object') return obj;
+  if (seen.has(obj as object)) return obj;
+  seen.add(obj as object);
+  if (Array.isArray(obj)) return obj.map(item => deepSanitizeObject(item, seen)) as any;
+  // Prevent prototype pollution
+  if (Object.getPrototypeOf(obj) !== Object.prototype && Object.getPrototypeOf(obj) !== null) {
+    Object.setPrototypeOf(obj, null);
+  }
+  const dangerousKeys = ['__proto__', 'constructor', 'prototype'];
+  const sanitized: any = Object.create(null);
+  for (const key of Object.keys(obj)) {
+    if (dangerousKeys.includes(key)) continue;
+    sanitized[key] = deepSanitizeObject((obj as any)[key], seen);
+  }
+  return sanitized;
+}
+
+// ============================================================================
 // Data/Event Binding
 // ============================================================================
 
@@ -117,41 +145,52 @@ import { renderCompiledTemplate, updateCompiledTemplate } from './template-compi
  */
 function useDataModel<T extends Record<string, unknown>>(el: Element, stateObj: T, keyWithModifiers: string) {
   const [key, ...modifiers] = keyWithModifiers.split('|').map(s => s.trim());
-  if (!key) return;
+  if (!key || key === '__proto__' || key === 'constructor' || key === 'prototype') return;
   const updateState = (e: Event) => {
     let value: unknown;
+    let newState: Record<string, unknown> = { ...stateObj };
     if (el instanceof HTMLInputElement && el.type === 'checkbox') {
       const trueValue = el.getAttribute('data-true-value');
       const falseValue = el.getAttribute('data-false-value');
       value = el.value;
-      if (Array.isArray((stateObj as Record<string, unknown>)[key])) {
-        const arr = ((stateObj as Record<string, unknown>)[key] as unknown[]);
+      if (Array.isArray(stateObj[key])) {
+        const arr = (stateObj[key] as unknown[]);
         if (el.checked) {
           if (!arr.includes(value)) arr.push(value);
         } else {
           const idx = arr.indexOf(value);
           if (idx !== -1) arr.splice(idx, 1);
         }
-        (stateObj as Record<string, unknown>)[key] = [...arr];
+        if (key !== '__proto__' && key !== 'constructor' && key !== 'prototype') {
+          newState[key] = [...arr];
+        }
       } else {
         if (trueValue !== null || falseValue !== null) {
           if (el.checked) {
-            (stateObj as Record<string, unknown>)[key] = trueValue;
+            if (key !== '__proto__' && key !== 'constructor' && key !== 'prototype') {
+              newState[key] = trueValue;
+            }
           } else {
-            (stateObj as Record<string, unknown>)[key] = falseValue !== null ? falseValue : false;
+            if (key !== '__proto__' && key !== 'constructor' && key !== 'prototype') {
+              newState[key] = falseValue !== null ? falseValue : false;
+            }
           }
         } else {
-          (stateObj as Record<string, unknown>)[key] = el.checked;
+          if (key !== '__proto__' && key !== 'constructor' && key !== 'prototype') {
+            newState[key] = el.checked;
+          }
         }
       }
     } else if (el instanceof HTMLInputElement && el.type === 'radio') {
       value = el.value;
-      (stateObj as Record<string, unknown>)[key] = value;
+      if (key !== '__proto__' && key !== 'constructor' && key !== 'prototype') {
+        newState[key] = value;
+      }
       const radios = (el.form || el.closest('form') || el.getRootNode()) instanceof Element
         ? ((el.form || el.closest('form') || el.getRootNode()) as Element).querySelectorAll(`input[type="radio"][name="${el.name}"][data-model="${keyWithModifiers}"]`)
         : [];
       radios.forEach((radio: Element) => {
-        (radio as HTMLInputElement).checked = (radio as HTMLInputElement).value === String((stateObj as Record<string, unknown>)[key]);
+        (radio as HTMLInputElement).checked = (radio as HTMLInputElement).value === String(newState[key]);
       });
     } else {
       value = (el as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement).value;
@@ -161,8 +200,14 @@ function useDataModel<T extends Record<string, unknown>>(el: Element, stateObj: 
       if (modifiers.includes('number')) {
         value = Number(value);
       }
-      (stateObj as Record<string, unknown>)[key] = value;
+      if (key !== '__proto__' && key !== 'constructor' && key !== 'prototype') {
+        newState[key] = value;
+      }
     }
+    // Replace stateObj reference with sanitized, null-prototype object
+    const sanitized = deepSanitizeObject(newState);
+  for (const k in stateObj) delete (stateObj as any)[k];
+  for (const k in sanitized) (stateObj as any)[k] = sanitized[k];
     if ('_vnode' in el && typeof (el as any)._vnode === 'object' && (el as any)._vnode?.props) {
       (el as any)._vnode.props.value = value;
     }
@@ -815,7 +860,10 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
    * @param newState - Partial state to merge
    */
   public setState(newState: Partial<S & C>): void {
-    Object.assign(this.stateObj, newState);
+    // Replace stateObj with a new sanitized, null-prototype object
+    const merged = { ...this.stateObj, ...newState };
+    this.stateObj = deepSanitizeObject(merged) as S & C;
+  (this.api as any).state = this.stateObj;
     this.render();
   }
 
@@ -894,6 +942,7 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
    * Called when an observed attribute changes. Syncs attribute to state and triggers render.
    */
   attributeChangedCallback(name: string, _oldValue: string, newValue: string) {
+    if (name === '__proto__' || name === 'constructor' || name === 'prototype') return;
     if (this.config?.debug) {
       console.debug(`[CustomElement] attributeChangedCallback: '${name}' changed to '${newValue}' on`, this);
     }
@@ -915,6 +964,7 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
       } else if (initialType === 'boolean') {
         value = value === 'true';
       }
+      value = deepSanitizeObject(value);
       if ((this.stateObj as any)[name] !== value) {
         if (this.config?.debug) {
           console.log('[runtime] state update:', { name, value });
@@ -1715,6 +1765,11 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
  * @param config - Component configuration
  */
 export function component<S extends ComponentState, C extends Record<string, any> = {}>(tag: string, config: ComponentConfig<S, C>): void {
+  // Prevent deep object injection in config and state
+  const sanitizedConfig = deepSanitizeObject(config);
+  const sanitizedState = deepSanitizeObject(config.state);
+  config = sanitizedConfig as ComponentConfig<S, C>;
+  (config as any).state = sanitizedState as S;
   if (config.debug) {
     console.log(`[runtime] Debugging component: ${tag}`, config);
   }
