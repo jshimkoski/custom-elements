@@ -1064,12 +1064,24 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
     // SSR hydration support (selective)
     if (typeof this.config.hydrate === 'function') {
       const hydrateEls = this.shadowRoot?.querySelectorAll('[data-hydrate]');
-      if (hydrateEls && hydrateEls.length > 0) {
-        hydrateEls.forEach(el => {
-          this.config.hydrate!(el, this.stateObj, this.api);
-        });
-      } else {
-        this.config.hydrate!(this.shadowRoot!, this.stateObj, this.api);
+      try {
+        if (hydrateEls && hydrateEls.length > 0) {
+          hydrateEls.forEach(el => {
+            try {
+              this.config.hydrate!(el, this.stateObj, this.api);
+            } catch (err) {
+              if (typeof this.config.onError === 'function') {
+                this.config.onError(err instanceof Error ? err : new Error(String(err)), this.api.state, this.api);
+              }
+            }
+          });
+        } else {
+          this.config.hydrate!(this.shadowRoot!, this.stateObj, this.api);
+        }
+      } catch (err) {
+        if (typeof this.config.onError === 'function') {
+          this.config.onError(err instanceof Error ? err : new Error(String(err)), this.api.state, this.api);
+        }
       }
     }
     const isSSRHydration = this.hasAttribute('data-hydrated');
