@@ -86,6 +86,10 @@ renderComponentsToString(components: SSRComponentConfig<any>[], options?: SSRRen
 generateHydrationScript(context: SSRContext): string;
 ```
 
+**Notes:**
+- SSR rendering excludes refs, event listeners, and lifecycle hooks.
+- Hydration is opt-in via the `hydrate` property; templates must match for correct hydration.
+
 ---
 
 ## Template Helpers

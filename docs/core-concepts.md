@@ -1,17 +1,23 @@
 
 # Core Concepts
 
-Essential building blocks for every component. All features are strictly typed and match the runtime implementation.
+Essential building blocks for every component. All features are strictly typed, regression-tested, and match the runtime implementation.
 
 ---
 
 ## Reactive State
 
 - State changes automatically trigger re-renders using ES6 Proxy.
-
-```typescript
-state.count++; // Automatically re-renders the component
-```
+- Controlled input sync: Inputs with `data-model` (including checkboxes, radios, multi-checkbox groups, and modifiers) stay in sync with state; user typing always wins. VDOM patching is regression-tested for reliable event handling.
+- Attribute-state sync: Primitive state keys are automatically observed as attributes and kept in sync.
+- Focus preservation: Inputs retain focus and selection during updates.
+- Error boundaries: Use `onError` for fallback UI and diagnostics.
+- SSR caveats: SSR excludes refs, event listeners, and lifecycle hooks; hydration is opt-in via the `hydrate` property.
+- Plugin system: Extend runtime behavior with hooks (`onInit`, `onRender`, `onError`).
+- Global event bus: Built-in store and event bus for cross-component communication.
+- Computed properties: Use `computed` for derived, reactive values.
+- Refs: Direct DOM access via `refs`; no complex selectors.
+- Lifecycle hooks: Use `onMounted` and `onUnmounted` for setup/teardown.
 
 ---
 
