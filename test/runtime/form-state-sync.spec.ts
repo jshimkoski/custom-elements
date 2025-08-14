@@ -10,12 +10,14 @@ describe('Form Elements State Sync', () => {
     };
     component('form-state-demo', {
       template: () => `
-        <input type="text" data-model="text" />
-        <input type="checkbox" data-model="checked" />
-        <select data-model="select">
-          <option value="a">A</option>
-          <option value="b">B</option>
-        </select>
+        <div>
+          <input type="text" data-model="text" />
+          <input type="checkbox" data-model="checked" />
+          <select data-model="select">
+            <option value="a">A</option>
+            <option value="b">B</option>
+          </select>
+        </div>
       `,
       state: { text: 'hello', checked: true, select: 'b' },
     });
@@ -29,8 +31,10 @@ describe('Form Elements State Sync', () => {
     expect(textInput.value).toBe('hello');
     expect(checkbox.checked).toBe(true);
     expect(select.value).toBe('b');
-    // Change state
-    el['setState']({ text: 'world', checked: false, select: 'a' });
+    // Change state using direct mutation
+    (el as any).api.state.text = 'world';
+    (el as any).api.state.checked = false;
+    (el as any).api.state.select = 'a';
     await new Promise((resolve) => requestAnimationFrame(resolve));
     // Re-query textInput after state change
     const textInputAfter = shadow.querySelector('input[type="text"]') as HTMLInputElement;

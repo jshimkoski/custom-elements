@@ -1,3 +1,7 @@
+// ============================================================================
+// Exports
+// ============================================================================
+
 /**
  * Represents the state object for a component.
  * Extend this interface for custom state typing.
@@ -8,6 +12,9 @@ export interface ComponentState extends Record<string, unknown> {}
  * Includes state, event emitters, and global event bus methods.
  */
 export interface ComponentAPI<T extends ComponentState = ComponentState> {
+  /**
+   * Reactive state object. Mutate directly for reactivity.
+   */
   readonly state: T;
   emit(eventName: string, detail?: unknown): void;
   onGlobal<U = any>(eventName: string, handler: (data: U) => void): () => void;
@@ -86,25 +93,26 @@ export { eventBus } from './event-bus';
 export { renderToString, renderComponentsToString, generateHydrationScript } from './ssr';
 export type { SSRComponentConfig, SSRRenderOptions, SSRContext } from './ssr';
 export { html, compile, css, classes, styles, ref, on } from './template-helpers';
+export { useDataModel } from './data-binding';
 export { compileTemplate, renderCompiledTemplate, updateCompiledTemplate } from './template-compiler';
+export { mountVNode, patchVNode, createVNodeFromElement, parseVNodeFromHTML, safeReplaceChild, getVNodeKey } from './v-dom';
+export type { VNode } from './v-dom';
 
-/**
- * Modern Web Component Runtime - v2.0
- *
- * - Strict TypeScript
- * - Memory efficiency
- * - Developer experience
- * - Performance
- * - Server-Side Rendering (SSR) support
- * - Template Compilation support
- */
+
+// ============================================================================
+// Imports
+// ============================================================================
 
 import { reactive } from './computed-state';
 import { eventBus } from './event-bus';
 import { renderCompiledTemplate, updateCompiledTemplate } from './template-compiler';
+import { useDataModel } from './data-binding';
+import { mountVNode, patchVNode, parseVNodeFromHTML } from './v-dom';
+import type { VNode } from './v-dom';
+
 
 // ============================================================================
-// Sanitation
+// Utilities
 // ============================================================================
 
 /**
@@ -131,678 +139,17 @@ function deepSanitizeObject<T>(obj: T, seen = new WeakSet()): T {
   return sanitized;
 }
 
-// ============================================================================
-// Data/Event Binding
-// ============================================================================
-
-/**
- * Minimal controlled input binding helper for data-model attributes.
- * Handles checkboxes, radios, text, and modifiers (trim, number).
- * @param el - Input/select/textarea element
- * @param stateObj - State object to bind
- * @param keyWithModifiers - Key and optional modifiers (e.g. 'name|trim|number')
- */
-function useDataModel<T extends Record<string, unknown>>(el: Element, stateObj: T, keyWithModifiers: string) {
-  const [rawKey, ...modifiers] = keyWithModifiers.split('|').map(s => s.trim());
-  if (!rawKey || rawKey === '__proto__' || rawKey === 'constructor' || rawKey === 'prototype') return;
-  // Helper to set nested state (dot notation)
-  function setNestedState(obj: any, path: string, value: unknown) {
-    const keys = path.split('.');
-    let target = obj;
-    for (let i = 0; i < keys.length - 1; i++) {
-      if (!(keys[i] in target)) target[keys[i]] = {};
-      target = target[keys[i]];
-    }
-    target[keys[keys.length - 1]] = value;
-  }
-  const updateState = (e: Event) => {
-    let value: unknown;
-    if (el instanceof HTMLInputElement && el.type === 'checkbox') {
-      value = el.value;
-      const trueValue = el.getAttribute('data-true-value');
-      const falseValue = el.getAttribute('data-false-value');
-      let arr = Array.isArray(stateObj[rawKey]) ? (stateObj[rawKey] as unknown[]) : undefined;
-      if (arr) {
-        if (el.checked) {
-          if (!arr.includes(value)) arr.push(value);
-        } else {
-          const idx = arr.indexOf(value);
-          if (idx !== -1) arr.splice(idx, 1);
-        }
-        setNestedState(stateObj, rawKey, [...arr]);
-      } else {
-        if (trueValue !== null || falseValue !== null) {
-          if (el.checked) {
-            setNestedState(stateObj, rawKey, trueValue);
-          } else {
-            setNestedState(stateObj, rawKey, falseValue !== null ? falseValue : false);
-          }
-        } else {
-          setNestedState(stateObj, rawKey, el.checked);
-        }
-      }
-    } else if (el instanceof HTMLInputElement && el.type === 'radio') {
-      value = el.value;
-      setNestedState(stateObj, rawKey, value);
-      const radios = (el.form || el.closest('form') || el.getRootNode()) instanceof Element
-        ? ((el.form || el.closest('form') || el.getRootNode()) as Element).querySelectorAll(`input[type="radio"][name="${el.name}"][data-model="${keyWithModifiers}"]`)
-        : [];
-      radios.forEach((radio: Element) => {
-        (radio as HTMLInputElement).checked = (radio as HTMLInputElement).value === String(value);
-      });
-    } else {
-      // Always read value from event target for input events
-      // Always read value from the input element itself for robustness
-      value = (el as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement).value;
-      if (el instanceof HTMLInputElement && el.type === 'number') {
-        value = Number(value);
-      }
-      if (modifiers.includes('trim') && typeof value === 'string') {
-        value = value.trim();
-      }
-      if (modifiers.includes('number')) {
-        value = Number(value);
-      }
-      setNestedState(stateObj, rawKey, value);
-    }
-    if ('_vnode' in el && typeof (el as any)._vnode === 'object' && (el as any)._vnode?.props) {
-      (el as any)._vnode.props.value = value;
-    }
-    if (e.type === 'input') {
-      (el as { _isDirty?: boolean })._isDirty = true;
-    }
-    if (e.type === 'keydown' && (e as KeyboardEvent).key === 'Enter') {
-      (el as { _isDirty?: boolean })._isDirty = false;
-      if (el instanceof HTMLElement && el.isConnected) {
-        let parent = el.parentElement;
-        while (parent && !(parent instanceof HTMLElement && parent.shadowRoot)) {
-          parent = parent.parentElement;
-        }
-        if (parent && typeof parent === 'object' && parent !== null && 'render' in parent && typeof (parent as any).render === 'function') {
-          (parent as HTMLElement & { render: () => void }).render();
-        }
-      }
-    }
-    if (e.type === 'blur') {
-      (el as { _isDirty?: boolean })._isDirty = false;
-    }
-  };
-  el.addEventListener('input', updateState);
-  el.addEventListener('change', updateState);
-  el.addEventListener('keydown', updateState);
-  el.addEventListener('blur', updateState);
-}
-
-// ============================================================================
-// VDOM
-// ============================================================================
-
-/**
- * Virtual Node (VNode) structure for incremental migration
- */
-interface VNode {
-  type: string; // tag name or '#text'
-  key?: string;
-  props: Record<string, any>;
-  children: VNode[];
-  dom?: Element | Text;
-}
-
-/**
- * Safely replaces a child node, guarding against NotFoundError and out-of-sync trees.
- * Falls back to appendChild if oldChild is not present.
- * Logs mutation for debugging if enabled.
- * @param parent - Parent node
- * @param newChild - New node to insert
- * @param oldChild - Old node to replace
- */
-function safeReplaceChild(parent: Node | null, newChild: Node, oldChild: Node): void {
-  // Get debug flag from parent custom element instance if available
-  let debug = false;
-  if (parent && parent instanceof Element && 'debug' in parent) {
-    debug = (parent as Element & { debug?: boolean }).debug === true;
-  }
-  if (!parent || !(parent instanceof Element)) {
-    if (debug) console.warn('[runtime] safeReplaceChild: parent is missing or not an Element', { parent, newChild, oldChild });
-    return;
-  }
-  if (parent.contains(oldChild) && oldChild.parentNode === parent) {
-    try {
-      parent.replaceChild(newChild, oldChild);
-    } catch (err) {
-      if (debug) console.error('[runtime] safeReplaceChild: error replacing child', err, {
-        parent,
-        newChild,
-        oldChild,
-        parentHTML: (parent as Element).outerHTML,
-        newChildHTML: (newChild as Element).outerHTML,
-        oldChildHTML: (oldChild as Element).outerHTML
-      });
-    }
-  } else {
-    // Do NOT append newChild if oldChild is missing during patching
-    if (debug) console.warn('[runtime] safeReplaceChild: attempted to replace missing child, skipping mutation', {
-      parent,
-      newChild,
-      oldChild,
-      parentChildren: Array.from(parent.childNodes).map(n => n.nodeName),
-      parentHTML: (parent as Element).outerHTML,
-      newChildHTML: (newChild as Element).outerHTML,
-      oldChildHTML: (oldChild as Element).outerHTML
-    });
-  }
-}
-
-/**
- * Mounts a VNode to the DOM and returns the created node.
- * Handles text, fragment, and element nodes.
- * @param vnode - Virtual node to mount
- * @returns DOM node or null
- */
-function mountVNode(vnode: VNode): Element | Text | null {
-  if (vnode.type === '#whitespace') {
-    return null;
-  }
-  if (vnode.type === '#text') {
-    const textNode = document.createTextNode(vnode.props.nodeValue ?? '');
-    vnode.dom = textNode;
-    return textNode;
-  }
-  const el = document.createElement(vnode.type);
-  for (const [k, v] of Object.entries(vnode.props)) {
-    if (k === 'value' && el instanceof HTMLInputElement) {
-      if (el.type === 'radio') {
-        // Always set value attribute for radios, never assign to property
-        el.setAttribute('value', v as string);
-      } else if (el.type === 'checkbox') {
-        // Always set value property and attribute for checkboxes
-        el.value = v as string;
-        el.setAttribute('value', v as string);
-      } else {
-        el.value = v as string;
-        el.setAttribute('value', v as string);
-      }
-    } else {
-      el.setAttribute(k, v as string);
-    }
-  }
-  vnode.dom = el;
-  for (const child of vnode.children) {
-    const childNode = mountVNode(child);
-    if (childNode) el.appendChild(childNode);
-  }
-  return el;
-}
-
-/**
- * Parses an HTML string into a VNode tree.
- * Supports basic tags, attributes, text, and key/data-model.
- * @param html - HTML string
- * @returns VNode tree
- */
-function parseVNodeFromHTML(html: string): VNode {
-  const template = document.createElement('template');
-  template.innerHTML = html.trim();
-  const nodes = Array.from(template.content.childNodes);
-  // If only one root node, return as before
-  if (nodes.length === 1) {
-    return createVNodeFromElement(nodes[0]);
-  }
-  // If multiple root nodes, create a fragment VNode
-  return {
-    type: '#fragment',
-    key: undefined,
-    props: {},
-    children: nodes.map((node, idx) => createVNodeFromElement(node, '#fragment', idx)),
-    dom: undefined
-  };
-}
-
-/**
- * Creates a VNode from a DOM ChildNode (Element or Text).
- * Assigns a stable, deterministic key for VDOM reconciliation.
- * @param node - DOM node
- * @param parentPath - Path for key generation
- * @param childIndex - Index for key generation
- * @returns VNode
- */
-function createVNodeFromElement(node: ChildNode, parentPath: string = '', childIndex: number = 0): VNode {
-  // Log all input elements and their attributes at VNode creation
-  if (node.nodeType === Node.ELEMENT_NODE) {
-    const elem = node as Element;
-    if (elem.tagName.toLowerCase() === 'input') {
-      const attrs: Record<string, string> = {};
-      Array.from(elem.attributes).forEach(attr => {
-        attrs[attr.name] = attr.value;
-      });
-    }
-  }
-  // let debugType = '';
-  // let debugKey = undefined;
-  if (!node) {
-    // Guard: skip undefined/null nodes
-    return { type: '#unknown', key: undefined, props: {}, children: [], dom: undefined };
-  }
-  if (node.nodeType === Node.TEXT_NODE) {
-    // Ignore pure whitespace text nodes
-    if (!node.nodeValue || /^\s*$/.test(node.nodeValue)) {
-      return { type: '#whitespace', key: undefined, props: {}, children: [], dom: undefined };
-    }
-    return { type: '#text', key: undefined, props: { nodeValue: node.nodeValue }, children: [], dom: node as Text };
-  }
-  if (node.nodeType === Node.ELEMENT_NODE) {
-    const elem = node as Element;
-    const props: Record<string, any> = {};
-    Array.from(elem.attributes).forEach(attr => {
-      props[attr.name] = attr.value;
-    });
-    const tagName = elem.tagName.toLowerCase();
-    let vnodeKey: string | undefined = undefined;
-    // User-typed element: input, textarea, contenteditable
-    if (tagName === 'input' && elem.hasAttribute('data-model')) {
-      const model = elem.getAttribute('data-model')!;
-      const inputType = elem.getAttribute('type');
-      // Always assign value 'on' for single checkbox if missing
-      if (inputType === 'checkbox' && !elem.hasAttribute('value')) {
-        elem.setAttribute('value', 'on');
-        props['value'] = 'on';
-      }
-      if (inputType === 'radio' || inputType === 'checkbox') {
-        // Always use DOM value attribute, fallback to 'on' if missing
-        let valueAttr = elem.getAttribute('value');
-        if (!valueAttr) {
-          valueAttr = 'on';
-          elem.setAttribute('value', valueAttr);
-        }
-        vnodeKey = `${model}:${valueAttr}`;
-        props['data-uid'] = vnodeKey;
-        elem.setAttribute('data-uid', vnodeKey);
-        props['value'] = valueAttr;
-      } else {
-        props['data-uid'] = model;
-        elem.setAttribute('data-uid', model);
-        vnodeKey = model;
-      }
-    } else if (tagName === 'input' || tagName === 'textarea' || elem.hasAttribute('contenteditable')) {
-      // Use path-based key for uncontrolled user-typed elements
-      vnodeKey = `${parentPath}.${tagName}[${childIndex}]`;
-      props['data-uid'] = vnodeKey;
-      elem.setAttribute('data-uid', vnodeKey);
-    } else {
-      // Non-user-typed element: assign deterministic key based on tree path
-      vnodeKey = `${parentPath}.${tagName}[${childIndex}]`;
-    }
-    // Recursively assign stable keys for all children
-    const children: VNode[] = Array.from(elem.childNodes).map((child, idx) => {
-      return createVNodeFromElement(child, vnodeKey, idx);
-    });
-    return {
-      type: tagName,
-      key: vnodeKey,
-      props,
-      children,
-      dom: elem
-    };
-  }
-  // Fallback for unsupported node types
-  return { type: '#unknown', key: undefined, props: {}, children: [], dom: undefined };
-}
-
-/**
- * Patches two VNodes and updates the DOM, preserving controlled inputs.
- * Handles keyed and index-based reconciliation.
- * @param parent - Parent DOM element
- * @param oldVNode - Previous VNode
- * @param newVNode - New VNode
- */
-function patchVNode(parent: Element, oldVNode: VNode, newVNode: VNode): void {
-  // Guard clause: if either VNode is undefined, return early
-  if (!oldVNode || !newVNode) {
-    return;
-  }
-
-  // Focus/selection preservation for replaced input elements
-  let restoreFocus: null | {
-    selectionStart: number | null;
-    selectionEnd: number | null;
-    value: string;
-    type: string;
-  } = null;
-  if (
-    oldVNode.dom instanceof HTMLInputElement &&
-    document.activeElement === oldVNode.dom
-  ) {
-    restoreFocus = {
-      selectionStart: oldVNode.dom.selectionStart,
-      selectionEnd: oldVNode.dom.selectionEnd,
-      value: oldVNode.dom.value,
-      type: oldVNode.dom.type
-    };
-  }
-
-  // If type or key differ, replace node
-  if (oldVNode.type !== newVNode.type || oldVNode.key !== newVNode.key) {
-    const newDom = mountVNode(newVNode);
-    // Only replace if both are valid Node instances
-    if (newDom instanceof Node && oldVNode.dom instanceof Node && parent.contains(oldVNode.dom)) {
-      if (parent.contains(oldVNode.dom) && oldVNode.dom.parentNode === parent) {
-        safeReplaceChild(parent, newDom, oldVNode.dom);
-        // Restore focus/selection if needed, try synchronously first
-        if (
-          restoreFocus &&
-          newDom instanceof HTMLInputElement &&
-          newDom.type === restoreFocus.type
-        ) {
-          try {
-            newDom.focus();
-            newDom.selectionStart = restoreFocus.selectionStart;
-            newDom.selectionEnd = restoreFocus.selectionEnd;
-          } catch {}
-          // If not focused, fallback to rAF
-          if (document.activeElement !== newDom) {
-            requestAnimationFrame(() => {
-              newDom.focus();
-              newDom.selectionStart = restoreFocus.selectionStart;
-              newDom.selectionEnd = restoreFocus.selectionEnd;
-            });
-          }
-        }
-      }
-    } else if ((newDom as any) instanceof Node) {
-      if (newDom) {
-        parent.appendChild(newDom);
-        newVNode.dom = newDom;
-      }
-      return;
-    } else {
-      // else: skip invalid node replacement
-      newVNode.dom = undefined;
-      return;
-    }
-  }
-  // Patch props for Element
-  const oldDom = oldVNode.dom;
-
-  // --- Robust keyed reconciliation ---
-
-  // Filter out whitespace-only VDOM nodes for robust reconciliation
-  function isMeaningfulVNode(v: VNode | undefined): v is VNode {
-    return !!v && v.type !== '#whitespace' && !(v.type === '#text' && (!v.props?.nodeValue || /^\s*$/.test(v.props.nodeValue)));
-  }
-  const oldChildren: VNode[] = Array.isArray(oldVNode.children) ? oldVNode.children.filter(isMeaningfulVNode) : [];
-  const newChildren: VNode[] = Array.isArray(newVNode.children) ? newVNode.children.filter(isMeaningfulVNode) : [];
-
-  // If children keys or count differ, replace parent node
-  const oldKeys = oldChildren.map(c => c.key).join(',');
-  const newKeys = newChildren.map(c => c.key).join(',');
-  if (oldKeys !== newKeys || oldChildren.length !== newChildren.length) {
-    const newDom = mountVNode(newVNode);
-    if (newDom && oldVNode.dom) {
-      if (parent.contains(oldVNode.dom) && oldVNode.dom.parentNode === parent) {
-        safeReplaceChild(parent, newDom, oldVNode.dom);
-      } else {
-        const grandparent = parent.parentNode;
-        if (grandparent && grandparent instanceof Element) {
-          grandparent.replaceChild(newDom, parent);
-          let debug = false;
-          if (parent && 'debug' in parent) debug = (parent as any).debug === true;
-          if (debug) console.warn('[runtime] patchVNode: replaced parent in grandparent due to out-of-sync DOM', {
-            grandparent,
-            parent,
-            newDom,
-            oldDom: oldVNode.dom
-          });
-        } else {
-          // Fallback: replace parent node in its host using replaceChild or replaceWith
-          const host = parent.parentNode;
-          if (host && typeof (host as Node).replaceChild === 'function') {
-            (host as Node).replaceChild(newDom, parent);
-          } else if ('replaceWith' in parent && typeof parent.replaceWith === 'function') {
-            parent.replaceWith(newDom);
-          }
-        }
-      }
-      newVNode.dom = newDom;
-      return;
-    }
-  }
-  if (oldDom && oldDom instanceof Element && newVNode.props) {
-    const inputType = oldDom.tagName.toLowerCase() === 'input' ? oldDom.getAttribute('type') : undefined;
-    const isCustomElement = oldDom.tagName.includes('-');
-    for (const [k, v] of Object.entries(newVNode.props)) {
-      if (inputType === 'radio' && k === 'value') {
-        // Never set value for radios
-        continue;
-      }
-      // For checkboxes, always set value attribute
-      if (inputType === 'checkbox' && k === 'value') {
-        oldDom.setAttribute('value', v as string);
-        continue;
-      }
-      // Always set attribute to ensure attributeChangedCallback fires
-      oldDom.setAttribute(k, v as string);
-    }
-    // For custom elements, explicitly set all attributes again to guarantee reactivity
-    if (isCustomElement) {
-      for (const [k, v] of Object.entries(newVNode.props)) {
-        oldDom.setAttribute(k, v as string);
-      }
-    }
-    // Remove attributes not present in newVNode.props, except value for radios/checkboxes
-    for (const k of Array.from(oldDom.attributes).map(a => a.name)) {
-      if (!(k in newVNode.props)) {
-        if (inputType === 'radio' && k === 'value') continue;
-        if (inputType === 'checkbox' && k === 'value') continue;
-        oldDom.removeAttribute(k);
-      }
-    }
-  }
-  // Patch text: always update nodeValue for text nodes
-  if (newVNode.type === '#text') {
-    if (oldDom && oldDom.nodeType === Node.TEXT_NODE) {
-      if ((oldDom as Text).nodeValue !== newVNode.props.nodeValue) {
-        (oldDom as Text).nodeValue = newVNode.props.nodeValue;
-      }
-      newVNode.dom = oldDom;
-    } else {
-      // Replace or insert text node at correct position
-      const newTextNode = document.createTextNode(newVNode.props.nodeValue ?? '');
-      if (oldDom && parent.contains(oldDom) && oldDom.parentNode === parent) {
-        safeReplaceChild(parent, newTextNode, oldDom);
-      } else {
-        const grandparent = parent.parentNode;
-        if (grandparent && grandparent instanceof Element) {
-          grandparent.replaceChild(newTextNode, parent);
-        } else {
-          parent.innerHTML = '';
-          while (parent.firstChild) parent.removeChild(parent.firstChild);
-          parent.appendChild(newTextNode);
-        }
-      }
-      newVNode.dom = newTextNode;
-    }
-    return;
-  }
-
-  // Always reconcile the full set of children for the parent element
-  if (parent !== oldVNode.dom && oldVNode.dom instanceof Element) {
-    // If patchVNode is called on a child, redirect to parent with full children
-    patchVNode(oldVNode.dom, oldVNode, newVNode);
-    return;
-  }
-  // Symbol for storing keys on DOM nodes
-  const DOM_KEY: unique symbol = Symbol('vdom-key');
-  const oldKeyed: Record<string, VNode> = {};
-  const newKeyed: Record<string, VNode> = {};
-  let hasKeys = false;
-  oldChildren.forEach(child => {
-    if (child.key) {
-      oldKeyed[child.key] = child;
-      hasKeys = true;
-    }
-  });
-  newChildren.forEach(child => {
-    if (child.key) {
-      newKeyed[child.key] = child;
-      hasKeys = true;
-    }
-  });
-  if (hasKeys) {
-    // Remove old keyed children not present in newChildren
-    Object.keys(oldKeyed).forEach(key => {
-      if (!newKeyed[key]) {
-        const childDom = oldKeyed[key].dom;
-        if (childDom && childDom instanceof Node && oldDom instanceof Element && oldDom.contains(childDom)) {
-          oldDom.removeChild(childDom);
-        }
-      }
-    });
-    // Insert or patch new keyed children
-    newChildren.forEach((newChild) => {
-      if (newChild.key && oldKeyed[newChild.key]) {
-        const oldChild = oldKeyed[newChild.key];
-        let isCheckbox = false;
-        if (oldChild.dom && oldChild.dom instanceof Element) {
-          isCheckbox = oldChild.dom.tagName.toLowerCase() === 'input' && oldChild.dom.getAttribute('type') === 'checkbox';
-        }
-        const isControlledCheckbox = isCheckbox && oldChild.dom && oldChild.dom instanceof Element && (oldChild.dom.hasAttribute('data-bind') || oldChild.dom.hasAttribute('data-model'));
-        if (isControlledCheckbox) {
-          // Always patch in place for controlled checkboxes
-          patchVNode(oldDom as Element, oldChild, newChild);
-        } else if (isCheckbox) {
-          // Only replace if not controlled
-          const newDom = mountVNode(newChild);
-          if (newDom && oldChild.dom && oldChild.dom instanceof Element && oldChild.dom.contains(oldChild.dom)) {
-            if (oldDom && oldDom.contains && oldDom.contains(oldChild.dom)) {
-              oldDom.replaceChild(newDom, oldChild.dom);
-            }
-            newChild.dom = newDom;
-          }
-        } else {
-          patchVNode(oldDom as Element, oldChild, newChild);
-        }
-      } else {
-        const childDom = mountVNode(newChild);
-        if (childDom) (oldDom as Element).appendChild(childDom);
-      }
-    });
-    // After patching all keyed children, remove any extra DOM nodes beyond the newChildren count
-    if (oldDom instanceof Element) {
-      while (oldDom.childNodes.length > newChildren.length) {
-        oldDom.removeChild(oldDom.lastChild!);
-      }
-    }
-  } else {
-    // Fallback: index-based reconciliation ONLY if no keys at all
-    if (!oldDom) return; // Guard for undefined oldDom
-
-    if (
-      oldChildren.length > 0 &&
-      newChildren.length > 0 &&
-      (oldChildren.some(c => c.key) || newChildren.some(c => c.key))
-    ) {
-      // If any child has a key, do keyed reconciliation
-      Object.keys(oldKeyed).forEach(key => {
-        if (!newKeyed[key]) {
-          const childDom = oldKeyed[key].dom;
-          if (childDom && childDom instanceof Node && oldDom instanceof Element && oldDom.contains(childDom)) {
-            oldDom.removeChild(childDom);
-          }
-        }
-      });
-      newChildren.forEach((newChild) => {
-        if (newChild.key && oldKeyed[newChild.key]) {
-          const oldChild = oldKeyed[newChild.key];
-          let isCheckbox = false;
-          if (oldChild.dom && oldChild.dom instanceof Element) {
-            isCheckbox = oldChild.dom.tagName.toLowerCase() === 'input' && oldChild.dom.getAttribute('type') === 'checkbox';
-          }
-          if (isCheckbox) {
-            // Always replace checkbox DOM node to ensure unique value
-            const newDom = mountVNode(newChild);
-            if (newDom && oldChild.dom && oldChild.dom instanceof Element && oldChild.dom.contains(oldChild.dom)) {
-              if (oldDom.contains(oldChild.dom)) {
-                oldDom.replaceChild(newDom, oldChild.dom);
-              }
-              newChild.dom = newDom;
-            }
-          } else {
-            patchVNode(oldDom as Element, oldChild, newChild);
-          }
-        } else {
-          const childDom = mountVNode(newChild);
-          if (childDom && oldDom instanceof Element) oldDom.appendChild(childDom);
-        }
-      });
-      if (oldDom instanceof Element) {
-        while (oldDom.childNodes.length > newChildren.length) {
-          oldDom.removeChild(oldDom.lastChild!);
-        }
-      }
-    } else {
-      // True fallback: index-based reconciliation for children with no keys
-      for (let i = 0; i < newChildren.length; i++) {
-        const newChild = newChildren[i];
-        const domChild = oldDom.childNodes[i];
-        const nextSibling = oldDom.childNodes[i + 1] || null;
-        const isCheckbox = newChild.type === 'input' && newChild.props?.type === 'checkbox';
-        if (!domChild) {
-          const newDom = mountVNode(newChild);
-          if (newDom && oldDom instanceof Element) {
-            oldDom.insertBefore(newDom, nextSibling);
-            newChild.dom = newDom;
-          }
-        } else if (isCheckbox) {
-          // Always replace checkbox DOM node to guarantee unique value
-          const newDom = mountVNode(newChild);
-          if (newDom && oldDom instanceof Element && oldDom.contains(domChild)) {
-            if (oldDom.contains(domChild)) {
-              oldDom.replaceChild(newDom, domChild);
-            }
-            if (newChild.key) (newDom as any)[DOM_KEY] = newChild.key;
-            newChild.dom = newDom;
-          }
-        } else {
-          const vdomType = newChild.type;
-          const domType = domChild.nodeType === Node.TEXT_NODE ? '#text' : domChild.nodeName.toLowerCase();
-          const vKey = newChild.key;
-          const domKey = (domChild as any)[DOM_KEY];
-          const isCustomElement = domType.includes('-');
-          if (vdomType !== domType || (vKey && domKey !== vKey) || isCustomElement) {
-            // Always replace custom elements when key changes or type differs
-            const newDom = mountVNode(newChild);
-            if (newDom && oldDom instanceof Element && oldDom.contains(domChild)) {
-              if (oldDom.contains(domChild)) {
-                oldDom.replaceChild(newDom, domChild);
-              }
-              if (vKey) (newDom as any)[DOM_KEY] = vKey;
-              newChild.dom = newDom;
-            }
-          } else {
-            if (oldDom instanceof Element) {
-              patchVNode(oldDom, oldChildren[i], newChild);
-            }
-          }
-        }
-      }
-      while (oldDom instanceof Element && oldDom.childNodes.length > newChildren.length) {
-        oldDom.removeChild(oldDom.lastChild!);
-      }
-    }
-  }
-  newVNode.dom = oldDom;
-}
-
-// ============================================================================
-// Component Lifecycle
-// ============================================================================
-
 /**
  * Type guard to check if a value is Promise-like.
  */
 function isPromise(val: unknown): val is Promise<unknown> {
   return !!val && typeof (val as any).then === 'function';
 }
+
+
+// ============================================================================
+// Component Lifecycle
+// ============================================================================
 
 /**
  * Base class for runtime custom elements.
@@ -815,13 +162,6 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
    * Allows updating the state object and triggers a re-render.
    * @param newState - Partial state to merge
    */
-  public setState(newState: Partial<S & C>): void {
-    // Replace stateObj with a new sanitized, null-prototype object
-    const merged = { ...this.stateObj, ...newState };
-    this.stateObj = deepSanitizeObject(merged) as S & C;
-  (this.api as any).state = this.stateObj;
-    this.render();
-  }
 
   /**
    * Syncs whitelisted state properties to attributes after render.
@@ -859,6 +199,9 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
       config.template = newTemplate;
     } else {
       config.template = () => newTemplate;
+    }
+    if ((window as any).DEBUG_PATCH_VNODE) {
+      console.log('[ComponentElement.setTemplate] Triggering render with newTemplate:', newTemplate);
     }
     this.render();
   }
@@ -1188,6 +531,9 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
     // Subscribe to state changes and batch re-render
     if (typeof (this.stateObj as any).subscribe === 'function') {
       this.unsubscribes.push((this.stateObj as any).subscribe(() => {
+        if ((window as any).DEBUG_PATCH_VNODE) {
+          console.log('[ComponentElement] Reactive state mutation detected, scheduling render.');
+        }
         this.scheduleRender();
       }));
     }
@@ -1369,6 +715,9 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
    * Render the component. Handles both string and compiled templates, refs, and error boundaries.
    */
   private render(): void {
+    if ((window as any).DEBUG_PATCH_VNODE) {
+      console.log('[ComponentElement.render] Called for', this);
+    }
     // Always reset error state before each render for predictable boundaries
     this._hasError = false;
     // Robust controlled input sync after every render
@@ -1396,6 +745,9 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
         });
       }
       // Do not call lifecycle hooks here; only call in connected/disconnectedCallback
+      if ((window as any).DEBUG_PATCH_VNODE) {
+        console.log('[ComponentElement.render] Evaluating template with state:', this.stateObj);
+      }
       const templateResultOrPromise = this.config.template(this.stateObj as S & C, this.api);
       if (templateResultOrPromise instanceof Promise) {
         templateResultOrPromise.then(templateResult => {
@@ -1446,16 +798,18 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
           el.removeEventListener(eventType, (el as any)._boundHandlers[eventType]);
         }
         // Bind new handler
-        const boundHandler = (e: Event) => {
-          const handler = this.config[handlerName];
-          if (typeof handler === 'function') {
-            handler(e, this.stateObj, this.api);
-          }
-        };
+        const handler = this.config[handlerName];
+        const boundHandler = (e: Event) => handler.call(this, e);
         el.addEventListener(eventType, boundHandler);
         if (!(el as any)._boundHandlers) (el as any)._boundHandlers = {};
         (el as any)._boundHandlers[eventType] = boundHandler;
       });
+    });
+    // Recurse into children for rebinding
+    Array.from(this.shadowRoot.children).forEach(child => {
+      if (child instanceof HTMLElement && typeof (child as any).rebindEventListeners === 'function') {
+        (child as any).rebindEventListeners();
+      }
     });
   }
   /**

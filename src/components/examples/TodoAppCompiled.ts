@@ -42,7 +42,7 @@ component<TodoAppState, TodoAppComputed>('todo-app-compiled', {
   state: initialState,
   computed: computedMap,
   template: (state, api) => compile`
-    <div class="todo-app">
+    <div class="todo-app" data-todo-list-root>
       <header>
         <h1>📝 Todo App</h1>
         <div>
@@ -68,18 +68,21 @@ component<TodoAppState, TodoAppComputed>('todo-app-compiled', {
       <main>
         <div class="filters">
           <button 
+            data-filter="all"
             class="${state.filter === 'all' ? 'active' : ''}"
             data-on-click="handleAllFilter"
           >
             All (${state.todos.length})
           </button>
-          <button 
+          <button
+            data-filter="active"
             class="${state.filter === 'active' ? 'active' : ''}"
             data-on-click="handleActiveFilter"
           >
             Active (${state.activeTodos.length})
           </button>
           <button 
+            data-filter="completed"
             class="${state.filter === 'completed' ? 'active' : ''}"
             data-on-click="handleCompletedFilter"
           >

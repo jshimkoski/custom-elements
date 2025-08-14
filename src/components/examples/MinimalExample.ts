@@ -7,10 +7,11 @@ interface MinimalExampleState {
 component('minimal-example', {
   state: { count: 0 },
   template: (state: MinimalExampleState) => html`
-    Multi-Root!
-    Text Node Breaks: ${state.count}
-    <span>${state.count}</span>
-    <button data-on-click="increment">Count: ${state.count}</button>
+    <div>
+      Text Node Breaks: ${state.count}
+      <span>${state.count}</span>
+      <button data-on-click="increment">Count: ${state.count}</button>
+    </div>
   `(state),
   style: css`
     button { font-size: 1.5rem; padding: 0.5rem 1rem; }

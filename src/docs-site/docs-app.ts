@@ -8,8 +8,10 @@ component('docs-app', {
   state: { current: 'overview' } as DocsAppState,
   template(state) {
     return `
-      <docs-nav data-on-select="handleNav"></docs-nav>
-  <docs-content section="${state.current}" key="${state.current}"></docs-content>
+      <div>
+        <docs-nav data-on-select="handleNav"></docs-nav>
+        <docs-content section="${state.current}" key="${state.current}"></docs-content>
+      </div>
     `;
   },
   handleNav(e: CustomEvent<string>, state: DocsAppState) {
