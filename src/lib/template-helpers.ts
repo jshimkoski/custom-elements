@@ -51,12 +51,19 @@ export function html(
   strings: TemplateStringsArray,
   ...values: unknown[]
 ): (state?: any, api?: any) => string | Promise<string> {
-  function flatten(val: any, state?: any, api?: any): string {
-    if (Array.isArray(val)) return val.map(v => flatten(v, state, api)).join('');
-    if (typeof val === 'function') return flatten(val(state, api), state, api);
-    // Only skip null and undefined, not empty string
+  function flatten(val: any, state?: any, api?: any): any {
+    if (Array.isArray(val)) {
+      const flat = val.map(v => flatten(v, state, api));
+      return flat.some(v => v instanceof Promise)
+        ? Promise.all(flat).then(arr => arr.join(''))
+        : flat.join('');
+    }
+    if (typeof val === 'function') {
+      const res = flatten(val(state, api), state, api);
+      return res instanceof Promise ? res : res;
+    }
     if (val === null || val === undefined) return '';
-    return String(val);
+    return val instanceof Promise ? val : String(val);
   }
   return (state?: any, api?: any) => {
     let result = '';

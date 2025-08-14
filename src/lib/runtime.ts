@@ -85,7 +85,6 @@ export { Store } from './store';
 export { eventBus } from './event-bus';
 export { renderToString, renderComponentsToString, generateHydrationScript } from './ssr';
 export type { SSRComponentConfig, SSRRenderOptions, SSRContext } from './ssr';
-export { TemplateParser, DOMDiffer } from './dom-diff';
 export { html, compile, css, classes, styles, ref, on } from './template-helpers';
 export { compileTemplate, renderCompiledTemplate, updateCompiledTemplate } from './template-compiler';
 
@@ -144,70 +143,68 @@ function deepSanitizeObject<T>(obj: T, seen = new WeakSet()): T {
  * @param keyWithModifiers - Key and optional modifiers (e.g. 'name|trim|number')
  */
 function useDataModel<T extends Record<string, unknown>>(el: Element, stateObj: T, keyWithModifiers: string) {
-  const [key, ...modifiers] = keyWithModifiers.split('|').map(s => s.trim());
-  if (!key || key === '__proto__' || key === 'constructor' || key === 'prototype') return;
+  const [rawKey, ...modifiers] = keyWithModifiers.split('|').map(s => s.trim());
+  if (!rawKey || rawKey === '__proto__' || rawKey === 'constructor' || rawKey === 'prototype') return;
+  // Helper to set nested state (dot notation)
+  function setNestedState(obj: any, path: string, value: unknown) {
+    const keys = path.split('.');
+    let target = obj;
+    for (let i = 0; i < keys.length - 1; i++) {
+      if (!(keys[i] in target)) target[keys[i]] = {};
+      target = target[keys[i]];
+    }
+    target[keys[keys.length - 1]] = value;
+  }
   const updateState = (e: Event) => {
     let value: unknown;
-    let newState: Record<string, unknown> = { ...stateObj };
     if (el instanceof HTMLInputElement && el.type === 'checkbox') {
+      value = el.value;
       const trueValue = el.getAttribute('data-true-value');
       const falseValue = el.getAttribute('data-false-value');
-      value = el.value;
-      if (Array.isArray(stateObj[key])) {
-        const arr = (stateObj[key] as unknown[]);
+      let arr = Array.isArray(stateObj[rawKey]) ? (stateObj[rawKey] as unknown[]) : undefined;
+      if (arr) {
         if (el.checked) {
           if (!arr.includes(value)) arr.push(value);
         } else {
           const idx = arr.indexOf(value);
           if (idx !== -1) arr.splice(idx, 1);
         }
-        if (key !== '__proto__' && key !== 'constructor' && key !== 'prototype') {
-          newState[key] = [...arr];
-        }
+        setNestedState(stateObj, rawKey, [...arr]);
       } else {
         if (trueValue !== null || falseValue !== null) {
           if (el.checked) {
-            if (key !== '__proto__' && key !== 'constructor' && key !== 'prototype') {
-              newState[key] = trueValue;
-            }
+            setNestedState(stateObj, rawKey, trueValue);
           } else {
-            if (key !== '__proto__' && key !== 'constructor' && key !== 'prototype') {
-              newState[key] = falseValue !== null ? falseValue : false;
-            }
+            setNestedState(stateObj, rawKey, falseValue !== null ? falseValue : false);
           }
         } else {
-          if (key !== '__proto__' && key !== 'constructor' && key !== 'prototype') {
-            newState[key] = el.checked;
-          }
+          setNestedState(stateObj, rawKey, el.checked);
         }
       }
     } else if (el instanceof HTMLInputElement && el.type === 'radio') {
       value = el.value;
-      if (key !== '__proto__' && key !== 'constructor' && key !== 'prototype') {
-        newState[key] = value;
-      }
+      setNestedState(stateObj, rawKey, value);
       const radios = (el.form || el.closest('form') || el.getRootNode()) instanceof Element
         ? ((el.form || el.closest('form') || el.getRootNode()) as Element).querySelectorAll(`input[type="radio"][name="${el.name}"][data-model="${keyWithModifiers}"]`)
         : [];
       radios.forEach((radio: Element) => {
-        (radio as HTMLInputElement).checked = (radio as HTMLInputElement).value === String(newState[key]);
+        (radio as HTMLInputElement).checked = (radio as HTMLInputElement).value === String(value);
       });
     } else {
+      // Always read value from event target for input events
+      // Always read value from the input element itself for robustness
       value = (el as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement).value;
+      if (el instanceof HTMLInputElement && el.type === 'number') {
+        value = Number(value);
+      }
       if (modifiers.includes('trim') && typeof value === 'string') {
         value = value.trim();
       }
       if (modifiers.includes('number')) {
         value = Number(value);
       }
-      if (key !== '__proto__' && key !== 'constructor' && key !== 'prototype') {
-        newState[key] = value;
-      }
+      setNestedState(stateObj, rawKey, value);
     }
-    // Replace stateObj reference with sanitized, null-prototype object
-    const sanitized = deepSanitizeObject(newState);
-  for (const k in stateObj) delete (stateObj as any)[k];
-  for (const k in sanitized) (stateObj as any)[k] = sanitized[k];
     if ('_vnode' in el && typeof (el as any)._vnode === 'object' && (el as any)._vnode?.props) {
       (el as any)._vnode.props.value = value;
     }
@@ -461,7 +458,26 @@ function createVNodeFromElement(node: ChildNode, parentPath: string = '', childI
 function patchVNode(parent: Element, oldVNode: VNode, newVNode: VNode): void {
   // Guard clause: if either VNode is undefined, return early
   if (!oldVNode || !newVNode) {
-      return;
+    return;
+  }
+
+  // Focus/selection preservation for replaced input elements
+  let restoreFocus: null | {
+    selectionStart: number | null;
+    selectionEnd: number | null;
+    value: string;
+    type: string;
+  } = null;
+  if (
+    oldVNode.dom instanceof HTMLInputElement &&
+    document.activeElement === oldVNode.dom
+  ) {
+    restoreFocus = {
+      selectionStart: oldVNode.dom.selectionStart,
+      selectionEnd: oldVNode.dom.selectionEnd,
+      value: oldVNode.dom.value,
+      type: oldVNode.dom.type
+    };
   }
 
   // If type or key differ, replace node
@@ -469,93 +485,29 @@ function patchVNode(parent: Element, oldVNode: VNode, newVNode: VNode): void {
     const newDom = mountVNode(newVNode);
     // Only replace if both are valid Node instances
     if (newDom instanceof Node && oldVNode.dom instanceof Node && parent.contains(oldVNode.dom)) {
-    if (parent.contains(oldVNode.dom) && oldVNode.dom.parentNode === parent) {
-      safeReplaceChild(parent, newDom, oldVNode.dom);
-    } else {
-      // If replacement fails, replace parent in its grandparent if possible
-      const grandparent = parent.parentNode;
-      if (grandparent && grandparent instanceof Element) {
-        grandparent.replaceChild(newDom, parent);
-        let debug = false;
-        if (parent && 'debug' in parent) debug = (parent as any).debug === true;
-        if (debug) console.warn('[runtime] patchVNode: replaced parent in grandparent due to out-of-sync DOM', {
-          grandparent,
-          parent,
-          newDom,
-          oldDom: oldVNode.dom
-        });
-      } else {
-        if (parent !== newDom && parent.parentNode) {
-          parent.replaceWith(newDom);
-          let debug = false;
-          if (parent && 'debug' in parent) debug = (parent as any).debug === true;
-          if (debug) console.warn('[runtime] patchVNode: replaced parent node directly (no grandparent)', {
-            parent,
-            newDom,
-            oldDom: oldVNode.dom
-          });
-        } else if (parent instanceof ShadowRoot || parent instanceof HTMLElement) {
-          // Remove all children from host
-          while (parent.firstChild) {
-            parent.removeChild(parent.firstChild);
-          }
-          parent.appendChild(newDom);
-          let debug = false;
-          if (parent && 'debug' in parent) debug = (parent as any).debug === true;
-          if (debug) console.warn('[runtime] patchVNode: replaced host children for root node', {
-            parent,
-            newDom,
-            oldDom: oldVNode.dom
-          });
-        } else {
-          // Replace parent node in its grandparent if possible
-          const grandparent = parent.parentNode;
-          if (grandparent) {
-            grandparent.replaceChild(newDom, parent);
-            let debug = false;
-            if (parent && 'debug' in parent) debug = (parent as any).debug === true;
-            if (debug) console.warn('[runtime] patchVNode: replaced parent in grandparent for root node', {
-              grandparent,
-              parent,
-              newDom,
-              oldDom: oldVNode.dom
+      if (parent.contains(oldVNode.dom) && oldVNode.dom.parentNode === parent) {
+        safeReplaceChild(parent, newDom, oldVNode.dom);
+        // Restore focus/selection if needed, try synchronously first
+        if (
+          restoreFocus &&
+          newDom instanceof HTMLInputElement &&
+          newDom.type === restoreFocus.type
+        ) {
+          try {
+            newDom.focus();
+            newDom.selectionStart = restoreFocus.selectionStart;
+            newDom.selectionEnd = restoreFocus.selectionEnd;
+          } catch {}
+          // If not focused, fallback to rAF
+          if (document.activeElement !== newDom) {
+            requestAnimationFrame(() => {
+              newDom.focus();
+              newDom.selectionStart = restoreFocus.selectionStart;
+              newDom.selectionEnd = restoreFocus.selectionEnd;
             });
-          } else {
-            // Fallback: never replace the host node itself
-            // If no grandparent, replace parent in its host (custom element or ShadowRoot)
-            let host: Node | null = null;
-            const parentNode = parent.parentNode as Node | null;
-            if (parentNode) {
-              if ((parentNode as ShadowRoot).host !== undefined) {
-                host = parentNode;
-              } else if (parentNode instanceof HTMLElement) {
-                host = parentNode;
-              }
-            }
-            if (host && typeof (host as Node).replaceChild === 'function') {
-              (host as Node).replaceChild(newDom, parent);
-              let debug = false;
-              if (parent && 'debug' in parent) debug = (parent as any).debug === true;
-              if (debug) console.warn('[runtime] patchVNode: replaced old root in host with new root', {
-                host,
-                parent,
-                newDom,
-                oldDom: oldVNode.dom
-              });
-            } else if ('replaceWith' in parent && typeof parent.replaceWith === 'function') {
-              parent.replaceWith(newDom);
-              let debug = false;
-              if (parent && 'debug' in parent) debug = (parent as any).debug === true;
-              if (debug) console.warn('[runtime] patchVNode: fallback replaced parent with newDom for root node', {
-                parent,
-                newDom,
-                oldDom: oldVNode.dom
-              });
-            } // Remove fallback that appends newDom to parent after clearing children
           }
         }
       }
-    }
     } else if ((newDom as any) instanceof Node) {
       if (newDom) {
         parent.appendChild(newDom);
@@ -877,7 +829,12 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
    */
   private syncStateToAttributes(): void {
     if (!this.stateObj || !this.config?.reflect || !Array.isArray(this.config.reflect)) return;
+    const dangerousKeys = ['__proto__', 'constructor', 'prototype'];
     this.config.reflect.forEach(key => {
+      if (dangerousKeys.includes(key)) {
+        this.removeAttribute(key);
+        return;
+      }
       const value = this.stateObj[key];
       if (["string", "number", "boolean"].includes(typeof value)) {
         if (value === undefined || value === null) {
@@ -885,6 +842,8 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
         } else {
           this.setAttribute(key, String(value));
         }
+      } else {
+        this.removeAttribute(key);
       }
     });
   }
@@ -1086,16 +1045,16 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
       if (!bindExpr) return;
       // Remove previous listener if present
       if ((input as any)._listItemModelListener) {
+        input.removeEventListener('input', (input as any)._listItemModelListener);
         input.removeEventListener('change', (input as any)._listItemModelListener);
         delete (input as any)._listItemModelListener;
       }
-      // Attach new listener and store reference
-      const match = bindExpr.match(/^([a-zA-Z0-9_]+)\[(\d+)\]\.([a-zA-Z0-9_]+)$/);
-      if (match) {
-        const [, arrKey, idxStr, propKey] = match;
+      // Array item binding: arrKey[idx].propKey
+      const arrMatch = bindExpr.match(/^([a-zA-Z0-9_]+)\[(\d+)\]\.([a-zA-Z0-9_]+)$/);
+      if (arrMatch) {
+        const [, arrKey, idxStr, propKey] = arrMatch;
         const idx = parseInt(idxStr, 10);
         const arr = this.stateObj[arrKey];
-        // Always sync checked property for checkboxes
         if (input instanceof HTMLInputElement && input.type === 'checkbox') {
           input.checked = !!(Array.isArray(arr) && arr[idx] && arr[idx][propKey]);
         }
@@ -1107,6 +1066,35 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
             arr[idx][propKey] = (input as any).value;
           }
         };
+        input.addEventListener('input', handler);
+        input.addEventListener('change', handler);
+        (input as any)._listItemModelListener = handler;
+        return;
+      }
+      // Dot notation binding: user.name or user.amount|number|trim
+      const dotMatch = bindExpr.match(/^([a-zA-Z0-9_]+)\.([a-zA-Z0-9_]+)((?:\|[a-zA-Z0-9_]+)*)$/);
+      if (dotMatch) {
+        const [, objKey, propKey, modifierStr] = dotMatch;
+        const obj = this.stateObj[objKey];
+        const modifiers = modifierStr ? modifierStr.split('|').map(s => s.trim()).filter(Boolean) : [];
+        if (input instanceof HTMLInputElement && input.type === 'checkbox') {
+          input.checked = !!(obj && obj[propKey]);
+        } else if (input instanceof HTMLInputElement) {
+          input.value = obj ? String(obj[propKey] ?? '') : '';
+        }
+        const handler = (_e: Event) => {
+          if (!obj) return;
+          let value: unknown;
+          if (input instanceof HTMLInputElement && input.type === 'checkbox') {
+            value = input.checked;
+          } else {
+            value = (input as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement).value;
+            if (modifiers.includes('number')) value = Number(value);
+            if (modifiers.includes('trim') && typeof value === 'string') value = value.trim();
+          }
+          obj[propKey] = value;
+        };
+        input.addEventListener('input', handler);
         input.addEventListener('change', handler);
         (input as any)._listItemModelListener = handler;
       }
@@ -1167,7 +1155,6 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
   private api!: ComponentAPI<S & C>;
   private _globalUnsubscribes: Array<() => void> = [];
   private unsubscribes: Array<() => void> = [];
-  private refsAttached = false;
   private lastCompiledTemplate: CompiledTemplate<S & C> | null = null;
   private lastState: (S & C) | null = null;
   private rafId: number | null = null;
@@ -1382,13 +1369,21 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
    * Render the component. Handles both string and compiled templates, refs, and error boundaries.
    */
   private render(): void {
-    if (this._hasError) return;
+    // Always reset error state before each render for predictable boundaries
+    this._hasError = false;
     // Robust controlled input sync after every render
     this.syncControlledInputsAndEvents();
     setTimeout(() => this.attachControlledInputListeners(), 0);
     try {
       // Plugin hook: onRender
-      runtimePlugins.forEach(p => p.onRender?.(this.stateObj, this.api));
+      runtimePlugins.forEach(p => {
+        try {
+          p.onRender?.(this.stateObj, this.api);
+        } catch (err) {
+          this._handleRenderError(err);
+          // Do NOT re-throw, just handle and continue
+        }
+      });
       // Error boundary for computed properties
       if (this.config.computed) {
         Object.values(this.config.computed).forEach(fn => {
@@ -1396,6 +1391,7 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
             fn(this.stateObj);
           } catch (err) {
             this._handleRenderError(err);
+            // Do NOT re-throw, just handle and continue
           }
         });
       }
@@ -1424,6 +1420,8 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
       }
     } catch (error) {
       this._handleRenderError(error);
+      // Always render fallback UI on error, do NOT re-throw
+      this.renderError(error instanceof Error ? error : new Error(String(error)));
     }
   }
 
@@ -1562,7 +1560,6 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
           newVNode.dom = rootEl;
         }
         this._prevVNode = newVNode;
-        this.refsAttached = true;
         this.forceSyncControlledInputs();
         this.lastCompiledTemplate = null;
       } else {
@@ -1571,7 +1568,6 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
         if (isInitialRender) {
           const fragment = renderCompiledTemplate(templateResult, this.stateObj, this.api);
           this.shadowRoot!.appendChild(fragment);
-          this.refsAttached = false;
         } else if (isSameTemplate && this.shadowRoot!.firstElementChild) {
           const oldState = this.lastState;
           updateCompiledTemplate(templateResult, this.shadowRoot!.firstElementChild, this.stateObj, this.api, oldState || undefined);
@@ -1602,7 +1598,6 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
           }
           // Append VDOM fragment to rootEl
           rootEl.appendChild(fragment);
-          this.refsAttached = false;
         }
         this.lastCompiledTemplate = templateResult;
       }
@@ -1630,14 +1625,11 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
         return clone(obj);
       }
       this.updateStyle();
-      if (!this.refsAttached) {
-        this.processRefs();
-        this.refsAttached = true;
-      }
+      this.processRefs();
       // Automatic event binding after refs and DOM update
       this.bindEvents();
-    // Robust controlled input sync after every render
-    this.syncControlledInputsAndEvents();
+      // Robust controlled input sync after every render
+      this.syncControlledInputsAndEvents();
     } catch (error) {
       this._handleRenderError(error);
     }
@@ -1729,9 +1721,8 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
         try {
           handler(element, this.api.state, this.api);
         } catch (err) {
-          if (typeof this.config.onError === 'function') {
-            this.config.onError(err instanceof Error ? err : new Error(String(err)), this.api.state, this.api);
-          }
+          this._handleRenderError(err);
+          // Do NOT re-throw, just handle and continue
         }
       }
       // Silently skip missing refs as they may be conditionally rendered
