@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v0.0.1-beta.2] - 2025-08-15
+
+- feat: add export for runtime.d.ts in package.json (16c39d9)
+- feat: add types export to package.json for improved TypeScript support (4c91499)
+
+
 ## [v0.0.1-beta.1] - 2025-08-15
 
 - feat: add types export to package.json for improved TypeScript support (4c91499)
