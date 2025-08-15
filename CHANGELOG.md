@@ -1,6 +1,13 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v0.0.1-beta.4] - 2025-08-15
+
+- feat: add dev server setup and Cypress testing to publish workflow (b2c910d)
+- fix: remove unused variable (5722fdd)
+- fix: prevent ssr issue when creating web components docs: add ssr example to framework integration (df77623)
+
+
 ## [v0.0.1-beta.3] - 2025-08-15
 
 - fix: remove unused variable (5722fdd)
