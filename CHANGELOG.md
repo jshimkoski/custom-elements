@@ -1,6 +1,11 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v0.0.2] - 2025-08-15
+
+- No changes since last release
+
+
 ## [v0.0.2-beta.0] - 2025-08-15
 
 - test: add wait for text input binding in DataModelDemo component (73462f0)
