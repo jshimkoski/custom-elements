@@ -1,4 +1,3 @@
-
 # Advanced Use Cases
 
 Explore advanced patterns and features available in the Custom Elements Runtime. All features are strictly typed, regression-tested, and match the implementation in src/lib. These enable robust, scalable, and maintainable web components for complex applications.
@@ -30,13 +29,21 @@ component('advanced-demo', {
     doubled: (state) => state.count * 2
   },
   template: compile(({ count, doubled }) => html`
-    <button data-on-click="increment">
+    <button data-ref="myButton" data-on-click="increment">
       Count: ${count} (Doubled: ${doubled})
     </button>
   `),
   style: css`
     button { font-size: 1.2rem; padding: 0.5rem 1rem; }
   `,
+  refs: {
+    myButton: (element, state, api) => {
+      element.addEventListener('click', () => {
+        state.count++;
+        api.emit('button-clicked', { count: state.count });
+      });
+    }
+  },
   increment(_e, state) {
     state.count++;
   },
@@ -87,6 +94,23 @@ useRuntimePlugin({
   onError: (error, state, api) => {
     // Global error handling
   }
+});
+```
+
+---
+
+## Example: Dynamic Style
+
+```typescript
+component('advanced-style-demo', {
+  state: { level: 1 },
+  template: ({ level }) => `<div>Level: ${level}</div>`,
+  style: (state) => `
+    div {
+      font-size: ${1 + state.level * 0.2}rem;
+      color: ${state.level > 3 ? 'gold' : 'gray'};
+    }
+  `
 });
 ```
 

@@ -86,7 +86,7 @@ export { Store } from './store';
 export { eventBus } from './event-bus';
 export { renderToString, renderComponentsToString, generateHydrationScript } from './ssr';
 export type { SSRComponentConfig, SSRRenderOptions, SSRContext } from './ssr';
-export { html, compile, css, classes, styles, ref, on } from './template-helpers';
+export { html, compile, css, classes, styles } from './template-helpers';
 export { useDataModel } from './data-binding';
 export { compileTemplate, renderCompiledTemplate, updateCompiledTemplate } from './template-compiler';
 export { mountVNode, patchVNode, createVNodeFromElement, parseVNodeFromHTML, safeReplaceChild, getVNodeKey } from './v-dom';

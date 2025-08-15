@@ -123,6 +123,7 @@ export function html(
     });
   };
 }
+
 /**
  * CompiledTemplateFn type for compiled templates
  */
@@ -183,26 +184,6 @@ export function css(strings: TemplateStringsArray, ...values: unknown[]): string
     if (i < values.length) result += values[i] ?? '';
   }
   return result;
-}
-
-/**
- * Create a ref function for element references.
- * @param callback - Callback to run with the element
- */
-export function ref<T extends Element = Element>(callback: (el: T) => void): (el: Element) => void {
-  return callback as (el: Element) => void;
-}
-
-/**
- * Create event handlers with strong typing for use in templates.
- * @param eventType - Event type
- * @param handler - Handler function
- */
-export function on<K extends keyof HTMLElementEventMap>(
-  eventType: K,
-  handler: (event: HTMLElementEventMap[K], state: any, api: any) => void
-): { [key in K]: (event: HTMLElementEventMap[K], state: any, api: any) => void } {
-  return { [eventType]: handler } as { [key in K]: (event: HTMLElementEventMap[K], state: any, api: any) => void };
 }
 
 /**

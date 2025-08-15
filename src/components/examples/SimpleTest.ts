@@ -1,4 +1,4 @@
-import { component, html, type ComponentState } from '../../lib/runtime';
+import { component, html, css, type ComponentState } from '../../lib/runtime';
 
 interface SimpleTestState extends ComponentState {
   message: string;
@@ -17,7 +17,7 @@ component<SimpleTestState>('simple-test-component', {
   },
 
   template: (state) => html`
-    <div style="border: 2px solid red; padding: 1rem; margin: 1rem; background: #ffe6e6;">
+    <div>
       <h3>🔴 Simple Test Component</h3>
       <p>${state.message}</p>
       <input type="text" data-model="message" />
@@ -25,6 +25,15 @@ component<SimpleTestState>('simple-test-component', {
       ${state.clicked ? html`<p>✅ Clicked!</p>` : ''}
     </div>
   `(state),
+
+  style: (state) => css`
+    div {
+      border: 2px solid ${state.message === "danger" ? "red" : "green"};
+      padding: 1rem;
+      margin: 1rem;
+      background: #ffe6e6;
+    }
+  `,
 
   updateMessage: (_e: Event, state: SimpleTestState) => {
     const input = _e.target as HTMLInputElement;

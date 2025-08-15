@@ -1,4 +1,3 @@
-
 # Runtime API Reference
 
 All APIs are strictly typed and match the implementation in `src/lib`. Only documented features are supported. This reference covers all exports, configuration options, event handlers, input binding, global store, event bus, refs, computed, SSR, error boundaries, plugin system, VDOM, template helpers, and build tools.
@@ -12,7 +11,7 @@ export interface ComponentConfig<S extends ComponentState, C extends Record<stri
   template: (state: S & C, api: ComponentAPI<S & C>) => string | Promise<string> | CompiledTemplate<S & C>;
   state: S;
   computed?: { [K in keyof C]: (state: S) => C[K] };
-  style?: string | ((state: S & C) => string);
+  style?: string | ((state: S & C) => string); // Static string or dynamic function
   refs?: Record<string, RefHandler<S & C>>;
   onMounted?: LifecycleHandler<S & C>;
   onUnmounted?: LifecycleHandler<S & C>;
@@ -109,8 +108,6 @@ css(strings: TemplateStringsArray, ...values: any[]): string;
 compile<T = any>(strings: TemplateStringsArray, ...expressions: Array<(state: T, api: any) => unknown>): CompiledTemplate<T>;
 classes(obj: Record<string, boolean>): string;
 styles(obj: Record<string, string | number>): string;
-ref(name: string): string;
-on(event: string, handler: Function): string;
 ```
 
 ---

@@ -1,8 +1,20 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
-## [v0.0.1] - 2025-08-15
+## [v0.0.2-beta.0] - 2025-08-15
 
+- test: add wait for text input binding in DataModelDemo component (73462f0)
+- docs: update README and documentation for dynamic styling and refs usage feat: enhance SimpleTest component with dynamic styling based on state refactor: remove unused ref and on functions from template helpers test: clean up template-helpers tests by removing unnecessary cases (0ff1d4f)
+
+
+
+## [v0.0.1-beta.6] - 2025-08-15
+
+- test: add wait for text input binding in DataModelDemo component (73462f0)
+- docs: update README and documentation for dynamic styling and refs usage feat: enhance SimpleTest component with dynamic styling based on state refactor: remove unused ref and on functions from template helpers test: clean up template-helpers tests by removing unnecessary cases (0ff1d4f)
+
+
+## [v0.0.1] - 2025-08-15
 - refactor: remove unnecessary global declaration for ImportMeta interface (c4f3464)
 - fix: improve HMR handling in component function and update tsconfig types (f5328c4)
 
