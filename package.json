@@ -50,7 +50,8 @@
       "import": "./dist/custom-elements-runtime.es.js",
       "require": "./dist/custom-elements-runtime.cjs.js",
       "default": "./dist/custom-elements-runtime.umd.js"
-    }
+    },
+    "./runtime.d.ts": "./dist/runtime.d.ts"
   },
   "publishConfig": {
     "access": "public"
