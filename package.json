@@ -11,8 +11,13 @@
     "frontend",
     "ui"
   ],
-  "author": "Josh Shimkoski",
+  "author": "Jason Shimkoski <https://jasonshimmy.com>",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jshimkoski/custom-elements.git"
+  },
+  "homepage": "https://github.com/jshimkoski/custom-elements#readme",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build && tsc",
