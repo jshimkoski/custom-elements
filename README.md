@@ -103,7 +103,6 @@ component('minimal-example', {
 - **Async rendering**: Supports Promises in templates for async data and UI
 - **Selective hydration**: Hydrate only regions marked with `data-hydrate` for efficient SSR
 
-
 ## Documentation
 
 - [API Reference](docs/api-reference.md): All runtime exports, configuration options, and advanced patterns.
