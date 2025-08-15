@@ -115,13 +115,14 @@ import type { VNode } from './v-dom';
 // Utilities
 // ============================================================================
 
+
 /**
  * Recursively sanitizes an object, removing dangerous keys and prototype pollution.
  * Handles circular references using a WeakSet.
  * @param obj - Object to sanitize
  * @param seen - WeakSet to track visited objects
  */
-function deepSanitizeObject<T>(obj: T, seen = new WeakSet()): T {
+export function deepSanitizeObject<T>(obj: T, seen = new WeakSet()): T {
   if (obj === null || typeof obj !== 'object') return obj;
   if (seen.has(obj as object)) return obj;
   seen.add(obj as object);
@@ -142,7 +143,7 @@ function deepSanitizeObject<T>(obj: T, seen = new WeakSet()): T {
 /**
  * Type guard to check if a value is Promise-like.
  */
-function isPromise(val: unknown): val is Promise<unknown> {
+export function isPromise(val: unknown): val is Promise<unknown> {
   return !!val && typeof (val as any).then === 'function';
 }
 
