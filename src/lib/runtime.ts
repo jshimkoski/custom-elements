@@ -1146,7 +1146,6 @@ if (typeof HTMLElement !== 'undefined') {
 export function component<S extends ComponentState, C extends Record<string, any> = {}>(tag: string, config: ComponentConfig<S, C>): void {
   // Prevent deep object injection in config and state
   const sanitizedConfig = deepSanitizeObject(config);
-  const sanitizedState = deepSanitizeObject(config.state);
   config = sanitizedConfig as ComponentConfig<S, C>;
   // Do not assign to readonly state property
   if (config.debug) {
