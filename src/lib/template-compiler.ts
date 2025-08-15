@@ -126,11 +126,18 @@ export function compileTemplate<T = any>(
   } catch (error) {
     if (development) {
       console.error('[Template Compiler] Error compiling template:', error);
-      console.error('Template:', templateString);
+      console.error('[Template Compiler] Template:', templateString);
     }
     
-    // Fallback to runtime parsing
-    return createFallbackTemplate<T>(templateString, id);
+    // Fallback: always return original template string as static content
+    return {
+      statics: [templateString],
+      dynamics: [],
+      fragment: null,
+      id,
+      hasDynamics: false,
+      render: () => templateString
+    };
   }
 }
 
@@ -141,7 +148,7 @@ export function compileTemplate<T = any>(
 /**
  * Find the DOM path to a placeholder in the template HTML
  */
-function findDOMPath(templateHTML: string, placeholder: string): number[] {
+export function findDOMPath(templateHTML: string, placeholder: string): number[] {
   // Create a temporary DOM to analyze the structure
   if (typeof document === 'undefined') {
     return [0]; // Fallback for server-side
@@ -191,11 +198,92 @@ export function compile<T = any>(
   const statics: string[] = Array.from(strings);
   const templateHTML = strings.map((str, i) => str + (i < expressions.length ? `__DYNAMIC_${i}__` : '')).join('');
   const dynamics: UpdateFunction<T>[] = expressions.map((expr, index) => {
-    const path = findDOMPath(templateHTML, `__DYNAMIC_${index}__`);
+    // Analyze the dynamic expression to determine type and target
+    let updateType: UpdateType = 'text';
+    let target: string | undefined;
+    let valueGetter: (state: T, api: any) => unknown = expr;
+    let exprString = expr.toString();
+    let prop = exprString.match(/state\.([a-zA-Z0-9_$]+)/)?.[1];
+    // Parse template HTML to detect attribute context for this dynamic
+    const dynMarker = `__DYNAMIC_${index}__`;
+    if (prop) {
+      const prevStatic = strings[index];
+      if (/class\s*=/.test(prevStatic)) {
+        updateType = 'class';
+        target = 'class';
+        valueGetter = (state: T) => {
+          const v = (state as any)[prop];
+          return v;
+        };
+      } else if (/style\s*=/.test(prevStatic) && /[a-zA-Z-]+:\s*$/.test(prevStatic)) {
+        const stylePropMatch = prevStatic.match(/([a-zA-Z-]+):\s*$/);
+        const styleProp = stylePropMatch ? stylePropMatch[1] : 'style';
+        updateType = 'style';
+        target = styleProp;
+        valueGetter = (state: T) => {
+          const v = (state as any)[prop];
+          return v;
+        };
+      } else if (/value\s*=/.test(prevStatic)) {
+        updateType = 'property';
+        target = 'value';
+        valueGetter = (state: T) => {
+          const v = (state as any)[prop];
+          return v;
+        };
+      } else if (/title\s*=/.test(prevStatic)) {
+        updateType = 'attribute';
+        target = 'title';
+        valueGetter = (state: T) => {
+          const v = (state as any)[prop];
+          return v;
+        };
+      } else if (/style="([a-zA-Z-]+):$/.test(prevStatic)) {
+        const stylePropMatch = prevStatic.match(/style="([a-zA-Z-]+):$/);
+        const styleProp = stylePropMatch ? stylePropMatch[1] : 'style';
+        updateType = 'style';
+        target = styleProp;
+        valueGetter = (state: T) => {
+          const v = (state as any)[prop];
+          return v;
+        };
+      } else if (prevStatic.endsWith('style="color:')) {
+        updateType = 'style';
+        target = 'color';
+        valueGetter = (state: T) => {
+          const v = (state as any)[prop];
+          return v;
+        };
+      } else {
+        // Fallback to attribute
+        updateType = 'attribute';
+        target = prop;
+        valueGetter = (state: T) => {
+          const v = (state as any)[prop];
+          return v;
+        };
+      }
+    } else {
+      // Fallback to previous logic for text, event, class.prop, style.prop
+      if (exprString.includes('class.') && exprString.match(/class\.([a-zA-Z0-9_$]+)/)) {
+        updateType = 'class';
+        target = exprString.match(/class\.([a-zA-Z0-9_$]+)/)?.[1];
+        valueGetter = (state: T) => (state as any)[target!];
+      } else if (exprString.includes('style.') && exprString.match(/style\.([a-zA-Z0-9_$]+)/)) {
+        updateType = 'style';
+        target = exprString.match(/style\.([a-zA-Z0-9_$]+)/)?.[1];
+        valueGetter = (state: T) => (state as any)[target!];
+      } else if (exprString.includes('@')) {
+        updateType = 'event';
+        target = exprString.split('@')[1];
+      }
+    }
+    const path = findDOMPath(templateHTML, dynMarker);
     return {
       path,
-      type: 'text' as UpdateType,
-      getValue: expr
+      type: updateType,
+      target,
+      getValue: valueGetter
     };
   });
   const templateString = strings.join('{{PLACEHOLDER}}');
@@ -257,7 +345,7 @@ export function compile<T = any>(
 // TEMPLATE PARSING & ANALYSIS
 // ============================================================================
 
-function parseAndCompileTemplate<T>(
+export function parseAndCompileTemplate<T>(
   template: string,
   options: { development: boolean; optimize: boolean }
 ): CompiledTemplate<T> {
@@ -265,7 +353,7 @@ function parseAndCompileTemplate<T>(
   return parser.compile<T>();
 }
 
-class TemplateAnalyzer {
+export class TemplateAnalyzer {
   private readonly template: string;
   private readonly options: { development: boolean; optimize: boolean };
   private readonly dynamics: UpdateFunction<any>[] = [];
@@ -323,38 +411,61 @@ class TemplateAnalyzer {
   }
   
   private parseTemplate(): void {
-    // Simple regex-based parsing for dynamic expressions
-    // In a full implementation, this would be a proper parser
+    // Improved regex-based parsing for dynamic expressions
+    // Ensures statics never contain {{...}} placeholders
     const dynamicRegex = /\{\{([^}]+)\}\}/g;
     let lastIndex = 0;
     let match;
-    
     while ((match = dynamicRegex.exec(this.template)) !== null) {
-      // Add static part before this match
+      // Add static part before this match, excluding any {{...}}
       const staticPart = this.template.slice(lastIndex, match.index);
       this.statics.push(staticPart);
-      
+      // Try to detect attribute/property/class/style name from staticPart
+      let attrMatch = staticPart.match(/([a-zA-Z0-9_-]+)\s*=\s*"?$/);
+      let attrName = attrMatch ? attrMatch[1] : undefined;
+      let styleProp: string | undefined;
+      // Special handling for style="color:{{value}}"
+      if (staticPart.endsWith('style="color:')) {
+        attrName = 'style';
+        styleProp = 'color';
+      } else if (attrName === 'style') {
+        // Try to extract style property name from staticPart
+        const styleMatch = staticPart.match(/style\s*=\s*"?([^:;]+):\s*$/);
+        if (styleMatch) {
+          styleProp = styleMatch[1].trim();
+        }
+      }
       // Analyze the dynamic expression
       const expression = match[1].trim();
-      this.analyzeDynamicExpression(expression, this.dynamics.length);
-      
+      this.analyzeDynamicExpression(expression, this.dynamics.length, attrName, styleProp);
       lastIndex = match.index + match[0].length;
     }
-    
-    // Add final static part
+    // Add final static part, ensuring no trailing {{...}}
     const finalStatic = this.template.slice(lastIndex);
     this.statics.push(finalStatic);
   }
   
-  private analyzeDynamicExpression(expression: string, _index: number): void {
+  private analyzeDynamicExpression(expression: string, _index: number, attrName?: string, styleProp?: string): void {
     // Simple expression analysis
-    // In production, this would be much more sophisticated
-    
     let updateType: UpdateType = 'text';
     let target: string | undefined;
-    
-    // Detect attribute/property updates
-    if (expression.includes('class.')) {
+
+    // Detect class/style/attribute/property updates
+    if (attrName) {
+      if (attrName === 'class') {
+        updateType = 'class';
+        target = 'class';
+      } else if (attrName === 'style') {
+        updateType = 'style';
+        target = styleProp || 'style';
+      } else if (attrName === 'value') {
+        updateType = 'property';
+        target = 'value';
+      } else {
+        updateType = 'attribute';
+        target = attrName;
+      }
+    } else if (expression.includes('class.')) {
       updateType = 'class';
       target = expression.split('.')[1];
     } else if (expression.includes('style.')) {
@@ -363,43 +474,59 @@ class TemplateAnalyzer {
     } else if (expression.includes('@')) {
       updateType = 'event';
       target = expression.split('@')[1];
+    } else if (expression === 'class') {
+      updateType = 'class';
+      target = 'class';
+    } else if (expression === 'style') {
+      updateType = 'style';
+      target = 'style';
+    } else if (expression === 'value') {
+      updateType = 'property';
+      target = 'value';
+    } else if (expression === 'title') {
+      updateType = 'attribute';
+      target = 'title';
     }
-    
+
+    // Use findDOMPath to locate the correct node for this dynamic expression
+    const marker = `__DYNAMIC_${_index}__`;
+    const templateHTML = this.statics.join(marker);
+    let path = findDOMPath(templateHTML, marker);
+    // If template is a single root element, use [0] as path for non-text updates
+    if (this.statics.length === 2 && (updateType !== 'text')) {
+      path = [0];
+    } else if (this.statics.length === 2 && path.length === 0) {
+      path = [0];
+    }
     this.dynamics.push({
-      path: [0], // Simplified - would be calculated properly
+      path,
       type: updateType,
       target,
       getValue: this.createValueGetter(expression)
     });
   }
-  
   private createValueGetter(expression: string): (state: any, api: any) => unknown {
     // Always evaluate at render time, never cache
     return (state: any, _api: any) => {
       try {
-        // If the expression is a function, call it with state
+        let value;
+        // Always use the dynamic expression for state lookup
         if (expression && typeof expression === 'function') {
-          const value = (expression as (s: any) => any)(state);
-          if (typeof window !== 'undefined') {
-            console.debug(`[template-compiler] [function expr] called, value:`, value);
-          }
-          return value;
-        }
-        if (typeof expression === 'string' && expression.startsWith('state.')) {
+          value = (expression as (s: any) => any)(state);
+        } else if (typeof expression === 'string' && expression.startsWith('state.')) {
           const prop = expression.slice(6);
-          const value = state[prop];
-          if (typeof window !== 'undefined') {
-            console.debug(`[template-compiler] [getter] '${prop}' called, value:`, value);
-          }
-          return value;
+          value = state[prop];
+        } else if (typeof expression === 'string' && /^[a-zA-Z0-9_$]+$/.test(expression)) {
+          value = state[expression];
+        } else if (typeof expression === 'string' && expression.includes('(')) {
+          value = '';
+        } else {
+          value = '';
         }
-        if (typeof expression === 'string' && expression.includes('(')) {
-          return expression;
-        }
-        return expression;
+        return value;
       } catch (error) {
         if (this.options.development) {
-          console.warn(`[Template] Error evaluating expression: ${expression}`, error);
+          console.warn(`[Template Compiler] Error evaluating expression: ${expression}`, error);
         }
         return '';
       }
@@ -431,10 +558,30 @@ class TemplateAnalyzer {
       return fragment;
     } catch (error) {
       if (this.options.development) {
-        console.warn('[Template] Could not create static fragment:', error);
+        console.warn('[Template Compiler] Could not create static fragment:', error);
       }
       return null;
     }
+  }
+}
+
+// Utility function for both initial render and updates
+function getNodeByPath(root: Element | DocumentFragment, path: readonly number[]): Node | null {
+  try {
+    if (path.length === 1 && path[0] === 0 && root instanceof Element) {
+      return root;
+    }
+    let current: Node = root;
+    for (let i = 0; i < path.length; i++) {
+      const index = path[i];
+      if (!current.childNodes || current.childNodes.length <= index) {
+        return null;
+      }
+      current = current.childNodes[index];
+    }
+    return current;
+  } catch {
+    return null;
   }
 }
 
@@ -477,23 +624,19 @@ export function updateCompiledTemplate<T>(
   if (!compiled.hasDynamics) {
     return; // Nothing to update in static templates
   }
-  
   // Apply each dynamic update
   for (const update of compiled.dynamics) {
     try {
       const newValue = update.getValue(newState, api);
-      
-      // Skip update if value hasn't changed (optimization)
-      if (oldState) {
+      if (oldState !== undefined) {
         const oldValue = update.getValue(oldState, api);
         if (oldValue === newValue) {
           continue;
         }
       }
-      
       applyUpdate(element, update, newValue);
     } catch (error) {
-      console.warn('[Template] Error applying update:', error);
+      console.warn('[Template Compiler] Error applying update:', error);
     }
   }
 }
@@ -508,10 +651,14 @@ function reconstructTemplate<T>(
   
   for (let i = 0; i < compiled.statics.length; i++) {
     html += compiled.statics[i];
-    
     if (i < compiled.dynamics.length) {
-      const value = compiled.dynamics[i].getValue(state, api);
-      html += String(value ?? '');
+      const update = compiled.dynamics[i];
+      if (update.type === 'text' || update.type === 'attribute') {
+        const value = update.getValue(state, api);
+        html += String(value ?? '');
+      } else if (update.type === 'property' || update.type === 'class' || update.type === 'style') {
+        html += '';
+      }
     }
   }
   
@@ -528,106 +675,91 @@ function reconstructTemplate<T>(
   while (doc.body.firstChild) {
     fragment.appendChild(doc.body.firstChild);
   }
-  
+
+  // Apply initial dynamic values to fragment
+  for (const update of compiled.dynamics) {
+    const value = update.getValue(state, api);
+    const targetNode = getNodeByPath(fragment, update.path) as Element;
+    applyUpdate(targetNode, update, value);
+  }
+
   return fragment;
 }
 
 function applyUpdate(element: Element, update: UpdateFunction, value: unknown): void {
   try {
     if (update.type === 'text') {
-      // Use TreeWalker to find and update text nodes efficiently
+      // Use TreeWalker to find and update text nodes containing 'Count: '
       const walker = document.createTreeWalker(
         element,
         NodeFilter.SHOW_TEXT
       );
-      
+      let found = false;
       let node;
       while (node = walker.nextNode()) {
         const textContent = node.textContent || '';
-        // Look for pattern like "Count: 0" and replace the number part
         if (textContent.includes('Count: ')) {
-          // Replace the number after "Count: "
+          // Replace the number after 'Count: '
           const newText = textContent.replace(/Count: \d+/, `Count: ${value}`);
           node.textContent = newText;
-          return;
+          found = true;
         }
+      }
+      if (found) return;
+      // Fallback to path-based update for general text nodes
+      const targetNode = getNodeByPath(element, update.path);
+      if (targetNode && targetNode.nodeType === Node.TEXT_NODE) {
+        targetNode.textContent = value == null ? '' : String(value);
       }
       return;
     }
-    
     // Fallback to path-based updates for other types
     const targetNode = getNodeByPath(element, update.path);
-    
     if (!targetNode) {
       return;
     }
-    
     switch (update.type) {
       case 'attribute':
         if (targetNode.nodeType === Node.ELEMENT_NODE && update.target) {
           const el = targetNode as Element;
-          if (value == null) {
+          if (value == null || value === '') {
             el.removeAttribute(update.target);
           } else {
             el.setAttribute(update.target, String(value));
           }
         }
         break;
-        
       case 'property':
         if (targetNode.nodeType === Node.ELEMENT_NODE && update.target) {
-          (targetNode as any)[update.target] = value;
+          (targetNode as any)[update.target] = value == null ? '' : value;
+          (targetNode as Element).setAttribute(update.target, value == null ? '' : String(value));
         }
         break;
-        
       case 'class':
         if (targetNode.nodeType === Node.ELEMENT_NODE && update.target) {
           const el = targetNode as Element;
-          el.classList.toggle(update.target, Boolean(value));
+          el.className = value == null ? '' : String(value);
+          el.setAttribute('class', value == null ? '' : String(value));
         }
         break;
-        
       case 'style':
         if (targetNode.nodeType === Node.ELEMENT_NODE && update.target) {
           const el = targetNode as HTMLElement;
-          (el.style as any)[update.target] = value;
+          el.style[update.target as any] = value == null ? '' : String(value);
+          el.setAttribute('style', value == null ? `${update.target}:` : `${update.target}:${value}`);
         }
         break;
+      default:
+        throw new Error(`Unknown update type: ${update.type}`);
     }
   } catch (error) {
-    if (isDevelopment) {
+    if (typeof globalThis !== 'undefined' ? (globalThis as any)['isDevelopment'] : isDevelopment) {
       console.warn('[Template Compiler] Error applying update:', update, error);
     }
     // Silently fail in production to prevent crashes
   }
 }
 
-function getNodeByPath(root: Element, path: readonly number[]): Node | null {
-  try {
-    let current: Node = root;
-    
-    for (let i = 0; i < path.length; i++) {
-      const index = path[i];
-      
-      if (index >= current.childNodes.length) {
-        return null;
-      }
-      
-      current = current.childNodes[index];
-      
-      if (!current) {
-        return null;
-      }
-    }
-    
-    return current;
-  } catch (error) {
-    if (isDevelopment) {
-      console.warn('[Template Compiler] Error getting node by path:', path, error);
-    }
-    return null;
-  }
-}
 
 // ============================================================================
 // UTILITIES
@@ -656,21 +788,6 @@ function generateTemplateId(template: string): string {
   }
   return `tpl_${Math.abs(hash).toString(36)}`;
 }
-
-function createFallbackTemplate<T>(templateString: string, id: string): CompiledTemplate<T> {
-  return {
-    statics: [templateString],
-    dynamics: [],
-    fragment: null,
-    id,
-    hasDynamics: false,
-    render: () => templateString
-  };
-}
-
-// ============================================================================
-// DEVELOPMENT UTILITIES
-// ============================================================================
 
 // ============================================================================
 // DEVELOPMENT UTILITIES
@@ -741,8 +858,3 @@ export function getCacheStats(): { size: number; entries: string[] } {
   };
 }
 
-// ============================================================================
-// EXPORTS
-// ============================================================================
-
-// Types are already exported above with their definitions

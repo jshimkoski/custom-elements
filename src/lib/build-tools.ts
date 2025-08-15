@@ -1,3 +1,8 @@
+declare global {
+  interface ImportMeta {
+    env?: Record<string, any>;
+  }
+}
 /**
  * Build Tool Integration for Template Compilation
  * 
@@ -108,17 +113,15 @@ export class TemplateDevTools {
   }>();
   
   static analyzeTemplate(templateString: string): void {
+    if (typeof templateString !== 'string') return;
     const existing = this.templates.get(templateString);
-    
     if (existing) {
       existing.usageCount++;
       existing.lastUsed = Date.now();
       return;
     }
-    
     const analysis = analyzeTemplate(templateString);
     const compiled = compileTemplate(templateString, { development: true });
-    
     this.templates.set(templateString, {
       template: templateString,
       analysis,
@@ -126,7 +129,6 @@ export class TemplateDevTools {
       usageCount: 1,
       lastUsed: Date.now()
     });
-    
     // Log analysis in development
     console.group(`[Template Analysis] ${compiled.id}`);
     console.log('Complexity:', analysis.complexity);
@@ -296,7 +298,7 @@ export function migrateToCompiledTemplate(
 // Classes are already exported above
 
 // Make dev tools available globally in development
-if (typeof window !== 'undefined' && import.meta.env?.DEV) {
+if (typeof window !== 'undefined' && (import.meta.env as any)?.DEV) {
   (window as any).__TEMPLATE_DEV_TOOLS__ = {
     TemplateDevTools,
     TemplatePerformanceMonitor,

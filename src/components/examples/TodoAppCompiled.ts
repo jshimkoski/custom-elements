@@ -42,33 +42,47 @@ component<TodoAppState, TodoAppComputed>('todo-app-compiled', {
   state: initialState,
   computed: computedMap,
   template: (state, api) => compile`
-    <div class="todo-app">
+    <div class="todo-app" data-todo-list-root>
       <header>
         <h1>📝 Todo App</h1>
+        <div>
+          ${state.newTodo}
+        </div>
+        <div>
+          <p>${state.newTodo}</p>
+        </div>
+        <div>
+          Text node 1: ${state.newTodo}
+        </div>
+        Text node 2: ${state.newTodo}
+        <span>Span: ${state.newTodo}</span>
+        <div>Div: ${state.newTodo}</div>
         <input 
           type="text" 
-          value="${state.newTodo}"
+          data-model="newTodo"
           placeholder="What needs to be done?"
           class="new-todo"
-          data-on-input="handleInput"
           data-on-keydown="handleKeydown"
         >
       </header>
       <main>
         <div class="filters">
           <button 
+            data-filter="all"
             class="${state.filter === 'all' ? 'active' : ''}"
             data-on-click="handleAllFilter"
           >
             All (${state.todos.length})
           </button>
-          <button 
+          <button
+            data-filter="active"
             class="${state.filter === 'active' ? 'active' : ''}"
             data-on-click="handleActiveFilter"
           >
             Active (${state.activeTodos.length})
           </button>
           <button 
+            data-filter="completed"
             class="${state.filter === 'completed' ? 'active' : ''}"
             data-on-click="handleCompletedFilter"
           >
@@ -76,26 +90,26 @@ component<TodoAppState, TodoAppComputed>('todo-app-compiled', {
           </button>
         </div>
         <ul class="todo-list">
-          ${state.filteredTodos.map((todo: Todo) => html`
-            <li key="${todo.id}" class="${todo.completed ? 'completed' : ''}">
-              <input 
-                type="checkbox" 
-                ${todo.completed ? 'checked' : ''}
-                data-todo-id="${todo.id}"
-                data-action="toggle"
-                data-on-change="handleToggle"
-              >
-              <span class="text">${todo.text}</span>
-              <button 
-                class="delete"
-                data-todo-id="${todo.id}"
-                data-action="delete"
-                data-on-click="handleDelete"
-              >
-                ×
-              </button>
-            </li>
-          `(state, api)).join('')}
+          ${state.filteredTodos.map((todo: Todo) => {
+            const idx = state.todos.findIndex(t => t.id === todo.id);
+            return html`
+              <li key="${todo.id}" class="${todo.completed ? 'completed' : ''}">
+                <input 
+                  type="checkbox"
+                  data-bind="todos[${idx}].completed"
+                >
+                <span class="text">${todo.text}</span>
+                <button 
+                  class="delete"
+                  data-todo-id="${todo.id}"
+                  data-action="delete"
+                  data-on-click="handleDelete"
+                >
+                  ×
+                </button>
+              </li>
+            `(state, api);
+          }).join('')}
         </ul>
       </main>
       <footer>
@@ -222,14 +236,6 @@ component<TodoAppState, TodoAppComputed>('todo-app-compiled', {
     const todoId = parseInt(target.getAttribute('data-todo-id') || '0');
     state.todos = state.todos.filter((t: Todo) => t.id !== todoId);
     api.emit('todo-removed', { id: todoId });
-  },
-  handleToggle(e: Event, state: TodoAppState, api: any) {
-    const target = e.target as HTMLInputElement;
-    const todoId = parseInt(target.getAttribute('data-todo-id') || '0');
-    state.todos = state.todos.map((t: Todo) =>
-      t.id === todoId ? { ...t, completed: target.checked } : t
-    );
-    api.emit('todo-toggled', { id: todoId, completed: target.checked });
   },
   onMounted: (state, api) => {
     console.log('📝 Todo App mounted', state);

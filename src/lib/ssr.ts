@@ -45,8 +45,6 @@ export function createSSRAPI<T extends ComponentState>(state: T): ComponentAPI<T
   return {
     state,
     emit: () => {}, // No-op on server
-    update: () => {}, // No-op on server
-    updateKey: () => {}, // No-op on server
     onGlobal: () => () => {},
     offGlobal: () => {},
     emitGlobal: () => {},
@@ -62,7 +60,7 @@ export function renderToString<T extends ComponentState>(
   options: SSRRenderOptions = {}
 ): string {
   if (!isServer) {
-    console.warn('renderToString should only be used on the server');
+    console.warn('[SSR] renderToString should only be used on the server');
   }
 
   try {
@@ -193,7 +191,7 @@ export function generateHydrationScript(context: SSRContext): string {
 // SSR UTILITIES
 // ============================================================================
 
-export function escapeHTML(str: string): string {
+export const escapeHTML = (str: string): string => {
   return str
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -202,7 +200,7 @@ export function escapeHTML(str: string): string {
     .replace(/'/g, '&#39;');
 }
 
-export function escapeAttribute(str: string): string {
+export const escapeAttribute = (str: string): string => {
   return str
     .replace(/&/g, '&amp;')
     .replace(/"/g, '&quot;')
@@ -211,7 +209,7 @@ export function escapeAttribute(str: string): string {
     .replace(/>/g, '&gt;');
 }
 
-export function formatHTML(html: string): string {
+export const formatHTML = (html: string): string => {
   // Simple HTML formatting for development
   return html
     .replace(/></g, '>\n<')

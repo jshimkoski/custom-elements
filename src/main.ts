@@ -1,26 +1,34 @@
 import './style.css';
-// import './components/examples/Examples';
+import './docs-site/docs-app.ts';
+import './docs-site/docs-nav.ts';
+import './docs-site/docs-content.ts';
+import './components/examples/MinimalExample';
 import './components/examples/TodoApp';
 import './components/examples/TodoAppCompiled';
 import './components/examples/ShoppingCart';
-// import './components/examples/NotificationSystem';
 import './components/examples/TemplateCompilationDemo';
 import './components/examples/SimpleTest';
+import './components/examples/DataModelDemo';
+// import './components/examples/Examples';
+// import './components/examples/NotificationSystem';
 
 // The new runtime is completely self-contained
 // Components automatically register themselves when imported
 
 document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
   <div>
+    <docs-app></docs-app>
     <h1>🚀 Modern TypeScript Runtime</h1>
     <p style="font-size: 1.1em; color: #666; margin-bottom: 2rem;">
       ✨ Performant • Type-Safe • Developer-Friendly ✨
     </p>
     
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 2rem; margin: 2rem 0;">
+      <minimal-example></minimal-example>
       <todo-app></todo-app>
       <todo-app-compiled></todo-app-compiled>
       <perf-counter></perf-counter>
+      <data-model-demo></data-model-demo>
     </div>
     
     <h2 style="margin-top: 3rem; margin-bottom: 1rem; color: #4f46e5;">Template Compilation Comparison</h2>
