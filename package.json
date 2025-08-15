@@ -46,6 +46,7 @@
   ],
   "exports": {
     ".": {
+      "types": "./dist/runtime.d.ts",
       "import": "./dist/custom-elements-runtime.es.js",
       "require": "./dist/custom-elements-runtime.cjs.js",
       "default": "./dist/custom-elements-runtime.umd.js"
