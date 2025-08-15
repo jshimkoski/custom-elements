@@ -1,6 +1,13 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v0.0.1-beta.5] - 2025-08-15
+
+- refactor: remove unnecessary global declaration for ImportMeta interface (c4f3464)
+- fix: improve HMR handling in component function and update tsconfig types (f5328c4)
+- feat: add dev server setup and Cypress testing to publish workflow (b2c910d)
+
+
 ## [v0.0.1-beta.4] - 2025-08-15
 
 - feat: add dev server setup and Cypress testing to publish workflow (b2c910d)
