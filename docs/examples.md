@@ -343,3 +343,19 @@ component('dynamic-style-example', {
   style: (state) => `div { color: ${state.active ? 'green' : 'red'}; }`
 });
 ```
+
+---
+
+## Stateless Component Example
+
+```typescript
+import { component } from '@jasonshimmy/custom-elements-runtime';
+
+component('stateless-demo', {
+  template: () => `<div>Stateless component rendered!</div>`
+});
+```
+
+```html
+<stateless-demo></stateless-demo>
+```

@@ -196,3 +196,17 @@ style: (state) => `div { color: ${state.isActive ? 'green' : 'red'}; }`
 - Dynamic style functions should be efficient; avoid heavy computations inside the style function.
 - The runtime does not diff the CSS—if the style changes, the entire <style> content is replaced.
 - Using static strings is fastest; dynamic functions are slightly slower but still performant for most use cases.
+
+---
+
+## Stateless Components
+
+- Components can be defined without a state. These stateless components are simpler and are useful for rendering UI that doesn't require reactivity.
+
+```typescript
+component('stateless-demo', {
+  template: () => `<div>Stateless component rendered!</div>`
+});
+```
+
+Stateless components can still use all the other features like event binding, refs, and lifecycle hooks, but they won't have a `state` property or reactive updates. They're ideal for presentational components or when you want to optimize for performance and simplicity.

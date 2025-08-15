@@ -29,7 +29,7 @@ export interface ComponentAPI<T extends ComponentState = ComponentState> {
  */
 export interface ComponentConfig<S extends ComponentState, C extends Record<string, any> = {}> {
   readonly template: (state: S & C, api: ComponentAPI<S & C>) => string | Promise<string> | CompiledTemplate<S & C>;
-  readonly state: S;
+  readonly state?: S;
   readonly computed?: { [K in keyof C]: (state: S) => C[K] };
   readonly style?: string | ((state: S & C) => string);
   readonly refs?: Record<string, RefHandler<S & C>>;
@@ -1153,10 +1153,10 @@ export function component<S extends ComponentState, C extends Record<string, any
   }
 
   // Validate config
-  if (!tag || !config.template || !config.state) {
+  if (!tag || !config.template) {
     if (config && typeof config.onError === 'function') {
-      config.onError(new Error('Component requires tag, template, and state'), config.state, {
-        state: config.state,
+      config.onError(new Error('Component requires tag and template'), config.state ?? {}, {
+        state: config.state ?? {},
         emit: () => {},
         onGlobal: () => () => {},
         offGlobal: () => {},
@@ -1207,13 +1207,14 @@ export function component<S extends ComponentState, C extends Record<string, any
   }
 
   // Create reactive state with computed properties
-  const state = reactive(config.state, config.computed as Record<string, (state: S) => unknown>);
+  const state = reactive(config.state ?? ({} as S), config.computed as Record<string, (state: S) => unknown>);
   // @ts-expect-error: Overriding readonly property for runtime assignment
   (config as { state: S & C }).state = state;
   (config as { _subscribe?: unknown })._subscribe = state.subscribe;
 
-  const primitiveKeys = Object.keys(config.state).filter(
-    key => ['string', 'number', 'boolean'].includes(typeof config.state[key])
+  const stateObjForKeys = (config.state ?? {}) as Record<string, unknown>;
+  const primitiveKeys = Object.keys(stateObjForKeys).filter(
+    key => ['string', 'number', 'boolean'].includes(typeof stateObjForKeys[key])
   );
 
   class RuntimeComponent extends ComponentElement {

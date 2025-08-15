@@ -1,8 +1,38 @@
-# Custom Elements Runtime
+# 🧩 Custom Elements Runtime
 
 > **Ultra-lightweight, type-safe runtime for fast, reactive, and maintainable web components.**
 
 Build modern web components with strict TypeScript, zero dependencies, and a functional API. Designed for performance, standards compliance, and developer productivity.
+
+## 🚀 Getting Started
+
+### Install
+
+```bash
+npm install @jasonshimmy/custom-elements-runtime
+```
+
+### Import and use in your project
+
+```typescript
+import { component, html } from '@jasonshimmy/custom-elements-runtime';
+
+component('my-counter', {
+  state: { count: 0 },
+  template: ({ count }) => html`
+    <button data-on-click="increment">Count: ${count}</button>
+  `({ count }),
+  increment: (_e, state) => state.count++
+});
+```
+
+### TypeScript support
+
+All types and interfaces are available for auto-completion and strict typing in code editors. No extra configuration is needed.
+
+### Advanced usage
+
+See the [API Reference](docs/api-reference.md) for advanced configuration, SSR, plugin system, global store, event bus, and more.
 
 ## ✨ Features
 
@@ -40,36 +70,6 @@ Build modern web components with strict TypeScript, zero dependencies, and a fun
 - Only features documented here and in [`src/lib/runtime.ts`](src/lib/runtime.ts) are supported. Undocumented features may not work as expected.
 - VDOM patching for controlled inputs (checkboxes, radios, etc.) is regression-tested to ensure event listeners are always attached and state updates are reliable.
 
-## 🚀 Getting Started
-
-### Install
-
-```bash
-npm install @jasonshimmy/custom-elements-runtime
-```
-
-### Import and use in your project
-
-```typescript
-import { component, html } from '@jasonshimmy/custom-elements-runtime';
-
-component('my-counter', {
-  state: { count: 0 },
-  template: ({ count }) => html`
-    <button data-on-click="increment">Count: ${count}</button>
-  `({ count }),
-  increment(_e, state) { state.count++; }
-});
-```
-
-### TypeScript support
-
-All types and interfaces are available for auto-completion and strict typing in code editors. No extra configuration is needed.
-
-### Advanced usage
-
-See the [API Reference](docs/api-reference.md) for advanced configuration, SSR, plugin system, global store, event bus, and more.
-
 ## 🎯 Use Cases
 
 - **Micro-frontends**: Lightweight, isolated components
@@ -79,11 +79,14 @@ See the [API Reference](docs/api-reference.md) for advanced configuration, SSR, 
 - **Performance-Critical Apps**: When bundle size matters
 - **Web Standards**: Future-proof, standards-based development
 
-## ⚠️ SSR Caveats
+## 🖥️ SSR Highlights
 
-- SSR only generates HTML and styles; DOM APIs, refs, and event listeners are not available during server rendering.
-- Lifecycle hooks (`onMounted`, `onUnmounted`) and refs are ignored during SSR.
-- Hydration requires the client bundle to match the server-rendered markup and state exactly.
+- **Universal Rendering:** Generate fast, standards-compliant HTML and CSS on the server for instant page loads and SEO.
+- **Opt-in Hydration:** Hydrate only the regions you need with `hydrate` for efficient client-side interactivity.
+- **Template Matching:** Hydration requires the client bundle to match the server-rendered markup and state for seamless transitions.
+- **Fragment & Keyed Templates:** Supports fragments and keyed nodes for robust SSR reconciliation.
+- **Error Boundaries:** SSR supports error boundaries for graceful fallback UI and diagnostics.
+- **Strict SSR Compliance:** Lifecycle hooks and refs are excluded during SSR for predictable, side-effect-free rendering.
 
 ## 🛡️ Production-Readiness
 
@@ -102,7 +105,7 @@ See the [API Reference](docs/api-reference.md) for advanced configuration, SSR, 
 - **Async rendering**: Supports Promises in templates for async data and UI
 - **Selective hydration**: Hydrate only regions marked with `data-hydrate` for efficient SSR
 
-## Documentation
+## 📚 Documentation
 
 - [API Reference](docs/api-reference.md): All runtime exports, configuration options, and advanced patterns.
 - [Core Concepts](docs/core-concepts.md): State, attribute sync, event binding, input binding, global store, event bus, lifecycle, error boundaries, SSR, plugin system.
