@@ -1235,12 +1235,17 @@ export function component<S extends ComponentState, C extends Record<string, any
     }
 
     // Accept HMR updates if available
-    if (hasHMR && typeof (import.meta as any).hot?.accept === 'function' && typeof customElements !== 'undefined') {
-  }
-
-  (import.meta as any).hot.accept(() => {
-    if (!customElements.get(tag)) {
-      customElements.define(tag, ComponentClass);
+    if (
+      hasHMR &&
+      typeof import.meta !== 'undefined' &&
+      import.meta.hot &&
+      typeof import.meta.hot.accept === 'function' &&
+      typeof customElements !== 'undefined'
+    ) {
+      import.meta.hot.accept(() => {
+        if (!customElements.get(tag)) {
+          customElements.define(tag, ComponentClass);
+        }
+      });
     }
-  });
 }
