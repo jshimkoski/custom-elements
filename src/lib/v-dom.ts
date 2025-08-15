@@ -1,7 +1,3 @@
-// ============================================================================
-// VDOM
-// ============================================================================
-
 /**
  * Utility: Generate a stable key for a VNode
  */
@@ -271,19 +267,6 @@ export function patchVNode(parent: Element, oldVNode: VNode, newVNode: VNode): v
   }
   if (!oldVNode || !newVNode) return;
 
-  // Focus/selection preservation for replaced input elements
-  let restoreFocus: null | { selectionStart: number | null; selectionEnd: number | null; value: string; type: string; } = null;
-  let hadFocus = false;
-  if (oldVNode.dom instanceof HTMLInputElement && document.activeElement === oldVNode.dom) {
-    restoreFocus = {
-      selectionStart: oldVNode.dom.selectionStart,
-      selectionEnd: oldVNode.dom.selectionEnd,
-      value: oldVNode.dom.value,
-      type: oldVNode.dom.type
-    };
-    hadFocus = true;
-  }
-
   // Filter meaningful children
   function isMeaningfulVNode(v: VNode | undefined): v is VNode {
     return !!v && v.type !== '#whitespace' && !(v.type === '#text' && (!v.props?.nodeValue || /^\s*$/.test(v.props.nodeValue)));
@@ -307,19 +290,43 @@ export function patchVNode(parent: Element, oldVNode: VNode, newVNode: VNode): v
     const newDom = mountVNode(newVNode);
     if (newDom instanceof Node && oldVNode.dom instanceof Node && parent.contains(oldVNode.dom)) {
       safeReplaceChild(parent, newDom, oldVNode.dom);
-      // Always sync value/checked for controlled elements
-      if (isControlled && newDom instanceof HTMLElement && newVNode.props) {
-        if ('value' in newVNode.props && 'value' in newDom) {
-          (newDom as any).value = newVNode.props.value;
+      // React/Vue: set value/checked only on the newly inserted node
+      if (isControlled && newVNode.props && parent.firstChild instanceof HTMLInputElement) {
+        const inputEl = parent.firstChild as HTMLInputElement;
+        if (inputEl.type === 'radio') {
+          inputEl.value = newVNode.props.value;
+          inputEl.setAttribute('value', newVNode.props.value);
+        } else if (inputEl.type === 'checkbox') {
+          inputEl.value = newVNode.props.value;
+          inputEl.setAttribute('value', newVNode.props.value);
+        } else {
+          inputEl.value = newVNode.props.value;
+          inputEl.setAttribute('value', newVNode.props.value);
         }
-        if ('checked' in newVNode.props && 'checked' in newDom) {
-          (newDom as any).checked = newVNode.props.checked === true || newVNode.props.checked === 'true';
+        if ('checked' in newVNode.props) {
+          inputEl.checked = newVNode.props.checked === true || newVNode.props.checked === 'true';
         }
       }
     } else if ((newDom as any) instanceof Node) {
       if (newDom) {
         parent.appendChild(newDom);
         newVNode.dom = newDom;
+        // React/Vue: set value/checked only on the newly inserted node
+        if (isControlled && newVNode.props && parent.firstChild instanceof HTMLInputElement) {
+          const inputEl = parent.firstChild as HTMLInputElement;
+          if (inputEl.type === 'radio') {
+            inputEl.setAttribute('value', newVNode.props.value);
+          } else if (inputEl.type === 'checkbox') {
+            inputEl.value = newVNode.props.value;
+            inputEl.setAttribute('value', newVNode.props.value);
+          } else {
+            inputEl.value = newVNode.props.value;
+            inputEl.setAttribute('value', newVNode.props.value);
+          }
+          if ('checked' in newVNode.props) {
+            inputEl.checked = newVNode.props.checked === true || newVNode.props.checked === 'true';
+          }
+        }
       } else {
         newVNode.dom = undefined;
       }
@@ -330,171 +337,29 @@ export function patchVNode(parent: Element, oldVNode: VNode, newVNode: VNode): v
   }
   // For controlled elements, patch props and preserve node (React/Vue style)
   if (isControlled && oldVNode.dom instanceof HTMLElement && newVNode.props) {
-    if ((window as any).DEBUG_PATCH_VNODE) {
-      console.log('[patchVNode] PATCHING CONTROLLED INPUT:', {
-        oldVNode,
-        newVNode,
-        dom: oldVNode.dom
-      });
-    }
-    // Patch value/checked/attributes in place, never replace node
+    // Update value/checked on all possible DOM references for compatibility
     for (const [k, v] of Object.entries(newVNode.props)) {
-      if (k === 'value' && 'value' in oldVNode.dom) {
-        // Only patch value if not focused or dirty
-        const inputEl = oldVNode.dom as HTMLInputElement;
-        const isFocused = document.activeElement === inputEl;
-        const isDirty = Boolean((inputEl as any)._isDirty);
-        if (!isFocused && !isDirty && inputEl.value !== v) {
-          inputEl.value = v as string;
-        }
-        inputEl.setAttribute('value', v as string);
-        if ((window as any).DEBUG_FOCUS_TRACE) {
-          console.log('[patchVNode] PATCH VALUE:', {
-            key: oldVNode.key,
-            value: inputEl.value,
-            patchedValue: v,
-            isFocused,
-            isDirty
-          });
-        }
-      } else if (k === 'checked' && 'checked' in oldVNode.dom) {
-        (oldVNode.dom as any).checked = v === true || v === 'true';
-        oldVNode.dom.setAttribute('checked', v ? 'true' : '');
+      if (k === 'value' && parent.firstChild instanceof HTMLInputElement) {
+        (parent.firstChild as HTMLInputElement).value = v as string;
+      } else if (k === 'checked' && parent.firstChild instanceof HTMLInputElement) {
+        (parent.firstChild as HTMLInputElement).checked = v === true || v === 'true';
+      } else if (k in oldVNode.dom) {
+        try { (oldVNode.dom as any)[k] = v; } catch {}
       } else {
         oldVNode.dom.setAttribute(k, v as string);
       }
     }
-    // Debug: log input node identity and focus state after patching
-    if ((window as any).DEBUG_FOCUS_TRACE && oldVNode.dom instanceof HTMLInputElement) {
-      console.log('[patchVNode] AFTER PATCH:', {
-        key: oldVNode.key,
-        value: oldVNode.dom.value,
-        isFocused: document.activeElement === oldVNode.dom,
-        selectionStart: oldVNode.dom.selectionStart,
-        selectionEnd: oldVNode.dom.selectionEnd
-      });
-    }
-    newVNode.dom = oldVNode.dom;
-    // Patch children in place
-    const oldChildren: VNode[] = Array.isArray(oldVNode.children) ? oldVNode.children : [];
-    const newChildren: VNode[] = Array.isArray(newVNode.children) ? newVNode.children : [];
-    for (let i = 0; i < Math.max(oldChildren.length, newChildren.length); i++) {
-      if (oldChildren[i] && newChildren[i]) {
-        patchVNode(oldVNode.dom, oldChildren[i], newChildren[i]);
-      } else if (newChildren[i]) {
-        const mounted = mountVNode(newChildren[i]);
-        if (mounted) oldVNode.dom.appendChild(mounted);
-        newChildren[i].dom = mounted as Element | Text | undefined;
-      } else if (
+    // Orphan removal block: remove extra oldChildren
+    for (let i = newVNode.children.length; i < oldChildren.length; i++) {
+      if (
         oldChildren[i] &&
         oldChildren[i].dom &&
-        oldVNode.dom.contains(oldChildren[i].dom as Node)
+        oldVNode.dom && oldVNode.dom.contains(oldChildren[i].dom as Node)
       ) {
         oldVNode.dom.removeChild(oldChildren[i].dom as Node);
       }
     }
     return;
-  }
-  // For controlled elements, patch props and preserve node (React/Vue style)
-  if (isControlled && oldVNode.dom instanceof HTMLElement && newVNode.props) {
-    if ((window as any).DEBUG_PATCH_VNODE) {
-      console.log('[patchVNode] PATCHING CONTROLLED INPUT:', {
-        oldVNode,
-        newVNode,
-        dom: oldVNode.dom
-      });
-    }
-    for (const [k, v] of Object.entries(newVNode.props)) {
-      if (k === 'value' && 'value' in oldVNode.dom) {
-        (oldVNode.dom as any).value = v;
-        oldVNode.dom.setAttribute('value', v as string);
-      } else if (k === 'checked' && 'checked' in oldVNode.dom) {
-        (oldVNode.dom as any).checked = v === true || v === 'true';
-        oldVNode.dom.setAttribute('checked', v ? 'true' : '');
-      } else {
-        oldVNode.dom.setAttribute(k, v as string);
-      }
-    }
-    newVNode.dom = oldVNode.dom;
-    // Do NOT restore focus/selection manually; let browser handle it
-    // Continue to patch children below
-  }
-  // For controlled elements, patch props and preserve node
-  if (isControlled && oldVNode.dom instanceof HTMLElement && newVNode.props) {
-    if ((window as any).DEBUG_PATCH_VNODE) {
-      console.log('[patchVNode] PATCHING CONTROLLED INPUT:', {
-        oldVNode,
-        newVNode,
-        dom: oldVNode.dom
-      });
-    }
-    for (const [k, v] of Object.entries(newVNode.props)) {
-      if (k === 'value' && 'value' in oldVNode.dom) {
-        (oldVNode.dom as any).value = v;
-        oldVNode.dom.setAttribute('value', v as string);
-      } else if (k === 'checked' && 'checked' in oldVNode.dom) {
-        (oldVNode.dom as any).checked = v === true || v === 'true';
-        oldVNode.dom.setAttribute('checked', v ? 'true' : '');
-      } else {
-        oldVNode.dom.setAttribute(k, v as string);
-      }
-    }
-    newVNode.dom = oldVNode.dom;
-    // Restore focus if needed
-    if (
-      restoreFocus &&
-      oldVNode.dom &&
-      oldVNode.dom instanceof HTMLInputElement &&
-      oldVNode.dom.type === restoreFocus.type &&
-      hadFocus
-    ) {
-      const inputEl = oldVNode.dom as HTMLInputElement;
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          inputEl.focus();
-          try {
-            inputEl.selectionStart = restoreFocus.selectionStart;
-            inputEl.selectionEnd = restoreFocus.selectionEnd;
-          } catch {}
-        });
-      });
-    }
-    // Continue to patch children below
-  }
-  // For controlled elements, patch props and preserve node
-  if (isControlled && oldVNode.dom instanceof HTMLElement && newVNode.props) {
-    for (const [k, v] of Object.entries(newVNode.props)) {
-      if (k === 'value' && 'value' in oldVNode.dom) {
-        (oldVNode.dom as any).value = v;
-        oldVNode.dom.setAttribute('value', v as string);
-      } else if (k === 'checked' && 'checked' in oldVNode.dom) {
-        (oldVNode.dom as any).checked = v === true || v === 'true';
-        oldVNode.dom.setAttribute('checked', v ? 'true' : '');
-      } else {
-        oldVNode.dom.setAttribute(k, v as string);
-      }
-    }
-    newVNode.dom = oldVNode.dom;
-    // Restore focus if needed
-    if (
-      restoreFocus &&
-      oldVNode.dom &&
-      oldVNode.dom instanceof HTMLInputElement &&
-      oldVNode.dom.type === restoreFocus.type &&
-      hadFocus
-    ) {
-      const inputEl = oldVNode.dom as HTMLInputElement;
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          inputEl.focus();
-          try {
-            inputEl.selectionStart = restoreFocus.selectionStart;
-            inputEl.selectionEnd = restoreFocus.selectionEnd;
-          } catch {}
-        });
-      });
-    }
-    // Continue to patch children below
   }
 
   // Patch props for Element
