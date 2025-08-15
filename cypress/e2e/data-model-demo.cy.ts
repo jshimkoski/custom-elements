@@ -9,6 +9,7 @@ describe('DataModelDemo.ts component', () => {
   it('should bind text input and trim value', () => {
     cy.get('data-model-demo').should('exist');
     cy.get('data-model-demo').shadow().find('input[type="text"]').type('  hello world  ');
+    cy.wait(100);
     cy.get('data-model-demo').shadow().find('pre').should('contain', '"text": "hello world"');
   });
 
