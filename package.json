@@ -1,7 +1,7 @@
 {
   "name": "@jasonshimmy/custom-elements-runtime",
   "description": "A powerful, modern, and lightweight runtime for creating reactive web components with TypeScript",
-  "version": "0.0.0",
+  "version": "0.0.1-beta.5",
   "type": "module",
   "keywords": [
     "web-components",
@@ -11,8 +11,13 @@
     "frontend",
     "ui"
   ],
-  "author": "Josh Shimkoski",
+  "author": "Jason Shimkoski <https://jasonshimmy.com>",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jshimkoski/custom-elements.git"
+  },
+  "homepage": "https://github.com/jshimkoski/custom-elements#readme",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build && tsc",
@@ -41,10 +46,12 @@
   ],
   "exports": {
     ".": {
+      "types": "./dist/runtime.d.ts",
       "import": "./dist/custom-elements-runtime.es.js",
       "require": "./dist/custom-elements-runtime.cjs.js",
       "default": "./dist/custom-elements-runtime.umd.js"
-    }
+    },
+    "./runtime.d.ts": "./dist/runtime.d.ts"
   },
   "publishConfig": {
     "access": "public"

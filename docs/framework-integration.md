@@ -83,6 +83,63 @@ component('simple-counter', {
 - Custom events must be listened to with `@event-name` (not `@onEventName`).
 - Avoid using v-model directly; use `data-model` and attribute reflection for two-way binding.
 
+### SSR Example: Using Custom Elements in Nuxt
+
+**Server-side rendering (Nuxt server):**
+
+```typescript
+// server/utils/render-custom-element.ts
+import { renderToString } from '@jasonshimmy/custom-elements-runtime';
+
+const userCardConfig = {
+  state: { name: 'Jane Doe', email: 'jane@example.com' },
+  template: ({ name, email }) => `
+    <div class="user-card">
+      <h3>${name}</h3>
+      <p>${email}</p>
+    </div>
+  `
+};
+
+export function renderUserCardSSR() {
+  return renderToString({ ...userCardConfig, tag: 'user-card' });
+}
+```
+
+**Use in a Nuxt page:**
+
+```vue
+<template>
+  <div v-html="userCardHtml" />
+</template>
+
+<script setup>
+import { ref } from 'vue';
+import { renderUserCardSSR } from '~/server/utils/render-custom-element';
+
+const userCardHtml = ref(renderUserCardSSR());
+</script>
+```
+
+**Client-side hydration (Nuxt plugin):**
+
+```typescript
+// plugins/custom-elements.client.ts
+import { component } from '@jasonshimmy/custom-elements-runtime';
+
+component('user-card', {
+  state: { name: '', email: '' },
+  template: ({ name, email }) => `
+    <div class="user-card">
+      <h3>${name}</h3>
+      <p>${email}</p>
+    </div>
+  `
+});
+```
+
+This pattern ensures SSR works in Nuxt and the component hydrates correctly in the browser.
+
 ## Svelte Integration
 
 ```typescript

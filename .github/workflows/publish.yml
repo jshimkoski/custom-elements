@@ -1,0 +1,220 @@
+name: Publish to npm
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history and tags
+
+      - name: Use Node.js version from .nvmrc
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          registry-url: 'https://registry.npmjs.org/'
+      
+      - name: Cache node modules
+        uses: actions/cache@v3
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run tests
+        run: npm test
+
+      - name: Start dev server
+        run: npm run dev -- --host & echo $! > dev.pid
+
+      - name: Wait for dev server
+        run: npx wait-on --timeout 30000 http://localhost:5173
+
+      - name: Run Cypress tests
+        run: npx cypress run
+
+      - name: Shutdown dev server
+        run: |
+          if [ -f dev.pid ]; then
+            kill $(cat dev.pid)
+          fi
+
+      - name: Build library
+        run: npm run build
+
+      - name: Configure Git
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
+
+      - name: Determine version bump from commit
+        id: bump
+        run: |
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          if [[ "$COMMIT_MSG" == *"BREAKING CHANGE:"* ]]; then
+            echo "major" > .bump
+          elif [[ "$COMMIT_MSG" == feat:* ]]; then
+            echo "minor" > .bump
+          elif [[ "$COMMIT_MSG" == fix:* ]]; then
+            echo "patch" > .bump
+          else
+            echo "patch" > .bump
+          fi
+
+      - name: Generate release notes and changelog
+        id: changelog
+        run: |
+          BRANCH=${GITHUB_REF##*/}
+          BUMP_TYPE=$(cat .bump)
+          
+          # Get the previous tag to determine what commits to include
+          TAG_COUNT=$(git tag --sort=-version:refname | wc -l)
+          echo "Debug: Found $TAG_COUNT tags"
+          
+          if [ "$TAG_COUNT" -gt 1 ]; then
+            # Get the second most recent tag
+            PREV_TAG=$(git tag --sort=-version:refname | head -n2 | tail -n1)
+            echo "Debug: Using second most recent tag: $PREV_TAG"
+          else
+            # If we have 1 or 0 tags, use the first commit
+            PREV_TAG=$(git rev-list --max-parents=0 HEAD)
+            echo "Debug: Using first commit as baseline: $PREV_TAG"
+          fi
+          
+          echo "Debug: Previous tag/commit is: $PREV_TAG"
+          echo "Debug: Current HEAD is: $(git rev-parse HEAD)"
+          echo "Debug: Checking commits between $PREV_TAG and HEAD"
+          
+          # Generate commit log since last tag (excluding merge commits and version bumps)
+          COMMITS=$(git log "$PREV_TAG..HEAD" --pretty=format:"- %s (%h)" --no-merges | grep -v "release:" | grep -v "chore: update changelog" || true)
+          
+          echo "Debug: Found commits: $COMMITS"
+          
+          # Handle case where no commits are found
+          if [ -z "$COMMITS" ]; then
+            COMMITS="- No changes since last release"
+          fi
+          
+          # Store commits for later use
+          echo "$COMMITS" > commits.txt
+
+      - name: Bump version
+        id: version
+        run: |
+          BUMP_TYPE=$(cat .bump)
+          BRANCH=${GITHUB_REF##*/}
+          # Ensure version includes -beta for develop
+          if [[ "$BRANCH" == "develop" ]]; then
+            NEW_VERSION=$(npm version prerelease --preid=beta -m "release: %s [skip ci]")
+          else
+            NEW_VERSION=$(npm version "$BUMP_TYPE" -m "release: %s [skip ci]")
+          fi
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          git push --follow-tags
+
+      - name: Create release and update changelog
+        run: |
+          BRANCH=${GITHUB_REF##*/}
+          VERSION="${{ steps.version.outputs.version }}"
+          COMMITS=$(cat commits.txt)
+          
+          # Get the previous tag for comparison link
+          PREV_TAG=$(git tag --sort=-version:refname | grep -v "$VERSION" | head -n1)
+          
+          # Create release notes
+          RELEASE_NOTES="## Release $VERSION
+          
+          ### Changes
+          $COMMITS
+          
+          **Full Changelog**: https://github.com/${{ github.repository }}/compare/$PREV_TAG...$VERSION"
+          
+          # Update or create CHANGELOG.md
+          DATE=$(date +"%Y-%m-%d")
+          if [ ! -f CHANGELOG.md ]; then
+            echo "# Changelog" > CHANGELOG.md
+            echo "" >> CHANGELOG.md
+            echo "All notable changes to this project will be documented in this file." >> CHANGELOG.md
+            echo "" >> CHANGELOG.md
+          fi
+          
+          # Prepare new changelog entry
+          TEMP_CHANGELOG="## [$VERSION] - $DATE
+          
+          $COMMITS
+          
+          "
+          
+          # Insert new entry at the top of changelog (after header)
+          # Create a temporary file to avoid sed portability issues
+          {
+            head -3 CHANGELOG.md
+            echo "$TEMP_CHANGELOG"
+            tail -n +4 CHANGELOG.md
+          } > CHANGELOG.tmp && mv CHANGELOG.tmp CHANGELOG.md
+          
+          # Commit and push changelog
+          git add CHANGELOG.md
+          git commit -m "chore: update changelog for $VERSION [skip ci]" || true
+          git push || true
+          
+          # Save release notes for GitHub release
+          echo "$RELEASE_NOTES" > release_notes.md
+          
+          # Create GitHub release using built-in GitHub CLI or curl without jq dependency
+          ESCAPED_BODY=$(echo "$RELEASE_NOTES" | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
+          
+          # Create GitHub release
+          if [[ "$BRANCH" == "develop" ]]; then
+            # Beta release
+            curl -X POST \
+              -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+              -H "Accept: application/vnd.github.v3+json" \
+              https://api.github.com/repos/${{ github.repository }}/releases \
+              -d "{
+                \"tag_name\": \"$VERSION\",
+                \"name\": \"$VERSION (Beta)\",
+                \"body\": \"$ESCAPED_BODY\",
+                \"prerelease\": true
+              }"
+          else
+            # Production release
+            curl -X POST \
+              -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+              -H "Accept: application/vnd.github.v3+json" \
+              https://api.github.com/repos/${{ github.repository }}/releases \
+              -d "{
+                \"tag_name\": \"$VERSION\",
+                \"name\": \"$VERSION\",
+                \"body\": \"$ESCAPED_BODY\",
+                \"prerelease\": false
+              }"
+          fi
+
+      - name: Publish to npm
+        run: |
+          BRANCH=${GITHUB_REF##*/}
+          if [[ "$BRANCH" == "develop" ]]; then
+            npm publish --tag beta
+          else
+            npm publish
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
