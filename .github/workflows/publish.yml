@@ -12,6 +12,7 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
 
     steps:
       - name: Checkout code
@@ -38,6 +39,21 @@ jobs:
       
       - name: Run tests
         run: npm test
+
+      - name: Start dev server
+        run: npm run dev -- --host & echo $! > dev.pid
+
+      - name: Wait for dev server
+        run: npx wait-on --timeout 30000 http://localhost:5173
+
+      - name: Run Cypress tests
+        run: npx cypress run
+
+      - name: Shutdown dev server
+        run: |
+          if [ -f dev.pid ]; then
+            kill $(cat dev.pid)
+          fi
 
       - name: Build library
         run: npm run build
