@@ -1,6 +1,11 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v0.0.3] - 2025-08-15
+
+- fix: make state optional for stateless components docs: add examples and documentation for stateless components (fc13ab8)
+
+
 ## [v0.0.3-beta.0] - 2025-08-15
 
 - fix: make state optional for stateless components docs: add examples and documentation for stateless components (fc13ab8)
