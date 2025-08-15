@@ -1,8 +1,3 @@
-declare global {
-  interface ImportMeta {
-    env?: Record<string, any>;
-  }
-}
 /**
  * Build Tool Integration for Template Compilation
  * 
