@@ -28,20 +28,14 @@ export interface VNode {
  * @param oldChild - Old node to replace
  */
 export function safeReplaceChild(parent: Node | null, newChild: Node, oldChild: Node): void {
-  // Get debug flag from parent custom element instance if available
-  let debug = false;
-  if (parent && parent instanceof Element && 'debug' in parent) {
-    debug = (parent as Element & { debug?: boolean }).debug === true;
-  }
   if (!parent || !(parent instanceof Element)) {
-    if (debug) console.warn('[runtime] safeReplaceChild: parent is missing or not an Element', { parent, newChild, oldChild });
     return;
   }
   if (parent.contains(oldChild) && oldChild.parentNode === parent) {
     try {
       parent.replaceChild(newChild, oldChild);
     } catch (err) {
-      if (debug) console.error('[runtime] safeReplaceChild: error replacing child', err, {
+      console.error('[VDOM] safeReplaceChild: error replacing child', err, {
         parent,
         newChild,
         oldChild,
@@ -50,17 +44,6 @@ export function safeReplaceChild(parent: Node | null, newChild: Node, oldChild: 
         oldChildHTML: (oldChild as Element).outerHTML
       });
     }
-  } else {
-    // Do NOT append newChild if oldChild is missing during patching
-    if (debug) console.warn('[runtime] safeReplaceChild: attempted to replace missing child, skipping mutation', {
-      parent,
-      newChild,
-      oldChild,
-      parentChildren: Array.from(parent.childNodes).map(n => n.nodeName),
-      parentHTML: (parent as Element).outerHTML,
-      newChildHTML: (newChild as Element).outerHTML,
-      oldChildHTML: (oldChild as Element).outerHTML
-    });
   }
 }
 
@@ -115,15 +98,9 @@ export function parseVNodeFromHTML(html: string): VNode {
   const template = document.createElement('template');
   template.innerHTML = html.trim();
   const nodes = Array.from(template.content.childNodes);
-  if ((window as any).DEBUG_VNODE_GEN) {
-    console.log('[parseVNodeFromHTML] HTML:', html, 'Nodes:', nodes);
-  }
   // If only one root node, return as before
   if (nodes.length === 1) {
     const vnode = createVNodeFromElement(nodes[0]);
-    if ((window as any).DEBUG_VNODE_GEN) {
-      console.log('[parseVNodeFromHTML] Single root VNode:', vnode);
-    }
     return vnode;
   }
   // If multiple root nodes, create a fragment VNode
@@ -134,9 +111,6 @@ export function parseVNodeFromHTML(html: string): VNode {
     children: nodes.map((node, idx) => createVNodeFromElement(node, '#fragment', idx)),
     dom: undefined
   };
-  if ((window as any).DEBUG_VNODE_GEN) {
-    console.log('[parseVNodeFromHTML] Fragment VNode:', fragmentVNode);
-  }
   return fragmentVNode;
 }
 
@@ -149,10 +123,6 @@ export function parseVNodeFromHTML(html: string): VNode {
  * @returns VNode
  */
 export function createVNodeFromElement(node: ChildNode, parentPath: string = '', childIndex: number = 0): VNode {
-  // Debug log for VNode creation
-  if ((window as any).DEBUG_VNODE_GEN) {
-    console.log('[createVNodeFromElement] node:', node, 'parentPath:', parentPath, 'childIndex:', childIndex);
-  }
   if (!node) {
     // Guard: skip undefined/null nodes
     return { type: '#unknown', key: undefined, props: {}, children: [], dom: undefined };
@@ -184,30 +154,10 @@ export function createVNodeFromElement(node: ChildNode, parentPath: string = '',
       let checkedAttr = elem.getAttribute('checked');
       if (valueAttr) props['value'] = valueAttr;
       if (checkedAttr) props['checked'] = checkedAttr;
-      if ((window as any).DEBUG_FORM_VNODE) {
-        console.log('[createVNodeFromElement] Controlled element:', {
-          tagName,
-          model,
-          inputType,
-          vnodeKey,
-          props,
-          valueAttr,
-          checkedAttr,
-          elem
-        });
-      }
     } else if (tagName === 'input' || tagName === 'textarea' || tagName === 'select' || elem.hasAttribute('contenteditable')) {
       vnodeKey = `${tagName}:${parentPath}:${childIndex}`;
       props['data-uid'] = vnodeKey;
       elem.setAttribute('data-uid', vnodeKey);
-      if ((window as any).DEBUG_FORM_VNODE) {
-        console.log('[createVNodeFromElement] Generic form element:', {
-          tagName,
-          vnodeKey,
-          props,
-          elem
-        });
-      }
     } else {
       vnodeKey = getVNodeKey(tagName, parentPath, childIndex);
       if (tagName === 'li') {
@@ -223,9 +173,6 @@ export function createVNodeFromElement(node: ChildNode, parentPath: string = '',
       children,
       dom: elem
     };
-    if ((window as any).DEBUG_FORM_VNODE) {
-      console.log('[createVNodeFromElement] VNode created:', vnode);
-    }
     return vnode;
   }
   // Fallback for unsupported node types
@@ -240,31 +187,6 @@ export function createVNodeFromElement(node: ChildNode, parentPath: string = '',
  * @param newVNode - New VNode
  */
 export function patchVNode(parent: Element, oldVNode: VNode, newVNode: VNode): void {
-  // Debug: log input node identity and focus state before patching
-  if ((window as any).DEBUG_FOCUS_TRACE && oldVNode.dom instanceof HTMLInputElement) {
-    console.log('[patchVNode] BEFORE PATCH:', {
-      key: oldVNode.key,
-      value: oldVNode.dom.value,
-      isFocused: document.activeElement === oldVNode.dom,
-      selectionStart: oldVNode.dom.selectionStart,
-      selectionEnd: oldVNode.dom.selectionEnd
-    });
-  }
-  // Debug: log patchVNode for form elements
-  if ((window as any).DEBUG_FORM_VNODE && (newVNode.type === 'input' || newVNode.type === 'select' || newVNode.type === 'textarea')) {
-    console.log('[patchVNode] Controlled element:', {
-      parent,
-      oldVNode,
-      newVNode,
-      oldDom: oldVNode.dom,
-      newDom: newVNode.dom
-    });
-  }
-  // Debug log for patchVNode entry
-  const debug = (parent as any)?.debug || (window as any).DEBUG_PATCH_VNODE;
-  if (debug) {
-    console.log('[patchVNode] Entry:', { parent, oldVNode, newVNode });
-  }
   if (!oldVNode || !newVNode) return;
 
   // Filter meaningful children
@@ -277,16 +199,6 @@ export function patchVNode(parent: Element, oldVNode: VNode, newVNode: VNode): v
   // Only replace node if type or key differ, NOT just because it's controlled
   const isControlled = newVNode.type === 'input' || newVNode.type === 'select' || newVNode.type === 'textarea';
   if (oldVNode.type !== newVNode.type || oldVNode.key !== newVNode.key) {
-    if ((window as any).DEBUG_PATCH_VNODE) {
-      console.warn('[patchVNode] REPLACING NODE:', {
-        reason: 'type or key differ',
-        oldType: oldVNode.type,
-        newType: newVNode.type,
-        oldKey: oldVNode.key,
-        newKey: newVNode.key,
-        isControlled
-      });
-    }
     const newDom = mountVNode(newVNode);
     if (newDom instanceof Node && oldVNode.dom instanceof Node && parent.contains(oldVNode.dom)) {
       safeReplaceChild(parent, newDom, oldVNode.dom);

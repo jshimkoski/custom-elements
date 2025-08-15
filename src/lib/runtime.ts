@@ -200,9 +200,6 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
     } else {
       config.template = () => newTemplate;
     }
-    if ((window as any).DEBUG_PATCH_VNODE) {
-      console.log('[ComponentElement.setTemplate] Triggering render with newTemplate:', newTemplate);
-    }
     this.render();
   }
 
@@ -249,9 +246,6 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
    */
   attributeChangedCallback(name: string, _oldValue: string, newValue: string) {
     if (name === '__proto__' || name === 'constructor' || name === 'prototype') return;
-    if (this.config?.debug) {
-      console.debug(`[CustomElement] attributeChangedCallback: '${name}' changed to '${newValue}' on`, this);
-    }
     // Guard against stateObj being undefined
     if (!this.stateObj) return;
     // Only update state and trigger render if value differs
@@ -531,9 +525,6 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
     // Subscribe to state changes and batch re-render
     if (typeof (this.stateObj as any).subscribe === 'function') {
       this.unsubscribes.push((this.stateObj as any).subscribe(() => {
-        if ((window as any).DEBUG_PATCH_VNODE) {
-          console.log('[ComponentElement] Reactive state mutation detected, scheduling render.');
-        }
         this.scheduleRender();
       }));
     }
@@ -715,9 +706,6 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
    * Render the component. Handles both string and compiled templates, refs, and error boundaries.
    */
   private render(): void {
-    if ((window as any).DEBUG_PATCH_VNODE) {
-      console.log('[ComponentElement.render] Called for', this);
-    }
     // Always reset error state before each render for predictable boundaries
     this._hasError = false;
     // Robust controlled input sync after every render
@@ -743,10 +731,6 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
             // Do NOT re-throw, just handle and continue
           }
         });
-      }
-      // Do not call lifecycle hooks here; only call in connected/disconnectedCallback
-      if ((window as any).DEBUG_PATCH_VNODE) {
-        console.log('[ComponentElement.render] Evaluating template with state:', this.stateObj);
       }
       const templateResultOrPromise = this.config.template(this.stateObj as S & C, this.api);
       if (templateResultOrPromise instanceof Promise) {
@@ -1114,7 +1098,7 @@ class ComponentElement<S extends ComponentState, C extends Record<string, any> =
             if (!(el as any)._boundHandlers) (el as any)._boundHandlers = {};
             (el as any)._boundHandlers[eventType] = boundHandler;
           } else {
-            if (this.config.debug) console.warn(`[bindEvents] Handler '${handlerName}' not found on config for event '${eventType}'`, el);
+            if (this.config.debug) console.warn(`[runtime] Handler '${handlerName}' not found on config for event '${eventType}'`, el);
           }
         }
       });
@@ -1213,7 +1197,7 @@ export function component<S extends ComponentState, C extends Record<string, any
   }
 
   if (customElements.get(tag)) {
-    if (config.debug) console.warn(`Component "${tag}" already registered`);
+    if (config.debug) console.warn(`[runtime] Component "${tag}" already registered`);
     return;
   }
 

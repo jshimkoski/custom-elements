@@ -126,7 +126,7 @@ export function compileTemplate<T = any>(
   } catch (error) {
     if (development) {
       console.error('[Template Compiler] Error compiling template:', error);
-      console.error('Template:', templateString);
+      console.error('[Template Compiler] Template:', templateString);
     }
     
     // Fallback: always return original template string as static content
@@ -526,7 +526,7 @@ export class TemplateAnalyzer {
         return value;
       } catch (error) {
         if (this.options.development) {
-          console.warn(`[Template] Error evaluating expression: ${expression}`, error);
+          console.warn(`[Template Compiler] Error evaluating expression: ${expression}`, error);
         }
         return '';
       }
@@ -558,7 +558,7 @@ export class TemplateAnalyzer {
       return fragment;
     } catch (error) {
       if (this.options.development) {
-        console.warn('[Template] Could not create static fragment:', error);
+        console.warn('[Template Compiler] Could not create static fragment:', error);
       }
       return null;
     }
@@ -636,7 +636,7 @@ export function updateCompiledTemplate<T>(
       }
       applyUpdate(element, update, newValue);
     } catch (error) {
-      console.warn('[Template] Error applying update:', error);
+      console.warn('[Template Compiler] Error applying update:', error);
     }
   }
 }

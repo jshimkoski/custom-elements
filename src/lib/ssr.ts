@@ -60,7 +60,7 @@ export function renderToString<T extends ComponentState>(
   options: SSRRenderOptions = {}
 ): string {
   if (!isServer) {
-    console.warn('renderToString should only be used on the server');
+    console.warn('[SSR] renderToString should only be used on the server');
   }
 
   try {
