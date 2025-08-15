@@ -1,6 +1,13 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v0.0.1-beta.3] - 2025-08-15
+
+- fix: remove unused variable (5722fdd)
+- fix: prevent ssr issue when creating web components docs: add ssr example to framework integration (df77623)
+- feat: add export for runtime.d.ts in package.json (16c39d9)
+
+
 ## [v0.0.1-beta.2] - 2025-08-15
 
 - feat: add export for runtime.d.ts in package.json (16c39d9)
