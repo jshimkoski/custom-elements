@@ -22,9 +22,13 @@
 - Minimal bundle size, zero dependencies
 - Direct DOM updates, no virtual DOM
 - Strict TypeScript, functional API
-- Built-in SSR, hydration, error boundaries
+- Built-in SSR, opt-in hydration, error boundaries
+- Plugin system for runtime extension
+- Global store and event bus for cross-component state and communication
+- Computed properties, refs, and lifecycle hooks
 - Declarative event binding, native custom elements
 - Fully tree-shakable
+- All features strictly typed and regression-tested (SSR, hydration, plugin system, error boundaries, global store/event bus, computed, refs, lifecycle hooks, VDOM, edge-case handling)
 
 ## Tradeoffs
 
@@ -50,6 +54,7 @@
 - **Native custom elements**: True web standard, interoperable with any framework
 - **Zero dependencies**: No external libraries, secure and maintainable
 - **Functional, modular API**: No classes, no boilerplate
+- **Strict typing and regression-tested features**: All runtime features (SSR, hydration, plugin system, error boundaries, global store/event bus, computed, refs, lifecycle hooks, VDOM, edge-case handling) are strictly typed and regression-tested for reliability and maintainability.
 
 ## Summary
 

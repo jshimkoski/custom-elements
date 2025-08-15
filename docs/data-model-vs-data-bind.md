@@ -1,20 +1,19 @@
 # `data-model` vs `data-bind`: Comparison & Use Cases
 
-This document explains the differences between the `data-model` and `data-bind` attributes in the Custom Elements Runtime, provides usage examples, and guides you on when to use each for optimal component design.
+This document explains the differences between the `data-model` and `data-bind` attributes in the Custom Elements Runtime, provides usage examples, edge cases, and guides you on when to use each for optimal component design. All features match the implementation in src/lib.
 
 ---
 
 ## Overview
 
-Both `data-model` and `data-bind` enable declarative, reactive binding between your component's state and form inputs. They serve different purposes and are optimized for distinct scenarios.
+Both `data-model` and `data-bind` enable declarative, reactive binding between your component's state and form inputs. They serve different purposes and are optimized for distinct scenarios. All binding is strictly type-safe and regression-tested for reliability.
 
 ---
 
 ## `data-model`
 
 **Purpose:**
-- Provides controlled, one-way binding between a single state property and a form input.
-- Ensures the input value is always in sync with the state, but user typing always wins (no lost keystrokes).
+- Provides controlled, one-way binding between a single state property and a form input. Input value is always in sync with state, but user typing always wins (no lost keystrokes).
 - Supports modifiers (e.g., `|number`, `|trim`) for type conversion and input normalization.
 - Handles all standard input types: text, number, checkbox (single/multi), radio, textarea, select.
 
@@ -45,8 +44,7 @@ state: {
 ## `data-bind`
 
 **Purpose:**
-- Enables deep, two-way binding to nested state objects or arrays.
-- Supports binding to complex structures (e.g., `user.address.street`, `items[0].name`).
+- Enables deep, two-way binding to nested state objects or arrays. Supports dot notation and array indices for complex structures (e.g., `user.address.street`, `items[0].name`).
 - Useful for dynamic forms, lists, or when state shape is not flat.
 - Can be used for advanced scenarios where `data-model` is insufficient.
 
@@ -78,6 +76,11 @@ state: {
 | Binding Type           | One-way, controlled         | Two-way, deep                |
 | State Shape            | Flat, primitive             | Nested, dynamic              |
 | Modifiers              | Supported (`|number`, etc.) | Not supported                |
+| Input Types            | All standard                | All standard                 |
+| Deep Binding           | No                          | Yes                          |
+| Dot Notation           | No                          | Yes                          |
+| Array Index Support    | No                          | Yes                          |
+| Edge Cases             | User typing always wins     | Handles dynamic lists        |
 | Input Types            | All standard                | All standard                 |
 | Checkbox/Radio Groups  | Supported                   | Supported                    |
 | Use Case               | Simple forms, direct state  | Dynamic forms, nested state  |

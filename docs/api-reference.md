@@ -1,7 +1,7 @@
 
 # Runtime API Reference
 
-All APIs are strictly typed and match the implementation in `runtime.ts`. Only documented features are supported.
+All APIs are strictly typed and match the implementation in `src/lib`. Only documented features are supported. This reference covers all exports, configuration options, event handlers, input binding, global store, event bus, refs, computed, SSR, error boundaries, plugin system, VDOM, template helpers, and build tools.
 
 ---
 
@@ -18,9 +18,22 @@ export interface ComponentConfig<S extends ComponentState, C extends Record<stri
   onUnmounted?: LifecycleHandler<S & C>;
   onError?: (error: Error, state: S & C, api: ComponentAPI<S & C>) => void;
   debug?: boolean; // Enable detailed runtime logs for this component
-  [handler: string]: any; // Event handlers for data-on-*
+  reflect?: string[]; // Whitelist of state keys to reflect as attributes
+  hydrate?: (el: Element | ShadowRoot, state: S & C, api: ComponentAPI<S & C>) => void; // SSR hydration
+  [handler: string]: ((...args: unknown[]) => unknown) | unknown; // Event handlers for data-on-*
 }
 ```
+
+**Attribute Reflection Caveats & Best Practices:**
+- Only primitive state keys (`string`, `number`, `boolean`) are supported for attribute reflection. Objects and arrays are ignored.
+- Dangerous keys (`__proto__`, `constructor`, `prototype`) are never reflected.
+- Initial attributes are merged into state on connection for seamless sync.
+- If you override `attributeChangedCallback`, you must call `super.attributeChangedCallback` to preserve reactivity.
+- Reflected attributes are automatically kept in sync with state changes.
+
+**Interaction with `data-model`/`data-bind`:**
+- If a state key is both reflected and bound to an input via `data-model` or `data-bind`, the runtime will keep them in sync. User input always wins for controlled inputs, preventing sync errors. Rapid external updates to the attribute may be overwritten by user typing.
+- Avoid updating the attribute and input at the exact same time to prevent unexpected UI flicker.
 
 **Notes:**
 - `debug` (optional): If true, enables detailed runtime logs (warnings, errors, mutation diagnostics) for this component only. Default is false.
@@ -78,12 +91,8 @@ export function useRuntimePlugin<S extends ComponentState, C extends Record<stri
 
 ```typescript
 renderToString<T>(config: SSRComponentConfig<T>, options?: SSRRenderOptions): string;
-renderComponentsToString(components: SSRComponentConfig<any>[], options?: SSRRenderOptions): {
-  html: string;
-  styles: string;
-  context: SSRContext;
-};
-generateHydrationScript(context: SSRContext): string;
+renderComponentsToString<T>(configs: SSRComponentConfig<T>[]): string;
+generateHydrationScript(): string;
 ```
 
 **Notes:**
@@ -95,11 +104,13 @@ generateHydrationScript(context: SSRContext): string;
 ## Template Helpers
 
 ```typescript
-html(strings: TemplateStringsArray, ...values: any[]): string;
+html(strings: TemplateStringsArray, ...values: any[]): string | Promise<string>;
 css(strings: TemplateStringsArray, ...values: any[]): string;
 compile<T = any>(strings: TemplateStringsArray, ...expressions: Array<(state: T, api: any) => unknown>): CompiledTemplate<T>;
 classes(obj: Record<string, boolean>): string;
 styles(obj: Record<string, string | number>): string;
+ref(name: string): string;
+on(event: string, handler: Function): string;
 ```
 
 ---
@@ -109,6 +120,7 @@ styles(obj: Record<string, string | number>): string;
 ```typescript
 emit<T = any>(eventName: string, data?: T): void;
 on<T = any>(eventName: string, handler: (data: T) => void): () => void;
+off<T = any>(eventName: string, handler: (data: T) => void): void;
 once<T = any>(eventName: string, handler: (data: T) => void): Promise<T>;
 
 class Store<T extends object> {
@@ -138,3 +150,37 @@ export type CompiledTemplate<S extends ComponentState = ComponentState> = {
   render: (state: S, api: ComponentAPI<S>) => DocumentFragment;
 };
 ```
+
+## Input Binding
+
+- `data-model`: Controlled, one-way binding between a state property and a form input. Supports modifiers (`|number`, `|trim`).
+- `data-bind`: Deep, two-way binding to nested state objects or arrays. Supports dot notation and array indices.
+
+## Event Binding
+
+- `data-on-*`: Declarative event binding for any event type. Handlers must be defined on the config object. Only one handler per event type per element is attached; previous handlers are removed on rerender.
+
+## Global Store
+
+```typescript
+import { Store } from './lib/store';
+const globalState = new Store({ theme: 'light', count: 0 });
+globalState.subscribe((state) => { console.log('Global changed:', state.count); });
+```
+
+## Global Event Bus
+
+```typescript
+import { eventBus } from './lib/event-bus';
+eventBus.emit('my-event', { foo: 123 });
+eventBus.on('my-event', (data) => { console.log(data); });
+eventBus.off('my-event', handler);
+```
+
+## VDOM Utilities
+
+- Fine-grained DOM diffing and patching for controlled inputs, event listeners, and efficient updates.
+
+## Build Tools
+
+- Integrate with Vite, Webpack, or Rollup for build-time template compilation and optimization.
