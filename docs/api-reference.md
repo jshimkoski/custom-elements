@@ -9,7 +9,7 @@ All APIs are strictly typed and match the implementation in `src/lib`. Only docu
 ```typescript
 export interface ComponentConfig<S extends ComponentState, C extends Record<string, any> = {}> {
   template: (state: S & C, api: ComponentAPI<S & C>) => string | Promise<string> | CompiledTemplate<S & C>;
-  state: S;
+  state?: S; // Optional for stateless components
   computed?: { [K in keyof C]: (state: S) => C[K] };
   style?: string | ((state: S & C) => string); // Static string or dynamic function
   refs?: Record<string, RefHandler<S & C>>;
