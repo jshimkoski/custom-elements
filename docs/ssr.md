@@ -2,7 +2,7 @@
 
 ## SSR Support
 
-- Use `renderToString`, `renderComponentsToString`, and `generateHydrationScript` from `src/lib/runtime.ts` for server-side rendering and hydration.
+- Use `renderToString`, `renderComponentsToString`, and `generateHydrationScript` for server-side rendering and hydration.
 - Hydration is opt-in via the `hydrate` property in your component config. If no region is marked, the entire shadow root is hydrated.
 - SSR templates must match client templates for correct hydration.
 
@@ -17,7 +17,7 @@ import {
   compile,
   css,
   type SSRComponentConfig
-} from './src/lib/runtime.ts';
+} from '@jasonshimmy/custom-elements-runtime';
 
 const userCardConfig: SSRComponentConfig<{ name: string; email: string; avatar: string; isOnline: boolean }> = {
   state: {

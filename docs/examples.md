@@ -8,7 +8,7 @@ Quick, readable examples for common patterns. All code matches the runtime API a
 ## Hello World
 
 ```typescript
-import { component } from './lib/runtime.ts';
+import { component } from '@jasonshimmy/custom-elements-runtime';
 
 component('hello-world', {
   state: { name: 'World' },
@@ -25,7 +25,7 @@ component('hello-world', {
 ## Simple Counter
 
 ```typescript
-import { component } from './lib/runtime.ts';
+import { component } from '@jasonshimmy/custom-elements-runtime';
 
 component('simple-counter', {
   state: { count: 0 },
@@ -47,7 +47,7 @@ component('simple-counter', {
 ## Async Rendering Example
 
 ```typescript
-import { component } from './lib/runtime.ts';
+import { component } from '@jasonshimmy/custom-elements-runtime';
 
 component('async-demo', {
   state: {},
@@ -89,7 +89,7 @@ component('focus-demo', {
 ## Todo App Example
 
 ```typescript
-import { component, html, css, type ComponentState } from '../../lib/runtime';
+import { component, html, css, type ComponentState } from '@jasonshimmy/custom-elements-runtime';
 
 interface Todo {
   id: number;

@@ -22,7 +22,7 @@ Explore advanced patterns and features available in the Custom Elements Runtime.
 ## Example: Advanced Component
 
 ```typescript
-import { component, html, css, compile } from './lib/runtime.ts';
+import { component, html, css, compile } from '@jasonshimmy/custom-elements-runtime';
 
 component('advanced-demo', {
   state: { count: 0 },
@@ -75,7 +75,7 @@ component('async-advanced', {
 ## Example: Plugin Usage
 
 ```typescript
-import { useRuntimePlugin } from './lib/runtime.ts';
+import { useRuntimePlugin } from '@jasonshimmy/custom-elements-runtime';
 
 useRuntimePlugin({
   onInit: (config) => {

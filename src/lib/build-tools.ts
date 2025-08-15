@@ -1,3 +1,8 @@
+declare global {
+  interface ImportMeta {
+    env?: Record<string, any>;
+  }
+}
 /**
  * Build Tool Integration for Template Compilation
  * 
@@ -293,7 +298,7 @@ export function migrateToCompiledTemplate(
 // Classes are already exported above
 
 // Make dev tools available globally in development
-if (typeof window !== 'undefined' && import.meta.env?.DEV) {
+if (typeof window !== 'undefined' && (import.meta.env as any)?.DEV) {
   (window as any).__TEMPLATE_DEV_TOOLS__ = {
     TemplateDevTools,
     TemplatePerformanceMonitor,

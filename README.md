@@ -40,36 +40,35 @@ Build modern web components with strict TypeScript, zero dependencies, and a fun
 - Only features documented here and in [`src/lib/runtime.ts`](src/lib/runtime.ts) are supported. Undocumented features may not work as expected.
 - VDOM patching for controlled inputs (checkboxes, radios, etc.) is regression-tested to ensure event listeners are always attached and state updates are reliable.
 
+## 🚀 Getting Started
 
-## Minimal Example
+### Install
+
+```bash
+npm install @jasonshimmy/custom-elements-runtime
+```
+
+### Import and use in your project
 
 ```typescript
-import { html, css, component } from '../../lib/runtime';
+import { component, html } from '@jasonshimmy/custom-elements-runtime';
 
-interface MinimalExampleState {
-  count: number;
-}
-
-component('minimal-example', {
+component('my-counter', {
   state: { count: 0 },
-  template: ({ count }: MinimalExampleState) => html`
+  template: ({ count }) => html`
     <button data-on-click="increment">Count: ${count}</button>
   `({ count }),
-  style: css`
-    button { font-size: 1.2rem; padding: 0.5rem 1rem; }
-  `,
-  increment(_e: Event, state: MinimalExampleState) {
-    state.count++;
-  }
+  increment(_e, state) { state.count++; }
 });
 ```
 
-## 🚀 Getting Started
+### TypeScript support
 
-1. **Clone this repository**
-2. **Run the examples**: `npm run dev`
-3. **Create your first component** (see minimal example above)
-4. **Build something awesome!**
+All types and interfaces are available for auto-completion and strict typing in code editors. No extra configuration is needed.
+
+### Advanced usage
+
+See the [API Reference](docs/api-reference.md) for advanced configuration, SSR, plugin system, global store, event bus, and more.
 
 ## 🎯 Use Cases
 
@@ -112,6 +111,12 @@ component('minimal-example', {
 - [Form Input Bindings](docs/form-input-bindings.md): All supported input types, modifiers, deep binding, edge cases, VDOM patching.
 - [SSR Guide](docs/ssr.md): SSR, hydration, limitations, API.
 - [Framework Comparison](docs/framework-comparison.md): Unique features, tradeoffs, strengths, and when to choose each approach.
+- [Framework Integration](docs/framework-integration.md): Using with React, Vue, Angular, Svelte, and Lit.
 - [Examples](docs/examples.md): Concise, accurate code for all features and patterns.
 
 See the [API Reference](docs/api-reference.md) for detailed usage, configuration options, and advanced patterns. For advanced topics, see the linked docs above.
+
+## Local development
+
+1. **Clone this repository**
+2. **Run the examples**: `npm run dev`

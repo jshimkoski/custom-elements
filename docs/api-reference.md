@@ -163,7 +163,7 @@ export type CompiledTemplate<S extends ComponentState = ComponentState> = {
 ## Global Store
 
 ```typescript
-import { Store } from './lib/store';
+import { Store } from '@jasonshimmy/custom-elements-runtime';
 const globalState = new Store({ theme: 'light', count: 0 });
 globalState.subscribe((state) => { console.log('Global changed:', state.count); });
 ```
@@ -171,7 +171,7 @@ globalState.subscribe((state) => { console.log('Global changed:', state.count); 
 ## Global Event Bus
 
 ```typescript
-import { eventBus } from './lib/event-bus';
+import { eventBus } from '@jasonshimmy/custom-elements-runtime';
 eventBus.emit('my-event', { foo: 123 });
 eventBus.on('my-event', (data) => { console.log(data); });
 eventBus.off('my-event', handler);

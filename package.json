@@ -1,7 +1,7 @@
 {
-  "name": "custom-elements-runtime",
+  "name": "@jasonshimmy/custom-elements-runtime",
   "description": "A powerful, modern, and lightweight runtime for creating reactive web components with TypeScript",
-  "version": "1.0.0",
+  "version": "0.0.0",
   "type": "module",
   "keywords": [
     "web-components",
@@ -15,13 +15,13 @@
   "license": "MIT",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "tsc && vite build && tsc",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
     "coverage": "vitest run --coverage",
-    "cy": "cypress open",
-    "cy:run": "cypress run"
+    "cy": "cypress run",
+    "cy:open": "cypress open"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.6.4",
@@ -32,12 +32,21 @@
     "vite": "^7.0.4",
     "vitest": "^3.2.4"
   },
-  "main": "./src/lib/runtime.ts",
+  "main": "dist/custom-elements-runtime.cjs.js",
+  "module": "dist/custom-elements-runtime.es.js",
+  "types": "dist/runtime.d.ts",
+  "files": [
+    "dist",
+    "dist/runtime.d.ts"
+  ],
   "exports": {
-    ".": "./src/lib/runtime.ts",
-    "./event-bus": "./src/lib/event-bus.ts",
-    "./store": "./src/lib/store.ts",
-    "./template-helpers": "./src/lib/template-helpers.ts",
-    "./ssr": "./src/lib/runtime.ts"
+    ".": {
+      "import": "./dist/custom-elements-runtime.es.js",
+      "require": "./dist/custom-elements-runtime.cjs.js",
+      "default": "./dist/custom-elements-runtime.umd.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
