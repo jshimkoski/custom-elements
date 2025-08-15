@@ -1,4 +1,3 @@
-
 # Core Concepts
 
 Essential building blocks for every component. All features are strictly typed, regression-tested, and match the runtime implementation in src/lib.
@@ -55,14 +54,22 @@ template: (state, api) => `<div>Hello ${state.name}!</div>`
 - Direct DOM access without complex selectors. Use `refs` for imperative logic and event handling.
 
 ```typescript
-refs: {
-  myButton: (element, state, api) => {
-    element.addEventListener('click', () => {
-      state.clicks++;
-      api.emit('button-clicked', { clicks: state.clicks });
-    });
+import { component } from '@jasonshimmy/custom-elements-runtime';
+
+component('ref-demo', {
+  state: { clicks: 0 },
+  template: (state) => `
+    <button data-ref="myButton">Clicked: ${state.clicks} times</button>
+  `,
+  refs: {
+    myButton: (element, state, api) => {
+      element.addEventListener('click', () => {
+        state.clicks++;
+        api.emit('button-clicked', { clicks: state.clicks });
+      });
+    }
   }
-}
+});
 ```
 
 ## Event Binding
@@ -164,3 +171,28 @@ component('my-form', {
 - ...any DOM event type
 
 See the TodoApp example for advanced usage.
+
+---
+
+## Dynamic Styles
+
+- Use the `style` property to define CSS for your component.
+- `style` can be a static string or a function that returns a CSS string based on state.
+- The runtime updates the style automatically whenever state changes.
+
+**Static style example:**
+```typescript
+style: `div { color: blue; }`
+```
+
+**Dynamic style example:**
+```typescript
+style: (state) => `div { color: ${state.isActive ? 'green' : 'red'}; }`
+```
+
+### Performance Considerations
+
+- Only one <style> tag per component is updated, not the global stylesheet.
+- Dynamic style functions should be efficient; avoid heavy computations inside the style function.
+- The runtime does not diff the CSS—if the style changes, the entire <style> content is replaced.
+- Using static strings is fastest; dynamic functions are slightly slower but still performant for most use cases.

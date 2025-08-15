@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { html, compile, css, ref, on, classes, styles } from '../../src/lib/template-helpers';
+import { html, compile, css, classes, styles } from '../../src/lib/template-helpers';
 
 describe('template-helpers', () => {
   it('escapeIfUserInput should escape nested array object properties', () => {
@@ -60,18 +60,6 @@ describe('template-helpers', () => {
 
   it('css should join strings and values', () => {
     expect(css`a{color:${'red'}}`).toBe('a{color:red}');
-  });
-
-  it('ref should return a callback', () => {
-    const cb = ref((el: HTMLElement) => el.setAttribute('x', 'y'));
-    const el = document.createElement('div');
-    cb(el);
-    expect(el.getAttribute('x')).toBe('y');
-  });
-
-  it('on should return a typed handler object', () => {
-    const handler = on('click', (e, s, a) => {});
-    expect(handler).toHaveProperty('click');
   });
 
   it('classes should join truthy class names', () => {

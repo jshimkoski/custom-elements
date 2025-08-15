@@ -1,4 +1,3 @@
-
 # Custom Elements Runtime
 
 > **Ultra-lightweight, type-safe runtime for fast, reactive, and maintainable web components.**
@@ -10,7 +9,8 @@ Build modern web components with strict TypeScript, zero dependencies, and a fun
 - **Reactive State:** Automatic re-renders using ES6 Proxy; direct assignment supported. State changes trigger batched updates for performance.
 - **Attribute-State Sync:** All primitive state keys (string, number, boolean) are automatically observed as attributes and kept in sync. Parent-to-child communication is seamless.
 - **Functional Templates:** Use plain functions, tagged helpers (`html`, `compile`), or async Promises. Templates can be compiled for performance and SSR.
-- **Refs:** Direct DOM access via `refs` for imperative logic and event handling. No complex selectors required.
+- **Static & Dynamic Styling:** Define static styles in the config or use functions for dynamic styles based on state.
+- **Refs:** Direct DOM access via `data-ref` for imperative logic and event handling. No complex selectors required.
 - **Computed Properties:** Define derived, reactive values with `computed` for efficient state management.
 - **Automatic Event Binding:** Declarative, type-safe handlers via `data-on-*` attributes. Only one handler per event type per element is attached; previous handlers are removed on rerender. Handlers are defined directly on the component config.
 - **Controlled Input Sync:** Inputs with `data-model` (including checkboxes, radios, multi-checkbox groups, and modifiers) stay in sync with state. User typing always wins. VDOM patching ensures reliable event handling and focus preservation.
@@ -26,7 +26,7 @@ Build modern web components with strict TypeScript, zero dependencies, and a fun
 - **Strict TypeScript:** Type-safe, developer-friendly, zero dependencies. All APIs and configuration are strictly typed.
 - **Tree-shakable & Modular:** Import only what you use. All exports are modular and optimized for tree-shaking.
 - **Functional API:** No classes, no boilerplate. All configuration is functional and declarative.
-- **Template Helpers:** Use `html`, `compile`, `css`, `classes`, `styles`, `ref`, and `on` for efficient, type-safe template authoring.
+- **Template Helpers:** Use `html`, `compile`, `css`, `classes`, and `styles` for efficient, type-safe template authoring.
 - **Build Tools:** Integrate with Vite, Webpack, or Rollup for build-time template compilation and optimization.
 - **VDOM Utilities:** Fine-grained DOM diffing and patching for controlled inputs, event listeners, and efficient updates.
 
@@ -36,7 +36,7 @@ Build modern web components with strict TypeScript, zero dependencies, and a fun
 - Only one event handler per event type per element is attached; previous handlers are removed on rerender. Handlers must be defined on the config object.
 - Controlled input sync prioritizes user typing (focused/dirty inputs) over state updates. VDOM patching is regression-tested for reliability.
 - SSR hydration is opt-in via the `hydrate` property. If no region is marked, the entire shadow root is hydrated. SSR excludes refs, event listeners, and lifecycle hooks.
-- All user-generated content is escaped in templates using `html` and `compile` helpers. Static HTML is not escaped.
+- All user-generated content is escaped in templates using `html` and `compile` helpers. Static strings are not escaped.
 - Only features documented here and in [`src/lib/runtime.ts`](src/lib/runtime.ts) are supported. Undocumented features may not work as expected.
 - VDOM patching for controlled inputs (checkboxes, radios, etc.) is regression-tested to ensure event listeners are always attached and state updates are reliable.
 

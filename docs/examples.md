@@ -1,4 +1,3 @@
-
 # Examples
 
 Quick, readable examples for common patterns. All code matches the runtime API and is type-safe.
@@ -318,5 +317,29 @@ component<TodoAppState, TodoAppComputed>('todo-app', {
       console.log('🔄 Todo toggled:', data);
     });
   }
+});
+```
+
+---
+
+## Static Style Example
+
+```typescript
+component('static-style-example', {
+  state: {},
+  template: () => `<div>Static</div>`,
+  style: `div { color: blue; }`
+});
+```
+
+---
+
+## Dynamic Style Example
+
+```typescript
+component('dynamic-style-example', {
+  state: { active: false },
+  template: ({ active }) => `<div>${active ? 'Active' : 'Inactive'}</div>`,
+  style: (state) => `div { color: ${state.active ? 'green' : 'red'}; }`
 });
 ```
