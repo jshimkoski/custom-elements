@@ -2,7 +2,8 @@
 
 | Feature                | Custom Elements | React   | Vue     | Angular | Svelte  | Lit     |
 |------------------------|----------------|---------|---------|---------|---------|---------|
-| **Bundle Size**        | ~8KB           | ~45KB+  | ~35KB+  | ~60KB+  | ~10KB+  | ~7KB+   |
+| **Bundle Size**        | ~15KB          | ~45KB+  | ~35KB+  | ~60KB+  | ~10KB+  | ~7KB+   |
+| **Gzipped Size**       | ~5KB           | ~16KB   | ~12KB   | ~24KB   | ~4KB    | ~2.5KB  |
 | **SSR**                | Built-in, treeshakable | Yes     | Yes     | Yes     | Yes     | Yes     |
 | **TypeScript**         | Strict         | Optional| Optional| Strict  | Optional| Strict  |
 | **State Mgmt**         | Direct assignment, Store, Event Bus | Redux   | Pinia   | RxJS    | Store   | Manual  |
