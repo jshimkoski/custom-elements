@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v0.0.9-beta.2] - 2025-08-16
+
+- feat: add <router-link> component for declarative navigation and update routing documentation (1443b81)
+- fix: update router initialization to support async component loading (14cddc9)
+
+
 ## [v0.0.9-beta.1] - 2025-08-16
 
 - fix: update router initialization to support async component loading (14cddc9)
