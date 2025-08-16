@@ -1,6 +1,11 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v0.0.5] - 2025-08-16
+
+- docs: update documentation for clarity and consistency, including SSR hydration changes and code examples (0025a74)
+
+
 ## [v0.0.5-beta.0] - 2025-08-16
 
 - docs: update documentation for clarity and consistency, including SSR hydration changes and code examples (0025a74)
