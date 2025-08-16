@@ -1,16 +1,20 @@
+
 # Integrating `@jasonshimmy/custom-elements-runtime` with Other Frameworks
 
-This guide shows how to use Custom Elements built with `@jasonshimmy/custom-elements-runtime` in popular frontend frameworks. All examples are strictly typed and follow best practices for interoperability, performance, and maintainability.
+This guide shows how to use Custom Elements built with `@jasonshimmy/custom-elements-runtime` in popular frontend frameworks. All examples are strictly typed and follow best practices for interoperability, performance, and maintainability. Covers SSR, hydration, plugin system, router, stateless components, error boundaries, event bus, global store, and static site generation.
 
 ---
+
 
 ## General Principles
 - Custom Elements are natively supported in all major frameworks (React, Vue, Svelte, Angular, etc.).
 - No wrapper libraries or adapters are required; use the web standard `<my-element></my-element>` tag.
 - Pass data via attributes, properties, or events. Use the runtime's attribute-state sync and event bus for communication.
-- All features (SSR, hydration, global store, event bus) work seamlessly in any framework environment.
+- All features (SSR, hydration, global store, event bus, plugin system, router, stateless components, error boundaries) work seamlessly in any framework environment.
+- For SSR/static site generation, use runtime SSR APIs and router matching for universal rendering.
 
 ---
+
 
 ## React Integration
 
@@ -28,6 +32,10 @@ component('simple-counter', {
   template: ({ count }) => `<button data-on-click="increment">Count: ${count}</button>`,
   increment(_e, state) { state.count++; }
 });
+
+component('stateless-demo', {
+  template: () => `<div>Pure view, no state!</div>`
+});
 ```
 
 ```tsx
@@ -38,6 +46,7 @@ function App() {
       {/* Use lowercase tag names and attributes */}
       <hello-world name="React User" />
       <simple-counter />
+      <stateless-demo />
     </div>
   );
 }
@@ -50,6 +59,8 @@ export default App;
 - Always use lowercase attribute names in JSX for custom elements (e.g., `name="value"`).
 - Avoid passing objects/functions as props; use primitives and strings for attribute reflection.
 - React may warn about unknown attributes—these are safe to ignore for custom elements.
+- SSR/static site generation: use runtime SSR APIs and router matching for universal rendering.
+
 
 ## Vue Integration
 
@@ -67,6 +78,10 @@ component('simple-counter', {
   template: ({ count }) => `<button data-on-click="increment">Count: ${count}</button>`,
   increment(_e, state) { state.count++; }
 });
+
+component('stateless-demo', {
+  template: () => `<div>Pure view, no state!</div>`
+});
 ```
 
 ```vue
@@ -74,14 +89,25 @@ component('simple-counter', {
   <!-- Use custom elements directly in your template -->
   <hello-world name="Vue User" />
   <simple-counter />
+  <stateless-demo />
 </template>
 ```
 
 **Caveats:**
+- Pre-render each route to HTML using SSR APIs and router matching for instant loads and SEO.
 - Use kebab-case for custom element tags and attributes in templates.
 - Vue 2 requires `vue-custom-element` or similar plugin; Vue 3 supports custom elements natively.
 - Custom events must be listened to with `@event-name` (not `@onEventName`).
 - Avoid using v-model directly; use `data-model` and attribute reflection for two-way binding.
+
+
+## SSR, Hydration, and Router Integration
+
+- Use `renderToString`, `renderComponentsToString`, and `generateHydrationScript` for SSR and hydration in any framework.
+- Use `matchRouteSSR(routes, path)` for static site generation and universal routing.
+- Plugin system and error boundaries work across all environments.
+
+## Static Site Generation
 
 ### SSR Example: Using Custom Elements in Nuxt
 
@@ -107,7 +133,6 @@ export function renderUserCardSSR() {
 ```
 
 **Use in a Nuxt page:**
-
 ```vue
 <template>
   <div v-html="userCardHtml" />
@@ -122,7 +147,6 @@ const userCardHtml = ref(renderUserCardSSR());
 ```
 
 **Client-side hydration (Nuxt plugin):**
-
 ```typescript
 // plugins/custom-elements.client.ts
 import { component } from '@jasonshimmy/custom-elements-runtime';

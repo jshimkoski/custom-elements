@@ -25,8 +25,8 @@ const userCardConfig: SSRComponentConfig<{ name: string; email: string; avatar: 
     email: 'john@example.com',
     avatar: 'https://via.placeholder.com/80x80',
     isOnline: true
-  },
-  template: compile(({ name, email, avatar, isOnline }) => `
+    ## Complete SSR Example with Hydration, Router, and Error Boundaries
+  template: ({ name, email, avatar, isOnline }) => compile`
     <div class="user-card">
       <img src="${avatar}" alt="${name}" class="avatar" />
       <div class="info">
@@ -37,7 +37,7 @@ const userCardConfig: SSRComponentConfig<{ name: string; email: string; avatar: 
         </span>
       </div>
     </div>
-  `),
+  `({ name, email, avatar, isOnline }),
   style: css`
     .user-card { display: flex; align-items: center; padding: 1rem; border: 1px solid #e0e0e0; border-radius: 8px; background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
     .avatar { width: 60px; height: 60px; border-radius: 50%; margin-right: 1rem; }
@@ -58,7 +58,7 @@ const dashboardConfig: SSRComponentConfig<{ title: string; widgets: Array<{ id: 
       { id: 3, name: 'Orders', value: 432 }
     ]
   },
-  template: compile(({ title, widgets }) => `
+  template: ({ title, widgets }) => compile`
     <div class="dashboard">
       <h1>${title}</h1>
       <div class="widgets">
@@ -73,7 +73,7 @@ const dashboardConfig: SSRComponentConfig<{ title: string; widgets: Array<{ id: 
         Total: ${widgets.reduce((sum, w) => sum + w.value, 0).toLocaleString()}
       </div>
     </div>
-  `),
+  `({ title, widgets }),
   style: css`
     .dashboard { padding: 2rem; font-family: system-ui, sans-serif; }
     .widgets { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin: 2rem 0; }
@@ -103,6 +103,28 @@ const fullPage = `
   <title>SSR Demo</title>
   <style>
     body { margin: 0; padding: 2rem; background: #f5f5f5; font-family: system-ui, sans-serif; }
+    const routes = [
+      { path: '/', component: 'home-page' },
+      { path: '/about', component: 'about-page' }
+    ];
+
+    const homePageConfig: SSRComponentConfig<{ title: string }> = {
+      state: { title: 'Welcome Home' },
+      template: ({ title }) => compile`<h1>${title}</h1>`({ title }),
+      style: css`h1 { color: #333; }`,
+      onError: (error, state) => `<div>Error: ${error.message}</div>`
+    };
+
+    const aboutPageConfig: SSRComponentConfig<{ info: string }> = {
+      state: { info: 'About this site' },
+      template: ({ info }) => compile`<div>${info}</div>`({ info }),
+      style: css`div { font-size: 1.2rem; }`,
+      onError: (error, state) => `<div>Error: ${error.message}</div>`
+    };
+
+    const matched = matchRouteSSR(routes, '/about');
+    const html = renderToString(aboutPageConfig);
+    const hydrationScript = generateHydrationScript();
     ${styles}
   </style>
 </head>

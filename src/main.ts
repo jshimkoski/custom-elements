@@ -9,8 +9,6 @@ import './components/examples/ShoppingCart';
 import './components/examples/TemplateCompilationDemo';
 import './components/examples/SimpleTest';
 import './components/examples/DataModelDemo';
-// import './components/examples/Examples';
-// import './components/examples/NotificationSystem';
 
 // The new runtime is completely self-contained
 // Components automatically register themselves when imported

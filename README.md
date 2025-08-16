@@ -34,43 +34,34 @@ All types and interfaces are available for auto-completion and strict typing in 
 
 See the [API Reference](docs/api-reference.md) for advanced configuration, SSR, plugin system, global store, event bus, and more.
 
+
 ## ✨ Features
 
-- **Reactive State:** Automatic re-renders using ES6 Proxy; direct assignment supported. State changes trigger batched updates for performance.
-- **Attribute-State Sync:** All primitive state keys (string, number, boolean) are automatically observed as attributes and kept in sync. Parent-to-child communication is seamless.
-- **Functional Templates:** Use plain functions, tagged helpers (`html`, `compile`), or async Promises. Templates can be compiled for performance and SSR.
-- **Static & Dynamic Styling:** Define static styles in the config or use functions for dynamic styles based on state.
-- **Refs:** Direct DOM access via `data-ref` for imperative logic and event handling. No complex selectors required.
-- **Computed Properties:** Define derived, reactive values with `computed` for efficient state management.
-- **Automatic Event Binding:** Declarative, type-safe handlers via `data-on-*` attributes. Only one handler per event type per element is attached; previous handlers are removed on rerender. Handlers are defined directly on the component config.
-- **Controlled Input Sync:** Inputs with `data-model` (including checkboxes, radios, multi-checkbox groups, and modifiers) stay in sync with state. User typing always wins. VDOM patching ensures reliable event handling and focus preservation.
-- **Deep State Binding:** Use `data-bind` for two-way binding to nested or dynamic state (objects, arrays, lists). Supports dot notation and array indices for deep binding.
-- **Global Store:** Use the built-in `Store` class for global, reactive state management across components. Subscribe to changes and update state directly.
-- **Global Event Bus:** Use the built-in `eventBus` for cross-component communication. Emit, listen, and unsubscribe from global events with event storm protection.
-- **SSR & Hydration:** Universal rendering and opt-in hydration. Templates must match for hydration. SSR excludes refs, event listeners, and lifecycle hooks. Hydration is opt-in via the `hydrate` property.
-- **Error Boundaries:** Optional `onError` for fallback UI and diagnostics. Robust error handling and recovery for all lifecycle and render errors.
-- **Focus Preservation:** Inputs retain focus and selection during updates, even with rapid state changes.
-- **Smart DOM Batching:** State-triggered renders are batched using requestAnimationFrame for optimal performance.
-- **Plugin System:** Extend runtime behavior with hooks (`onInit`, `onRender`, `onError`). Plugins can be registered globally and affect all components.
-- **Debug Mode:** Enable detailed runtime logs for any component via `debug: true` in the config. Logs warnings, errors, and mutation diagnostics.
-- **Strict TypeScript:** Type-safe, developer-friendly, zero dependencies. All APIs and configuration are strictly typed.
-- **Tree-shakable & Modular:** Import only what you use. All exports are modular and optimized for tree-shaking.
-- **Functional API:** No classes, no boilerplate. All configuration is functional and declarative.
-- **Template Helpers:** Use `html`, `compile`, `css`, `classes`, and `styles` for efficient, type-safe template authoring.
-- **Build Tools:** Integrate with Vite, Webpack, or Rollup for build-time template compilation and optimization.
-- **VDOM Utilities:** Fine-grained DOM diffing and patching for controlled inputs, event listeners, and efficient updates.
+- **Stateless & Stateful Components:** Define components with or without state for maximum flexibility and performance.
+- **Reactive State & Attribute Sync:** Automatic re-renders and attribute reflection for primitive keys. Direct assignment triggers batched updates.
+- **Functional Templates & Styling:** Use functions, tagged helpers (`html`, `compile`), or async Promises. Supports static and dynamic styles.
+- **Refs & Computed Properties:** Direct DOM access via `data-ref` and derived state with `computed`.
+- **Declarative Event & Input Binding:** Use `data-on-*`, `data-model`, and `data-bind` for type-safe event and input sync, including deep and nested state.
+- **Global Store & Event Bus:** Built-in reactive store and event bus for cross-component state and communication.
+- **SSR & Hydration:** Universal rendering, opt-in hydration, and template matching. SSR excludes refs, event listeners, and lifecycle hooks.
+- **Error Boundaries & Focus Preservation:** Robust error handling and input focus retention during updates.
+- **Plugin System:** Extend runtime with hooks (`onInit`, `onRender`, `onError`) for global/component logic.
+- **Router:** Lightweight, functional router with SSR/static site support, `<router-view>`, route params, and programmatic navigation.
+- **Performance & Modularity:** Smart DOM batching, tree-shakable exports, strict TypeScript, and modular functional API.
 
 ### Limitations & Edge Cases
 
-- Templates must have a single root node. Fragment templates are supported, but reconciliation is strict and positional; use keys for robust updates.
-- Only one event handler per event type per element is attached; previous handlers are removed on rerender. Handlers must be defined on the config object.
-- Controlled input sync prioritizes user typing (focused/dirty inputs) over state updates. VDOM patching is regression-tested for reliability.
-- SSR hydration is opt-in via the `hydrate` property. If no region is marked, the entire shadow root is hydrated. SSR excludes refs, event listeners, and lifecycle hooks.
-- All user-generated content is escaped in templates using `html` and `compile` helpers. Static strings are not escaped.
-- Only features documented here and in [`src/lib/runtime.ts`](src/lib/runtime.ts) are supported. Undocumented features may not work as expected.
-- VDOM patching for controlled inputs (checkboxes, radios, etc.) is regression-tested to ensure event listeners are always attached and state updates are reliable.
+- Templates require a single root node. Fragments are supported, but strict reconciliation and keys are recommended for robust updates.
+- Only one event handler per event type per element; handlers must be defined on the config object.
+- Controlled input sync always prioritizes user typing over state updates.
+- SSR hydration is opt-in via `hydrate`; refs, event listeners, and lifecycle hooks are excluded during SSR.
+- User-generated content is escaped in templates using `html` and `compile` helpers.
+- Only documented features are supported; undocumented features may not work as expected.
+- Plugin system hooks must be pure and side-effect free for best results.
+- Router requires template matching for SSR hydration; navigation is programmatic and declarative.
 
-## 🎯 Use Cases
+
+## � Use Cases
 
 - **Micro-frontends**: Lightweight, isolated components
 - **Progressive Enhancement**: Add reactivity to existing sites
@@ -78,15 +69,18 @@ See the [API Reference](docs/api-reference.md) for advanced configuration, SSR, 
 - **SSR Applications**: Universal rendering with hydration
 - **Performance-Critical Apps**: When bundle size matters
 - **Web Standards**: Future-proof, standards-based development
+- **Static Site Generation**: Pre-render routes for instant loads and SEO
+- **Plugin-driven Architectures**: Extend runtime with custom hooks
+
 
 ## 🖥️ SSR Highlights
 
-- **Universal Rendering:** Generate fast, standards-compliant HTML and CSS on the server for instant page loads and SEO.
-- **Opt-in Hydration:** Hydrate only the regions you need with `hydrate` for efficient client-side interactivity.
-- **Template Matching:** Hydration requires the client bundle to match the server-rendered markup and state for seamless transitions.
-- **Fragment & Keyed Templates:** Supports fragments and keyed nodes for robust SSR reconciliation.
-- **Error Boundaries:** SSR supports error boundaries for graceful fallback UI and diagnostics.
-- **Strict SSR Compliance:** Lifecycle hooks and refs are excluded during SSR for predictable, side-effect-free rendering.
+- **Universal Rendering & SEO:** Fast, standards-compliant HTML/CSS for instant loads and search optimization.
+- **Opt-in Hydration:** Hydrate only needed regions for efficient interactivity; templates must match for seamless transitions.
+- **Fragment & Keyed Templates:** Robust reconciliation for fragments and keyed nodes.
+- **Error Boundaries & Compliance:** Graceful fallback UI; lifecycle hooks and refs excluded for predictable SSR.
+- **SSR Router Support:** Match routes server-side for static site generation and universal rendering.
+
 
 ## 🛡️ Production-Readiness
 
@@ -94,16 +88,27 @@ See the [API Reference](docs/api-reference.md) for advanced configuration, SSR, 
 - Early returns, guard clauses, custom error types
 - No external dependencies
 - Manual input validation and error handling
+- Deep sanitization of user-generated content
+- Regression-tested features and API
+
 
 ## ⚡ Performance Features
 
-- **Batched Updates**: Multiple state changes are batched using RAF
-- **Template & Computed Property Caching**: Expensive calculations are cached
-- **Memory Management**: Automatic cleanup prevents memory leaks
-- **Focus Preservation**: Smart input focus handling during updates
-- **Fine-grained DOM diffing**: Only changed DOM nodes are updated, not replaced, for optimal performance and UX
-- **Async rendering**: Supports Promises in templates for async data and UI
-- **Selective hydration**: Hydrate only regions marked with `data-hydrate` for efficient SSR
+- Smart DOM batching and minimal re-renders
+- Tree-shakable exports for optimal bundle size
+- Modular functional API for code splitting
+- Zero dependencies for maximum speed
+- SSR and static site generation for instant loads
+- Input focus and selection preservation
+- Efficient attribute-state sync and event handling
+
+---
+
+- **Batched Updates & Caching:** State changes are batched (RAF); templates and computed properties are cached for speed.
+- **Memory Management:** Automatic cleanup prevents leaks.
+- **Focus & DOM Efficiency:** Input focus is preserved; only changed DOM nodes are updated for optimal UX.
+- **Async & Selective Rendering:** Promises supported in templates; hydrate only marked regions for efficient SSR.
+
 
 ## 📚 Documentation
 
@@ -113,6 +118,7 @@ See the [API Reference](docs/api-reference.md) for advanced configuration, SSR, 
 - [Advanced Use Cases](docs/advanced-use-cases.md): Patterns for event bus, store, plugin system, async templates, error boundaries, SSR, VDOM.
 - [Form Input Bindings](docs/form-input-bindings.md): All supported input types, modifiers, deep binding, edge cases, VDOM patching.
 - [SSR Guide](docs/ssr.md): SSR, hydration, limitations, API.
+- [Routing](docs/routing.md): Lightweight, functional router with SSR/static site support.
 - [Framework Comparison](docs/framework-comparison.md): Unique features, tradeoffs, strengths, and when to choose each approach.
 - [Framework Integration](docs/framework-integration.md): Using with React, Vue, Angular, Svelte, and Lit.
 - [Examples](docs/examples.md): Concise, accurate code for all features and patterns.

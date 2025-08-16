@@ -2,7 +2,7 @@
 // Usage example
 // import { Store } from './lib/store';
 
-// export const globalState = new Store({ theme: 'light', count: 0 });
+// export const globalState = Store({ theme: 'light', count: 0 });
 
 // // In a component
 // globalState.subscribe((state) => {
@@ -12,30 +12,28 @@
 // src/lib/store.ts
 type Listener<T> = (state: T) => void;
 
-export class Store<T extends object> {
-  private state: T;
-  private listeners: Listener<T>[] = [];
+export function Store<T extends object>(initial: T) {
+  let state = new Proxy(initial, {
+    set: (target, prop, value) => {
+      (target as any)[prop] = value;
+      notify();
+      return true;
+    }
+  });
+  const listeners: Listener<T>[] = [];
 
-  constructor(initial: T) {
-    this.state = new Proxy(initial, {
-      set: (target, prop, value) => {
-        (target as any)[prop] = value;
-        this.notify();
-        return true;
-      }
-    });
+  function subscribe(listener: Listener<T>) {
+    listeners.push(listener);
+    listener(state); // Initial call
   }
 
-  subscribe(listener: Listener<T>) {
-    this.listeners.push(listener);
-    listener(this.state); // Initial call
+  function getState(): T {
+    return state;
   }
 
-  getState(): T {
-    return this.state;
+  function notify() {
+    listeners.forEach((fn) => fn(state));
   }
 
-  private notify() {
-    this.listeners.forEach((fn) => fn(this.state));
-  }
+  return { subscribe, getState };
 }

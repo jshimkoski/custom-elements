@@ -92,6 +92,10 @@ export { compileTemplate, renderCompiledTemplate, updateCompiledTemplate } from 
 export { mountVNode, patchVNode, createVNodeFromElement, parseVNodeFromHTML, safeReplaceChild, getVNodeKey } from './v-dom';
 export type { VNode } from './v-dom';
 
+// Router API
+export { initRouter, useRouter, matchRouteSSR } from './router';
+export type { RouterConfig, RouteState } from './router';
+
 
 // ============================================================================
 // Imports
@@ -1250,3 +1254,19 @@ export function component<S extends ComponentState, C extends Record<string, any
       });
     }
 }
+
+/**
+ * Router view component (used by router)
+ */
+component('router-view', {
+  template: (_state, _api) => {
+    // Find the router instance (singleton pattern)
+    const router = (window as any).__routerInstance;
+    if (!router) return '<div>Router not initialized.</div>';
+    const { path } = router.getCurrent();
+    const match = router.matchRoute(path);
+    if (!match.route) return '<div>Not found</div>';
+    // Render the matched component
+    return `<${match.route.component}></${match.route.component}>`;
+  }
+});
