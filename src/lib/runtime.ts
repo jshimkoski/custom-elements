@@ -93,7 +93,7 @@ export { mountVNode, patchVNode, createVNodeFromElement, parseVNodeFromHTML, saf
 export type { VNode } from './v-dom';
 
 // Router API
-export { initRouter, useRouter, matchRouteSSR, resolveRouteComponent } from './router';
+export { useRouter, matchRouteSSR, resolveRouteComponent } from './router';
 export type { Route, RouterConfig, RouteState } from './router';
 
 
@@ -106,8 +106,10 @@ import { eventBus } from './event-bus';
 import { renderCompiledTemplate, updateCompiledTemplate } from './template-compiler';
 import { useDataModel } from './data-binding';
 import { mountVNode, patchVNode, parseVNodeFromHTML } from './v-dom';
+import { useRouter } from './router';
 import type { VNode } from './v-dom';
 import type { CompiledTemplate } from './template-compiler';
+import type { RouteState, RouterConfig } from './router';
 
 
 // ============================================================================
@@ -1256,17 +1258,23 @@ export function component<S extends ComponentState, C extends Record<string, any
 }
 
 /**
- * Router view component (used by router)
+ * Singleton router instance for global access.
+ * 
+ * Define here to prevent circular dependency
+ * issue with component.
  */
-component('router-view', {
-  template: (_state, _api) => {
-    // Find the router instance (singleton pattern)
-    const router = (window as any).__routerInstance;
-    if (!router) return '<div>Router not initialized.</div>';
-    const { path } = router.getCurrent();
-    const match = router.matchRoute(path);
-    if (!match.route) return '<div>Not found</div>';
-    // Render the matched component
-    return `<${match.route.component}></${match.route.component}>`;
-  }
-});
+export function initRouter(config: RouterConfig) {
+  const router = useRouter(config);
+  component('router-view', {
+    template: (_state, _api) => {
+      if (!router) return '<div>Router not initialized.</div>';
+      const current = router.getCurrent() as RouteState;
+      const { path } = current;
+      const match = router.matchRoute(path);
+      if (!match.route) return '<div>Not found</div>';
+      // Render the matched component
+      return `<${match.route.component}></${match.route.component}>`;
+    }
+  });
+  return router;
+}

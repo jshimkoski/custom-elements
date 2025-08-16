@@ -144,16 +144,6 @@ export function useRouter(config: RouterConfig) {
   };
 }
 
-// Singleton router instance for global access
-
-export function initRouter(config: RouterConfig) {
-  const router = useRouter(config);
-  if (typeof window !== 'undefined') {
-    (window as any).__routerInstance = router;
-  }
-  return router;
-}
-
 // SSR/static site support: match route for a given path
 export function matchRouteSSR(routes: Route[], path: string) {
   return matchRoute(routes, path);
