@@ -6,17 +6,18 @@ A lightweight, scalable router designed for seamless integration with Custom Ele
 
 ## Features
 
-- Declarative route definitions  
+- Declarative route definitions
 - Functional API: pure functions, no classes  
-- Reactive route state via Store  
-- `<router-view>` custom element renders matched components  
-- Programmatic navigation: `push`, `replace`, `back`  
-- Route params and query support  
-- SSR and static site compatible  
-- Zero dependencies  
-- Supports stateless and stateful components  
-- Plugin system and error boundaries supported  
-- Event bus and global store integration  
+- Reactive route state via Store
+- `<router-view>` custom element renders matched components
+- Programmatic navigation: `push`, `replace`, `back`
+- Route params and query support
+- SSR and static site compatible
+- Zero dependencies
+- Supports stateless and stateful components
+- Plugin system and error boundaries supported
+- Event bus and global store integration
+- Asynchronous component loading via dynamic import
 
 ---
 
@@ -24,11 +25,23 @@ A lightweight, scalable router designed for seamless integration with Custom Ele
 
 ### Define Routes
 
+#### Synchronous Component Example
+
 ```typescript
 const routes = [
   { path: '/', component: 'home-page' },
   { path: '/about', component: 'about-page' },
   { path: '/user/:id', component: 'user-page' }
+];
+```
+
+#### Asynchronous Component Example
+
+```typescript
+const routes = [
+  { path: '/', load: () => import('./home-page') },
+  { path: '/about', load: () => import('./about-page') },
+  { path: '/user/:id', load: () => import('./user-page') }
 ];
 ```
 
