@@ -1,33 +1,29 @@
+# 🎛️ Form Input Bindings
 
-# Form Input Bindings in Custom Elements Runtime
-
-This document describes all supported ways to use form input bindings in the custom-elements runtime (`runtime.ts`).
-
----
-
-
-## Overview
-
-Form input bindings allow you to declaratively connect HTML form controls (input, textarea, select, etc.) to your component's reactive state. The runtime automatically synchronizes values, handles user input, and supports advanced features like modifiers, multi-checkbox groups, deep binding, stateless components, plugin system, SSR, error boundaries, and global store integration.
+Declaratively connect form elements to component state with automatic syncing, modifiers, and advanced features.
 
 ---
 
+## 🚀 Overview
 
-## Supported Input Types
+Form input bindings link HTML inputs (`input`, `textarea`, `select`, etc.) to your component’s reactive `state`. The runtime keeps everything in sync, supports modifiers, nested binding, multi-checkbox arrays, SSR, plugin integration, error boundaries, and more.
+
+---
+
+## ✅ Supported Input Types
 
 - `<input type="text">`
 - `<input type="number">`
-- `<input type="checkbox">` (single and multi-checkbox group)
-- `<input type="radio">` (radio group)
+- `<input type="checkbox">` (single + multi-group)
+- `<input type="radio">`
 - `<textarea>`
 - `<select>`
 
 ---
 
+## 🔗 Basic Binding
 
-## Basic Usage
-
-Bind an input to a state property using the `data-model` attribute:
+Use `data-model` to bind inputs to state:
 
 ```html
 <input type="text" data-model="message" />
@@ -38,8 +34,7 @@ Bind an input to a state property using the `data-model` attribute:
 </select>
 ```
 
-**State Example:**
-```typescript
+```ts
 state: {
   message: '',
   description: '',
@@ -49,22 +44,16 @@ state: {
 
 ---
 
+## 🧪 Modifiers
 
-## Modifiers
+Use `|trim` or `|number` to preprocess input:
 
-Modifiers can be added to `data-model` using the pipe (`|`) syntax:
-
-- `trim`: Trims whitespace from string input
-- `number`: Converts input value to a number
-
-**Example:**
 ```html
-<input type="text" data-model="amount|number" />
-<input type="text" data-model="username|trim" />
+<input data-model="amount|number" />
+<input data-model="username|trim" />
 ```
 
-**State Example:**
-```typescript
+```ts
 state: {
   amount: 0,
   username: ''
@@ -73,68 +62,21 @@ state: {
 
 ---
 
-
-## Checkbox Bindings
-
-### Single Checkbox
+## ☑️ Single Checkbox
 
 ```html
 <input type="checkbox" data-model="accepted" />
 ```
 
-**State Example:**
-
-## Deep Binding with `data-bind`
-
-Bind to nested state objects or arrays using dot notation or array indices:
-
-```html
-<input type="text" data-bind="user.address.street" />
-<input type="checkbox" data-bind="items[0].checked" />
-```
-
-**State Example:**
-```typescript
+```ts
 state: {
-  user: { address: { street: '' } },
-  items: [{ checked: false }]
+  accepted: false
 }
 ```
 
-## Plugin System, SSR, and Error Boundaries
+---
 
-- Input binding works with plugin system hooks (`onInit`, `onRender`, `onError`).
-- SSR: Input bindings are excluded from SSR output; hydration restores input sync.
-- Error boundaries: Use `onError` for fallback UI and diagnostics during input sync.
-
-## Global Store & Event Bus Integration
-
-- Use input bindings with global store and event bus for cross-component state and communication.
-
-## Edge Cases & Best Practices
-
-- Controlled input sync always prioritizes user typing over state updates.
-- Only one event handler per event type per element; handlers must be defined on the config object.
-- Use stateless components for pure view/input scenarios.
-- SSR hydration is opt-in; input bindings are restored on hydration.
-
-#### True/False values
-
-```html
-<input
-  type="checkbox"
-  data-model="accepted"
-  data-true-value="yes"
-  data-false-value="no"
->
-```
-
-`data-true-value` and `data-false-value` are attributes that only work with data-model.
-
-- When checked, state is set to `yes`.
-- When unchecked, state is set to `no`.
-
-### Multi-Checkbox Group (Array)
+## 🔁 Multi-Checkbox Group
 
 ```html
 <input type="checkbox" value="apple" data-model="fruits" />
@@ -142,19 +84,18 @@ state: {
 <input type="checkbox" value="cherry" data-model="fruits" />
 ```
 
-**State Example:**
-```typescript
+```ts
 state: {
   fruits: [] // e.g. ['apple', 'banana']
 }
 ```
 
-- When checked, value is added to the array.
-- When unchecked, value is removed from the array.
+- Checked: value added to array
+- Unchecked: value removed
 
 ---
 
-## Radio Group Bindings
+## 🔘 Radio Group
 
 ```html
 <input type="radio" name="color" value="red" data-model="favoriteColor" />
@@ -162,27 +103,24 @@ state: {
 <input type="radio" name="color" value="green" data-model="favoriteColor" />
 ```
 
-**State Example:**
-```typescript
+```ts
 state: {
   favoriteColor: 'red'
 }
 ```
 
-- Only one radio can be selected at a time.
-- State is set to the value of the selected radio.
-- All radios in the group must share the same `name` and `data-model`.
+- Radios must share `name` and `data-model`
+- State reflects the selected value
 
 ---
 
-## Textarea Bindings
+## ✍️ Textarea
 
 ```html
 <textarea data-model="notes"></textarea>
 ```
 
-**State Example:**
-```typescript
+```ts
 state: {
   notes: ''
 }
@@ -190,7 +128,7 @@ state: {
 
 ---
 
-## Select Bindings
+## 📤 Select
 
 ```html
 <select data-model="selected">
@@ -199,8 +137,7 @@ state: {
 </select>
 ```
 
-**State Example:**
-```typescript
+```ts
 state: {
   selected: 'a'
 }
@@ -208,24 +145,65 @@ state: {
 
 ---
 
-## Event Handling and Sync
+## 🧬 Deep Binding
 
-- The runtime automatically attaches listeners for `input`, `change`, `keydown`, and `blur` events.
-- Controlled inputs are only updated if not focused or dirty (user is not typing).
-- For radios and checkboxes, the runtime ensures the `checked` property matches the state after every update.
-- For multi-checkbox groups, the runtime checks if the value is present in the array.
+Use `data-bind` for nested properties or arrays:
+
+```html
+<input data-bind="user.address.street" />
+<input type="checkbox" data-bind="items[0].checked" />
+```
+
+```ts
+state: {
+  user: { address: { street: '' } },
+  items: [{ checked: false }]
+}
+```
 
 ---
 
-## Advanced: VNode Keying and Data UID
+## ✅ True/False Value Mapping
 
-- Inputs with `data-model` are assigned a stable `data-uid` attribute for VDOM reconciliation.
-- For radios and checkboxes, the key is `model:value` (e.g., `favoriteColor:red`).
-- For other inputs, the key is the model name (e.g., `message`).
+```html
+<input
+  type="checkbox"
+  data-model="accepted"
+  data-true-value="yes"
+  data-false-value="no"
+/>
+```
+
+```ts
+state: {
+  accepted: 'yes' | 'no'
+}
+```
+
+- When checked: `'yes'`
+- When unchecked: `'no'`
 
 ---
 
-## Full Example
+## 🔄 Event Handling & Sync
+
+- Events handled: `input`, `change`, `keydown`, `blur`
+- Inputs update state unless focused (to preserve user typing)
+- Radios/checkboxes keep `checked` in sync with state
+- Multi-checkbox checks if value is in array
+
+---
+
+## ⚙️ Integration Support
+
+- ✅ Plugin system: `onInit`, `onRender`, `onError`
+- ✅ SSR: Inputs excluded from SSR; hydration restores state
+- ✅ Error boundaries: Use `onError` for fallback rendering
+- ✅ Global store & event bus: Full compatibility
+
+---
+
+## 🧪 Full Example
 
 ```html
 <form>
@@ -243,8 +221,7 @@ state: {
 </form>
 ```
 
-**State Example:**
-```typescript
+```ts
 state: {
   username: '',
   age: 0,
@@ -257,25 +234,26 @@ state: {
 
 ---
 
-## Notes
+## 💡 Tips & Best Practices
 
-- Always use `data-model` for binding; do not use `name` for state.
-- Modifiers are optional and can be combined (e.g., `data-model="amount|number|trim"`).
-- For multi-checkbox groups, initialize state as an array.
-- The runtime automatically syncs DOM and state after every update.
-
----
-
-## Troubleshooting
-
-- If an input is not updating, check that the state property exists and matches the model name.
-- For radio groups, ensure all radios share the same `name` and `data-model`.
-- For checkboxes, ensure each has a unique `value`.
-- If you see unexpected behavior, check the browser console for debug logs.
+- Always use `data-model` (not `name`) for state binding
+- Combine modifiers as needed (e.g. `data-model="amount|trim|number"`)
+- Multi-checkbox state must be an array
+- Stateless components can still bind to inputs
+- SSR hydration is opt-in—bindings restore on hydrate
 
 ---
 
-## References
+## 🛠️ Troubleshooting
 
-- See `runtime.ts` for implementation details.
-- All examples above are accurate to the current runtime behavior.
+- Input not syncing? Check that the state key exists and matches the model
+- Radios: must share `name` + `data-model`
+- Checkboxes: must have unique `value`
+- Debug logs in browser console can help
+
+---
+
+## 📚 References
+
+- See `runtime.ts` for implementation
+- Examples reflect current runtime behavior

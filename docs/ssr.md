@@ -1,31 +1,32 @@
-# 🌐 Server-Side Rendering (SSR)
+# 🌐 SSR Guide
 
 ## SSR Support
 
 - Use `renderToString`, `renderComponentsToString`, and `generateHydrationScript` for server-side rendering and hydration.
-- Hydration is opt-in via the `data-hydrate` property in your component config. If no region is marked, the entire shadow root is hydrated.
-- SSR templates must match client templates for correct hydration.
+- Hydration is opt-in via `data-hydrate` in your component config. Without it, the whole shadow root hydrates.
+- Ensure SSR templates match client templates for smooth hydration.
 
-## Complete SSR example with hydration (using helpers):
+## Complete SSR Example with Hydration
 
 ```typescript
-// server-example.js (or .ts)
 import {
   renderToString,
   renderComponentsToString,
   generateHydrationScript,
   compile,
   css,
-  type SSRComponentConfig
+  type SSRComponentConfig,
+  matchRouteSSR
 } from '@jasonshimmy/custom-elements-runtime';
 
+// User Card Component
 const userCardConfig: SSRComponentConfig<{ name: string; email: string; avatar: string; isOnline: boolean }> = {
   state: {
     name: 'John Doe',
     email: 'john@example.com',
     avatar: 'https://via.placeholder.com/80x80',
     isOnline: true
-    ## Complete SSR Example with Hydration, Router, and Error Boundaries
+  },
   template: ({ name, email, avatar, isOnline }) => compile`
     <div class="user-card">
       <img src="${avatar}" alt="${name}" class="avatar" />
@@ -49,6 +50,7 @@ const userCardConfig: SSRComponentConfig<{ name: string; email: string; avatar: 
   `
 };
 
+// Dashboard Component
 const dashboardConfig: SSRComponentConfig<{ title: string; widgets: Array<{ id: number; name: string; value: number }> }> = {
   state: {
     title: 'Analytics Dashboard',
@@ -84,48 +86,25 @@ const dashboardConfig: SSRComponentConfig<{ title: string; widgets: Array<{ id: 
   `
 };
 
-const { html, styles, context } = renderComponentsToString([
-  userCardConfig,
-  dashboardConfig
-], {
+// Render components to HTML string
+const { html, context } = renderComponentsToString([userCardConfig, dashboardConfig], {
   includeStyles: false,
   prettyPrint: true
 });
 
+// Generate hydration script for client
 const hydrationScript = generateHydrationScript(context);
 
+// Full HTML page
 const fullPage = `
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>SSR Demo</title>
   <style>
     body { margin: 0; padding: 2rem; background: #f5f5f5; font-family: system-ui, sans-serif; }
-    const routes = [
-      { path: '/', component: 'home-page' },
-      { path: '/about', component: 'about-page' }
-    ];
-
-    const homePageConfig: SSRComponentConfig<{ title: string }> = {
-      state: { title: 'Welcome Home' },
-      template: ({ title }) => compile`<h1>${title}</h1>`({ title }),
-      style: css`h1 { color: #333; }`,
-      onError: (error, state) => `<div>Error: ${error.message}</div>`
-    };
-
-    const aboutPageConfig: SSRComponentConfig<{ info: string }> = {
-      state: { info: 'About this site' },
-      template: ({ info }) => compile`<div>${info}</div>`({ info }),
-      style: css`div { font-size: 1.2rem; }`,
-      onError: (error, state) => `<div>Error: ${error.message}</div>`
-    };
-
-    const matched = matchRouteSSR(routes, '/about');
-    const html = renderToString(aboutPageConfig);
-    const hydrationScript = generateHydrationScript();
-    ${styles}
   </style>
 </head>
 <body>
@@ -133,7 +112,6 @@ const fullPage = `
   ${html}
   <!-- Hydration script for client-side takeover -->
   ${hydrationScript}
-  <!-- Your client-side JavaScript -->
   <script type="module" src="/main.js"></script>
 </body>
 </html>
@@ -144,4 +122,3 @@ export function handleSSR(req: any, res: any) {
   res.setHeader('Content-Type', 'text/html');
   res.send(fullPage);
 }
-```

@@ -1,5 +1,5 @@
 
-# Integrating `@jasonshimmy/custom-elements-runtime` with Other Frameworks
+# 🔗 Framework Integration
 
 This guide shows how to use Custom Elements built with `@jasonshimmy/custom-elements-runtime` in popular frontend frameworks.
 
@@ -7,6 +7,7 @@ This guide shows how to use Custom Elements built with `@jasonshimmy/custom-elem
 
 
 ## General Principles
+
 - Custom Elements are natively supported in all major frameworks (React, Vue, Svelte, Angular, etc.).
 - No wrapper libraries or adapters are required; use the web standard `<my-element></my-element>` tag.
 - Pass data via attributes, properties, or events. Use the runtime's attribute-state sync and event bus for communication.
@@ -100,14 +101,6 @@ component('stateless-demo', {
 - Custom events must be listened to with `@event-name` (not `@onEventName`).
 - Avoid using v-model directly; use `data-model` and attribute reflection for two-way binding.
 
-
-## SSR, Hydration, and Router Integration
-
-- Use `renderToString`, `renderComponentsToString`, and `generateHydrationScript` for SSR and hydration in any framework.
-- Use `matchRouteSSR(routes, path)` for static site generation and universal routing.
-- Plugin system and error boundaries work across all environments.
-
-## Static Site Generation
 
 ### SSR Example: Using Custom Elements in Nuxt
 

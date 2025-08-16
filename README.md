@@ -1,20 +1,22 @@
 # 🧩 Custom Elements Runtime
 
-> **Ultra-lightweight, type-safe runtime for fast, reactive, and maintainable web components.**
+> **Ultra-light, type-safe runtime for fast, reactive web components.**
 
-Build modern web components with strict TypeScript, zero dependencies, and a functional API. Designed for performance, standards compliance, and developer productivity.
+Build modern components with strict TypeScript, zero dependencies, and a clean functional API. Designed for speed, standards compliance, and productivity.
 
-## 🚀 Getting Started
+---
+
+## 🚀 Quick Start
 
 ### Install
 
-```bash
+```
 npm install @jasonshimmy/custom-elements-runtime
 ```
 
-### Import and use in your project
+### Example Usage
 
-```typescript
+```ts
 import { component, html } from '@jasonshimmy/custom-elements-runtime';
 
 component('my-counter', {
@@ -26,107 +28,102 @@ component('my-counter', {
 });
 ```
 
-### TypeScript support
+No config needed — TypeScript support is built-in.
 
-All types and interfaces are available for auto-completion and strict typing in code editors. No extra configuration is needed.
-
-### Advanced usage
-
-See the [API Reference](docs/api-reference.md) for advanced configuration, SSR, plugin system, global store, event bus, and more.
-
-
-## ✨ Features
-
-- **Stateless & Stateful Components:** Define components with or without state for maximum flexibility and performance.
-- **Reactive State & Attribute Sync:** Automatic re-renders and attribute reflection for primitive keys. Direct assignment triggers batched updates.
-- **Functional Templates & Styling:** Use functions, tagged helpers (`html`, `compile`), or async Promises. Supports static and dynamic styles.
-- **Refs & Computed Properties:** Direct DOM access via `data-ref` and derived state with `computed`.
-- **Declarative Event & Input Binding:** Use `data-on-*`, `data-model`, and `data-bind` for type-safe event and input sync, including deep and nested state.
-- **Global Store & Event Bus:** Built-in reactive store and event bus for cross-component state and communication.
-- **SSR & Hydration:** Universal rendering, opt-in hydration, and template matching. SSR excludes refs, event listeners, and lifecycle hooks.
-- **Error Boundaries & Focus Preservation:** Robust error handling and input focus retention during updates.
-- **Plugin System:** Extend runtime with hooks (`onInit`, `onRender`, `onError`) for global/component logic.
-- **Router:** Lightweight, functional router with SSR/static site support, `<router-view>`, route params, and programmatic navigation.
-- **Performance & Modularity:** Smart DOM batching, tree-shakable exports, strict TypeScript, and modular functional API.
-
-### Limitations & Edge Cases
-
-- Templates require a single root node. Fragments are supported, but strict reconciliation and keys are recommended for robust updates.
-- Only one event handler per event type per element; handlers must be defined on the config object.
-- Controlled input sync always prioritizes user typing over state updates.
-- SSR hydration is opt-in via `data-hydrate`; refs, event listeners, and lifecycle hooks are excluded during SSR.
-- User-generated content is escaped in templates using `html` and `compile` helpers.
-- Only documented features are supported; undocumented features may not work as expected.
-- Plugin system hooks must be pure and side-effect free for best results.
-- Router requires template matching for SSR hydration; navigation is programmatic and declarative.
-
-
-## � Use Cases
-
-- **Micro-frontends**: Lightweight, isolated components
-- **Progressive Enhancement**: Add reactivity to existing sites
-- **Design Systems**: Reusable component libraries
-- **SSR Applications**: Universal rendering with hydration
-- **Performance-Critical Apps**: When bundle size matters
-- **Web Standards**: Future-proof, standards-based development
-- **Static Site Generation**: Pre-render routes for instant loads and SEO
-- **Plugin-driven Architectures**: Extend runtime with custom hooks
-
-
-## 🖥️ SSR Highlights
-
-- **Universal Rendering & SEO:** Fast, standards-compliant HTML/CSS for instant loads and search optimization.
-- **Opt-in Hydration:** Hydrate only needed regions for efficient interactivity; templates must match for seamless transitions.
-- **Fragment & Keyed Templates:** Robust reconciliation for fragments and keyed nodes.
-- **Error Boundaries & Compliance:** Graceful fallback UI; lifecycle hooks and refs excluded for predictable SSR.
-- **SSR Router Support:** Match routes server-side for static site generation and universal rendering.
-
-
-## 🛡️ Production-Readiness
-
-- Strict TypeScript, modular structure
-- Early returns, guard clauses, custom error types
-- No external dependencies
-- Manual input validation and error handling
-- Deep sanitization of user-generated content
-- Regression-tested features and API
-
-
-## ⚡ Performance Features
-
-- Smart DOM batching and minimal re-renders
-- Tree-shakable exports for optimal bundle size
-- Modular functional API for code splitting
-- Zero dependencies for maximum speed
-- SSR and static site generation for instant loads
-- Input focus and selection preservation
-- Efficient attribute-state sync and event handling
+👉 Explore [Advanced Usage](docs/api-reference.md)
 
 ---
 
-- **Batched Updates & Caching:** State changes are batched (RAF); templates and computed properties are cached for speed.
-- **Memory Management:** Automatic cleanup prevents leaks.
-- **Focus & DOM Efficiency:** Input focus is preserved; only changed DOM nodes are updated for optimal UX.
-- **Async & Selective Rendering:** Promises supported in templates; hydrate only marked regions for efficient SSR.
+## ✨ Why Use It?
 
+- **Stateful or Stateless:** Flexible components with or without internal state  
+- **Reactive & Declarative:** Auto updates, attribute sync, and data binding  
+- **Functional Templates:** Tagged helpers (`html`, `compile`), Promises, and styles  
+- **Refs & Computed:** Access elements or create derived state easily  
+- **Built-in Store & Events:** Global state and event bus included  
+- **SSR & Hydration:** Universal rendering with opt-in hydration  
+- **Error Handling & Focus Retention:** Smooth updates without breaking UX  
+- **Plugin System:** Hooks like `onInit`, `onRender`, `onError`  
+- **Lightweight Router:** SSR-ready with `<router-view>` and programmatic navigation  
+- **Tiny & Fast:** Tree-shakable, modular, no dependencies  
 
-## 📚 Documentation
+---
 
-- [Advanced Use Cases](docs/advanced-use-cases.md): Patterns for event bus, store, plugin system, async templates, error boundaries, SSR, VDOM.
-- [API Reference](docs/api-reference.md): All runtime exports, configuration options, and advanced patterns.
-- [Core Concepts](docs/core-concepts.md): State, attribute sync, event binding, input binding, global store, event bus, lifecycle, error boundaries, SSR, plugin system.
-- [Data Model vs Data Bind](docs/data-model-vs-data-bind.md): Comparison, use cases, modifiers, deep binding, edge cases.
-- [Examples](docs/examples.md): Concise, accurate code for all features and patterns.
-- [Form Input Bindings](docs/form-input-bindings.md): All supported input types, modifiers, deep binding, edge cases, VDOM patching.
-- [Framework Comparison](docs/framework-comparison.md): Unique features, tradeoffs, strengths, and when to choose each approach.
-- [Framework Integration](docs/framework-integration.md): Using with React, Vue, Angular, Svelte, and Lit.
-- [Routing](docs/routing.md): Lightweight, functional router with SSR/static site support.
-- [SSR](docs/ssr.md): SSR, hydration, limitations, API.
+## ⚠️ Things to Know
 
+- Templates need a single root node (fragments allowed with keys)  
+- One handler per event type per element  
+- User input takes priority over programmatic changes  
+- SSR hydration is opt-in (`data-hydrate`)  
+- Only documented features are officially supported  
+- Plugins must be pure and side-effect free  
+- Router requires matching templates for SSR hydration  
 
-See the [API Reference](docs/api-reference.md) for detailed usage, configuration options, and advanced patterns. For advanced topics, see the linked docs above.
+---
 
-## Local development
+## 🔧 Use Cases
 
-1. **Clone this repository**
-2. **Run the examples**: `npm run dev`
+- Micro-frontends  
+- Progressive enhancement  
+- Design systems  
+- SSR apps  
+- Performance-critical projects  
+- Standards-based development  
+- Static site generation  
+- Plugin-extendable architectures  
+
+---
+
+## 🖥️ SSR Highlights
+
+- SEO-friendly HTML/CSS out of the box  
+- Hydrate only what you need  
+- Robust support for fragments, keyed nodes, and error handling  
+- Compatible with routing and static site generation  
+
+---
+
+## 🛡️ Production Ready
+
+- Strict TypeScript and modular design  
+- No dependencies  
+- Clean error handling and validation  
+- Secure: sanitizes user input  
+- Fully tested  
+
+---
+
+## ⚡ Performance Perks
+
+- DOM batching and minimal re-renders  
+- Tree-shakable exports  
+- Focus preservation and efficient DOM updates  
+- Async rendering with Promises  
+- Smart memory cleanup  
+
+---
+
+## 📚 Learn More
+
+- [⚙️ Advanced Use Cases](docs/advanced-use-cases.md)  
+- [🛠 API Reference](docs/api-reference.md)  
+- [🌱 Core Concepts](docs/core-concepts.md)  
+- [🥊 Data Model vs Data Bind](docs/data-model-vs-data-bind.md)  
+- [📦 Examples](docs/examples.md)  
+- [🎛️ Form Input Bindings](docs/form-input-bindings.md)  
+- [🎯 Framework Comparison](docs/framework-comparison.md)  
+- [🔗 Framework Integration](docs/framework-integration.md)  
+- [🚦 Routing](docs/routing.md)  
+- [🌐 SSR Guide](docs/ssr.md)  
+
+---
+
+## 🛠 Local Dev
+
+```
+# Clone the repo
+git clone <repo-url>
+
+# Run examples
+npm run dev
+```

@@ -1,17 +1,17 @@
-
-# Runtime API Reference
+# 🛠 API Reference
 
 All APIs are strictly typed and match the implementation in `src/lib`. Only documented features are supported.
 
 ---
 
+## ✅ Component Config
 
-## Component Configuration
+Define components with the following options:
 
-```typescript
-export interface ComponentConfig<S extends ComponentState, C extends Record<string, any> = {}> {
+```ts
+interface ComponentConfig<S, C = {}> {
   template: (state: S & C, api: ComponentAPI<S & C>) => string | Promise<string> | CompiledTemplate<S & C>;
-  state?: S; // Optional for stateless components
+  state?: S;
   computed?: { [K in keyof C]: (state: S) => C[K] };
   style?: string | ((state: S & C) => string);
   refs?: Record<string, RefHandler<S & C>>;
@@ -21,90 +21,99 @@ export interface ComponentConfig<S extends ComponentState, C extends Record<stri
   debug?: boolean;
   reflect?: string[];
   hydrate?: (el: Element | ShadowRoot, state: S & C, api: ComponentAPI<S & C>) => void;
-  [handler: string]: ((...args: unknown[]) => unknown) | unknown;
+  [handler: string]: any;
 }
 ```
 
+### Notes
 
-**Attribute Reflection Caveats & Best Practices:**
-- Only primitive state keys (`string`, `number`, `boolean`) are supported for attribute reflection. Objects and arrays are ignored.
-- Dangerous keys (`__proto__`, `constructor`, `prototype`) are never reflected.
-- Initial attributes are merged into state on connection for seamless sync.
-- If you override `attributeChangedCallback`, you must call `super.attributeChangedCallback` to preserve reactivity.
-- Reflected attributes are automatically kept in sync with state changes.
+- **`state`**: Omit for stateless components.
+- **`computed`**: Define derived, reactive properties.
+- **`style`**: Static string or function based on state.
+- **`refs`**: DOM access and custom logic via `data-ref`.
+- **`onMounted`, `onUnmounted`**: Setup and cleanup.
+- **`onError`**: Catch and handle errors locally.
+- **`debug`**: Enable detailed logs for this component only.
+- **`reflect`**: Sync primitive state keys with attributes.
+- **Event Handlers**: Use `data-on-*` and define handlers on config.
 
-
-**Interaction with `data-model`/`data-bind`:**
-- If a state key is both reflected and bound to an input via `data-model` or `data-bind`, the runtime will keep them in sync. User input always wins for controlled inputs, preventing sync errors. Rapid external updates to the attribute may be overwritten by user typing.
-- Avoid updating the attribute and input at the exact same time to prevent unexpected UI flicker.
-
-
-**Notes:**
-- `debug` (optional): If true, enables detailed runtime logs (warnings, errors, mutation diagnostics) for this component only. Default is false.
-- Event handlers for `data-on-*` and `refs` must be defined on the config object.
-- Only one event handler per event type per element is attached; previous handlers are removed on rerender.
-- `computed` is for derived, reactive values.
-- Stateless components are supported: omit `state` for pure view components.
-- All configuration options are strictly typed and match the runtime implementation.
 ---
 
+## ⚠️ Attribute Reflection Tips
 
-## Debug Mode Example
+- Only `string`, `number`, and `boolean` keys are reflected.
+- `__proto__`, `constructor`, and `prototype` are ignored.
+- Reflected attributes update state on connect.
+- If using `attributeChangedCallback`, call `super.attributeChangedCallback`.
 
-Enable runtime logs for a component:
+---
 
-```typescript
+## 🔁 Binding Behavior
+
+- **`data-model` / `data-bind`** keep state and inputs in sync.
+- User input always takes priority.
+- Avoid simultaneous state+DOM updates to prevent flicker.
+
+---
+
+## 🐞 Debug Mode
+
+Enable detailed logs for a single component:
+
+```ts
 component('my-debug-demo', {
   debug: true,
   state: { count: 0 },
   template: ({ count }) => html`<button data-on-click="increment">Count: ${count}</button>`({ count }),
-  increment(event, state) { state.count++; }
+  increment(_, state) { state.count++; }
 });
 ```
 
-All internal warnings and errors will only appear if `debug` is set to true.
 ---
 
+## 📦 Component API
 
-## Component API
-
-```typescript
-export interface ComponentAPI<T extends ComponentState = ComponentState> {
+```ts
+interface ComponentAPI<T> {
   readonly state: T;
-  emit(eventName: string, detail?: unknown): void;
-  onGlobal<U = any>(eventName: string, handler: (data: U) => void): () => void;
-  offGlobal<U = any>(eventName: string, handler: (data: U) => void): void;
-  emitGlobal<U = any>(eventName: string, data?: U): void;
+  emit(event: string, detail?: unknown): void;
+  onGlobal<U>(event: string, handler: (data: U) => void): () => void;
+  offGlobal<U>(event: string, handler: (data: U) => void): void;
+  emitGlobal<U>(event: string, data?: U): void;
 }
 ```
+
 ---
 
-## Plugin System
+## 🔌 Plugin System
 
-```typescript
-export function useRuntimePlugin<S extends ComponentState, C extends Record<string, any>>(
-  plugin: {
-    onInit?: (config: ComponentConfig<S, C>) => void;
-    onRender?: (state: S & C, api: ComponentAPI<S & C>) => void;
-    onError?: (error: Error, state: S & C, api: ComponentAPI<S & C>) => void;
-  }
-): void;
+Extend global behavior:
+
+```ts
+function useRuntimePlugin<S, C>(plugin: {
+  onInit?: (config: ComponentConfig<S, C>) => void;
+  onRender?: (state: S & C, api: ComponentAPI<S & C>) => void;
+  onError?: (error: Error, state: S & C, api: ComponentAPI<S & C>) => void;
+}): void;
 ```
 
-**Usage:**
-```typescript
+**Example:**
+
+```ts
 useRuntimePlugin({
-  onInit: (config) => { /* global setup */ },
-  onRender: (state, api) => { /* global render logic */ },
-  onError: (error, state, api) => { /* global error handling */ }
+  onInit: (config) => { /* setup */ },
+  onRender: (state, api) => { /* render logic */ },
+  onError: (err, state, api) => { /* error handling */ }
 });
 ```
+
 ---
-## Router
 
-Lightweight, functional router for custom elements. SSR/static site compatible.
+## 🌐 Router
 
-```typescript
+Minimal SSR-compatible router:
+
+```ts
 import { initRouter, useRouter, matchRouteSSR } from '@jasonshimmy/custom-elements-runtime';
 
 const routes = [
@@ -117,144 +126,85 @@ const router = initRouter({ routes });
 router.push('/about');
 ```
 
-- `<router-view>` custom element renders matched component
-- SSR: use `matchRouteSSR(routes, path)` for static site generation
+- Use `<router-view>` for rendering.
+- For SSR, use `matchRouteSSR(routes, path)`.
 
 ---
 
-## Global Store & Event Bus
+## 📦 Global Store & Event Bus
 
-Built-in reactive store and event bus for cross-component state and communication.
-
-```typescript
+```ts
 import { Store, eventBus } from '@jasonshimmy/custom-elements-runtime';
 
 const store = Store({ count: 0 });
-store.subscribe((state) => { /* react to changes */ });
-eventBus.on('my-event', (data) => { /* handle event */ });
+store.subscribe((state) => {
+  console.log('State updated:', state.count);
+});
+
+eventBus.on('my-event', (data) => {
+  console.log('Received:', data);
+});
+eventBus.emit('my-event', { foo: 123 });
 ```
 
 ---
 
-## SSR & Hydration
+## 🖥️ SSR & Hydration
 
-Universal rendering, opt-in hydration, and template matching. SSR excludes refs, event listeners, and lifecycle hooks.
+Server-side rendering and hydration tools:
 
-```typescript
-import { renderToString, renderComponentsToString, generateHydrationScript } from '@jasonshimmy/custom-elements-runtime';
+```ts
+import {
+  renderToString,
+  renderComponentsToString,
+  generateHydrationScript
+} from '@jasonshimmy/custom-elements-runtime';
+```
+
+- SSR excludes refs, events, and lifecycle.
+- Hydration is opt-in via `data-hydrate`.
+- Templates must match for proper hydration.
+
+---
+
+## 🔧 Template Helpers
+
+```ts
+html(strings, ...values): string | Promise<string>
+css(strings, ...values): string
+compile(strings, ...expressions): CompiledTemplate
+classes(obj): string
+styles(obj): string
 ```
 
 ---
 
-## Error Boundaries
+## 🧱 Types
 
-Use `onError` in component config or plugin for robust error handling and fallback UI.
+```ts
+interface ComponentState extends Record<string, unknown> {}
 
----
+type RefHandler<T> = (el: Element, state: T, api: ComponentAPI<T>) => void;
 
-## Input Binding
+type LifecycleHandler<T> = (state: T, api: ComponentAPI<T>) => void;
 
-Declarative, type-safe event and input binding via `data-on-*`, `data-model`, and `data-bind`.
-
----
-
-## VDOM & Template Helpers
-
-Utilities for virtual DOM diffing, compiling templates, and CSS-in-JS.
-
-```typescript
-import { html, compile, css, classes, styles } from '@jasonshimmy/custom-elements-runtime';
-```
-
----
-
-## Build Tools
-
-Utilities for SSR, static site generation, and advanced rendering.
----
-    onRender?: (state: S & C, api: ComponentAPI<S & C>) => void;
-    onError?: (error: Error, state: S & C, api: ComponentAPI<S & C>) => void;
-  }
-): void;
-```
-
----
-
-## SSR Functions
-
-```typescript
-renderToString<T>(config: SSRComponentConfig<T>, options?: SSRRenderOptions): string;
-renderComponentsToString<T>(configs: SSRComponentConfig<T>[]): string;
-generateHydrationScript(): string;
-```
-
-**Notes:**
-- SSR rendering excludes refs, event listeners, and lifecycle hooks.
-- Hydration is opt-in via the `data-hydrate` property; templates must match for correct hydration.
-
----
-
-## Template Helpers
-
-```typescript
-html(strings: TemplateStringsArray, ...values: any[]): string | Promise<string>;
-css(strings: TemplateStringsArray, ...values: any[]): string;
-compile<T = any>(strings: TemplateStringsArray, ...expressions: Array<(state: T, api: any) => unknown>): CompiledTemplate<T>;
-classes(obj: Record<string, boolean>): string;
-styles(obj: Record<string, string | number>): string;
-```
-
----
-
-## Types
-
-```typescript
-export interface ComponentState extends Record<string, unknown> {}
-export type RefHandler<T extends ComponentState> = (
-  element: Element,
-  state: T,
-  api: ComponentAPI<T>
-) => void;
-export type LifecycleHandler<T extends ComponentState> = (
-  state: T,
-  api: ComponentAPI<T>
-) => void;
-export type CompiledTemplate<S extends ComponentState = ComponentState> = {
+type CompiledTemplate<S = ComponentState> = {
   id: string;
   render: (state: S, api: ComponentAPI<S>) => DocumentFragment;
 };
 ```
 
-## Input Binding
+---
 
-- `data-model`: Controlled, one-way binding between a state property and a form input. Supports modifiers (`|number`, `|trim`).
-- `data-bind`: Deep, two-way binding to nested state objects or arrays. Supports dot notation and array indices.
+## 🔗 Input & Event Binding
 
-## Event Binding
+- `data-model`: One-way binding for form inputs (supports modifiers like `|number`, `|trim`).
+- `data-bind`: Two-way binding for nested state (dot paths supported).
+- `data-on-*`: Declarative event listeners. One handler per event per element.
 
-- `data-on-*`: Declarative event binding for any event type. Handlers must be defined on the config object. Only one handler per event type per element is attached; previous handlers are removed on rerender.
+---
 
-## Global Store
+## ⚙️ Build Tools
 
-```typescript
-import { Store } from '@jasonshimmy/custom-elements-runtime';
-const globalState = Store({ theme: 'light', count: 0 });
-globalState.subscribe((state) => { console.log('Global changed:', state.count); });
-```
-
-## Global Event Bus
-
-```typescript
-import { eventBus } from '@jasonshimmy/custom-elements-runtime';
-eventBus.emit('my-event', { foo: 123 });
-eventBus.on('my-event', (data) => { console.log(data); });
-eventBus.off('my-event', handler);
-```
-
-## VDOM Utilities
-
-- Fine-grained DOM diffing and patching for controlled inputs, event listeners, and efficient updates.
-
-## Build Tools
-
-- Integrate with Vite, Webpack, or Rollup for build-time template compilation and optimization.
+- Compatible with Vite, Webpack, Rollup.
+- Supports build-time template compilation and optimization.
