@@ -1,6 +1,11 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v0.0.6] - 2025-08-16
+
+- Enhance documentation for Custom Elements Runtime (a21d0d0)
+
+
 ## [v0.0.6-beta.0] - 2025-08-16
 
 - Enhance documentation for Custom Elements Runtime (a21d0d0)
