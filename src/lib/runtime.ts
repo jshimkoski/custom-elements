@@ -93,8 +93,8 @@ export { mountVNode, patchVNode, createVNodeFromElement, parseVNodeFromHTML, saf
 export type { VNode } from './v-dom';
 
 // Router API
-export { initRouter, useRouter, matchRouteSSR } from './router';
-export type { RouterConfig, RouteState } from './router';
+export { initRouter, useRouter, matchRouteSSR, resolveRouteComponent } from './router';
+export type { Route, RouterConfig, RouteState } from './router';
 
 
 // ============================================================================
