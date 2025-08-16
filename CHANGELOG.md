@@ -1,6 +1,11 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v0.0.4-beta.0] - 2025-08-16
+
+- feat(router): implement lightweight router with SSR support and `<router-view>` component (fae925b)
+
+
 
 
 ## [v0.0.3] - 2025-08-15
