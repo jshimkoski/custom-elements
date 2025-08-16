@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v0.0.9-beta.0] - 2025-08-16
+
+- test: increase wait time for text input binding in DataModelDemo component (5937797)
+- refactor: remove singleton router instance and integrate into router-view component (80d23be)
+
+
 ## [v0.0.8] - 2025-08-16
 
 - feat: add resolveRouteComponent to Router API exports (2b6bb5a)
