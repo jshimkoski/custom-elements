@@ -22,7 +22,7 @@ component('my-counter', {
   template: ({ count }) => html`
     <button data-on-click="increment">Count: ${count}</button>
   `({ count }),
-  increment: (_e, state) => state.count++
+  increment(event, state) { state.count++; }
 });
 ```
 
@@ -54,7 +54,7 @@ See the [API Reference](docs/api-reference.md) for advanced configuration, SSR, 
 - Templates require a single root node. Fragments are supported, but strict reconciliation and keys are recommended for robust updates.
 - Only one event handler per event type per element; handlers must be defined on the config object.
 - Controlled input sync always prioritizes user typing over state updates.
-- SSR hydration is opt-in via `hydrate`; refs, event listeners, and lifecycle hooks are excluded during SSR.
+- SSR hydration is opt-in via `data-hydrate`; refs, event listeners, and lifecycle hooks are excluded during SSR.
 - User-generated content is escaped in templates using `html` and `compile` helpers.
 - Only documented features are supported; undocumented features may not work as expected.
 - Plugin system hooks must be pure and side-effect free for best results.
@@ -112,16 +112,17 @@ See the [API Reference](docs/api-reference.md) for advanced configuration, SSR, 
 
 ## 📚 Documentation
 
+- [Advanced Use Cases](docs/advanced-use-cases.md): Patterns for event bus, store, plugin system, async templates, error boundaries, SSR, VDOM.
 - [API Reference](docs/api-reference.md): All runtime exports, configuration options, and advanced patterns.
 - [Core Concepts](docs/core-concepts.md): State, attribute sync, event binding, input binding, global store, event bus, lifecycle, error boundaries, SSR, plugin system.
 - [Data Model vs Data Bind](docs/data-model-vs-data-bind.md): Comparison, use cases, modifiers, deep binding, edge cases.
-- [Advanced Use Cases](docs/advanced-use-cases.md): Patterns for event bus, store, plugin system, async templates, error boundaries, SSR, VDOM.
+- [Examples](docs/examples.md): Concise, accurate code for all features and patterns.
 - [Form Input Bindings](docs/form-input-bindings.md): All supported input types, modifiers, deep binding, edge cases, VDOM patching.
-- [SSR Guide](docs/ssr.md): SSR, hydration, limitations, API.
-- [Routing](docs/routing.md): Lightweight, functional router with SSR/static site support.
 - [Framework Comparison](docs/framework-comparison.md): Unique features, tradeoffs, strengths, and when to choose each approach.
 - [Framework Integration](docs/framework-integration.md): Using with React, Vue, Angular, Svelte, and Lit.
-- [Examples](docs/examples.md): Concise, accurate code for all features and patterns.
+- [Routing](docs/routing.md): Lightweight, functional router with SSR/static site support.
+- [SSR](docs/ssr.md): SSR, hydration, limitations, API.
+
 
 See the [API Reference](docs/api-reference.md) for detailed usage, configuration options, and advanced patterns. For advanced topics, see the linked docs above.
 

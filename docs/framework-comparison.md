@@ -2,8 +2,6 @@
 
 | Feature                | Custom Elements Runtime | React   | Vue     | Angular | Svelte  | Lit     |
 |------------------------|------------------------|---------|---------|---------|---------|---------|
-| **Bundle Size**        | ~42.2KB                | ~45KB+  | ~35KB+  | ~60KB+  | ~10KB+  | ~7KB+   |
-| **Gzipped Size**       | ~13.4KB                | ~16KB   | ~12KB   | ~24KB   | ~4KB    | ~2.5KB  |
 | **SSR**                | Built-in, universal    | Yes     | Yes     | Yes     | Yes     | Yes     |
 | **TypeScript**         | Strict, enforced       | Optional| Optional| Strict  | Optional| Strict  |
 | **State Mgmt**         | Direct assignment, Store, Event Bus | Redux   | Pinia   | RxJS    | Store   | Manual  |

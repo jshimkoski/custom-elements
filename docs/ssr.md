@@ -3,7 +3,7 @@
 ## SSR Support
 
 - Use `renderToString`, `renderComponentsToString`, and `generateHydrationScript` for server-side rendering and hydration.
-- Hydration is opt-in via the `hydrate` property in your component config. If no region is marked, the entire shadow root is hydrated.
+- Hydration is opt-in via the `data-hydrate` property in your component config. If no region is marked, the entire shadow root is hydrated.
 - SSR templates must match client templates for correct hydration.
 
 ## Complete SSR example with hydration (using helpers):

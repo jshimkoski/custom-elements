@@ -1,7 +1,7 @@
 
 # Runtime API Reference
 
-All APIs are strictly typed and match the implementation in `src/lib`. Only documented features are supported. This reference covers all exports, configuration options, event handlers, input binding, global store, event bus, refs, computed, SSR, error boundaries, plugin system, router, VDOM, template helpers, and build tools.
+All APIs are strictly typed and match the implementation in `src/lib`. Only documented features are supported.
 
 ---
 
@@ -57,8 +57,8 @@ Enable runtime logs for a component:
 component('my-debug-demo', {
   debug: true,
   state: { count: 0 },
-  template: ({ count }) => `<button data-on-click="increment">Count: ${count}</button>`,
-  increment(_e, state) { state.count++; }
+  template: ({ count }) => html`<button data-on-click="increment">Count: ${count}</button>`({ count }),
+  increment(event, state) { state.count++; }
 });
 ```
 
@@ -190,7 +190,7 @@ generateHydrationScript(): string;
 
 **Notes:**
 - SSR rendering excludes refs, event listeners, and lifecycle hooks.
-- Hydration is opt-in via the `hydrate` property; templates must match for correct hydration.
+- Hydration is opt-in via the `data-hydrate` property; templates must match for correct hydration.
 
 ---
 
@@ -202,23 +202,6 @@ css(strings: TemplateStringsArray, ...values: any[]): string;
 compile<T = any>(strings: TemplateStringsArray, ...expressions: Array<(state: T, api: any) => unknown>): CompiledTemplate<T>;
 classes(obj: Record<string, boolean>): string;
 styles(obj: Record<string, string | number>): string;
-```
-
----
-
-## Event Bus & Store
-
-```typescript
-emit<T = any>(eventName: string, data?: T): void;
-on<T = any>(eventName: string, handler: (data: T) => void): () => void;
-off<T = any>(eventName: string, handler: (data: T) => void): void;
-once<T = any>(eventName: string, handler: (data: T) => void): Promise<T>;
-
-class Store<T extends object> {
-  constructor(initial: T);
-  subscribe(listener: (state: T) => void): void;
-  getState(): T;
-}
 ```
 
 ---

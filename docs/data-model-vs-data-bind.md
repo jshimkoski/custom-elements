@@ -1,7 +1,7 @@
 
 # `data-model` vs `data-bind`: Comparison & Use Cases
 
-This document explains the differences between the `data-model` and `data-bind` attributes in the Custom Elements Runtime, provides usage examples, edge cases, stateless components, plugin system, SSR, error boundaries, event bus, global store, deep binding, modifiers, and best practices. All features match the implementation in src/lib.
+This document explains the differences between the `data-model` and `data-bind` attributes in the Custom Elements Runtime, provides usage examples, edge cases, stateless components, plugin system, SSR, error boundaries, event bus, global store, deep binding, modifiers, and best practices.
 
 ---
 
@@ -37,13 +37,6 @@ state: {
 }
 ```
 
-**Stateless Example:**
-```typescript
-component('stateless-model', {
-  template: () => `<input type="text" data-model="username">`
-});
-```
-
 **Best For:**
 - Simple, direct binding to primitive state properties.
 - Controlled forms where each input maps to a single state key.
@@ -75,13 +68,6 @@ state: {
 }
 ```
 
-**Stateless Example:**
-```typescript
-component('stateless-bind', {
-  template: () => `<input type="text" data-bind="user.address.street" />`
-});
-```
-
 **Best For:**
 - Deeply nested or dynamic state structures.
 - Dynamic forms, lists, or arrays of inputs.
@@ -103,7 +89,7 @@ component('stateless-bind', {
 |------------------------|-----------------------------|------------------------------|
 | Binding Type           | One-way, controlled         | Two-way, deep                |
 | State Shape            | Flat, primitive             | Nested, dynamic              |
-| Modifiers              | Supported (`|number`, etc.) | Not supported                |
+| Modifiers              | Supported (`number`, etc.)  | Not supported                |
 | Input Types            | All standard                | All standard                 |
 | Deep Binding           | No                          | Yes                          |
 | Stateless Support      | Yes                         | Yes                          |

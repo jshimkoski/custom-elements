@@ -1,7 +1,7 @@
 
 # Examples
 
-Quick, readable examples for common patterns. All code matches the runtime API and is type-safe. Includes stateless components, plugin system, router, SSR, error boundaries, event bus, global store, input binding, async templates, and VDOM utilities.
+Quick, readable examples for common patterns.
 
 ---
 
@@ -9,11 +9,11 @@ Quick, readable examples for common patterns. All code matches the runtime API a
 ## Hello World
 
 ```typescript
-import { component } from '@jasonshimmy/custom-elements-runtime';
+import { component, html } from '@jasonshimmy/custom-elements-runtime';
 
 component('hello-world', {
   state: { name: 'World' },
-  template: (state) => `<h1>Hello, ${state.name}!</h1>`
+  template: (state) => html`<h1>Hello, ${state.name}!</h1>`()
 });
 ```
 
@@ -25,7 +25,7 @@ component('hello-world', {
 
 ```typescript
 component('stateless-demo', {
-  template: () => `<div>Pure view, no state!</div>`
+  template: () => html`<div>Pure view, no state!</div>`()
 });
 ```
 
@@ -41,9 +41,9 @@ component('stateless-demo', {
 ```typescript
 component('simple-counter', {
   state: { count: 0 },
-  template: (state) => `
+  template: (state) => html`
     <button data-on-click="increment">Count: ${state.count}</button>
-  `,
+  `(state),
   increment(_e, state) {
     state.count++;
   }
@@ -81,7 +81,7 @@ const router = initRouter({ routes: [
 import { renderToString, matchRouteSSR } from '@jasonshimmy/custom-elements-runtime';
 const html = renderToString({
   state: { title: 'SSR Example' },
-  template: ({ title }) => `<h1>${title}</h1>`
+  template: ({ title }) => html`<h1>${title}</h1>`({ title })
 });
 const matched = matchRouteSSR([
   { path: '/', component: 'home-page' }
@@ -111,29 +111,13 @@ eventBus.on('my-event', (data) => { /* handle event */ });
 ```typescript
 component('input-demo', {
   state: { message: '' },
-  template: ({ message }) => `<input type="text" data-model="message" />`,
+  template: ({ message }) => html`<input type="text" data-model="message" />`({ message }),
 });
 ```
 
 ## Async Template Example
 
 ```typescript
-component('async-demo', {
-  state: {},
-  template: async () => {
-    const data = await fetch('/api/data').then(r => r.json());
-    return `<div>Loaded: ${data.value}</div>`;
-  }
-});
-```
-
----
-
-## Async Rendering Example
-
-```typescript
-import { component } from '@jasonshimmy/custom-elements-runtime';
-
 component('async-demo', {
   state: {},
   template: async () => {
@@ -161,13 +145,13 @@ component('async-demo', {
 // Typing in either field will preserve focus and cursor position
 component('focus-demo', {
   state: { text: '' },
-  template: (state) => `
+  template: (state) => html`
     <div>
       ${state.text}
       <input type="text" data-model="text" />
       <textarea data-model="text"></textarea>
     </div>
-  `
+  `(state)
 });
 ```
 
@@ -427,7 +411,7 @@ component('static-style-example', {
 ```typescript
 component('dynamic-style-example', {
   state: { active: false },
-  template: ({ active }) => `<div>${active ? 'Active' : 'Inactive'}</div>`,
+  template: ({ active }) => html`<div>${active ? 'Active' : 'Inactive'}</div>`({ active }),
   style: (state) => `div { color: ${state.active ? 'green' : 'red'}; }`
 });
 ```
