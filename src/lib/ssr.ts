@@ -48,6 +48,7 @@ export function createSSRAPI<T extends ComponentState>(state: T): ComponentAPI<T
     onGlobal: () => () => {},
     offGlobal: () => {},
     emitGlobal: () => {},
+    render: () => {}
   };
 }
 

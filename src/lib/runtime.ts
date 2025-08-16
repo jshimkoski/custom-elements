@@ -20,6 +20,7 @@ export interface ComponentAPI<T extends ComponentState = ComponentState> {
   onGlobal<U = any>(eventName: string, handler: (data: U) => void): () => void;
   offGlobal<U = any>(eventName: string, handler: (data: U) => void): void;
   emitGlobal<U = any>(eventName: string, data?: U): void;
+  render(): void;
 }
 /**
  * Configuration object for a custom element component.
@@ -110,6 +111,7 @@ import { useRouter } from './router';
 import type { VNode } from './v-dom';
 import type { CompiledTemplate } from './template-compiler';
 import type { RouterConfig } from './router';
+import { css, html } from './template-helpers';
 
 
 // ============================================================================
@@ -257,30 +259,31 @@ if (typeof HTMLElement !== 'undefined') {
      */
     attributeChangedCallback(name: string, _oldValue: string, newValue: string) {
       if (name === '__proto__' || name === 'constructor' || name === 'prototype') return;
-      // Guard against stateObj being undefined
       if (!this.stateObj) return;
-      // Only update state and trigger render if value differs
-      if (name in this.stateObj) {
-        const initialType = typeof (this.config?.state?.[name]);
+      // Map kebab-case to camelCase
+      const camelName = name.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+      const stateKey = (name in this.stateObj) ? name : (camelName in this.stateObj ? camelName : null);
+      if (stateKey) {
+        const initialType = typeof (this.config?.state?.[stateKey]);
         let value: any = newValue;
         if (newValue === null) {
           value = undefined;
         } else if (initialType === 'number') {
           if (value === undefined || value === '') {
-            value = this.config?.state?.[name];
+            value = this.config?.state?.[stateKey];
           } else {
             const num = Number(value);
-            value = isNaN(num) ? this.config?.state?.[name] : num;
+            value = isNaN(num) ? this.config?.state?.[stateKey] : num;
           }
         } else if (initialType === 'boolean') {
           value = value === 'true';
         }
         value = deepSanitizeObject(value);
-        if ((this.stateObj as any)[name] !== value) {
+        if ((this.stateObj as any)[stateKey] !== value) {
           if (this.config?.debug) {
-            console.log('[runtime] state update:', { name, value });
+            console.log('[runtime] state update:', { stateKey, value });
           }
-          (this.stateObj as any)[name] = value;
+          (this.stateObj as any)[stateKey] = value;
           this.render();
         }
       }
@@ -549,7 +552,8 @@ if (typeof HTMLElement !== 'undefined') {
           return unsub;
         },
         offGlobal: <U = any>(eventName: string, handler: (data: U) => void) => eventBus.off(eventName, handler),
-        emitGlobal: <U = any>(eventName: string, data?: U) => eventBus.emit(eventName, data)
+        emitGlobal: <U = any>(eventName: string, data?: U) => eventBus.emit(eventName, data),
+        render: () => this.render()
       };
       Object.keys(this.config).forEach(key => {
         if (key.startsWith('on') && key.length > 2 && typeof this.config[key] === 'function') {
@@ -634,12 +638,15 @@ if (typeof HTMLElement !== 'undefined') {
       // Merge all attributes into state for initial sync
       if (this.stateObj) {
         for (const attr of this.getAttributeNames()) {
-          if (attr in this.stateObj) {
-            const initialType = typeof (this.config?.state?.[attr]);
+          // Always map kebab-case to camelCase for state keys
+          const camelName = attr.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+          const stateKey = camelName;
+          if (stateKey in this.stateObj) {
+            const initialType = typeof (this.config?.state?.[stateKey]);
             let value: unknown = this.getAttribute(attr);
             if (initialType === 'number') value = Number(value);
             else if (initialType === 'boolean') value = value === 'true';
-            (this.stateObj as Record<string, unknown>)[attr] = value === null ? undefined : value;
+            (this.stateObj as Record<string, unknown>)[stateKey] = value === null ? undefined : value;
           }
         }
       }
@@ -1258,6 +1265,22 @@ export function component<S extends ComponentState, C extends Record<string, any
 }
 
 /**
+ * RouterLink component state
+ */
+export interface RouterLinkState extends ComponentState {
+  to: string;
+  tag: string;
+  replace: boolean;
+  exact: boolean;
+  activeClass: string;
+  exactActiveClass: string;
+  ariaCurrentValue: string;
+  disabled: boolean;
+  external: boolean;
+  style: string;
+}
+
+/**
  * Singleton router instance for global access.
  * 
  * Define here to prevent circular dependency
@@ -1266,17 +1289,125 @@ export function component<S extends ComponentState, C extends Record<string, any
 export function initRouter(config: RouterConfig) {
   const router = useRouter(config);
   component('router-view', {
-    template: async (_state, _api) => {
+    template: async () => {
       if (!router) return '<div>Router not initialized.</div>';
       const current = router.getCurrent() as import('./router').RouteState;
       const { path } = current;
       const match = router.matchRoute(path);
       if (!match.route) return '<div>Not found</div>';
-      // Ensure custom element is registered before rendering
       if (match.route.load) {
         await match.route.load();
       }
       return `<${match.route.component}></${match.route.component}>`;
+    },
+    onMounted(_state, api) {
+      // Subscribe to router state and re-render on change
+      if (router && typeof router.subscribe === 'function') {
+        router.subscribe(() => {
+          api.render();
+        });
+      }
+    }
+  });
+  component<RouterLinkState>('router-link', {
+    state: {
+      to: '',
+      tag: 'a',
+      replace: false,
+      exact: false,
+      activeClass: 'active',
+      exactActiveClass: 'exact-active',
+      ariaCurrentValue: 'page',
+      disabled: false,
+      external: false,
+      style: css`
+        [aria-disabled="true"] {
+          pointer-events: none;
+          opacity: 0.5;
+        }
+      `,
+    },
+    computed: {
+      current() {
+        return router.getCurrent();
+      },
+      isExactActive(state: RouterLinkState) {
+        const current = state.current as { path: string };
+        return current.path === state.to;
+      },
+      isActive(state: RouterLinkState) {
+        const current = state.current as { path?: string } | undefined;
+        return state.exact
+          ? state.isExactActive
+          : current && typeof current.path === 'string'
+            ? current.path.startsWith(state.to)
+            : false;
+      },
+      className(state: RouterLinkState) {
+        return state.isExactActive
+          ? state.exactActiveClass
+          : state.isActive
+          ? state.activeClass
+          : '';
+      },
+      ariaCurrent(state: RouterLinkState) {
+        return state.isExactActive ? `aria-current="${state.ariaCurrentValue}"` : '';
+      },
+      isButton(state: RouterLinkState) {
+        return state.tag === 'button';
+      },
+      disabledAttr(state: RouterLinkState) {
+        return state.disabled
+          ? state.isButton
+            ? 'disabled aria-disabled="true" tabindex="-1"'
+            : 'aria-disabled="true" tabindex="-1"'
+          : '';
+      },
+      externalAttr(state: RouterLinkState) {
+        return state.external && (state.tag === 'a' || !state.tag)
+          ? 'target="_blank" rel="noopener noreferrer"'
+          : '';
+      },
+    },
+    reflect: [ 'to', 'tag', 'replace', 'exact', 'activeClass', 'exactActiveClass', 'ariaCurrentValue', 'disabled', 'external', 'style' ],
+    style: (state: RouterLinkState) => state.style,
+    template: (state) => html`
+      ${state.isButton ? html`
+        <button
+          part="button"
+          class="${state.className}"
+          ${state.ariaCurrent}
+          ${state.disabledAttr}
+          ${state.externalAttr}
+          data-on-click="navigate"
+        ><slot></slot></button>
+      `(state) : html`
+        <a
+          part="link"
+          href="${state.to}"
+          class="${state.className}"
+          ${state.ariaCurrent}
+          ${state.disabledAttr}
+          ${state.externalAttr}
+          data-on-click="navigate"
+        ><slot></slot></a>
+      `(state)}
+    `(state),
+    navigate: (e: MouseEvent, state: RouterLinkState) => {
+      if (state.disabled) {
+        e.preventDefault();
+        return;
+      }
+      // If external, let browser handle navigation
+      if (state.external && (state.tag === 'a' || !state.tag)) {
+        return;
+      }
+      e.preventDefault();
+      if (state.replace) {
+        router.replace(state.to);
+      } else {
+        router.push(state.to);
+      }
     }
   });
   return router;

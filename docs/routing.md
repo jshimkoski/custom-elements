@@ -53,14 +53,14 @@ import { initRouter } from '@jasonshimmy/custom-elements-runtime';
 const router = initRouter({ routes });
 ```
 
-### Use `<router-view>` in Your App
+### Use `<router-view>` and `<router-link>` in Your App
 
 ```typescript
 component('app-root', {
   template: () => `
     <nav>
-      <a href="/" data-on-click="goHome">Home</a>
-      <a href="/about" data-on-click="goAbout">About</a>
+      <router-link to="/" exact="true">Home</router-link>
+      <router-link to="/about">About</router-link>
     </nav>
     <router-view></router-view>
   `,
@@ -95,6 +95,10 @@ Lower-level API for advanced use cases.
 ### `<router-view>`
 
 Custom element that renders the matched component for the current route.
+
+### `<router-link>`
+
+Custom element that provides declarative navigation for your app.
 
 ### Route Matching
 
@@ -196,6 +200,46 @@ staticPages.forEach(page => {
 - Route guards, lazy loading, nested routes can be added as needed
 - Subscribe to route changes via `router.store.subscribe(fn)`
 - Access current route via `router.getCurrent()`
+
+---
+
+## Router Link Component
+
+The `<router-link>` custom element provides declarative navigation for your app. It supports both anchor and button rendering, robust attribute reflection, and accessibility features.
+
+### Usage
+
+```html
+<router-link to="/about">About</router-link>
+<router-link to="/submit" tag="button">Submit</router-link>
+```
+
+### Attributes
+- `to`: The target route path (required).
+- `tag`: Render as an `<a>` (default) or `<button>`.
+- `replace`: Use history.replaceState instead of pushState.
+- `exact`: Match the route exactly.
+- `active-class`: CSS class for active state.
+- `exact-active-class`: CSS class for exact active state.
+- `aria-current-value`: Value for `aria-current` when active.
+- `disabled`: Disables navigation and sets accessibility attributes.
+- `external`: For external links, adds `target="_blank"` and `rel="noopener noreferrer"`.
+- `style`: Inline styles for the link/button.
+
+### Accessibility
+- When `disabled`, sets `aria-disabled="true"` and `tabindex="-1"`.
+- Supports `aria-current` for active routes.
+
+### Example
+```html
+<router-link to="/home" active-class="active" exact-active-class="exact-active">Home</router-link>
+<router-link to="/contact" tag="button" disabled="true">Contact</router-link>
+```
+
+### Notes
+- All attributes are reflected and reactive.
+- Works seamlessly with `<router-view>` for dynamic route rendering.
+- For best results, set attributes before connecting to the DOM.
 
 ---
 
