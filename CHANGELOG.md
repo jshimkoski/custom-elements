@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v0.0.7] - 2025-08-16
+
+- fix: increase wait time for text input binding test (c87190e)
+- feat: add support for asynchronous component loading in router (905276f)
+
+
 ## [v0.0.7-beta.0] - 2025-08-16
 
 - fix: increase wait time for text input binding test (c87190e)
