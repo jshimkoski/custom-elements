@@ -1,7 +1,7 @@
 
 # Integrating `@jasonshimmy/custom-elements-runtime` with Other Frameworks
 
-This guide shows how to use Custom Elements built with `@jasonshimmy/custom-elements-runtime` in popular frontend frameworks. All examples are strictly typed and follow best practices for interoperability, performance, and maintainability. Covers SSR, hydration, plugin system, router, stateless components, error boundaries, event bus, global store, and static site generation.
+This guide shows how to use Custom Elements built with `@jasonshimmy/custom-elements-runtime` in popular frontend frameworks.
 
 ---
 

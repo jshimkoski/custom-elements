@@ -110,8 +110,7 @@ Custom element that renders the matched component for the current route.
 ### Full SSR & Static Site Generation Example
 
 ```typescript
-import { matchRouteSSR } from '../src/lib/router';
-import { renderToString } from '../src/lib/ssr';
+import { matchRouteSSR, renderToString } from '@jasonshimmy/custom-elements-runtime';
 
 const routes = [
   { path: '/', component: 'home-page' },

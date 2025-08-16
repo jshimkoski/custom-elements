@@ -1,7 +1,7 @@
 
 # Core Concepts
 
-Essential building blocks for every component. All features are strictly typed, regression-tested, and match the runtime implementation in src/lib. This guide covers stateless/stateful components, plugin system, router, SSR, error boundaries, event bus, global store, input binding, and VDOM utilities.
+Essential building blocks for every component.
 
 ---
 
@@ -13,7 +13,7 @@ Essential building blocks for every component. All features are strictly typed, 
 - Attribute-state sync: Primitive state keys are observed as attributes and kept in sync.
 - Focus preservation: Inputs retain focus and selection during updates.
 - Error boundaries: Use `onError` for fallback UI and diagnostics.
-- SSR: SSR excludes refs, event listeners, and lifecycle hooks; hydration is opt-in via `hydrate` and requires template matching.
+- SSR: SSR excludes refs, event listeners, and lifecycle hooks; hydration is opt-in via `data-hydrate` and requires template matching.
 - Plugin system: Extend runtime with hooks (`onInit`, `onRender`, `onError`).
 - Router: Lightweight, functional router with SSR/static site support, `<router-view>`, route params, and programmatic navigation.
 - Global event bus & store: Built-in `eventBus` and `Store` for cross-component communication and global state.
@@ -59,13 +59,13 @@ template: (state, api) => `<div>Hello ${state.name}!</div>`
 - Direct DOM access without complex selectors. Use `refs` for imperative logic and event handling.
 
 ```typescript
-import { component } from '@jasonshimmy/custom-elements-runtime';
+import { component, html } from '@jasonshimmy/custom-elements-runtime';
 
 component('ref-demo', {
   state: { clicks: 0 },
-  template: (state) => `
+  template: (state) => html`
     <button data-ref="myButton">Clicked: ${state.clicks} times</button>
-  `,
+  `(state),
   refs: {
     myButton: (element, state, api) => {
       element.addEventListener('click', () => {
@@ -149,26 +149,6 @@ const router = initRouter({ routes: [
 
 - Declarative, type-safe event and input binding via `data-on-*`, `data-model`, and `data-bind`.
 
-## VDOM & Template Helpers
-
-- Utilities for virtual DOM diffing, compiling templates, and CSS-in-JS.
-
-## Build Tools
-
-- Utilities for SSR, static site generation, and advanced rendering.
-
-## Error Boundaries
-
-- Use `onError` for fallback UI and diagnostics. All lifecycle and render errors are handled robustly.
-
-## Plugin System
-
-- Extend runtime behavior with hooks (`onInit`, `onRender`, `onError`). Plugins can be registered globally and affect all components.
-
-## VDOM Utilities
-
-- Fine-grained DOM diffing and patching for controlled inputs, event listeners, and efficient updates.
-
 ---
 
 ## Computed Properties
@@ -187,10 +167,10 @@ component('user-profile', {
     fullName: (state) => `${state.firstName} ${state.lastName}`,
     isValid: (state) => state.email.includes('@') && state.password.length >= 8
   },
-  template: (state) => `
+  template: ({ fullName, isValid }) => html`
     <div>Name: ${fullName}</div>
     <div>Valid: ${isValid ? 'Yes' : 'No'}</div>
-  `
+  `({ fullName, isValid })
 });
 ```
 
@@ -204,14 +184,14 @@ component('user-profile', {
 ```typescript
 component('my-form', {
   state: { name: '' },
-  template: (state) => `
+  template: (state) => html`
     <form>
       <input data-model="name" type="text">
       <button type="submit" data-on-click="handleSubmit">Submit</button>
     </form>
-  `,
-  handleSubmit(e, state, api) {
-    e.preventDefault();
+  `({ state }),
+  handleSubmit(event, state, api) {
+    event.preventDefault();
     api.emit('form-submitted', { name: state.name });
   }
 });
@@ -264,7 +244,7 @@ style: (state) => `div { color: ${state.isActive ? 'green' : 'red'}; }`
 
 ```typescript
 component('stateless-demo', {
-  template: () => `<div>Stateless component rendered!</div>`
+  template: () => html`<div>Stateless component rendered!</div>`()
 });
 ```
 

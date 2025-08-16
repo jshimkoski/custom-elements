@@ -1,7 +1,7 @@
 
 # Form Input Bindings in Custom Elements Runtime
 
-This document describes all supported ways to use form input bindings in the custom-elements runtime (`runtime.ts`). It covers binding strategies, modifiers, supported input types, stateless components, plugin system, SSR, error boundaries, event bus, global store, deep binding, and edge cases. All examples are strictly typed and match the current implementation.
+This document describes all supported ways to use form input bindings in the custom-elements runtime (`runtime.ts`).
 
 ---
 
@@ -45,13 +45,6 @@ state: {
   description: '',
   selectedOption: 'a'
 }
-```
-
-**Stateless Example:**
-```typescript
-component('stateless-input', {
-  template: () => `<input type="text" data-model="message">`
-});
 ```
 
 ---

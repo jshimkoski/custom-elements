@@ -1,12 +1,12 @@
 
 # Advanced Use Cases
 
-Explore advanced patterns and features available in the Custom Elements Runtime. All features are strictly typed, regression-tested, and match the implementation in src/lib. These enable robust, scalable, and maintainable web components for complex applications.
+Explore advanced patterns and features available in the Custom Elements Runtime.
 
 ## Key Patterns
 
 **Key Patterns & Features:**
-- **SSR & Hydration:** Universal HTML rendering, opt-in hydration (`hydrate`), and strict template matching. SSR excludes refs, event listeners, and lifecycle hooks.
+- **SSR & Hydration:** Universal HTML rendering, opt-in hydration (`data-hydrate`), and strict template matching. SSR excludes refs, event listeners, and lifecycle hooks.
 - **Plugin System:** Extend runtime with `useRuntimePlugin` and global/component hooks (`onInit`, `onRender`, `onError`).
 - **Error Boundaries:** Use `onError` for fallback UI, diagnostics, and recovery; all errors surfaced for debugging.
 - **Global Store & Event Bus:** Built-in reactive store and event bus for cross-component state and communication.
@@ -26,11 +26,11 @@ component('advanced-demo', {
   computed: {
     doubled: (state) => state.count * 2
   },
-  template: compile(({ count, doubled }) => html`
+  template: ({ count, doubled }) => html`
     <button data-ref="myButton" data-on-click="increment">
       Count: ${count} (Doubled: ${doubled})
     </button>
-  `),
+  `({ count, doubled }),
   style: css`
     button { font-size: 1.2rem; padding: 0.5rem 1rem; }
   `,
@@ -70,7 +70,7 @@ component('async-advanced', {
       state.data = data;
       state.loading = false;
     }
-    return `<div>Loaded: ${state.data ? state.data.value : '...'}</div>`;
+    return html`<div>Loaded: ${state.data ? state.data.value : '...'}</div>`(state);
   }
 });
 ```
@@ -114,7 +114,7 @@ const router = initRouter({ routes: [
 
 ```typescript
 component('stateless-demo', {
-  template: () => `<div>Pure view, no state!</div>`
+  template: () => html`<div>Pure view, no state!</div>`()
 });
 ```
 
@@ -123,7 +123,7 @@ component('stateless-demo', {
 ```typescript
 component('advanced-style-demo', {
   state: { level: 1 },
-  template: ({ level }) => `<div>Level: ${level}</div>`,
+  template: ({ level }) => html`<div>Level: ${level}</div>`({ level }),
   style: (state) => `
     div {
       font-size: ${1 + state.level * 0.2}rem;
