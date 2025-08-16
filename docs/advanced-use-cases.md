@@ -1,3 +1,4 @@
+
 # Advanced Use Cases
 
 Explore advanced patterns and features available in the Custom Elements Runtime. All features are strictly typed, regression-tested, and match the implementation in src/lib. These enable robust, scalable, and maintainable web components for complex applications.
@@ -5,16 +6,13 @@ Explore advanced patterns and features available in the Custom Elements Runtime.
 ## Key Patterns
 
 **Key Patterns & Features:**
-- **SSR & Hydration:** Universal rendering to HTML on the server, opt-in hydration via the `hydrate` property. SSR excludes refs, event listeners, and lifecycle hooks; hydration restores interactivity and state. Templates must match for hydration.
-- **Plugin System:** Extend runtime behavior with `useRuntimePlugin`. Register hooks (`onInit`, `onRender`, `onError`) globally or per component. Plugins are strictly typed and composable.
-- **Error Boundaries:** Use `onError` to catch and handle errors during rendering or lifecycle events. Provide fallback UI, diagnostics, or recovery logic. All errors are surfaced for debugging and can be logged or reported.
-- **Global Store & Event Bus:** Use the built-in `Store` class for global, reactive state management across components. Use the built-in `eventBus` for cross-component communication. Emit, listen, and unsubscribe from global events with event storm protection.
-- **Computed Properties:** Use `computed` for derived, reactive values based on state. Efficiently manage complex logic and dependencies. Computed values are automatically updated when dependencies change.
-- **Refs:** Attach refs for direct DOM access and imperative logic. No complex selectors required.
-- **Lifecycle Hooks:** Use `onMounted` and `onUnmounted` for setup/teardown. All hooks are strictly typed and match the runtime implementation.
-- **Async Templates:** Return a Promise from `template` for async rendering.
-- **Custom Event Handlers:** Map event handlers to `data-on-*` attributes in your template. Handlers are type-safe and cleaned up automatically.
-- **VDOM & Edge Cases:** Fine-grained DOM diffing and patching for controlled inputs, event listeners, and efficient updates. Handles focus preservation, event rebinding, and input edge cases. Regression-tested for reliability in all scenarios. VDOM utilities are exposed for advanced use.
+- **SSR & Hydration:** Universal HTML rendering, opt-in hydration (`hydrate`), and strict template matching. SSR excludes refs, event listeners, and lifecycle hooks.
+- **Plugin System:** Extend runtime with `useRuntimePlugin` and global/component hooks (`onInit`, `onRender`, `onError`).
+- **Error Boundaries:** Use `onError` for fallback UI, diagnostics, and recovery; all errors surfaced for debugging.
+- **Global Store & Event Bus:** Built-in reactive store and event bus for cross-component state and communication.
+- **Computed Properties & Refs:** Derived state with `computed`; direct DOM access with `refs`.
+- **Lifecycle Hooks & Async Templates:** Setup/teardown with `onMounted`/`onUnmounted`; async rendering via Promise templates.
+- **Declarative Event Handling & VDOM:** Type-safe handlers via `data-on-*`; fine-grained DOM diffing, focus preservation, and robust input sync.
 
 ---
 
@@ -79,6 +77,7 @@ component('async-advanced', {
 
 ---
 
+
 ## Example: Plugin Usage
 
 ```typescript
@@ -98,6 +97,26 @@ useRuntimePlugin({
 ```
 
 ---
+
+## Example: Router Usage
+
+```typescript
+import { initRouter } from '@jasonshimmy/custom-elements-runtime';
+const router = initRouter({ routes: [
+  { path: '/', component: 'home-page' },
+  { path: '/about', component: 'about-page' }
+] });
+```
+
+---
+
+## Example: Stateless Component
+
+```typescript
+component('stateless-demo', {
+  template: () => `<div>Pure view, no state!</div>`
+});
+```
 
 ## Example: Dynamic Style
 

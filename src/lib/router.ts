@@ -1,0 +1,136 @@
+/**
+ * Lightweight, scalable router for Custom Elements Runtime
+ * - Functional API, zero dependencies, SSR/static site compatible
+ * - Integrates with Store and runtime.ts
+ */
+
+
+import { Store } from './store';
+
+export interface Route {
+  path: string;
+  component: string;
+}
+
+export interface RouterConfig {
+  routes: Route[];
+  base?: string;
+}
+
+export interface RouteState {
+  path: string;
+  params: Record<string, string>;
+  query: Record<string, string>;
+}
+
+
+const parseQuery = (search: string): Record<string, string> => {
+  if (!search) return {};
+  if (typeof URLSearchParams === 'undefined') return {};
+  return Object.fromEntries(new URLSearchParams(search));
+};
+
+const matchRoute = (routes: Route[], path: string): { route: Route | null; params: Record<string, string> } => {
+  for (const route of routes) {
+    const paramNames: string[] = [];
+    const regexPath = route.path.replace(/:[^/]+/g, (m) => {
+      paramNames.push(m.slice(1));
+      return '([^/]+)';
+    });
+    const regex = new RegExp(`^${regexPath}$`);
+    const match = path.match(regex);
+    if (match) {
+      const params: Record<string, string> = {};
+      paramNames.forEach((name, i) => {
+        params[name] = match[i + 1];
+      });
+      return { route, params };
+    }
+  }
+  return { route: null, params: {} };
+};
+
+
+export function useRouter(config: RouterConfig) {
+  const { routes, base = '' } = config;
+  let getLocation: () => { path: string; query: Record<string, string> };
+  let initial: { path: string; query: Record<string, string> };
+  let store: ReturnType<typeof Store>;
+  let update: () => void;
+  let push: (path: string) => void;
+  let replace: (path: string) => void;
+  let back: () => void;
+
+  if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+    getLocation = () => {
+      const url = new URL(window.location.href);
+      const path = url.pathname.replace(base, '') || '/';
+      const query = parseQuery(url.search);
+      return { path, query };
+    };
+    initial = getLocation();
+    const match = matchRoute(routes, initial.path);
+    store = Store<RouteState>({
+      path: initial.path,
+      params: match.params,
+      query: initial.query
+    });
+    update = () => {
+      const loc = getLocation();
+      const match = matchRoute(routes, loc.path);
+      const s = store.getState() as RouteState;
+      s.path = loc.path;
+      s.params = match.params;
+      s.query = loc.query;
+    };
+    window.addEventListener('popstate', update);
+    push = (path: string) => {
+      window.history.pushState({}, '', base + path);
+      update();
+    };
+    replace = (path: string) => {
+      window.history.replaceState({}, '', base + path);
+      update();
+    };
+    back = () => window.history.back();
+  } else {
+    // SSR fallback: minimal API
+    getLocation = () => ({ path: '/', query: {} });
+    initial = getLocation();
+    const match = matchRoute(routes, initial.path);
+    store = Store<RouteState>({
+      path: initial.path,
+      params: match.params,
+      query: initial.query
+    });
+    update = () => {};
+    push = () => {};
+    replace = () => {};
+    back = () => {};
+  }
+
+  return {
+    store,
+    push,
+    replace,
+    back,
+    subscribe: store.subscribe,
+    matchRoute: (path: string) => matchRoute(routes, path),
+    getCurrent: () => store.getState()
+  };
+}
+
+// Singleton router instance for global access
+
+export function initRouter(config: RouterConfig) {
+  const router = useRouter(config);
+  if (typeof window !== 'undefined') {
+    (window as any).__routerInstance = router;
+  }
+  return router;
+}
+
+// SSR/static site support: match route for a given path
+export function matchRouteSSR(routes: Route[], path: string) {
+  return matchRoute(routes, path);
+}

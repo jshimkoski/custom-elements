@@ -1,8 +1,10 @@
+
 # Examples
 
-Quick, readable examples for common patterns. All code matches the runtime API and is type-safe.
+Quick, readable examples for common patterns. All code matches the runtime API and is type-safe. Includes stateless components, plugin system, router, SSR, error boundaries, event bus, global store, input binding, async templates, and VDOM utilities.
 
 ---
+
 
 ## Hello World
 
@@ -19,13 +21,24 @@ component('hello-world', {
 <hello-world></hello-world>
 ```
 
+## Stateless Component
+
+```typescript
+component('stateless-demo', {
+  template: () => `<div>Pure view, no state!</div>`
+});
+```
+
+```html
+<stateless-demo></stateless-demo>
+```
+
 ---
+
 
 ## Simple Counter
 
 ```typescript
-import { component } from '@jasonshimmy/custom-elements-runtime';
-
 component('simple-counter', {
   state: { count: 0 },
   template: (state) => `
@@ -39,6 +52,79 @@ component('simple-counter', {
 
 ```html
 <simple-counter></simple-counter>
+```
+
+## Plugin System Example
+
+```typescript
+import { useRuntimePlugin } from '@jasonshimmy/custom-elements-runtime';
+useRuntimePlugin({
+  onInit: (config) => { /* global setup */ },
+  onRender: (state, api) => { /* global render logic */ },
+  onError: (error, state, api) => { /* global error handling */ }
+});
+```
+
+## Router Example
+
+```typescript
+import { initRouter } from '@jasonshimmy/custom-elements-runtime';
+const router = initRouter({ routes: [
+  { path: '/', component: 'home-page' },
+  { path: '/about', component: 'about-page' }
+] });
+```
+
+## SSR Example
+
+```typescript
+import { renderToString, matchRouteSSR } from '@jasonshimmy/custom-elements-runtime';
+const html = renderToString({
+  state: { title: 'SSR Example' },
+  template: ({ title }) => `<h1>${title}</h1>`
+});
+const matched = matchRouteSSR([
+  { path: '/', component: 'home-page' }
+], '/');
+```
+
+## Error Boundary Example
+
+```typescript
+component('error-demo', {
+  state: { fail: false },
+  template: ({ fail }) => fail ? (() => { throw new Error('Oops!'); })() : `<div>All good</div>`,
+  onError: (error, state) => `<div>Error: ${error.message}</div>`
+});
+```
+## Event Bus & Global Store Example
+
+```typescript
+import { Store, eventBus } from '@jasonshimmy/custom-elements-runtime';
+const store = Store({ count: 0 });
+store.subscribe((state) => { /* react to changes */ });
+eventBus.on('my-event', (data) => { /* handle event */ });
+```
+
+## Input Binding Example
+
+```typescript
+component('input-demo', {
+  state: { message: '' },
+  template: ({ message }) => `<input type="text" data-model="message" />`,
+});
+```
+
+## Async Template Example
+
+```typescript
+component('async-demo', {
+  state: {},
+  template: async () => {
+    const data = await fetch('/api/data').then(r => r.json());
+    return `<div>Loaded: ${data.value}</div>`;
+  }
+});
 ```
 
 ---
@@ -76,9 +162,11 @@ component('async-demo', {
 component('focus-demo', {
   state: { text: '' },
   template: (state) => `
-    ${state.text}
-    <input type="text" data-model="text" />
-    <textarea data-model="text"></textarea>
+    <div>
+      ${state.text}
+      <input type="text" data-model="text" />
+      <textarea data-model="text"></textarea>
+    </div>
   `
 });
 ```

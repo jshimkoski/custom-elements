@@ -1,8 +1,10 @@
+
 # Runtime API Reference
 
-All APIs are strictly typed and match the implementation in `src/lib`. Only documented features are supported. This reference covers all exports, configuration options, event handlers, input binding, global store, event bus, refs, computed, SSR, error boundaries, plugin system, VDOM, template helpers, and build tools.
+All APIs are strictly typed and match the implementation in `src/lib`. Only documented features are supported. This reference covers all exports, configuration options, event handlers, input binding, global store, event bus, refs, computed, SSR, error boundaries, plugin system, router, VDOM, template helpers, and build tools.
 
 ---
+
 
 ## Component Configuration
 
@@ -11,17 +13,18 @@ export interface ComponentConfig<S extends ComponentState, C extends Record<stri
   template: (state: S & C, api: ComponentAPI<S & C>) => string | Promise<string> | CompiledTemplate<S & C>;
   state?: S; // Optional for stateless components
   computed?: { [K in keyof C]: (state: S) => C[K] };
-  style?: string | ((state: S & C) => string); // Static string or dynamic function
+  style?: string | ((state: S & C) => string);
   refs?: Record<string, RefHandler<S & C>>;
   onMounted?: LifecycleHandler<S & C>;
   onUnmounted?: LifecycleHandler<S & C>;
   onError?: (error: Error, state: S & C, api: ComponentAPI<S & C>) => void;
-  debug?: boolean; // Enable detailed runtime logs for this component
-  reflect?: string[]; // Whitelist of state keys to reflect as attributes
-  hydrate?: (el: Element | ShadowRoot, state: S & C, api: ComponentAPI<S & C>) => void; // SSR hydration
-  [handler: string]: ((...args: unknown[]) => unknown) | unknown; // Event handlers for data-on-*
+  debug?: boolean;
+  reflect?: string[];
+  hydrate?: (el: Element | ShadowRoot, state: S & C, api: ComponentAPI<S & C>) => void;
+  [handler: string]: ((...args: unknown[]) => unknown) | unknown;
 }
 ```
+
 
 **Attribute Reflection Caveats & Best Practices:**
 - Only primitive state keys (`string`, `number`, `boolean`) are supported for attribute reflection. Objects and arrays are ignored.
@@ -30,16 +33,21 @@ export interface ComponentConfig<S extends ComponentState, C extends Record<stri
 - If you override `attributeChangedCallback`, you must call `super.attributeChangedCallback` to preserve reactivity.
 - Reflected attributes are automatically kept in sync with state changes.
 
+
 **Interaction with `data-model`/`data-bind`:**
 - If a state key is both reflected and bound to an input via `data-model` or `data-bind`, the runtime will keep them in sync. User input always wins for controlled inputs, preventing sync errors. Rapid external updates to the attribute may be overwritten by user typing.
 - Avoid updating the attribute and input at the exact same time to prevent unexpected UI flicker.
+
 
 **Notes:**
 - `debug` (optional): If true, enables detailed runtime logs (warnings, errors, mutation diagnostics) for this component only. Default is false.
 - Event handlers for `data-on-*` and `refs` must be defined on the config object.
 - Only one event handler per event type per element is attached; previous handlers are removed on rerender.
 - `computed` is for derived, reactive values.
+- Stateless components are supported: omit `state` for pure view components.
+- All configuration options are strictly typed and match the runtime implementation.
 ---
+
 
 ## Debug Mode Example
 
@@ -55,8 +63,8 @@ component('my-debug-demo', {
 ```
 
 All internal warnings and errors will only appear if `debug` is set to true.
-
 ---
+
 
 ## Component API
 
@@ -69,7 +77,6 @@ export interface ComponentAPI<T extends ComponentState = ComponentState> {
   emitGlobal<U = any>(eventName: string, data?: U): void;
 }
 ```
-
 ---
 
 ## Plugin System
@@ -78,6 +85,93 @@ export interface ComponentAPI<T extends ComponentState = ComponentState> {
 export function useRuntimePlugin<S extends ComponentState, C extends Record<string, any>>(
   plugin: {
     onInit?: (config: ComponentConfig<S, C>) => void;
+    onRender?: (state: S & C, api: ComponentAPI<S & C>) => void;
+    onError?: (error: Error, state: S & C, api: ComponentAPI<S & C>) => void;
+  }
+): void;
+```
+
+**Usage:**
+```typescript
+useRuntimePlugin({
+  onInit: (config) => { /* global setup */ },
+  onRender: (state, api) => { /* global render logic */ },
+  onError: (error, state, api) => { /* global error handling */ }
+});
+```
+---
+## Router
+
+Lightweight, functional router for custom elements. SSR/static site compatible.
+
+```typescript
+import { initRouter, useRouter, matchRouteSSR } from '@jasonshimmy/custom-elements-runtime';
+
+const routes = [
+  { path: '/', component: 'home-page' },
+  { path: '/about', component: 'about-page' },
+  { path: '/user/:id', component: 'user-page' }
+];
+
+const router = initRouter({ routes });
+router.push('/about');
+```
+
+- `<router-view>` custom element renders matched component
+- SSR: use `matchRouteSSR(routes, path)` for static site generation
+
+---
+
+## Global Store & Event Bus
+
+Built-in reactive store and event bus for cross-component state and communication.
+
+```typescript
+import { Store, eventBus } from '@jasonshimmy/custom-elements-runtime';
+
+const store = Store({ count: 0 });
+store.subscribe((state) => { /* react to changes */ });
+eventBus.on('my-event', (data) => { /* handle event */ });
+```
+
+---
+
+## SSR & Hydration
+
+Universal rendering, opt-in hydration, and template matching. SSR excludes refs, event listeners, and lifecycle hooks.
+
+```typescript
+import { renderToString, renderComponentsToString, generateHydrationScript } from '@jasonshimmy/custom-elements-runtime';
+```
+
+---
+
+## Error Boundaries
+
+Use `onError` in component config or plugin for robust error handling and fallback UI.
+
+---
+
+## Input Binding
+
+Declarative, type-safe event and input binding via `data-on-*`, `data-model`, and `data-bind`.
+
+---
+
+## VDOM & Template Helpers
+
+Utilities for virtual DOM diffing, compiling templates, and CSS-in-JS.
+
+```typescript
+import { html, compile, css, classes, styles } from '@jasonshimmy/custom-elements-runtime';
+```
+
+---
+
+## Build Tools
+
+Utilities for SSR, static site generation, and advanced rendering.
+---
     onRender?: (state: S & C, api: ComponentAPI<S & C>) => void;
     onError?: (error: Error, state: S & C, api: ComponentAPI<S & C>) => void;
   }
@@ -161,7 +255,7 @@ export type CompiledTemplate<S extends ComponentState = ComponentState> = {
 
 ```typescript
 import { Store } from '@jasonshimmy/custom-elements-runtime';
-const globalState = new Store({ theme: 'light', count: 0 });
+const globalState = Store({ theme: 'light', count: 0 });
 globalState.subscribe((state) => { console.log('Global changed:', state.count); });
 ```
 

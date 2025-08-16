@@ -1,14 +1,17 @@
+
 # Form Input Bindings in Custom Elements Runtime
 
-This document describes all supported ways to use form input bindings in the custom-elements runtime (`runtime.ts`). It covers binding strategies, modifiers, supported input types, and provides accurate code examples based on the current implementation.
+This document describes all supported ways to use form input bindings in the custom-elements runtime (`runtime.ts`). It covers binding strategies, modifiers, supported input types, stateless components, plugin system, SSR, error boundaries, event bus, global store, deep binding, and edge cases. All examples are strictly typed and match the current implementation.
 
 ---
+
 
 ## Overview
 
-Form input bindings allow you to declaratively connect HTML form controls (input, textarea, select, etc.) to your component's reactive state. The runtime automatically synchronizes values, handles user input, and supports advanced features like modifiers and multi-checkbox groups.
+Form input bindings allow you to declaratively connect HTML form controls (input, textarea, select, etc.) to your component's reactive state. The runtime automatically synchronizes values, handles user input, and supports advanced features like modifiers, multi-checkbox groups, deep binding, stateless components, plugin system, SSR, error boundaries, and global store integration.
 
 ---
+
 
 ## Supported Input Types
 
@@ -20,6 +23,7 @@ Form input bindings allow you to declaratively connect HTML form controls (input
 - `<select>`
 
 ---
+
 
 ## Basic Usage
 
@@ -43,7 +47,15 @@ state: {
 }
 ```
 
+**Stateless Example:**
+```typescript
+component('stateless-input', {
+  template: () => `<input type="text" data-model="message">`
+});
+```
+
 ---
+
 
 ## Modifiers
 
@@ -68,6 +80,7 @@ state: {
 
 ---
 
+
 ## Checkbox Bindings
 
 ### Single Checkbox
@@ -77,14 +90,40 @@ state: {
 ```
 
 **State Example:**
+
+## Deep Binding with `data-bind`
+
+Bind to nested state objects or arrays using dot notation or array indices:
+
+```html
+<input type="text" data-bind="user.address.street" />
+<input type="checkbox" data-bind="items[0].checked" />
+```
+
+**State Example:**
 ```typescript
 state: {
-  accepted: false
+  user: { address: { street: '' } },
+  items: [{ checked: false }]
 }
 ```
 
-- When checked, state is set to `true`.
-- When unchecked, state is set to `false`.
+## Plugin System, SSR, and Error Boundaries
+
+- Input binding works with plugin system hooks (`onInit`, `onRender`, `onError`).
+- SSR: Input bindings are excluded from SSR output; hydration restores input sync.
+- Error boundaries: Use `onError` for fallback UI and diagnostics during input sync.
+
+## Global Store & Event Bus Integration
+
+- Use input bindings with global store and event bus for cross-component state and communication.
+
+## Edge Cases & Best Practices
+
+- Controlled input sync always prioritizes user typing over state updates.
+- Only one event handler per event type per element; handlers must be defined on the config object.
+- Use stateless components for pure view/input scenarios.
+- SSR hydration is opt-in; input bindings are restored on hydration.
 
 #### True/False values
 
@@ -93,7 +132,8 @@ state: {
   type="checkbox"
   data-model="accepted"
   data-true-value="yes"
-  data-false-value="no" />
+  data-false-value="no"
+>
 ```
 
 `data-true-value` and `data-false-value` are attributes that only work with data-model.
