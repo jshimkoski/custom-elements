@@ -9,7 +9,8 @@ import { Store } from './store';
 
 export interface Route {
   path: string;
-  component: string;
+  component?: string;
+  load?: () => Promise<{ default: string | HTMLElement | Function }>;
 }
 
 export interface RouterConfig {
@@ -50,6 +51,28 @@ const matchRoute = (routes: Route[], path: string): { route: Route | null; param
   return { route: null, params: {} };
 };
 
+// Async component loader cache
+const componentCache: Record<string, any> = {};
+
+/**
+ * Loads a route's component, supporting both static and async.
+ * @param route Route object
+ * @returns Promise resolving to the component
+ */
+export async function resolveRouteComponent(route: Route): Promise<any> {
+  if (route.component) return route.component;
+  if (route.load) {
+    if (componentCache[route.path]) return componentCache[route.path];
+    try {
+      const mod = await route.load();
+      componentCache[route.path] = mod.default;
+      return mod.default;
+    } catch (err) {
+      throw new Error(`Failed to load component for route: ${route.path}`);
+    }
+  }
+  throw new Error(`No component or loader defined for route: ${route.path}`);
+}
 
 export function useRouter(config: RouterConfig) {
   const { routes, base = '' } = config;
@@ -116,7 +139,8 @@ export function useRouter(config: RouterConfig) {
     back,
     subscribe: store.subscribe,
     matchRoute: (path: string) => matchRoute(routes, path),
-    getCurrent: () => store.getState()
+    getCurrent: () => store.getState(),
+    resolveRouteComponent
   };
 }
 
