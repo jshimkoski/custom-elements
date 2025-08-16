@@ -109,7 +109,7 @@ import { mountVNode, patchVNode, parseVNodeFromHTML } from './v-dom';
 import { useRouter } from './router';
 import type { VNode } from './v-dom';
 import type { CompiledTemplate } from './template-compiler';
-import type { RouteState, RouterConfig } from './router';
+import type { RouterConfig } from './router';
 
 
 // ============================================================================
@@ -1266,13 +1266,16 @@ export function component<S extends ComponentState, C extends Record<string, any
 export function initRouter(config: RouterConfig) {
   const router = useRouter(config);
   component('router-view', {
-    template: (_state, _api) => {
+    template: async (_state, _api) => {
       if (!router) return '<div>Router not initialized.</div>';
-      const current = router.getCurrent() as RouteState;
+      const current = router.getCurrent() as import('./router').RouteState;
       const { path } = current;
       const match = router.matchRoute(path);
       if (!match.route) return '<div>Not found</div>';
-      // Render the matched component
+      // Ensure custom element is registered before rendering
+      if (match.route.load) {
+        await match.route.load();
+      }
       return `<${match.route.component}></${match.route.component}>`;
     }
   });
