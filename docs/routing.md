@@ -1,30 +1,29 @@
+🚦 Routing
 
-# Routing System for Custom Elements Runtime
-
-A lightweight, scalable, and developer-friendly router designed for seamless integration with Custom Elements Runtime. Zero dependencies, functional API, SSR/static site compatible, stateless component support, plugin system, error boundaries, event bus, global store, and easy to use.
+A lightweight, scalable router designed for seamless integration with Custom Elements Runtime. Zero dependencies, functional API, SSR/static site compatible, supports stateless components, plugins, error boundaries, event bus, global store, and is easy to use.
 
 ---
-
 
 ## Features
-- Declarative route definitions
-- Functional API: no classes, pure functions
-- Reactive route state via Store
-- `<router-view>` custom element for rendering matched components
-- Programmatic navigation: `push`, `replace`, `back`
-- Route params and query support
-- SSR/static site compatible
-- Zero dependencies
-- Works with stateless and stateful components
-- Plugin system and error boundaries supported
-- Event bus and global store integration
+
+- Declarative route definitions  
+- Functional API: pure functions, no classes  
+- Reactive route state via Store  
+- `<router-view>` custom element renders matched components  
+- Programmatic navigation: `push`, `replace`, `back`  
+- Route params and query support  
+- SSR and static site compatible  
+- Zero dependencies  
+- Supports stateless and stateful components  
+- Plugin system and error boundaries supported  
+- Event bus and global store integration  
 
 ---
-
 
 ## Getting Started
 
-### 1. Define Routes
+### Define Routes
+
 ```typescript
 const routes = [
   { path: '/', component: 'home-page' },
@@ -33,14 +32,16 @@ const routes = [
 ];
 ```
 
-### 2. Initialize Router
+### Initialize Router
+
 ```typescript
 import { initRouter } from '@jasonshimmy/custom-elements-runtime';
 
 const router = initRouter({ routes });
 ```
 
-### 3. Use `<router-view>` in Your App
+### Use `<router-view>` in Your App
+
 ```typescript
 component('app-root', {
   template: () => `
@@ -55,7 +56,8 @@ component('app-root', {
 });
 ```
 
-### 4. Stateless Route Component Example
+### Stateless Route Component Example
+
 ```typescript
 component('stateless-home', {
   template: () => `<h1>Welcome Home!</h1>`
@@ -68,34 +70,42 @@ component('stateless-home', {
 ## API Reference
 
 ### `initRouter(config: RouterConfig)`
+
 Initializes the router and exposes navigation methods.
 - `routes`: Array of `{ path, component }` objects
 - Returns: `{ store, push, replace, back, subscribe, matchRoute, getCurrent }`
 
 ### `useRouter(config: RouterConfig)`
+
 Lower-level API for advanced use cases.
 
 ### `<router-view>`
+
 Custom element that renders the matched component for the current route.
 
 ### Route Matching
+
 - Supports path params (e.g., `/user/:id`)
 - Supports query params (e.g., `/user/1?tab=info`)
 
 ### Navigation
+
 - `push(path: string)`: Navigate to a new route
 - `replace(path: string)`: Replace current route
 - `back()`: Go back in history
 
 ### SSR & Static Site Support
+
 - `matchRouteSSR(routes, path)`: Match a route for a given path on the server
 - Pre-render each route to HTML for static site generation
 - Works with stateless components and plugin system
+
 ## Plugin System, Error Boundaries, Event Bus, and Global Store
 
 - Router works with plugin system hooks (`onInit`, `onRender`, `onError`).
 - Use error boundaries for fallback UI and diagnostics during navigation.
 - Integrate with event bus and global store for cross-component state and communication.
+
 ## Edge Cases & Best Practices
 
 - SSR hydration requires template matching for seamless transitions.
@@ -159,6 +169,7 @@ staticPages.forEach(page => {
 ---
 
 ## Benefits
+
 - **Scalable:** Supports nested routes, params, SSR/static sites
 - **Robust:** Uses Store for reactivity, eventBus for communication
 - **Developer Friendly:** Declarative config, simple API, automatic rendering
@@ -168,6 +179,7 @@ staticPages.forEach(page => {
 ---
 
 ## Advanced Usage
+
 - Route guards, lazy loading, nested routes can be added as needed
 - Subscribe to route changes via `router.store.subscribe(fn)`
 - Access current route via `router.getCurrent()`
@@ -175,4 +187,5 @@ staticPages.forEach(page => {
 ---
 
 ## Summary
+
 This router makes navigation in Custom Elements Runtime projects effortless, robust, and maintainable—ideal for micro-frontends, design systems, SSR, and modern web apps.

@@ -1,24 +1,25 @@
+# ⚙️ Advanced Use Cases
 
-# Advanced Use Cases
-
-Explore advanced patterns and features available in the Custom Elements Runtime.
-
-## Key Patterns
-
-**Key Patterns & Features:**
-- **SSR & Hydration:** Universal HTML rendering, opt-in hydration (`data-hydrate`), and strict template matching. SSR excludes refs, event listeners, and lifecycle hooks.
-- **Plugin System:** Extend runtime with `useRuntimePlugin` and global/component hooks (`onInit`, `onRender`, `onError`).
-- **Error Boundaries:** Use `onError` for fallback UI, diagnostics, and recovery; all errors surfaced for debugging.
-- **Global Store & Event Bus:** Built-in reactive store and event bus for cross-component state and communication.
-- **Computed Properties & Refs:** Derived state with `computed`; direct DOM access with `refs`.
-- **Lifecycle Hooks & Async Templates:** Setup/teardown with `onMounted`/`onUnmounted`; async rendering via Promise templates.
-- **Declarative Event Handling & VDOM:** Type-safe handlers via `data-on-*`; fine-grained DOM diffing, focus preservation, and robust input sync.
+Explore powerful patterns and features built into Custom Elements Runtime.
 
 ---
 
-## Example: Advanced Component
+## 🔑 Key Features
 
-```typescript
+- **SSR & Hydration:** Render HTML on the server, hydrate on the client (`data-hydrate`). SSR skips refs, listeners, and lifecycle hooks.
+- **Plugin System:** Extend runtime with `useRuntimePlugin` and hooks like `onInit`, `onRender`, and `onError`.
+- **Error Boundaries:** Catch errors with `onError` and provide fallback UI or diagnostics.
+- **Global Store & Events:** Built-in reactive store and event bus for shared state and communication.
+- **Refs & Computed State:** Use `data-ref` for direct DOM access and `computed` for derived values.
+- **Lifecycle Hooks:** Add setup/cleanup logic with `onMounted` and `onUnmounted`.
+- **Async Templates:** Render templates from `async` functions (Promises supported).
+- **Declarative Events & VDOM:** Use `data-on-*`, preserve focus, and enjoy efficient DOM updates.
+
+---
+
+## 🧩 Example: Advanced Component
+
+```ts
 import { component, html, css, compile } from '@jasonshimmy/custom-elements-runtime';
 
 component('advanced-demo', {
@@ -35,8 +36,8 @@ component('advanced-demo', {
     button { font-size: 1.2rem; padding: 0.5rem 1rem; }
   `,
   refs: {
-    myButton: (element, state, api) => {
-      element.addEventListener('click', () => {
+    myButton: (el, state, api) => {
+      el.addEventListener('click', () => {
         state.count++;
         api.emit('button-clicked', { count: state.count });
       });
@@ -59,9 +60,9 @@ component('advanced-demo', {
 
 ---
 
-## Example: Async Template
+## ⏳ Example: Async Template
 
-```typescript
+```ts
 component('async-advanced', {
   state: { loading: true, data: null },
   template: async (state) => {
@@ -77,15 +78,14 @@ component('async-advanced', {
 
 ---
 
+## 🔌 Example: Plugin Usage
 
-## Example: Plugin Usage
-
-```typescript
+```ts
 import { useRuntimePlugin } from '@jasonshimmy/custom-elements-runtime';
 
 useRuntimePlugin({
   onInit: (config) => {
-    // Add analytics, logging, etc.
+    // Analytics, logging, etc.
   },
   onRender: (state, api) => {
     // Custom render logic
@@ -98,29 +98,34 @@ useRuntimePlugin({
 
 ---
 
-## Example: Router Usage
+## 🌐 Example: Router
 
-```typescript
+```ts
 import { initRouter } from '@jasonshimmy/custom-elements-runtime';
-const router = initRouter({ routes: [
-  { path: '/', component: 'home-page' },
-  { path: '/about', component: 'about-page' }
-] });
+
+const router = initRouter({
+  routes: [
+    { path: '/', component: 'home-page' },
+    { path: '/about', component: 'about-page' }
+  ]
+});
 ```
 
 ---
 
-## Example: Stateless Component
+## 🚫 Example: Stateless Component
 
-```typescript
+```ts
 component('stateless-demo', {
   template: () => html`<div>Pure view, no state!</div>`()
 });
 ```
 
-## Example: Dynamic Style
+---
 
-```typescript
+## 🎨 Example: Dynamic Style
+
+```ts
 component('advanced-style-demo', {
   state: { level: 1 },
   template: ({ level }) => html`<div>Level: ${level}</div>`({ level }),
@@ -133,4 +138,6 @@ component('advanced-style-demo', {
 });
 ```
 
-**See [`src/lib/runtime.ts`](src/lib/runtime.ts) for full API docs and advanced usage.**
+---
+
+**📄 Full API Docs:** See [`src/lib/runtime.ts`](src/lib/runtime.ts) for all available options and advanced patterns.

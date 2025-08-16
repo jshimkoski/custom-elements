@@ -1,16 +1,12 @@
+# 📦 Examples
 
-# Examples
-
-Quick, readable examples for common patterns.
+Quick and readable examples for common patterns.
 
 ---
 
+## 👋 Hello World
 
-## Hello World
-
-```typescript
-import { component, html } from '@jasonshimmy/custom-elements-runtime';
-
+```ts
 component('hello-world', {
   state: { name: 'World' },
   template: (state) => html`<h1>Hello, ${state.name}!</h1>`()
@@ -21,9 +17,11 @@ component('hello-world', {
 <hello-world></hello-world>
 ```
 
-## Stateless Component
+---
 
-```typescript
+## 🚫 Stateless Component
+
+```ts
 component('stateless-demo', {
   template: () => html`<div>Pure view, no state!</div>`()
 });
@@ -35,16 +33,15 @@ component('stateless-demo', {
 
 ---
 
+## ➕ Simple Counter
 
-## Simple Counter
-
-```typescript
+```ts
 component('simple-counter', {
   state: { count: 0 },
   template: (state) => html`
     <button data-on-click="increment">Count: ${state.count}</button>
   `(state),
-  increment(_e, state) {
+  increment(_, state) {
     state.count++;
   }
 });
@@ -54,70 +51,85 @@ component('simple-counter', {
 <simple-counter></simple-counter>
 ```
 
-## Plugin System Example
+---
 
-```typescript
-import { useRuntimePlugin } from '@jasonshimmy/custom-elements-runtime';
+## 🔌 Plugin System
+
+```ts
 useRuntimePlugin({
   onInit: (config) => { /* global setup */ },
-  onRender: (state, api) => { /* global render logic */ },
-  onError: (error, state, api) => { /* global error handling */ }
+  onRender: (state, api) => { /* global logic */ },
+  onError: (error, state, api) => { /* error handling */ }
 });
 ```
 
-## Router Example
+---
 
-```typescript
-import { initRouter } from '@jasonshimmy/custom-elements-runtime';
-const router = initRouter({ routes: [
-  { path: '/', component: 'home-page' },
-  { path: '/about', component: 'about-page' }
-] });
+## 🧭 Router Setup
+
+```ts
+const router = initRouter({
+  routes: [
+    { path: '/', component: 'home-page' },
+    { path: '/about', component: 'about-page' }
+  ]
+});
 ```
 
-## SSR Example
+---
 
-```typescript
-import { renderToString, matchRouteSSR } from '@jasonshimmy/custom-elements-runtime';
+## 🖥️ SSR Example
+
+```ts
 const html = renderToString({
   state: { title: 'SSR Example' },
   template: ({ title }) => html`<h1>${title}</h1>`({ title })
 });
+
 const matched = matchRouteSSR([
   { path: '/', component: 'home-page' }
 ], '/');
 ```
 
-## Error Boundary Example
+---
 
-```typescript
+## ⚠️ Error Boundary
+
+```ts
 component('error-demo', {
   state: { fail: false },
   template: ({ fail }) => fail ? (() => { throw new Error('Oops!'); })() : `<div>All good</div>`,
-  onError: (error, state) => `<div>Error: ${error.message}</div>`
+  onError: (err) => `<div>Error: ${err.message}</div>`
 });
 ```
-## Event Bus & Global Store Example
 
-```typescript
-import { Store, eventBus } from '@jasonshimmy/custom-elements-runtime';
+---
+
+## 📡 Global Store & Event Bus
+
+```ts
 const store = Store({ count: 0 });
 store.subscribe((state) => { /* react to changes */ });
+
 eventBus.on('my-event', (data) => { /* handle event */ });
 ```
 
-## Input Binding Example
+---
 
-```typescript
+## ✍️ Input Binding
+
+```ts
 component('input-demo', {
   state: { message: '' },
   template: ({ message }) => html`<input type="text" data-model="message" />`({ message }),
 });
 ```
 
-## Async Template Example
+---
 
-```typescript
+## ⏳ Async Template
+
+```ts
 component('async-demo', {
   state: {},
   template: async () => {
@@ -129,26 +141,25 @@ component('async-demo', {
 
 ---
 
-## Selective Hydration Example
+## ⚡ Selective Hydration
 
 ```html
 <div data-hydrate>
-  <!-- Only this region will be hydrated on the client -->
+  <!-- Only this part hydrates -->
 </div>
 ```
 
 ---
 
-## Focus Preservation Example
+## 🔒 Focus Preservation
 
-```typescript
-// Typing in either field will preserve focus and cursor position
+```ts
 component('focus-demo', {
   state: { text: '' },
   template: (state) => html`
     <div>
       ${state.text}
-      <input type="text" data-model="text" />
+      <input data-model="text" />
       <textarea data-model="text"></textarea>
     </div>
   `(state)
@@ -157,234 +168,95 @@ component('focus-demo', {
 
 ---
 
-## Todo App Example
+## ✅ Todo App (Full Example)
 
-```typescript
-import { component, html, css, type ComponentState } from '@jasonshimmy/custom-elements-runtime';
+A complete, interactive Todo App using state, computed properties, dynamic styles, and lifecycle hooks.
 
-interface Todo {
-  id: number;
-  text: string;
-  completed: boolean;
-}
-
-interface TodoAppState extends ComponentState {
-  todos: Todo[];
-  newTodo: string;
-  filter: 'all' | 'active' | 'completed';
-}
-
-interface TodoAppComputed {
-  filteredTodos: Todo[];
-  activeTodos: Todo[];
-  completedCount: number;
-}
-
+```ts
 component<TodoAppState, TodoAppComputed>('todo-app', {
   state: {
     todos: [
       { id: 1, text: 'Learn TypeScript', completed: true },
-      { id: 2, text: 'Build awesome components', completed: false },
-      { id: 3, text: 'Ship to production', completed: false }
+      { id: 2, text: 'Build components', completed: false },
+      { id: 3, text: 'Deploy', completed: false }
     ],
     newTodo: '',
     filter: 'all'
   },
   computed: {
-    filteredTodos: (state) => state.todos.filter((todo) => {
-      if (state.filter === 'active') return !todo.completed;
-      if (state.filter === 'completed') return todo.completed;
-      return true;
-    }),
-    activeTodos: (state) => state.todos.filter((todo) => !todo.completed),
-    completedCount: (state) => state.todos.filter((todo) => todo.completed).length
+    filteredTodos: (s) => s.todos.filter(t =>
+      s.filter === 'active' ? !t.completed :
+      s.filter === 'completed' ? t.completed : true
+    ),
+    activeTodos: (s) => s.todos.filter(t => !t.completed),
+    completedCount: (s) => s.todos.filter(t => t.completed).length
   },
   template: (state, api) => html`
     <div class="todo-app">
       <header>
         <h1>📝 Todo App</h1>
-        <input 
-          type="text" 
-          data-model="newTodo"
-          placeholder="What needs to be done?"
+        <input
           class="new-todo"
+          type="text"
+          data-model="newTodo"
           data-on-keydown="handleKeydown"
+          placeholder="What needs to be done?"
         >
       </header>
       <main>
         <div class="filters">
-          <button
-            class="${state.filter === 'all' ? 'active' : ''}"
-            data-on-click="handleAllFilter"
-          >
-            All (${state.todos.length})
-          </button>
-          <button 
-            class="${state.filter === 'active' ? 'active' : ''}"
-            data-on-click="handleActiveFilter"
-          >
-            Active (${state.activeTodos.length})
-          </button>
-          <button 
-            class="${state.filter === 'completed' ? 'active' : ''}"
-            data-on-click="handleCompletedFilter"
-          >
-            Completed (${state.completedCount})
-          </button>
+          <button class="${state.filter === 'all' ? 'active' : ''}" data-on-click="handleAllFilter">All (${state.todos.length})</button>
+          <button class="${state.filter === 'active' ? 'active' : ''}" data-on-click="handleActiveFilter">Active (${state.activeTodos.length})</button>
+          <button class="${state.filter === 'completed' ? 'active' : ''}" data-on-click="handleCompletedFilter">Completed (${state.completedCount})</button>
         </div>
         <ul class="todo-list">
-          ${state.filteredTodos.map((todo) => html`
-            <li key="${todo.id}" class="${todo.completed ? 'completed' : ''}">
-              <input 
-                type="checkbox" 
-                ${todo.completed ? 'checked' : ''}
-                data-todo-id="${todo.id}"
-                data-action="toggle"
-                data-on-change="handleToggle"
-              >
+          ${state.filteredTodos.map(todo => html`
+            <li class="${todo.completed ? 'completed' : ''}" key="${todo.id}">
+              <input type="checkbox" ${todo.completed ? 'checked' : ''} data-todo-id="${todo.id}" data-on-change="handleToggle">
               <span class="text">${todo.text}</span>
-              <button 
-                class="delete"
-                data-todo-id="${todo.id}"
-                data-action="delete"
-                data-on-click="handleDelete"
-              >
-                ×
-              </button>
+              <button class="delete" data-todo-id="${todo.id}" data-on-click="handleDelete">×</button>
             </li>
           `(state, api)).join('')}
         </ul>
       </main>
-      <footer>
-        <small>
-          ${state.activeTodos.length} items left
-        </small>
-      </footer>
+      <footer><small>${state.activeTodos.length} items left</small></footer>
     </div>
   `(state, api),
   style: css`
-    .todo-app {
-      max-width: 400px;
-      margin: 2rem auto;
-      padding: 1rem;
-      border-radius: 8px;
-      font-family: system-ui, sans-serif;
-    }
-    header h1 {
-      margin: 0 0 1rem 0;
-      text-align: center;
-      color: #333;
-    }
-    .new-todo {
-      width: 100%;
-      padding: 0.75rem;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      font-size: 1rem;
-      box-sizing: border-box;
-    }
-    .filters {
-      display: flex;
-      gap: 0.5rem;
-      margin: 1rem 0;
-    }
-    .filters button {
-      flex: 1;
-      padding: 0.5rem;
-      border: 1px solid #ddd;
-      background: white;
-      border-radius: 4px;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .filters button.active {
-      background: #007bff;
-      color: white;
-      border-color: #007bff;
-    }
-    .filters button:hover {
-      background: #f8f9fa;
-    }
-    .filters button.active:hover {
-      background: #0056b3;
-    }
-    .todo-list {
-      list-style: none;
-      padding: 0;
-      margin: 0;
-    }
-    .todo-list li {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      padding: 0.75rem 0;
-      border-bottom: 1px solid #eee;
-    }
-    .todo-list li.completed .text {
-      text-decoration: line-through;
-      color: #888;
-    }
-    .todo-list .text {
-      flex: 1;
-    }
-    .delete {
-      background: #dc3545;
-      color: white;
-      border: none;
-      border-radius: 50%;
-      width: 24px;
-      height: 24px;
-      cursor: pointer;
-      font-size: 16px;
-      line-height: 1;
-    }
-    .delete:hover {
-      background: #c82333;
-    }
-    footer {
-      text-align: center;
-      margin-top: 1rem;
-      color: #888;
-    }
+    .todo-app { max-width: 400px; margin: 2rem auto; font-family: system-ui; }
+    .new-todo { width: 100%; padding: 0.75rem; }
+    .filters { display: flex; gap: 0.5rem; margin: 1rem 0; }
+    .filters button { flex: 1; padding: 0.5rem; }
+    .filters button.active { background: #007bff; color: white; }
+    .todo-list li { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 0; }
+    .todo-list li.completed .text { text-decoration: line-through; color: #888; }
+    .delete { background: #dc3545; color: white; border: none; border-radius: 50%; width: 24px; height: 24px; }
   `,
   handleKeydown(e, state, api) {
-    if ('key' in e && e.key === 'Enter' && state.newTodo.trim()) {
-      const newId = Math.max(0, ...state.todos.map((t) => t.id)) + 1;
-      const todoText = state.newTodo.trim();
+    if (e.key === 'Enter' && state.newTodo.trim()) {
+      const id = Math.max(0, ...state.todos.map(t => t.id)) + 1;
+      state.todos.push({ id, text: state.newTodo.trim(), completed: false });
       state.newTodo = '';
-      state.todos.push({
-        id: newId,
-        text: todoText,
-        completed: false
-      });
-      api.emit('todo-added', { id: newId, text: todoText });
+      api.emit('todo-added', { id });
     }
   },
-  handleAllFilter(_e, state) {
-    state.filter = 'all';
-  },
-  handleActiveFilter(_e, state) {
-    state.filter = 'active';
-  },
-  handleCompletedFilter(_e, state) {
-    state.filter = 'completed';
-  },
+  handleAllFilter(_, state) { state.filter = 'all'; },
+  handleActiveFilter(_, state) { state.filter = 'active'; },
+  handleCompletedFilter(_, state) { state.filter = 'completed'; },
   handleDelete(e, state, api) {
-    const target = e.target;
-    const todoId = parseInt(target.getAttribute('data-todo-id') || '0');
-    state.todos = state.todos.filter((t) => t.id !== todoId);
-    api.emit('todo-removed', { id: todoId });
+    const id = Number(e.target.getAttribute('data-todo-id'));
+    state.todos = state.todos.filter(t => t.id !== id);
+    api.emit('todo-removed', { id });
   },
   handleToggle(e, state, api) {
-    const target = e.target;
-    const todoId = parseInt(target.getAttribute('data-todo-id') || '0');
-    state.todos = state.todos.map((t) =>
-      t.id === todoId ? { ...t, completed: target.checked } : t
+    const id = Number(e.target.getAttribute('data-todo-id'));
+    state.todos = state.todos.map(t =>
+      t.id === id ? { ...t, completed: e.target.checked } : t
     );
-    api.emit('todo-toggled', { id: todoId, completed: target.checked });
+    api.emit('todo-toggled', { id });
   },
-  onMounted: (state, api) => {
-    console.log('📝 Todo App mounted', state);
+  onMounted(state, api) {
+    console.log('📝 Todo App mounted');
     api.onGlobal?.('todo-toggled', (data) => {
       console.log('🔄 Todo toggled:', data);
     });
@@ -394,11 +266,10 @@ component<TodoAppState, TodoAppComputed>('todo-app', {
 
 ---
 
-## Static Style Example
+## 🎨 Static Style
 
-```typescript
+```ts
 component('static-style-example', {
-  state: {},
   template: () => `<div>Static</div>`,
   style: `div { color: blue; }`
 });
@@ -406,28 +277,12 @@ component('static-style-example', {
 
 ---
 
-## Dynamic Style Example
+## 🎨 Dynamic Style
 
-```typescript
+```ts
 component('dynamic-style-example', {
   state: { active: false },
   template: ({ active }) => html`<div>${active ? 'Active' : 'Inactive'}</div>`({ active }),
   style: (state) => `div { color: ${state.active ? 'green' : 'red'}; }`
 });
-```
-
----
-
-## Stateless Component Example
-
-```typescript
-import { component } from '@jasonshimmy/custom-elements-runtime';
-
-component('stateless-demo', {
-  template: () => `<div>Stateless component rendered!</div>`
-});
-```
-
-```html
-<stateless-demo></stateless-demo>
 ```

@@ -1,74 +1,66 @@
-
-# Core Concepts
+# 🌱 Core Concepts
 
 Essential building blocks for every component.
 
 ---
 
+## 🔄 Reactive State & Sync
 
-## Reactive State & Attribute Sync
-
-- State changes trigger re-renders; direct assignment is supported.
-- Controlled input sync: `data-model` and `data-bind` inputs stay in sync with state; user typing always wins.
-- Attribute-state sync: Primitive state keys are observed as attributes and kept in sync.
-- Focus preservation: Inputs retain focus and selection during updates.
-- Error boundaries: Use `onError` for fallback UI and diagnostics.
-- SSR: SSR excludes refs, event listeners, and lifecycle hooks; hydration is opt-in via `data-hydrate` and requires template matching.
-- Plugin system: Extend runtime with hooks (`onInit`, `onRender`, `onError`).
-- Router: Lightweight, functional router with SSR/static site support, `<router-view>`, route params, and programmatic navigation.
-- Global event bus & store: Built-in `eventBus` and `Store` for cross-component communication and global state.
-- Computed properties & refs: Use `computed` for derived state; direct DOM access via `refs`.
-- Lifecycle hooks: Use `onMounted` and `onUnmounted` for setup/teardown.
-- Stateless components: Omit `state` for pure view components.
-
----
-
-
-## Attribute-State Reactivity
-
-**How attributes sync with state:**
-
-- Primitive state keys (`string`, `number`, `boolean`) are automatically observed as attributes and kept in sync.
-- Attribute changes (parent, VDOM, or DOM mutation) update state and trigger re-render—no manual wiring needed.
-- Initial attributes are merged into state for seamless sync; no need to declare `observedAttributes`.
-- Only primitives are synced; objects/arrays are not. If overriding `attributeChangedCallback`, call `super` to preserve reactivity.
-
-**Best practices:**
-- Use attributes for parent-to-child communication and initial state, and use state for internal logic and reactivity.
-- Stateless components: omit `state` for pure view components.
-- Always define a state object in your component to enable attribute-state merging and type inference (unless stateless).
+- State is reactive—just assign to update and re-render.
+- Use `data-model` and `data-bind` for controlled inputs (user input always wins).
+- Primitive state keys sync to attributes automatically.
+- Input focus and cursor position are preserved during updates.
+- Use `onError` for fallback UIs and error handling.
+- SSR skips refs, event listeners, and lifecycle hooks.
+- Hydration is opt-in via `data-hydrate` and requires matching templates.
+- Plugins extend the runtime with `onInit`, `onRender`, and `onError`.
+- Built-in router, store, and event bus for shared state and navigation.
+- Use `computed` for derived values and `refs` for direct DOM access.
+- Lifecycle hooks: `onMounted` and `onUnmounted`.
+- Omit `state` to create stateless components.
 
 ---
 
+## 🔗 Attribute-State Reactivity
 
-## Functional Templates & Helpers
+- Primitives (`string`, `number`, `boolean`) sync between attributes and state.
+- Changes from parents or DOM mutations update state automatically.
+- Initial attributes merge into state—no need to declare `observedAttributes`.
+- Objects/arrays aren’t synced.
+- If overriding `attributeChangedCallback`, call `super` to preserve reactivity.
 
-- Templates are JavaScript functions that return HTML strings or use tagged helpers (`html`, `compile`, `css`, `classes`, `styles`, `ref`, `on`).
-- Templates can be compiled for performance and SSR.
-- Async templates are supported for data fetching and progressive rendering.
+**Best Practices:**
+- Use attributes for parent input and initial state.
+- Use state for internal logic and reactivity.
+- Define a `state` object for type inference and syncing.
 
-```typescript
-template: (state, api) => `<div>Hello ${state.name}!</div>`
+---
+
+## 🧩 Templates & Helpers
+
+- Templates are functions returning HTML strings or tagged template helpers.
+- Use `html`, `compile`, `css`, `classes`, and `styles` for clean templates.
+- Supports async templates for data loading.
+
+```ts
+template: (state) => `<div>Hello ${state.name}!</div>`
 ```
 
 ---
 
+## 🔍 Refs System
 
-## Refs System
+- Use `data-ref` for direct DOM access—no query selectors needed.
 
-- Direct DOM access without complex selectors. Use `refs` for imperative logic and event handling.
-
-```typescript
-import { component, html } from '@jasonshimmy/custom-elements-runtime';
-
+```ts
 component('ref-demo', {
   state: { clicks: 0 },
   template: (state) => html`
-    <button data-ref="myButton">Clicked: ${state.clicks} times</button>
+    <button data-ref="myButton">Clicked: ${state.clicks}</button>
   `(state),
   refs: {
-    myButton: (element, state, api) => {
-      element.addEventListener('click', () => {
+    myButton: (el, state, api) => {
+      el.addEventListener('click', () => {
         state.clicks++;
         api.emit('button-clicked', { clicks: state.clicks });
       });
@@ -77,85 +69,90 @@ component('ref-demo', {
 });
 ```
 
-## Event Binding
+---
 
-- Use `data-on-*` attributes for declarative, type-safe event binding. Handlers must be defined on the config object. Only one handler per event type per element is attached; previous handlers are removed on rerender.
+## ⚡ Event Binding
+
+- Use `data-on-*` attributes to declaratively bind event handlers.
+- Handlers must be defined on the component config.
+- One handler per event per element—auto-cleaned on rerender.
 
 ```html
 <button data-on-click="increment">Click Me</button>
 ```
 
-```typescript
+```ts
 increment(event, state, api) {
-  event.preventDefault()
+  event.preventDefault();
   state.count++;
   api.emit('count-incremented', { count: state.count });
 }
 ```
 
+---
 
-## Event Binding
+## 🔌 Plugin System
 
-- Use `data-on-*` attributes for declarative, type-safe event binding. Handlers must be defined on the config object. Only one handler per event type per element is attached; previous handlers are removed on rerender.
+Add global logic with runtime plugins.
 
-```html
-<button data-on-click="increment">Click Me</button>
-```
-
-```typescript
-increment(event, state, api) {
-  // ...existing code...
-}
-```
-
-## Plugin System
-
-- Extend runtime with hooks (`onInit`, `onRender`, `onError`) for global/component logic.
-
-```typescript
-import { useRuntimePlugin } from '@jasonshimmy/custom-elements-runtime';
+```ts
 useRuntimePlugin({
-  onInit: (config) => { /* global setup */ },
-  onRender: (state, api) => { /* global render logic */ },
-  onError: (error, state, api) => { /* global error handling */ }
+  onInit: (config) => { /* setup */ },
+  onRender: (state, api) => { /* custom logic */ },
+  onError: (error, state, api) => { /* error handling */ }
 });
 ```
 
-## Router
+---
 
-- Lightweight, functional router with SSR/static site support, `<router-view>`, route params, and programmatic navigation.
+## 🚦 Router
 
-```typescript
-import { initRouter } from '@jasonshimmy/custom-elements-runtime';
-const router = initRouter({ routes: [
-  { path: '/', component: 'home-page' },
-  { path: '/about', component: 'about-page' }
-] });
+Simple, SSR-friendly router with `<router-view>`, route params, and navigation.
+
+```ts
+const router = initRouter({
+  routes: [
+    { path: '/', component: 'home-page' },
+    { path: '/about', component: 'about-page' }
+  ]
+});
 ```
-
-## SSR & Hydration
-
-- Universal rendering, opt-in hydration, and template matching. SSR excludes refs, event listeners, and lifecycle hooks.
-
-## Error Boundaries
-
-- Use `onError` in component config or plugin for robust error handling and fallback UI.
-
-## Global Store & Event Bus
-
-- Built-in reactive store and event bus for cross-component state and communication.
-
-## Input Binding
-
-- Declarative, type-safe event and input binding via `data-on-*`, `data-model`, and `data-bind`.
 
 ---
 
-## Computed Properties
+## 🖥 SSR & Hydration
 
-- Use the `computed` property for derived, reactive values.
+- SSR renders static HTML.
+- Hydration is opt-in via `data-hydrate`.
+- Templates must match exactly for hydration to succeed.
 
-```typescript
+---
+
+## 🛡 Error Boundaries
+
+- Use `onError` in your component or plugin for catching and handling errors gracefully.
+
+---
+
+## 🌍 Global Store & Event Bus
+
+Built-in tools for shared state and cross-component communication.
+
+```ts
+const store = Store({ count: 0 });
+store.subscribe((state) => console.log(state.count));
+
+eventBus.emit('event-name', { some: 'data' });
+eventBus.on('event-name', (data) => console.log(data));
+```
+
+---
+
+## 🧠 Computed Properties
+
+Create reactive, derived values with `computed`.
+
+```ts
 component('user-profile', {
   state: {
     firstName: 'Jane',
@@ -176,12 +173,12 @@ component('user-profile', {
 
 ---
 
-## Automatic Event Binding
+## 🧷 Automatic Event Binding
 
-- Define event handlers in your config and use `data-on-*` attributes for declarative, type-safe event handling.
-- Listeners are attached after each render, with no duplicates.
+- Define handlers in your component config.
+- Use `data-on-*` in your template—listeners are attached automatically and efficiently.
 
-```typescript
+```ts
 component('my-form', {
   state: { name: '' },
   template: (state) => html`
@@ -198,54 +195,50 @@ component('my-form', {
 ```
 
 **Benefits:**
-- No manual event listener management
-- Handlers are type-safe and colocated with component logic
-- Works with all native DOM events
-- No duplicate listeners after rerender
+- No manual event listeners
+- Type-safe, colocated handlers
+- Prevents duplicate listeners on rerender
 
-**Supported Syntax:**
+**Examples:**
 - `data-on-click="handlerName"`
 - `data-on-input="handlerName"`
 - `data-on-change="handlerName"`
-- ...any DOM event type
-
-See the TodoApp example for advanced usage.
+- `data-on-submit="handlerName"`
 
 ---
 
-## Dynamic Styles
+## 🎨 Dynamic Styles
 
-- Use the `style` property to define CSS for your component.
-- `style` can be a static string or a function that returns a CSS string based on state.
-- The runtime updates the style automatically whenever state changes.
+- Use `style` to define scoped CSS.
+- Static strings or functions based on state are both supported.
 
-**Static style example:**
-```typescript
+```ts
+// Static
 style: `div { color: blue; }`
+
+// Dynamic
+style: (state) => `
+  div {
+    color: ${state.isActive ? 'green' : 'red'};
+  }
+`
 ```
 
-**Dynamic style example:**
-```typescript
-style: (state) => `div { color: ${state.isActive ? 'green' : 'red'}; }`
-```
-
-### Performance Considerations
-
-- Only one `<style>` tag per component is updated (not global).
-- Dynamic style functions should be efficient; avoid heavy computations.
-- The runtime replaces the entire `<style>` content if changed—no CSS diffing.
-- Static strings are fastest; dynamic functions are performant for most use cases.
+**Performance Tips:**
+- One `<style>` tag per component
+- No CSS diffing—style is replaced entirely
+- Keep dynamic styles efficient
 
 ---
 
-## Stateless Components
+## 📦 Stateless Components
 
-- Components can be defined without a state. These stateless components are simpler and are useful for rendering UI that doesn't require reactivity.
+Omit `state` for lightweight, non-reactive components.
 
-```typescript
+```ts
 component('stateless-demo', {
   template: () => html`<div>Stateless component rendered!</div>`()
 });
 ```
 
-Stateless components can still use all the other features like event binding, refs, and lifecycle hooks, but they won't have a `state` property or reactive updates. They're ideal for presentational components or when you want to optimize for performance and simplicity.
+Stateless components still support event binding, refs, and lifecycle hooks—perfect for pure UI or optimized rendering.
