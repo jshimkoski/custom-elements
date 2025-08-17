@@ -51,7 +51,8 @@ No config needed — TypeScript support is built-in.
 
 ## ⚠️ Things to Know
 
-- Templates need a single root node (fragments allowed with keys)  
+- Templates need a single root node (fragments allowed with keys)
+- Always use helpers (e.g.; `html`, `compile`, `css`) to sanitize templates and styles
 - One handler per event type per element  
 - User input takes priority over programmatic changes  
 - SSR hydration is opt-in (`data-hydrate`)  
