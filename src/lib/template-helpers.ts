@@ -5,6 +5,19 @@ import type { CompiledTemplate } from './template-compiler.js';
  */
 export type TemplateResult = string | CompiledTemplate | ((state?: any) => string);
 
+
+/**
+ * Sanitizes a CSS value to prevent injection of unsafe content.
+ * Only allows safe characters and blocks dangerous patterns.
+ */
+function sanitizeCSSValue(value: unknown): string {
+  if (typeof value !== 'string') return String(value);
+  // Block dangerous patterns: expression(), url(javascript:), etc.
+  if (/expression\s*\(|url\s*\(\s*['"]?javascript:/i.test(value)) return '';
+  // Remove any non-printable/control characters
+  return value.replace(/[\u0000-\u001F\u007F-\u009F]/g, '').replace(/<|>|"|'|`|;/g, '');
+}
+
 /**
  * Escape HTML entities for safe rendering of user-generated content.
  */
@@ -181,7 +194,7 @@ export function css(strings: TemplateStringsArray, ...values: unknown[]): string
   let result = '';
   for (let i = 0; i < strings.length; i++) {
     result += strings[i];
-    if (i < values.length) result += values[i] ?? '';
+    if (i < values.length) result += sanitizeCSSValue(values[i]);
   }
   return result;
 }
@@ -200,6 +213,11 @@ export function classes(obj: Record<string, boolean>): string {
  */
 export function styles(obj: Record<string, string | number>): string {
   return Object.entries(obj)
-    .map(([prop, value]) => `${prop}: ${value}`)
+    .map(([prop, value]) => {
+      // Sanitize property name and value
+      const safeProp = prop.replace(/[^a-zA-Z0-9\-]/g, '');
+      const safeValue = typeof value === 'string' ? sanitizeCSSValue(value) : value;
+      return `${safeProp}: ${safeValue}`;
+    })
     .join('; ');
 }
