@@ -801,7 +801,7 @@ if (typeof HTMLElement !== 'undefined') {
           }
           // Bind new handler
           const handler = this.config[handlerName];
-          const boundHandler = (e: Event) => handler.call(this, e);
+          const boundHandler = (e: Event) => handler.call(this, e, this.stateObj, this.api);
           el.addEventListener(eventType, boundHandler);
           if (!(el as any)._boundHandlers) (el as any)._boundHandlers = {};
           (el as any)._boundHandlers[eventType] = boundHandler;
@@ -819,7 +819,7 @@ if (typeof HTMLElement !== 'undefined') {
      * Handles VDOM patching, style updates, refs, and event binding.
      * @param templateResult - HTML string or compiled template
      */
-  private _renderTemplateResult(templateResult: string | CompiledTemplate<S & C>): void {
+    private _renderTemplateResult(templateResult: string | CompiledTemplate<S & C>): void {
       if (this._hasError) return;
       try {
         if (typeof templateResult === 'string') {
