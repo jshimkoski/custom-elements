@@ -1,6 +1,11 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v0.0.9] - 2025-08-17
+
+- fix: enhance SSR compatibility with a fallback for ComponentElement (6c9d8fa)
+
+
 ## [v0.0.9-beta.5] - 2025-08-17
 
 - fix: enhance SSR compatibility with a fallback for ComponentElement (6c9d8fa)
