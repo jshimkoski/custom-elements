@@ -1,6 +1,31 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v0.0.9-beta.3] - 2025-08-17
+
+- fix: update event handler binding to include state and API parameters (3f81095)
+- feat: add <router-link> component for declarative navigation and update routing documentation (1443b81)
+
+
+## [v0.0.9-beta.2] - 2025-08-16
+
+- feat: add <router-link> component for declarative navigation and update routing documentation (1443b81)
+- fix: update router initialization to support async component loading (14cddc9)
+
+
+## [v0.0.9-beta.1] - 2025-08-16
+
+- fix: update router initialization to support async component loading (14cddc9)
+- test: increase wait time for text input binding in DataModelDemo component (5937797)
+- refactor: remove singleton router instance and integrate into router-view component (80d23be)
+
+
+## [v0.0.9-beta.0] - 2025-08-16
+
+- test: increase wait time for text input binding in DataModelDemo component (5937797)
+- refactor: remove singleton router instance and integrate into router-view component (80d23be)
+
+
 ## [v0.0.8] - 2025-08-16
 
 - feat: add resolveRouteComponent to Router API exports (2b6bb5a)
