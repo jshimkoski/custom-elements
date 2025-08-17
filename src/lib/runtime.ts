@@ -1204,7 +1204,7 @@ export function component<S extends ComponentState, C extends Record<string, any
   const isDev = typeof window !== 'undefined' && (window as any).VITE_DEV_HMR;
   const hasHMR = typeof import.meta !== 'undefined' && (import.meta as any).hot;
 
-  if ((isDev || hasHMR) && customElements.get(tag)) {
+  if ((isDev || hasHMR) && typeof customElements !== 'undefined' && customElements.get(tag)) {
     try {
       document.querySelectorAll(tag).forEach(el => el.remove());
       // @ts-ignore
@@ -1214,7 +1214,7 @@ export function component<S extends ComponentState, C extends Record<string, any
     } catch (_e) {}
   }
 
-  if (customElements.get(tag)) {
+  if (typeof customElements !== 'undefined' && customElements.get(tag)) {
     if (config.debug) console.warn(`[runtime] Component "${tag}" already registered`);
     return;
   }
