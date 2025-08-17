@@ -172,7 +172,9 @@ type ExtendedHTMLElement = HTMLElement & {
   _dataModelBound?: boolean;
   _listItemModelListener?: EventListener;
 };
-let ComponentElement: typeof HTMLElement;
+
+// SSR-safe ComponentElement definition
+let ComponentElement: CustomElementConstructor | { new (): object };
 
 if (typeof HTMLElement !== 'undefined') {
   ComponentElement = class<S extends ComponentState, C extends Record<string, any> = {}> extends HTMLElement {
@@ -1141,6 +1143,12 @@ if (typeof HTMLElement !== 'undefined') {
       `;
     }
   }
+} else {
+  // SSR fallback: minimal class, no DOM, no lifecycle, no "this"
+  ComponentElement = class {
+    // No-op for SSR, just a stub
+    constructor() {}
+  };
 }
 
 // ============================================================================
