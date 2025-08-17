@@ -1,4 +1,4 @@
-🚦 Routing
+# 🚦 Routing
 
 A lightweight, scalable router designed for seamless integration with Custom Elements Runtime. Zero dependencies, functional API, SSR/static site compatible, supports stateless components, plugins, error boundaries, event bus, global store, and is easy to use.
 

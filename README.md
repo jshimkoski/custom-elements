@@ -1,6 +1,6 @@
 # 🧩 Custom Elements Runtime
 
-> **Ultra-light, type-safe runtime for fast, reactive web components.**
+> **Ultra-lightweight, type-safe runtime for fast, reactive, and maintainable web components.**
 
 Build modern components with strict TypeScript, zero dependencies, and a clean functional API. Designed for speed, standards compliance, and productivity.
 

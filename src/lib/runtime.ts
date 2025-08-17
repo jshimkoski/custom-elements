@@ -172,7 +172,9 @@ type ExtendedHTMLElement = HTMLElement & {
   _dataModelBound?: boolean;
   _listItemModelListener?: EventListener;
 };
-let ComponentElement: typeof HTMLElement;
+
+// SSR-safe ComponentElement definition
+let ComponentElement: CustomElementConstructor | { new (): object };
 
 if (typeof HTMLElement !== 'undefined') {
   ComponentElement = class<S extends ComponentState, C extends Record<string, any> = {}> extends HTMLElement {
@@ -1141,6 +1143,12 @@ if (typeof HTMLElement !== 'undefined') {
       `;
     }
   }
+} else {
+  // SSR fallback: minimal class, no DOM, no lifecycle, no "this"
+  ComponentElement = class {
+    // No-op for SSR, just a stub
+    constructor() {}
+  };
 }
 
 // ============================================================================
@@ -1204,7 +1212,7 @@ export function component<S extends ComponentState, C extends Record<string, any
   const isDev = typeof window !== 'undefined' && (window as any).VITE_DEV_HMR;
   const hasHMR = typeof import.meta !== 'undefined' && (import.meta as any).hot;
 
-  if ((isDev || hasHMR) && customElements.get(tag)) {
+  if ((isDev || hasHMR) && typeof customElements !== 'undefined' && customElements.get(tag)) {
     try {
       document.querySelectorAll(tag).forEach(el => el.remove());
       // @ts-ignore
@@ -1214,7 +1222,7 @@ export function component<S extends ComponentState, C extends Record<string, any
     } catch (_e) {}
   }
 
-  if (customElements.get(tag)) {
+  if (typeof customElements !== 'undefined' && customElements.get(tag)) {
     if (config.debug) console.warn(`[runtime] Component "${tag}" already registered`);
     return;
   }

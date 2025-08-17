@@ -1,6 +1,18 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v0.0.9-beta.5] - 2025-08-17
+
+- fix: enhance SSR compatibility with a fallback for ComponentElement (6c9d8fa)
+- fix: improve custom elements checks for development mode docs: fix routing header and other minor cleanup (8debd16)
+
+
+## [v0.0.9-beta.4] - 2025-08-17
+
+- fix: improve custom elements checks for development mode docs: fix routing header and other minor cleanup (8debd16)
+- fix: update event handler binding to include state and API parameters (3f81095)
+
+
 ## [v0.0.9-beta.3] - 2025-08-17
 
 - fix: update event handler binding to include state and API parameters (3f81095)
