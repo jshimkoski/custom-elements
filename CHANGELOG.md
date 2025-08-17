@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v0.0.9-beta.3] - 2025-08-17
+
+- fix: update event handler binding to include state and API parameters (3f81095)
+- feat: add <router-link> component for declarative navigation and update routing documentation (1443b81)
+
+
 ## [v0.0.9-beta.2] - 2025-08-16
 
 - feat: add <router-link> component for declarative navigation and update routing documentation (1443b81)
