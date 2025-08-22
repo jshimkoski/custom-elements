@@ -1,20 +1,22 @@
 import './style.css';
-import './docs-site/docs-app.ts';
-import './docs-site/docs-nav.ts';
-import './docs-site/docs-content.ts';
-import './components/examples/MinimalExample';
-import './components/examples/TodoApp';
-import './components/examples/TodoAppCompiled';
-import './components/examples/ShoppingCart';
-import './components/examples/TemplateCompilationDemo';
-import './components/examples/SimpleTest';
-import './components/examples/DataModelDemo';
+import "./lib/runtime-v2";
+// import './docs-site/docs-app.ts';
+// import './docs-site/docs-nav.ts';
+// import './docs-site/docs-content.ts';
+// import './components/examples/MinimalExample';
+// import './components/examples/TodoApp';
+// import './components/examples/TodoAppCompiled';
+// import './components/examples/ShoppingCart';
+// import './components/examples/TemplateCompilationDemo';
+// import './components/examples/SimpleTest';
+// import './components/examples/DataModelDemo';
 
 // The new runtime is completely self-contained
 // Components automatically register themselves when imported
 
 document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
   <div>
+    <my-greeting></my-greeting>
     <docs-app></docs-app>
     <h1>🚀 Modern TypeScript Runtime</h1>
     <p style="font-size: 1.1em; color: #666; margin-bottom: 2rem;">
