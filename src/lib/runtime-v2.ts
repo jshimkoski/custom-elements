@@ -134,9 +134,36 @@ export function component<
   P extends object = {},
 >(tag: string, config: ComponentConfig<S, C, P>): void {
   registry.set(tag, config);
-  if (!customElements.get(tag)) {
-    customElements.define(tag, createElementClass(config));
+  if (typeof customElements !== "undefined" && !customElements.get(tag)) {
+    customElements.define(tag, createElementClass(config) as CustomElementConstructor);
   }
+}
+
+// --- Hot Module Replacement (HMR) ---
+if (
+  typeof import.meta !== 'undefined' &&
+  (import.meta as any).hot &&
+  import.meta && import.meta.hot
+) {
+  import.meta.hot.accept((newModule) => {
+    // Update registry with new configs from the hot module
+    if (newModule && newModule.registry) {
+      for (const [tag, newConfig] of newModule.registry.entries()) {
+        registry.set(tag, newConfig);
+        // Update all instances to use new config
+        if (typeof document !== "undefined") {
+          document.querySelectorAll(tag).forEach((el) => {
+            if (typeof (el as any)._cfg !== "undefined") {
+              (el as any)._cfg = newConfig;
+            }
+            if (typeof (el as any)._render === "function") {
+              (el as any)._render(newConfig);
+            }
+          });
+        }
+      }
+    }
+  });
 }
 
 // --- Element class factory ---
@@ -144,7 +171,13 @@ export function createElementClass<
   S extends object,
   C extends object,
   P extends object,
->(config: ComponentConfig<S, C, P>): CustomElementConstructor {
+>(config: ComponentConfig<S, C, P>): CustomElementConstructor | { new (): object } {
+  if (typeof customElements === "undefined") {
+    return class {
+      // No-op for SSR, just a stub
+      constructor() {}
+    };
+  }
   return class extends HTMLElement {
     private _cfg: ComponentConfig<S, C, P>;
     private _state: S & C & P & { [key: string]: any };
@@ -333,7 +366,7 @@ export function createElementClass<
 
             // Set initial value from state
             const initialValue = getNestedValue(state, stateProp);
-            this._setInitialInputValue(el, initialValue, stateProp);
+            this._setInitialInputValue(el, initialValue);
 
             // Create update handler with Vue.js-like behavior
             const updateState = (e: Event) => {
@@ -491,7 +524,6 @@ export function createElementClass<
     private _setInitialInputValue(
       el: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement,
       stateValue: any,
-      stateProp: string,
     ): void {
       if (el instanceof HTMLInputElement && el.type === "checkbox") {
         const trueValue =
@@ -538,6 +570,7 @@ export function createElementClass<
     // --- Style ---
     private _applyStyle(cfg: ComponentConfig<S, C, P>) {
       this._runLogicWithinErrorBoundary(cfg, () => {
+        if (typeof document === "undefined") return;
         if (!this.shadowRoot) return;
         let style = this.shadowRoot.querySelector("style");
         if (!style) {
@@ -716,6 +749,13 @@ component("my-greeting", {
         </div>
 
         <div class="form-group">
+          <label>Name (vModel):</label>
+          <p>None of these work at the moment:</p>
+          <input type="text" ${vModel(state.name, val => state.name = val)} ${vClass("form-control", "cool")} ${vShow(false)} />
+          <button ${vBind({ disabled: state.isActive })}>Submit</button>
+        </div>
+
+        <div class="form-group">
           <label>Email:</label>
           <input type="email" name="email" />
         </div>
@@ -773,7 +813,7 @@ component("my-greeting", {
   onError(error, state, api) {
     console.error("Component error:", error, state, api);
   },
-  handleSomething(state, e: Event) {
+  handleSomething(state: any, e: Event) {
     state.name = "Updated Name";
     state.array.push("New Item");
     console.log("component did something", state, e);
