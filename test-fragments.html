@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fragment Support Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .expected {
+            background-color: #e8f5e8;
+            padding: 10px;
+            border-left: 4px solid #4caf50;
+            margin: 10px 0;
+        }
+
+        .actual {
+            background-color: #f0f8ff;
+            padding: 10px;
+            border-left: 4px solid #2196f3;
+            margin: 10px 0;
+        }
+
+        code {
+            background-color: #f4f4f4;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .highlight {
+            background-color: yellow;
+            padding: 2px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Fragment Support Test for vFor</h1>
+
+    <div class="test-section">
+        <h2>Test Overview</h2>
+        <p>This page tests that <code>vFor</code> properly supports fragments (multiple root nodes) without requiring wrapper elements.</p>
+
+        <div class="expected">
+            <strong>Expected:</strong> Each vFor item should render multiple nodes directly without additional wrapper divs.
+            The generated HTML should show mixed content (text + elements) as direct siblings.
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>Live Test Component</h2>
+        <fragment-test></fragment-test>
+    </div>
+
+    <div class="test-section">
+        <h2>What to Look For</h2>
+        <ol>
+            <li>
+                <strong>Fragment List:</strong> Each item should render as:
+                <ul>
+                    <li>Text content (item name + colon)</li>
+                    <li>Checkbox input</li>
+                    <li>Line break</li>
+                    <li><span class="highlight">No wrapper div around each item</span></li>
+                </ul>
+            </li>
+            <li>
+                <strong>Multiple Root Nodes:</strong> Each item should render:
+                <ul>
+                    <li>Numbered span</li>
+                    <li>Bold item name</li>
+                    <li>Separator span</li>
+                    <li><span class="highlight">All as direct siblings</span></li>
+                </ul>
+            </li>
+            <li>
+                <strong>Mixed Content:</strong> Each item should render:
+                <ul>
+                    <li>Text content</li>
+                    <li>Button element</li>
+                    <li>Horizontal rule</li>
+                    <li><span class="highlight">No artificial containers</span></li>
+                </ul>
+            </li>
+        </ol>
+    </div>
+
+    <div class="test-section">
+        <h2>Developer Tools Inspection</h2>
+        <p>
+            Open browser DevTools and inspect the rendered elements. You should see that:
+        </p>
+        <ul>
+            <li>The <code>vFor</code> items render as direct children of their containers</li>
+            <li>No additional wrapper <code>&lt;div&gt;</code> elements are created around fragment content</li>
+            <li>Text nodes and element nodes appear as siblings in the DOM tree</li>
+            <li>Anchor blocks (<code>#anchor</code> comment nodes) provide proper boundaries for updates</li>
+        </ul>
+    </div>
+
+    <script type="module" src="./test-fragments.js"></script>
+</body>
+</html>

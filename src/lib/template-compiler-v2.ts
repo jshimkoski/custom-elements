@@ -120,6 +120,7 @@ function htmlImpl(
   let currentProps: Record<string, any> = {};
   let currentKey: string | number | undefined = undefined;
   let nodeIndex = 0;
+  let fragmentChildren: VNode[] = []; // Track root-level nodes for fragments
 
   // Helper: merge object-like interpolation into currentProps
   function mergeIntoCurrentProps(maybe: any) {
@@ -135,15 +136,15 @@ function htmlImpl(
     }
   }
 
-  // Helper: push an interpolated value into currentChildren/currentProps
+  // Helper: push an interpolated value into currentChildren/currentProps or fragments
   function pushInterpolation(val: any, baseKey: string) {
-    if (!currentTag) return;
+    const targetChildren = currentTag ? currentChildren : fragmentChildren;
 
     if (isAnchorBlock(val)) {
       const anchorKey = (val as VNode).key ?? baseKey;
       let anchorChildren = (val as any).children as VNode[] | undefined;
 
-      currentChildren.push({
+      targetChildren.push({
         ...(val as VNode),
         key: anchorKey,
         children: anchorChildren,
@@ -153,7 +154,7 @@ function htmlImpl(
 
     if (isElementVNode(val)) {
       // Leave key undefined so assignKeysDeep can generate a stable one
-      currentChildren.push(ensureKey(val, undefined as any));
+      targetChildren.push(ensureKey(val, undefined as any));
       return;
     }
 
@@ -167,7 +168,7 @@ function htmlImpl(
         } else if (v !== null && typeof v === "object") {
           mergeIntoCurrentProps(v);
         } else {
-          currentChildren.push(textVNode(String(v), `${baseKey}-${i}`));
+          targetChildren.push(textVNode(String(v), `${baseKey}-${i}`));
         }
       }
       return;
@@ -178,7 +179,7 @@ function htmlImpl(
       return;
     }
 
-    currentChildren.push(textVNode(String(val), baseKey));
+    targetChildren.push(textVNode(String(val), baseKey));
   }
 
   while ((match = tagRegex.exec(template))) {
@@ -254,7 +255,7 @@ function htmlImpl(
       // Plain text (may contain embedded interpolation markers like "...{{N}}...")
       const text = match[4];
 
-      if (!currentTag) continue;
+      const targetChildren = currentTag ? currentChildren : fragmentChildren;
 
       // Split text by embedded markers and handle parts
       const parts = text.split(/({{\d+}})/);
@@ -269,24 +270,45 @@ function htmlImpl(
           pushInterpolation(val, baseKey);
         } else {
           const key = `text-${nodeIndex++}`;
-          currentChildren.push(textVNode(part, key));
+          targetChildren.push(textVNode(part, key));
         }
       }
     }
   }
 
-  // Clean empty text nodes at root level
-  if (root && isElementVNode(root) && Array.isArray(root.children)) {
-    root.children = (root.children as VNode[]).filter(
-      (child): child is VNode =>
-        isElementVNode(child)
-          ? child.tag !== "#text" ||
-            (typeof child.children === "string" && child.children.trim() !== "")
-          : true, // keep non-element VNodes (including anchors) as-is
-    );
+  // If we have a single root element, return it
+  if (root) {
+    // Clean empty text nodes at root level
+    if (isElementVNode(root) && Array.isArray(root.children)) {
+      root.children = (root.children as VNode[]).filter(
+        (child): child is VNode =>
+          isElementVNode(child)
+            ? child.tag !== "#text" ||
+              (typeof child.children === "string" &&
+                child.children.trim() !== "")
+            : true, // keep non-element VNodes (including anchors) as-is
+      );
+    }
+    return root;
   }
 
-  return root ?? h("div", {}, "", "fallback-root");
+  // If we have fragment children (multiple root nodes), return them as array
+  if (fragmentChildren.length > 0) {
+    // Filter out empty text nodes
+    const cleanedFragments = fragmentChildren.filter((child): child is VNode =>
+      isElementVNode(child)
+        ? child.tag !== "#text" ||
+          (typeof child.children === "string" && child.children.trim() !== "")
+        : true,
+    );
+
+    return cleanedFragments.length === 1
+      ? cleanedFragments[0]
+      : cleanedFragments;
+  }
+
+  // Fallback for empty content
+  return h("div", {}, "", "fallback-root");
 }
 
 /**

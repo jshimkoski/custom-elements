@@ -728,7 +728,7 @@ component("my-greeting", {
         <div class="form-group">
           <label>Active group:</label>
           ${vFor(state.array, (item) => html`
-            <div>${item}: <input type="checkbox" value="${item}" data-bind="array" /></div>
+            ${item}: <input type="checkbox" value="${item}" data-bind="array" />
           `)}
         </div>
 

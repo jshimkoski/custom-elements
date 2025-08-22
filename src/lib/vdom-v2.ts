@@ -370,8 +370,8 @@ function patchChildren(
       }
 
       // Preserve anchor references on the new VNode
-      (newVNode as AnchorBlockVNode)._startNode = start;
-      (newVNode as AnchorBlockVNode)._endNode = end;
+      (newVNode as AnchorBlockVNode)._startNode = start as Comment;
+      (newVNode as AnchorBlockVNode)._endNode = end as Comment;
 
       // If boundaries aren't in DOM, insert the whole fragment
       if (!parent.contains(start) || !parent.contains(end)) {
@@ -390,7 +390,7 @@ function patchChildren(
         );
       }
 
-      markRangeUsed(start, end);
+      markRangeUsed(start as Comment, end as Comment);
       nextSibling = end.nextSibling;
       continue;
     }
