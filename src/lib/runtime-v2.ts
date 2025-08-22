@@ -751,7 +751,12 @@ component("my-greeting", {
         <div class="form-group">
           <label>Name (vModel):</label>
           <p>None of these work at the moment:</p>
-          <input type="text" ${vModel(state.name, val => state.name = val)} ${vClass("form-control", "cool")} ${vShow(false)} />
+          <input
+            type="text"
+            ${vModel(state.name, val => state.name = val)}
+            ${vClass("form-control", "cool")}
+            ${vShow(false)}
+          />
           <button ${vBind({ disabled: state.isActive })}>Submit</button>
         </div>
 
