@@ -150,6 +150,7 @@ function createElementClass<
       refs: Record<string, HTMLElement>;
     };
     private _listeners: Array<() => void> = [];
+    private _inputListeners: Array<() => void> = [];
     private _mounted = false;
     private _hasError = false;
     private _initializing = true;
@@ -201,6 +202,8 @@ function createElementClass<
           config.onDisconnected(this._state, this._api);
         this._listeners.forEach((unsub) => unsub());
         this._listeners = [];
+        this._inputListeners.forEach((unsub) => unsub());
+        this._inputListeners = [];
         this._mounted = false;
       });
     }
@@ -269,6 +272,10 @@ function createElementClass<
     }
 
     private _bindInputsToState(root: ShadowRoot, state: S & C & P) {
+      // Clean up existing input listeners
+      this._inputListeners.forEach((unsub) => unsub());
+      this._inputListeners = [];
+
       const bindEls = Array.from(
         root.querySelectorAll("input,textarea,select"),
       );
@@ -278,16 +285,68 @@ function createElementClass<
           el instanceof HTMLTextAreaElement ||
           el instanceof HTMLSelectElement
         ) {
-          // if ('value' in el) {
-          //   el.oninput = () => {
-          //     state.name = el.value;
-          //   };
-          // }
-          // Only bind if props.props exists and has a value property
-          if ("name" in state) {
-            el.oninput = () => {
-              state.name = el.value;
+          // Check for data-bind attribute or v-model binding
+          const bindAttr =
+            el.getAttribute("data-bind") || el.getAttribute("v-model");
+          const nameAttr = el.getAttribute("name");
+
+          // Determine which state property to bind to
+          const stateProp = bindAttr || nameAttr;
+
+          if (stateProp && stateProp in state) {
+            // Set initial value from state
+            if (el instanceof HTMLInputElement && el.type === "checkbox") {
+              el.checked = Boolean(state[stateProp as keyof typeof state]);
+            } else if (el instanceof HTMLInputElement && el.type === "radio") {
+              el.checked =
+                el.value === String(state[stateProp as keyof typeof state]);
+            } else {
+              el.value = String(state[stateProp as keyof typeof state] || "");
+            }
+
+            // Set up two-way binding
+            const updateState = () => {
+              if (el instanceof HTMLInputElement && el.type === "checkbox") {
+                (state as any)[stateProp] = el.checked;
+              } else if (
+                el instanceof HTMLInputElement &&
+                el.type === "radio"
+              ) {
+                if (el.checked) {
+                  (state as any)[stateProp] = el.value;
+                }
+              } else if (
+                el instanceof HTMLInputElement &&
+                el.type === "number"
+              ) {
+                (state as any)[stateProp] = el.value ? Number(el.value) : "";
+              } else {
+                (state as any)[stateProp] = el.value;
+              }
             };
+
+            // Bind appropriate events based on element type and store cleanup functions
+            if (el instanceof HTMLSelectElement) {
+              el.addEventListener("change", updateState);
+              this._inputListeners.push(() =>
+                el.removeEventListener("change", updateState),
+              );
+            } else {
+              el.addEventListener("input", updateState);
+              this._inputListeners.push(() =>
+                el.removeEventListener("input", updateState),
+              );
+
+              if (
+                el instanceof HTMLInputElement &&
+                (el.type === "checkbox" || el.type === "radio")
+              ) {
+                el.addEventListener("change", updateState);
+                this._inputListeners.push(() =>
+                  el.removeEventListener("change", updateState),
+                );
+              }
+            }
           }
         }
       });
@@ -430,18 +489,72 @@ component("child-component", {
 });
 
 component("my-greeting", {
-  state: { name: "World", array: ["A", "B", "C"] },
+  state: {
+    name: "World",
+    array: ["A", "B", "C"],
+    email: "test@me.com",
+    age: 25,
+    isActive: true,
+    color: "red",
+  },
+  computed: {
+    funnyName(state) {
+      return `Funny ${state.name}`;
+    },
+  },
   style: `
     div {
       color: blue;
+      padding: 20px;
+    }
+    .form-group {
+      margin: 10px 0;
+    }
+    label {
+      display: inline-block;
+      width: 100px;
     }
   `,
   render(state) {
     return html`
       <div>
-        Hello, <span>${state.name}</span>
+        <h2>Hello, <span>${state.name}</span></h2>
+        <h3>You have a funny name: ${state.funnyName}</h3>
         ${vIf(state.name === "World", html`<span>Welcome to the world!</span>`)}
-        <input type="text" :value="${state.name}" :aria-label="${state.name}" />
+
+        <div class="form-group">
+          <label>Name:</label>
+          <input type="text" data-bind="name" />
+        </div>
+
+        <div class="form-group">
+          <label>Email:</label>
+          <input type="email" name="email" />
+        </div>
+
+        <div class="form-group">
+          <label>Age:</label>
+          <input type="number" data-bind="age" />
+        </div>
+
+        <div class="form-group">
+          <label>Active:</label>
+          <input type="checkbox" data-bind="isActive" />
+        </div>
+
+        <div class="form-group">
+          <label>Color:</label>
+          <select name="color">
+            <option value="red">Red</option>
+            <option value="green">Green</option>
+            <option value="blue">Blue</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <p>State: ${JSON.stringify(state, null, 2)}</p>
+        </div>
+
         <button
           @click="${() => {
             state.name = "Custom Element";
