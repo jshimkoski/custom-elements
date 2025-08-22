@@ -29,15 +29,16 @@ export function vIf(cond: boolean, children: VNode | VNode[]): VNode {
 }
 
 /* --- vFor --- */
-export function vFor<T extends { id?: string | number; key?: string }>(
+export function vFor<T extends string | number | boolean | { id?: string | number; key?: string }>(
   list: T[],
   render: (item: T, index: number) => VNode | VNode[],
 ): VNode[] {
   return list.map((item, i) => {
+    // For primitives, use value as key; for objects, prefer key/id
     const itemKey =
-      (item as any)?.key ??
-      (item.id !== undefined ? String(item.id) : undefined) ??
-      `idx-${i}`;
+      typeof item === "object"
+        ? (item as any)?.key ?? (item as any)?.id ?? `idx-${i}`
+        : String(item);
     return anchorBlock(render(item, i), `vFor-${itemKey}`);
   });
 }

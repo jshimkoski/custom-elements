@@ -7,6 +7,8 @@
 
 export { Store } from "./store";
 export { eventBus } from "./event-bus";
+export { html } from "./template-compiler-v2";
+export * from "./directives-v2";
 
 import { vdomRenderer, type VNode } from "./vdom-v2";
 import { html } from "./template-compiler-v2";
@@ -138,19 +140,21 @@ export function component<
 }
 
 // --- Element class factory ---
-function createElementClass<
+export function createElementClass<
   S extends object,
   C extends object,
   P extends object,
 >(config: ComponentConfig<S, C, P>): CustomElementConstructor {
   return class extends HTMLElement {
+    private _cfg: ComponentConfig<S, C, P>;
     private _state: S & C & P & { [key: string]: any };
     private _refs: Record<string, HTMLElement> = {};
     private _api: ComponentAPI<S & C & P> & {
       refs: Record<string, HTMLElement>;
     };
     private _listeners: Array<() => void> = [];
-    private _inputListeners: Array<() => void> = [];
+    private _inputListeners: (() => void)[] = [];
+    private _renderTimeoutId: number | null = null;
     private _mounted = false;
     private _hasError = false;
     private _initializing = true;
@@ -158,6 +162,7 @@ function createElementClass<
     constructor() {
       super();
       this.attachShadow({ mode: "open" });
+      this._cfg = config;
       this._state = this._initState(config);
 
       // --- Inject config methods into state ---
@@ -279,77 +284,255 @@ function createElementClass<
       const bindEls = Array.from(
         root.querySelectorAll("input,textarea,select"),
       );
+
       bindEls.forEach((el) => {
         if (
           el instanceof HTMLInputElement ||
           el instanceof HTMLTextAreaElement ||
           el instanceof HTMLSelectElement
         ) {
-          // Check for data-bind attribute or v-model binding
+          // Check for data-bind, v-model, or data-model attributes
           const bindAttr =
-            el.getAttribute("data-bind") || el.getAttribute("v-model");
+            el.getAttribute("v-model") ||
+            el.getAttribute("data-bind") ||
+            el.getAttribute("data-model");
           const nameAttr = el.getAttribute("name");
 
           // Determine which state property to bind to
-          const stateProp = bindAttr || nameAttr;
+          const rawStateProp = bindAttr || nameAttr;
+          if (!rawStateProp) return;
 
-          if (stateProp && stateProp in state) {
+          // Parse modifiers from v-model (e.g., v-model.trim.number)
+          const [stateProp, ...modifiers] = rawStateProp.includes("|")
+            ? rawStateProp.split("|").map((s) => s.trim())
+            : rawStateProp.includes(".") &&
+                bindAttr === el.getAttribute("v-model")
+              ? rawStateProp.split(".")
+              : [rawStateProp];
+
+          if (stateProp && this._hasNestedProperty(state, stateProp)) {
+            // Helper function to get nested property value
+            const getNestedValue = (obj: any, path: string): any => {
+              return path.split(".").reduce((o, key) => o?.[key], obj);
+            };
+
+            // Helper function to set nested property value
+            const setNestedValue = (
+              obj: any,
+              path: string,
+              value: any,
+            ): void => {
+              const keys = path.split(".");
+              let target = obj;
+              for (let i = 0; i < keys.length - 1; i++) {
+                if (!(keys[i] in target)) target[keys[i]] = {};
+                target = target[keys[i]];
+              }
+              target[keys[keys.length - 1]] = value;
+            };
+
             // Set initial value from state
-            if (el instanceof HTMLInputElement && el.type === "checkbox") {
-              el.checked = Boolean((state as Record<string, unknown>)[stateProp]);
-            } else if (el instanceof HTMLInputElement && el.type === "radio") {
-              el.checked =
-                el.value === String(state[stateProp as keyof typeof state]);
-            } else {
-              el.value = String(state[stateProp as keyof typeof state] || "");
-            }
+            const initialValue = getNestedValue(state, stateProp);
+            this._setInitialInputValue(el, initialValue, stateProp);
 
-            // Set up two-way binding
-            const updateState = () => {
+            // Create update handler with Vue.js-like behavior
+            const updateState = (e: Event) => {
+              // Skip update if element is composing (IME input)
+              if (el instanceof HTMLInputElement && (el as any).isComposing) {
+                return;
+              }
+
+              let value: any;
+
               if (el instanceof HTMLInputElement && el.type === "checkbox") {
-                (state as any)[stateProp] = el.checked;
+                const trueValue =
+                  el.getAttribute("true-value") ||
+                  el.getAttribute("data-true-value");
+                const falseValue =
+                  el.getAttribute("false-value") ||
+                  el.getAttribute("data-false-value");
+                const currentStateValue = getNestedValue(state, stateProp);
+
+                // Handle multiple checkboxes bound to same v-model (array binding)
+                if (Array.isArray(currentStateValue)) {
+                  const arr = [...currentStateValue];
+                  const checkboxValue = trueValue || el.value;
+
+                  if (el.checked) {
+                    if (!arr.includes(checkboxValue)) {
+                      arr.push(checkboxValue);
+                    }
+                  } else {
+                    const index = arr.indexOf(checkboxValue);
+                    if (index > -1) {
+                      arr.splice(index, 1);
+                    }
+                  }
+                  value = arr;
+                } else {
+                  // Single checkbox with custom true/false values
+                  if (trueValue !== null || falseValue !== null) {
+                    value = el.checked
+                      ? trueValue || true
+                      : falseValue || false;
+                  } else {
+                    value = el.checked;
+                  }
+                }
               } else if (
                 el instanceof HTMLInputElement &&
                 el.type === "radio"
               ) {
                 if (el.checked) {
-                  (state as any)[stateProp] = el.value;
+                  value = el.value;
+                  // Update other radio buttons in the same group
+                  const radioGroup = root.querySelectorAll(
+                    `input[type="radio"][name="${el.name}"]`,
+                  );
+                  radioGroup.forEach((radio) => {
+                    if (radio !== el) {
+                      (radio as HTMLInputElement).checked = false;
+                    }
+                  });
+                } else {
+                  return; // Don't update state for unchecked radio
                 }
-              } else if (
-                el instanceof HTMLInputElement &&
-                el.type === "number"
-              ) {
-                (state as any)[stateProp] = el.value ? Number(el.value) : "";
               } else {
-                (state as any)[stateProp] = el.value;
+                // Text inputs, textarea, select, etc.
+                value = (
+                  el as
+                    | HTMLInputElement
+                    | HTMLTextAreaElement
+                    | HTMLSelectElement
+                ).value;
+
+                // Apply modifiers in Vue.js order
+                if (modifiers.includes("trim") && typeof value === "string") {
+                  value = value.trim();
+                }
+
+                if (
+                  modifiers.includes("number") ||
+                  (el instanceof HTMLInputElement && el.type === "number")
+                ) {
+                  const numValue = Number(value);
+                  value = isNaN(numValue) ? value : numValue;
+                }
               }
+
+              // Update state
+              setNestedValue(state, stateProp, value);
+
+              // Trigger re-render if needed
+              this._requestRender();
             };
 
-            // Bind appropriate events based on element type and store cleanup functions
-            if (el instanceof HTMLSelectElement) {
-              el.addEventListener("change", updateState);
-              this._inputListeners.push(() =>
-                el.removeEventListener("change", updateState),
-              );
-            } else {
-              el.addEventListener("input", updateState);
-              this._inputListeners.push(() =>
-                el.removeEventListener("input", updateState),
-              );
+            // Handle IME composition events
+            if (el instanceof HTMLInputElement && el.type === "text") {
+              const handleCompositionStart = () => {
+                (el as any).isComposing = true;
+              };
 
-              if (
-                el instanceof HTMLInputElement &&
-                (el.type === "checkbox" || el.type === "radio")
-              ) {
-                el.addEventListener("change", updateState);
-                this._inputListeners.push(() =>
-                  el.removeEventListener("change", updateState),
+              const handleCompositionEnd = (e: Event) => {
+                (el as any).isComposing = false;
+                updateState(e);
+              };
+
+              el.addEventListener("compositionstart", handleCompositionStart);
+              el.addEventListener("compositionend", handleCompositionEnd);
+
+              this._inputListeners.push(() => {
+                el.removeEventListener(
+                  "compositionstart",
+                  handleCompositionStart,
                 );
-              }
+                el.removeEventListener("compositionend", handleCompositionEnd);
+              });
             }
+
+            // Determine which events to listen to based on modifiers and input type
+            const isLazy = modifiers.includes("lazy");
+            const events: string[] = [];
+
+            if (
+              el instanceof HTMLSelectElement ||
+              (el instanceof HTMLInputElement &&
+                (el.type === "checkbox" || el.type === "radio"))
+            ) {
+              events.push("change");
+            } else if (isLazy) {
+              events.push("change", "blur");
+            } else {
+              events.push("input");
+              // Also listen to change for additional robustness
+              events.push("change");
+            }
+
+            // Add event listeners
+            events.forEach((eventType) => {
+              el.addEventListener(eventType, updateState);
+              this._inputListeners.push(() =>
+                el.removeEventListener(eventType, updateState),
+              );
+            });
           }
         }
       });
+    }
+
+    private _hasNestedProperty(obj: any, path: string): boolean {
+      try {
+        return path.split(".").reduce((o, key) => o?.[key], obj) !== undefined;
+      } catch {
+        return false;
+      }
+    }
+
+    private _setInitialInputValue(
+      el: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement,
+      stateValue: any,
+      stateProp: string,
+    ): void {
+      if (el instanceof HTMLInputElement && el.type === "checkbox") {
+        const trueValue =
+          el.getAttribute("true-value") || el.getAttribute("data-true-value");
+
+        if (Array.isArray(stateValue)) {
+          // Multiple checkbox binding - check if this checkbox's value is in the array
+          const checkboxValue = trueValue || el.value;
+          el.checked = stateValue.includes(checkboxValue);
+        } else {
+          // Single checkbox
+          if (trueValue !== null) {
+            el.checked = stateValue === trueValue;
+          } else {
+            el.checked = Boolean(stateValue);
+          }
+        }
+      } else if (el instanceof HTMLInputElement && el.type === "radio") {
+        el.checked = el.value === String(stateValue);
+      } else {
+        // Text inputs, textarea, select, etc.
+        const stringValue = stateValue == null ? "" : String(stateValue);
+        if (el instanceof HTMLSelectElement) {
+          // For select elements, make sure the option exists
+          const option = el.querySelector(`option[value="${stringValue}"]`);
+          el.value = option ? stringValue : "";
+        } else {
+          el.value = stringValue;
+        }
+      }
+    }
+
+    private _requestRender(): void {
+      // Debounced render request to avoid excessive re-renders
+      if (this._renderTimeoutId !== null) {
+        clearTimeout(this._renderTimeoutId);
+      }
+      this._renderTimeoutId = setTimeout(() => {
+        this._render(this._cfg);
+        this._renderTimeoutId = null;
+      }, 0);
     }
 
     // --- Style ---
@@ -410,11 +593,11 @@ function createElementClass<
                 delete target[prop as any];
                 if (!self._initializing) self._render(cfg);
                 return true;
-              }
+              },
             });
           }
           if (obj && typeof obj === "object") {
-            Object.keys(obj).forEach(key => {
+            Object.keys(obj).forEach((key) => {
               obj[key] = createReactive(obj[key]);
             });
             return new Proxy(obj, {
@@ -425,7 +608,7 @@ function createElementClass<
               },
               get(target, prop, receiver) {
                 return Reflect.get(target, prop, receiver);
-              }
+              },
             });
           }
           return obj;
@@ -540,6 +723,13 @@ component("my-greeting", {
         <div class="form-group">
           <label>Age:</label>
           <input type="number" data-bind="age" />
+        </div>
+
+        <div class="form-group">
+          <label>Active group:</label>
+          ${vFor(state.array, (item) => html`
+            <div>${item}: <input type="checkbox" value="${item}" data-bind="array" /></div>
+          `)}
         </div>
 
         <div class="form-group">
