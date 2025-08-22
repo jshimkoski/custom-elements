@@ -1,17 +1,18 @@
 /**
  * runtime-v2.ts
  * Lightweight, strongly typed, functional custom element runtime for two-way binding, event, and prop support.
- * Supports: state, computed, props, style, render, lifecycle hooks, data-bind-* and data-on-* attributes.
+ * Supports: state, computed, props, style, render, lifecycle hooks, v-model-* and data-on-* attributes.
  * No external dependencies. Mobile-first, secure, and developer friendly.
  */
 
 export { Store } from "./store";
 export { eventBus } from "./event-bus";
-export { html } from "./template-compiler-v2";
-export * from "./directives-v2";
 
 import { vdomRenderer, type VNode } from "./vdom-v2";
 import { html } from "./template-compiler-v2";
+
+// Re-export html function for external use
+export { html } from "./template-compiler-v2";
 import {
   vIf,
   vBind,
@@ -134,36 +135,9 @@ export function component<
   P extends object = {},
 >(tag: string, config: ComponentConfig<S, C, P>): void {
   registry.set(tag, config);
-  if (typeof customElements !== "undefined" && !customElements.get(tag)) {
-    customElements.define(tag, createElementClass(config) as CustomElementConstructor);
+  if (!customElements.get(tag)) {
+    customElements.define(tag, createElementClass(config));
   }
-}
-
-// --- Hot Module Replacement (HMR) ---
-if (
-  typeof import.meta !== 'undefined' &&
-  (import.meta as any).hot &&
-  import.meta && import.meta.hot
-) {
-  import.meta.hot.accept((newModule) => {
-    // Update registry with new configs from the hot module
-    if (newModule && newModule.registry) {
-      for (const [tag, newConfig] of newModule.registry.entries()) {
-        registry.set(tag, newConfig);
-        // Update all instances to use new config
-        if (typeof document !== "undefined") {
-          document.querySelectorAll(tag).forEach((el) => {
-            if (typeof (el as any)._cfg !== "undefined") {
-              (el as any)._cfg = newConfig;
-            }
-            if (typeof (el as any)._render === "function") {
-              (el as any)._render(newConfig);
-            }
-          });
-        }
-      }
-    }
-  });
 }
 
 // --- Element class factory ---
@@ -171,26 +145,20 @@ export function createElementClass<
   S extends object,
   C extends object,
   P extends object,
->(config: ComponentConfig<S, C, P>): CustomElementConstructor | { new (): object } {
-  if (typeof customElements === "undefined") {
-    return class {
-      // No-op for SSR, just a stub
-      constructor() {}
-    };
-  }
+>(config: ComponentConfig<S, C, P>): CustomElementConstructor {
   return class extends HTMLElement {
-    private _cfg: ComponentConfig<S, C, P>;
     private _state: S & C & P & { [key: string]: any };
     private _refs: Record<string, HTMLElement> = {};
     private _api: ComponentAPI<S & C & P> & {
       refs: Record<string, HTMLElement>;
     };
     private _listeners: Array<() => void> = [];
-    private _inputListeners: (() => void)[] = [];
+
     private _renderTimeoutId: number | null = null;
     private _mounted = false;
     private _hasError = false;
     private _initializing = true;
+    private _cfg: ComponentConfig<S, C, P>;
 
     constructor() {
       super();
@@ -302,214 +270,46 @@ export function createElementClass<
 
         // --- Render VDOM ---
         const output = cfg.render(this._state);
-        vdomRenderer(this.shadowRoot, output);
+        // Create context with state and render method for directive processing
+        // Use a proxy to avoid modifying the actual state object
+        const context = new Proxy(this._state, {
+          get: (target, prop) => {
+            if (prop === "_requestRender") {
+              return () => this._requestRender();
+            }
+            if (prop === "_state") {
+              return target;
+            }
+            // Handle nested property access for v-model directives
+            if (typeof prop === "string" && prop.includes(".")) {
+              return prop.split(".").reduce((obj, key) => obj?.[key], target);
+            }
+            return target[prop as keyof typeof target];
+          },
+          set: (target, prop, value) => {
+            // Handle nested property assignment for v-model directives
+            if (typeof prop === "string" && prop.includes(".")) {
+              const keys = prop.split(".");
+              const lastKey = keys.pop();
+              if (!lastKey) return false;
+
+              const nestedTarget = keys.reduce((obj, key) => {
+                if (!(key in obj)) {
+                  obj[key] = {};
+                }
+                return obj[key];
+              }, target);
+
+              nestedTarget[lastKey] = value;
+              return true;
+            }
+            target[prop as keyof typeof target] = value;
+            return true;
+          },
+        });
+        vdomRenderer(this.shadowRoot, output, context);
         this._applyStyle(cfg);
         this._collectRefs();
-        this._bindInputsToState(this.shadowRoot, this._state);
-      });
-    }
-
-    private _bindInputsToState(root: ShadowRoot, state: S & C & P) {
-      // Clean up existing input listeners
-      this._inputListeners.forEach((unsub) => unsub());
-      this._inputListeners = [];
-
-      const bindEls = Array.from(
-        root.querySelectorAll("input,textarea,select"),
-      );
-
-      bindEls.forEach((el) => {
-        if (
-          el instanceof HTMLInputElement ||
-          el instanceof HTMLTextAreaElement ||
-          el instanceof HTMLSelectElement
-        ) {
-          // Check for data-bind, v-model, or data-model attributes
-          const bindAttr =
-            el.getAttribute("v-model") ||
-            el.getAttribute("data-bind") ||
-            el.getAttribute("data-model");
-          const nameAttr = el.getAttribute("name");
-
-          // Determine which state property to bind to
-          const rawStateProp = bindAttr || nameAttr;
-          if (!rawStateProp) return;
-
-          // Parse modifiers from v-model (e.g., v-model.trim.number)
-          const [stateProp, ...modifiers] = rawStateProp.includes("|")
-            ? rawStateProp.split("|").map((s) => s.trim())
-            : rawStateProp.includes(".") &&
-                bindAttr === el.getAttribute("v-model")
-              ? rawStateProp.split(".")
-              : [rawStateProp];
-
-          if (stateProp && this._hasNestedProperty(state, stateProp)) {
-            // Helper function to get nested property value
-            const getNestedValue = (obj: any, path: string): any => {
-              return path.split(".").reduce((o, key) => o?.[key], obj);
-            };
-
-            // Helper function to set nested property value
-            const setNestedValue = (
-              obj: any,
-              path: string,
-              value: any,
-            ): void => {
-              const keys = path.split(".");
-              let target = obj;
-              for (let i = 0; i < keys.length - 1; i++) {
-                if (!(keys[i] in target)) target[keys[i]] = {};
-                target = target[keys[i]];
-              }
-              target[keys[keys.length - 1]] = value;
-            };
-
-            // Set initial value from state
-            const initialValue = getNestedValue(state, stateProp);
-            this._setInitialInputValue(el, initialValue);
-
-            // Create update handler with Vue.js-like behavior
-            const updateState = (e: Event) => {
-              // Skip update if element is composing (IME input)
-              if (el instanceof HTMLInputElement && (el as any).isComposing) {
-                return;
-              }
-
-              let value: any;
-
-              if (el instanceof HTMLInputElement && el.type === "checkbox") {
-                const trueValue =
-                  el.getAttribute("true-value") ||
-                  el.getAttribute("data-true-value");
-                const falseValue =
-                  el.getAttribute("false-value") ||
-                  el.getAttribute("data-false-value");
-                const currentStateValue = getNestedValue(state, stateProp);
-
-                // Handle multiple checkboxes bound to same v-model (array binding)
-                if (Array.isArray(currentStateValue)) {
-                  const arr = [...currentStateValue];
-                  const checkboxValue = trueValue || el.value;
-
-                  if (el.checked) {
-                    if (!arr.includes(checkboxValue)) {
-                      arr.push(checkboxValue);
-                    }
-                  } else {
-                    const index = arr.indexOf(checkboxValue);
-                    if (index > -1) {
-                      arr.splice(index, 1);
-                    }
-                  }
-                  value = arr;
-                } else {
-                  // Single checkbox with custom true/false values
-                  if (trueValue !== null || falseValue !== null) {
-                    value = el.checked
-                      ? trueValue || true
-                      : falseValue || false;
-                  } else {
-                    value = el.checked;
-                  }
-                }
-              } else if (
-                el instanceof HTMLInputElement &&
-                el.type === "radio"
-              ) {
-                if (el.checked) {
-                  value = el.value;
-                  // Update other radio buttons in the same group
-                  const radioGroup = root.querySelectorAll(
-                    `input[type="radio"][name="${el.name}"]`,
-                  );
-                  radioGroup.forEach((radio) => {
-                    if (radio !== el) {
-                      (radio as HTMLInputElement).checked = false;
-                    }
-                  });
-                } else {
-                  return; // Don't update state for unchecked radio
-                }
-              } else {
-                // Text inputs, textarea, select, etc.
-                value = (
-                  el as
-                    | HTMLInputElement
-                    | HTMLTextAreaElement
-                    | HTMLSelectElement
-                ).value;
-
-                // Apply modifiers in Vue.js order
-                if (modifiers.includes("trim") && typeof value === "string") {
-                  value = value.trim();
-                }
-
-                if (
-                  modifiers.includes("number") ||
-                  (el instanceof HTMLInputElement && el.type === "number")
-                ) {
-                  const numValue = Number(value);
-                  value = isNaN(numValue) ? value : numValue;
-                }
-              }
-
-              // Update state
-              setNestedValue(state, stateProp, value);
-
-              // Trigger re-render if needed
-              this._requestRender();
-            };
-
-            // Handle IME composition events
-            if (el instanceof HTMLInputElement && el.type === "text") {
-              const handleCompositionStart = () => {
-                (el as any).isComposing = true;
-              };
-
-              const handleCompositionEnd = (e: Event) => {
-                (el as any).isComposing = false;
-                updateState(e);
-              };
-
-              el.addEventListener("compositionstart", handleCompositionStart);
-              el.addEventListener("compositionend", handleCompositionEnd);
-
-              this._inputListeners.push(() => {
-                el.removeEventListener(
-                  "compositionstart",
-                  handleCompositionStart,
-                );
-                el.removeEventListener("compositionend", handleCompositionEnd);
-              });
-            }
-
-            // Determine which events to listen to based on modifiers and input type
-            const isLazy = modifiers.includes("lazy");
-            const events: string[] = [];
-
-            if (
-              el instanceof HTMLSelectElement ||
-              (el instanceof HTMLInputElement &&
-                (el.type === "checkbox" || el.type === "radio"))
-            ) {
-              events.push("change");
-            } else if (isLazy) {
-              events.push("change", "blur");
-            } else {
-              events.push("input");
-              // Also listen to change for additional robustness
-              events.push("change");
-            }
-
-            // Add event listeners
-            events.forEach((eventType) => {
-              el.addEventListener(eventType, updateState);
-              this._inputListeners.push(() =>
-                el.removeEventListener(eventType, updateState),
-              );
-            });
-          }
-        }
       });
     }
 
@@ -518,41 +318,6 @@ export function createElementClass<
         return path.split(".").reduce((o, key) => o?.[key], obj) !== undefined;
       } catch {
         return false;
-      }
-    }
-
-    private _setInitialInputValue(
-      el: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement,
-      stateValue: any,
-    ): void {
-      if (el instanceof HTMLInputElement && el.type === "checkbox") {
-        const trueValue =
-          el.getAttribute("true-value") || el.getAttribute("data-true-value");
-
-        if (Array.isArray(stateValue)) {
-          // Multiple checkbox binding - check if this checkbox's value is in the array
-          const checkboxValue = trueValue || el.value;
-          el.checked = stateValue.includes(checkboxValue);
-        } else {
-          // Single checkbox
-          if (trueValue !== null) {
-            el.checked = stateValue === trueValue;
-          } else {
-            el.checked = Boolean(stateValue);
-          }
-        }
-      } else if (el instanceof HTMLInputElement && el.type === "radio") {
-        el.checked = el.value === String(stateValue);
-      } else {
-        // Text inputs, textarea, select, etc.
-        const stringValue = stateValue == null ? "" : String(stateValue);
-        if (el instanceof HTMLSelectElement) {
-          // For select elements, make sure the option exists
-          const option = el.querySelector(`option[value="${stringValue}"]`);
-          el.value = option ? stringValue : "";
-        } else {
-          el.value = stringValue;
-        }
       }
     }
 
@@ -570,7 +335,6 @@ export function createElementClass<
     // --- Style ---
     private _applyStyle(cfg: ComponentConfig<S, C, P>) {
       this._runLogicWithinErrorBoundary(cfg, () => {
-        if (typeof document === "undefined") return;
         if (!this.shadowRoot) return;
         let style = this.shadowRoot.querySelector("style");
         if (!style) {
@@ -745,10 +509,9 @@ component("my-greeting", {
 
         <div class="form-group">
           <label>Name:</label>
-          <input type="text" data-bind="name" />
-        </div>
+          <input type="text" v-model="name" />
 
-        <div class="form-group">
+          <div class="form-group">
           <label>Name (vModel):</label>
           <p>None of these work at the moment:</p>
           <input
@@ -759,36 +522,37 @@ component("my-greeting", {
           />
           <button ${vBind({ disabled: state.isActive })}>Submit</button>
         </div>
+        </div>
 
         <div class="form-group">
           <label>Email:</label>
-          <input type="email" name="email" />
+          <input type="email" v-model="email" />
         </div>
 
         <div class="form-group">
           <label>Age:</label>
-          <input type="number" data-bind="age" />
+          <input type="number" v-model="age" />
+        </div>
+
+        <div class="form-group">
+          <label>Active:</label>
+          <input type="checkbox" v-model="isActive" />
+        </div>
+
+        <div class="form-group">
+          <label>Color:</label>
+          <select v-model="color">
+            <option value="red">Red</option>
+            <option value="green">Green</option>
+            <option value="blue">Blue</option>
+          </select>
         </div>
 
         <div class="form-group">
           <label>Active group:</label>
           ${vFor(state.array, (item) => html`
-            ${item}: <input type="checkbox" value="${item}" data-bind="array" />
+            ${item}: <input type="checkbox" value="${item}" v-model="array" />
           `)}
-        </div>
-
-        <div class="form-group">
-          <label>Active:</label>
-          <input type="checkbox" data-bind="isActive" />
-        </div>
-
-        <div class="form-group">
-          <label>Color:</label>
-          <select name="color">
-            <option value="red">Red</option>
-            <option value="green">Green</option>
-            <option value="blue">Blue</option>
-          </select>
         </div>
 
         <div class="form-group">
@@ -818,7 +582,7 @@ component("my-greeting", {
   onError(error, state, api) {
     console.error("Component error:", error, state, api);
   },
-  handleSomething(state: any, e: Event) {
+  handleSomething(state, e: Event) {
     state.name = "Updated Name";
     state.array.push("New Item");
     console.log("component did something", state, e);

@@ -36,16 +36,18 @@ function parseProps(
 ): {
   props: Record<string, any>;
   attrs: Record<string, any>;
+  directives: Record<string, { value: string; modifiers: string[] }>;
 } {
   const props: Record<string, any> = {};
   const attrs: Record<string, any> = {};
+  const directives: Record<string, { value: string; modifiers: string[] }> = {};
 
-  // Allow ":" for props, "@" for events.
-  const attrRegex = /([:@])?([a-zA-Z0-9-:]+)="([^"]*)"/g;
+  // Allow ":" for props, "@" for events, "v-" for directives.
+  const attrRegex = /([:@]|v-)?([a-zA-Z0-9-:\.]+)="([^"]*)"/g;
   let match: RegExpExecArray | null;
 
   while ((match = attrRegex.exec(str))) {
-    const prefix = match[1]; // ":" or "@" or undefined
+    const prefix = match[1]; // ":" or "@" or "v-" or undefined
     const rawName = match[2];
     const rawVal = match[3];
 
@@ -71,13 +73,53 @@ function parseProps(
         if (context && typeof context[rawVal] === "function")
           props[onName] = context[rawVal];
       }
+    } else if (prefix === "v-") {
+      // Vue-like directive - rawName includes the full directive name (e.g., "model" from "v-model")
+      const [directiveName, ...modifierParts] = rawName.split(".");
+      const modifiers = modifierParts || [];
+
+      let finalValue = interpMatch
+        ? String(values[Number(interpMatch[1])])
+        : rawVal;
+      let finalModifiers = [...modifiers];
+
+      // For v-model, check if modifiers are in the directive name (e.g., v-model.trim)
+      // vs. in the value (e.g., v-model="text.trim")
+      if (directiveName === "model" && finalValue.includes(".")) {
+        // Check if the dots in the value represent nested properties vs modifiers
+        // Common modifiers: trim, number, lazy
+        const commonModifiers = ["trim", "number", "lazy"];
+        const valueParts = finalValue.split(".");
+
+        // Check if the last parts are common modifiers
+        let actualValue = finalValue;
+        const valueModifiers: string[] = [];
+
+        // Work backwards from the end to find modifiers
+        for (let i = valueParts.length - 1; i > 0; i--) {
+          if (commonModifiers.includes(valueParts[i])) {
+            valueModifiers.unshift(valueParts[i]);
+            actualValue = valueParts.slice(0, i).join(".");
+          } else {
+            break;
+          }
+        }
+
+        finalValue = actualValue;
+        finalModifiers.push(...valueModifiers);
+      }
+
+      directives[directiveName] = {
+        value: finalValue,
+        modifiers: finalModifiers,
+      };
     } else {
       // Plain attribute (string)
       attrs[rawName] = interpMatch ? values[Number(interpMatch[1])] : rawVal;
     }
   }
 
-  return { props, attrs };
+  return { props, attrs, directives };
 }
 
 /**
@@ -189,20 +231,26 @@ function htmlImpl(
       const isClosing = match[0][1] === "/";
       const isSelfClosing = match[0][match[0].length - 2] === "/";
 
-      const { props: rawProps, attrs: rawAttrs } = parseProps(
-        match[2] || "",
-        values,
-        context,
-      );
+      const {
+        props: rawProps,
+        attrs: rawAttrs,
+        directives,
+      } = parseProps(match[2] || "", values, context);
 
-      // Shape props into { props, attrs } expected by VDOM
+      // Shape props into { props, attrs, directives } expected by VDOM
       const vnodeProps: {
         props: Record<string, unknown>;
         attrs: Record<string, unknown>;
+        directives?: Record<string, { value: string; modifiers: string[] }>;
       } = { props: {}, attrs: {} };
 
       for (const k in rawProps) vnodeProps.props[k] = rawProps[k];
       for (const k in rawAttrs) vnodeProps.attrs[k] = rawAttrs[k];
+
+      // Add directives if any exist
+      if (Object.keys(directives).length > 0) {
+        vnodeProps.directives = directives;
+      }
 
       if (isClosing) {
         const node = h(
@@ -325,5 +373,6 @@ export function html(
     typeof last === "object" && last && !Array.isArray(last)
       ? (last as Record<string, any>)
       : undefined;
+
   return htmlImpl(strings, values, context);
 }

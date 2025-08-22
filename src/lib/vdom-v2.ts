@@ -7,7 +7,12 @@
 export interface VNode {
   tag: string;
   key?: string;
-  props?: { key?: string; props?: any; attrs?: Record<string, any> };
+  props?: {
+    key?: string;
+    props?: any;
+    attrs?: Record<string, any>;
+    directives?: Record<string, { value: string; modifiers: string[] }>;
+  };
   children?: VNode[] | string;
 }
 
@@ -17,6 +22,348 @@ export interface AnchorBlockVNode extends VNode {
   children: VNode[];
   _startNode?: Comment;
   _endNode?: Comment;
+}
+
+/**
+ * Get nested property value from object using dot notation
+ */
+function getNestedValue(obj: any, path: string): any {
+  return path.split(".").reduce((current, key) => current?.[key], obj);
+}
+
+/**
+ * Set nested property value in object using dot notation
+ */
+function setNestedValue(obj: any, path: string, value: any): void {
+  const keys = path.split(".");
+  const lastKey = keys.pop();
+
+  if (!lastKey) return;
+
+  const target = keys.reduce((current, key) => {
+    if (!(key in current)) {
+      current[key] = {};
+    }
+    return current[key];
+  }, obj);
+
+  target[lastKey] = value;
+}
+
+/**
+ * Process v-model directive for two-way data binding
+ */
+function processVModelDirective(
+  value: string,
+  modifiers: string[],
+  props: Record<string, any>,
+  listeners: Record<string, EventListener>,
+  context?: any,
+  el?: HTMLElement,
+  vnodeAttrs?: Record<string, any>,
+): void {
+  if (!context) return;
+
+  const hasLazy = modifiers.includes("lazy");
+  const hasTrim = modifiers.includes("trim");
+  const hasNumber = modifiers.includes("number");
+
+  // Get current value from state - use the actual state object, not the proxy
+  // The proxy is for setting values, but for getting we want direct access
+  const actualState = context._state || context;
+  const currentValue = getNestedValue(actualState, value);
+
+  // Determine input type from VNode attrs (since element attrs aren't set yet)
+  let inputType = "text";
+  const vnodeInputType = vnodeAttrs?.type;
+
+  if (el instanceof HTMLInputElement) {
+    inputType = vnodeInputType || el.type || "text";
+  } else if (el instanceof HTMLSelectElement) {
+    inputType = "select";
+  } else if (el instanceof HTMLTextAreaElement) {
+    inputType = "textarea";
+  }
+
+  // Set initial value
+  if (inputType === "checkbox") {
+    if (Array.isArray(currentValue)) {
+      // Multiple checkboxes bound to array
+      const checkboxValue =
+        el?.getAttribute("value") || vnodeAttrs?.value || "";
+      props.checked = currentValue.includes(checkboxValue);
+    } else {
+      // Single checkbox bound to boolean or custom values
+      const trueValue = el?.getAttribute("true-value") || true;
+      props.checked = currentValue === trueValue;
+    }
+  } else if (inputType === "radio") {
+    const radioValue = vnodeAttrs?.value || "";
+    props.checked = currentValue === radioValue;
+  } else if (inputType === "select") {
+    // For select elements, defer value setting until after options are rendered
+    setTimeout(() => {
+      if (el instanceof HTMLSelectElement) {
+        el.value = String(currentValue);
+      }
+    }, 0);
+  } else {
+    props.value = currentValue;
+  }
+
+  // Create event listener
+  const eventType =
+    hasLazy ||
+    inputType === "checkbox" ||
+    inputType === "radio" ||
+    inputType === "select"
+      ? "change"
+      : "input";
+
+  const eventListener: EventListener = (event: Event) => {
+    // Skip during IME composition - check multiple ways
+    if ((event as any).isComposing || (listeners as any)._isComposing) return;
+
+    const target = event.target as
+      | HTMLInputElement
+      | HTMLTextAreaElement
+      | HTMLSelectElement;
+    let newValue: any = target.value;
+
+    // Handle different input types
+    if (inputType === "checkbox") {
+      if (Array.isArray(currentValue)) {
+        // Multiple checkboxes bound to array
+        const checkboxValue = target.getAttribute("value") || "";
+        const currentArray = [...currentValue];
+        if ((target as HTMLInputElement).checked) {
+          if (!currentArray.includes(checkboxValue)) {
+            currentArray.push(checkboxValue);
+          }
+        } else {
+          const index = currentArray.indexOf(checkboxValue);
+          if (index > -1) {
+            currentArray.splice(index, 1);
+          }
+        }
+        newValue = currentArray;
+      } else {
+        // Single checkbox
+        const trueValue = target.getAttribute("true-value") || true;
+        const falseValue = target.getAttribute("false-value") || false;
+        newValue = (target as HTMLInputElement).checked
+          ? trueValue
+          : falseValue;
+      }
+    } else if (inputType === "radio") {
+      newValue = target.getAttribute("value") || target.value;
+    } else {
+      // Apply modifiers
+      if (hasTrim) {
+        newValue = newValue.trim();
+      }
+      if (hasNumber) {
+        const numValue = Number(newValue);
+        if (!isNaN(numValue)) {
+          newValue = numValue;
+        }
+      }
+    }
+
+    // Update state
+
+    // Update using the actual state object for proper nested property support
+    const actualState = context._state || context;
+    setNestedValue(actualState, value, newValue);
+
+    // Trigger re-render if context has a render method
+    if (context._requestRender) {
+      context._requestRender();
+    }
+  };
+
+  listeners[eventType] = eventListener;
+
+  // Handle IME composition for all input types (not just when !hasLazy)
+  if (inputType === "text" || inputType === "textarea") {
+    const compositionStartListener: EventListener = () => {
+      // Flag to skip input events during composition
+      (listeners as any)._isComposing = true;
+    };
+
+    const compositionEndListener: EventListener = (event: Event) => {
+      (listeners as any)._isComposing = false;
+
+      // Capture the target reference before setTimeout to avoid losing it
+      const target = event.target as HTMLInputElement | HTMLTextAreaElement;
+      // Manually trigger the update after composition ends
+      setTimeout(() => {
+        if (target) {
+          let newValue: any = target.value;
+
+          // Apply modifiers
+          if (hasTrim) {
+            newValue = newValue.trim();
+          }
+          if (hasNumber) {
+            const numValue = Number(newValue);
+            if (!isNaN(numValue)) {
+              newValue = numValue;
+            }
+          }
+
+          setNestedValue(actualState, value, newValue);
+
+          if (context._requestRender) {
+            context._requestRender();
+          }
+        }
+      }, 0);
+    };
+
+    listeners.compositionstart = compositionStartListener;
+    listeners.compositionend = compositionEndListener;
+  }
+}
+
+/**
+ * Process v-bind directive for attribute/property binding
+ */
+function processVBindDirective(
+  value: string,
+  props: Record<string, any>,
+  attrs: Record<string, any>,
+  context?: any,
+): void {
+  if (!context) return;
+
+  try {
+    // Parse as object binding
+    const bindings = JSON.parse(value);
+    if (typeof bindings === "object") {
+      for (const [key, val] of Object.entries(bindings)) {
+        props[key] = val;
+      }
+    }
+  } catch {
+    // Parse as single property binding
+    const currentValue = getNestedValue(context, value);
+    // Default to binding as attribute
+    attrs[value] = currentValue;
+  }
+}
+
+/**
+ * Process v-show directive for conditional display
+ */
+function processVShowDirective(
+  value: string,
+  attrs: Record<string, any>,
+  context?: any,
+): void {
+  if (!context) return;
+
+  const isVisible = getNestedValue(context, value);
+  const currentStyle = attrs.style || "";
+  const displayStyle = isVisible ? "" : "none";
+
+  // Merge with existing styles
+  if (currentStyle) {
+    const styleRules = currentStyle.split(";").filter(Boolean);
+    const displayIndex = styleRules.findIndex((rule: string) =>
+      rule.trim().startsWith("display:"),
+    );
+
+    if (displayIndex >= 0) {
+      styleRules[displayIndex] = `display: ${displayStyle}`;
+    } else {
+      styleRules.push(`display: ${displayStyle}`);
+    }
+
+    attrs.style = styleRules.join("; ");
+  } else {
+    attrs.style = `display: ${displayStyle}`;
+  }
+}
+
+/**
+ * Process v-class directive for conditional CSS classes
+ */
+function processVClassDirective(
+  value: string,
+  attrs: Record<string, any>,
+  context?: any,
+): void {
+  if (!context) return;
+
+  const classValue = getNestedValue(context, value);
+  let classes: string[] = [];
+
+  if (typeof classValue === "string") {
+    classes = [classValue];
+  } else if (Array.isArray(classValue)) {
+    classes = classValue.filter(Boolean);
+  } else if (typeof classValue === "object") {
+    // Object syntax: { className: condition }
+    classes = Object.entries(classValue)
+      .filter(([, condition]) => Boolean(condition))
+      .map(([className]) => className);
+  }
+
+  const existingClasses = attrs.class || "";
+  const allClasses = existingClasses
+    ? `${existingClasses} ${classes.join(" ")}`.trim()
+    : classes.join(" ");
+
+  if (allClasses) {
+    attrs.class = allClasses;
+  }
+}
+
+/**
+ * Process Vue-like directives and return merged props, attrs, and event listeners
+ */
+function processDirectives(
+  directives: Record<string, { value: string; modifiers: string[] }>,
+  context?: any,
+  el?: HTMLElement,
+  vnodeAttrs?: Record<string, any>,
+): {
+  props: Record<string, any>;
+  attrs: Record<string, any>;
+  listeners: Record<string, EventListener>;
+} {
+  const props: Record<string, any> = {};
+  const attrs: Record<string, any> = {};
+  const listeners: Record<string, EventListener> = {};
+
+  for (const [directiveName, { value, modifiers }] of Object.entries(
+    directives,
+  )) {
+    switch (directiveName) {
+      case "model":
+        processVModelDirective(
+          value,
+          modifiers,
+          props,
+          listeners,
+          context,
+          el,
+          vnodeAttrs,
+        );
+        break;
+      case "bind":
+        processVBindDirective(value, props, attrs, context);
+        break;
+      case "show":
+        processVShowDirective(value, attrs, context);
+        break;
+      case "class":
+        processVClassDirective(value, attrs, context);
+        break;
+    }
+  }
+  return { props, attrs, listeners };
 }
 
 function assignKeysDeep(
@@ -83,16 +430,40 @@ function patchProps(
   el: HTMLElement,
   oldProps: Record<string, any>,
   newProps: Record<string, any>,
+  context?: any,
 ) {
+  // Process directives first
+  const newDirectives = newProps.directives ?? {};
+  const processedDirectives = processDirectives(
+    newDirectives,
+    context,
+    el,
+    newProps.attrs,
+  );
+
+  // Merge processed directive results with existing props/attrs
+  const mergedProps = {
+    ...oldProps.props,
+    ...newProps.props,
+    ...processedDirectives.props,
+  };
+  const mergedAttrs = {
+    ...oldProps.attrs,
+    ...newProps.attrs,
+    ...processedDirectives.attrs,
+  };
+
   const oldPropProps = oldProps.props ?? {};
-  const newPropProps = newProps.props ?? {};
+  const newPropProps = mergedProps;
   for (const key in { ...oldPropProps, ...newPropProps }) {
     const oldVal = oldPropProps[key];
     const newVal = newPropProps[key];
     if (oldVal !== newVal) {
       if (
         key === "value" &&
-        (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement)
+        (el instanceof HTMLInputElement ||
+          el instanceof HTMLTextAreaElement ||
+          el instanceof HTMLSelectElement)
       ) {
         if (el.value !== newVal) el.value = newVal ?? "";
       } else if (key === "checked" && el instanceof HTMLInputElement) {
@@ -108,8 +479,16 @@ function patchProps(
       }
     }
   }
+
+  // Handle directive event listeners
+  for (const [eventType, listener] of Object.entries(
+    processedDirectives.listeners || {},
+  )) {
+    el.addEventListener(eventType, listener as EventListener);
+  }
+
   const oldAttrs = oldProps.attrs ?? {};
-  const newAttrs = newProps.attrs ?? {};
+  const newAttrs = mergedAttrs;
   for (const key in { ...oldAttrs, ...newAttrs }) {
     const oldVal = oldAttrs[key];
     const newVal = newAttrs[key];
@@ -120,7 +499,7 @@ function patchProps(
   }
 }
 
-function createElement(vnode: VNode | string): Node {
+function createElement(vnode: VNode | string, context?: any): Node {
   // String VNode → plain text node (no key)
   if (typeof vnode === "string") {
     return document.createTextNode(vnode);
@@ -156,7 +535,7 @@ function createElement(vnode: VNode | string): Node {
     const frag = document.createDocumentFragment();
     frag.appendChild(start);
     for (const child of children) {
-      frag.appendChild(createElement(child));
+      frag.appendChild(createElement(child, context));
     }
     frag.appendChild(end);
     return frag;
@@ -166,19 +545,34 @@ function createElement(vnode: VNode | string): Node {
   const el = document.createElement(vnode.tag);
   if (vnode.key != null) (el as any).key = vnode.key; // attach key
 
-  const { props = {}, attrs = {} } = vnode.props ?? {};
+  const { props = {}, attrs = {}, directives = {} } = vnode.props ?? {};
+
+  // Process directives first to get merged props/attrs/listeners
+  const processedDirectives = processDirectives(directives, context, el, attrs);
+
+  // Merge processed directive results with existing props/attrs
+  const mergedProps = {
+    ...props,
+    ...processedDirectives.props,
+  };
+  const mergedAttrs = {
+    ...attrs,
+    ...processedDirectives.attrs,
+  };
 
   // Set attributes
-  for (const key in attrs) {
-    el.setAttribute(key, String(attrs[key]));
+  for (const key in mergedAttrs) {
+    el.setAttribute(key, String(mergedAttrs[key]));
   }
 
   // Set props and event listeners
-  for (const key in props) {
-    const val = props[key];
+  for (const key in mergedProps) {
+    const val = mergedProps[key];
     if (
       key === "value" &&
-      (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement)
+      (el instanceof HTMLInputElement ||
+        el instanceof HTMLTextAreaElement ||
+        el instanceof HTMLSelectElement)
     ) {
       el.value = val ?? "";
     } else if (key === "checked" && el instanceof HTMLInputElement) {
@@ -192,10 +586,17 @@ function createElement(vnode: VNode | string): Node {
     }
   }
 
+  // Handle directive event listeners
+  for (const [eventType, listener] of Object.entries(
+    processedDirectives.listeners || {},
+  )) {
+    el.addEventListener(eventType, listener as EventListener);
+  }
+
   // Append children
   if (Array.isArray(vnode.children)) {
     for (const child of vnode.children) {
-      el.appendChild(createElement(child));
+      el.appendChild(createElement(child, context));
     }
   } else if (typeof vnode.children === "string") {
     el.textContent = vnode.children;
@@ -211,6 +612,7 @@ function patchChildren(
   parent: HTMLElement,
   oldChildren: VNode[] | string | undefined,
   newChildren: VNode[] | string | undefined,
+  context?: any,
 ) {
   if (typeof newChildren === "string") {
     if (parent.textContent !== newChildren) parent.textContent = newChildren;
@@ -295,13 +697,14 @@ function patchChildren(
             oldNodeByKeyRange.get(newVNode.key)!,
             oldVNode,
             newVNode,
+            context,
           );
           usedInRange.add(node);
           if (node !== next && parent.contains(node)) {
             parent.insertBefore(node, next);
           }
         } else {
-          node = createElement(newVNode);
+          node = createElement(newVNode, context);
           parent.insertBefore(node, next);
           usedInRange.add(node);
         }
@@ -324,7 +727,7 @@ function patchChildren(
       for (let i = 0; i < commonLength; i++) {
         const oldVNode = oldVNodesInRange[i];
         const newVNode = newChildren[i];
-        const node = patch(oldNodesInRange[i], oldVNode, newVNode);
+        const node = patch(oldNodesInRange[i], oldVNode, newVNode, context);
         if (node !== oldNodesInRange[i]) {
           parent.insertBefore(node, oldNodesInRange[i]);
           parent.removeChild(oldNodesInRange[i]);
@@ -333,7 +736,7 @@ function patchChildren(
 
       // Add extra new
       for (let i = commonLength; i < newChildren.length; i++) {
-        parent.insertBefore(createElement(newChildren[i]), end);
+        parent.insertBefore(createElement(newChildren[i], context), end);
       }
 
       // Remove extra old
@@ -377,7 +780,7 @@ function patchChildren(
       if (!parent.contains(start) || !parent.contains(end)) {
         parent.insertBefore(start, nextSibling);
         for (const child of children) {
-          parent.insertBefore(createElement(child), nextSibling);
+          parent.insertBefore(createElement(child, context), nextSibling);
         }
         parent.insertBefore(end, nextSibling);
       } else {
@@ -398,14 +801,19 @@ function patchChildren(
     // Normal keyed element/text
     if (newVNode.key != null && oldNodeByKey.has(newVNode.key)) {
       const oldVNode = oldVNodeByKey.get(newVNode.key)!;
-      node = patch(oldNodeByKey.get(newVNode.key)!, oldVNode, newVNode);
+      node = patch(
+        oldNodeByKey.get(newVNode.key)!,
+        oldVNode,
+        newVNode,
+        context,
+      );
       usedNodes.add(node);
       if (node !== nextSibling && parent.contains(node)) {
         if (nextSibling && !parent.contains(nextSibling)) nextSibling = null;
         parent.insertBefore(node, nextSibling);
       }
     } else {
-      node = createElement(newVNode);
+      node = createElement(newVNode, context);
       if (nextSibling && !parent.contains(nextSibling)) nextSibling = null;
       parent.insertBefore(node, nextSibling);
       usedNodes.add(node);
@@ -429,6 +837,7 @@ function patch(
   dom: Node,
   oldVNode: VNode | string | null,
   newVNode: VNode | string | null,
+  context?: any,
 ): Node {
   if (oldVNode === newVNode) return dom;
 
@@ -463,7 +872,7 @@ function patch(
     const frag = document.createDocumentFragment();
     frag.appendChild(start);
     for (const child of children) {
-      frag.appendChild(createElement(child));
+      frag.appendChild(createElement(child, context));
     }
     frag.appendChild(end);
     dom.parentNode?.replaceChild(frag, dom);
@@ -477,7 +886,7 @@ function patch(
   }
 
   if (!oldVNode || typeof oldVNode === "string") {
-    const newEl = createElement(newVNode);
+    const newEl = createElement(newVNode, context);
     dom.parentNode?.replaceChild(newEl, dom);
     return newEl;
   }
@@ -498,7 +907,7 @@ function patch(
     const frag = document.createDocumentFragment();
     frag.appendChild(start);
     for (const child of children) {
-      frag.appendChild(createElement(child));
+      frag.appendChild(createElement(child, context));
     }
     frag.appendChild(end);
     dom.parentNode?.replaceChild(frag, dom);
@@ -512,12 +921,12 @@ function patch(
     oldVNode.key === newVNode.key
   ) {
     const el = dom as HTMLElement;
-    patchProps(el, oldVNode.props || {}, newVNode.props || {});
-    patchChildren(el, oldVNode.children, newVNode.children);
+    patchProps(el, oldVNode.props || {}, newVNode.props || {}, context);
+    patchChildren(el, oldVNode.children, newVNode.children, context);
     return el;
   }
 
-  const newEl = createElement(newVNode);
+  const newEl = createElement(newVNode, context);
   dom.parentNode?.replaceChild(newEl, dom);
   return newEl;
 }
@@ -526,7 +935,11 @@ function patch(
  * Main renderer: uses patching and keys for node reuse.
  * Never uses innerHTML. Only updates what has changed.
  */
-export function vdomRenderer(root: ShadowRoot, vnodeOrArray: VNode | VNode[]) {
+export function vdomRenderer(
+  root: ShadowRoot,
+  vnodeOrArray: VNode | VNode[],
+  context?: any,
+) {
   const wrap = (v: VNode): VNode =>
     v.key == null ? { ...v, key: "__root__" } : v;
   let newVNode = Array.isArray(vnodeOrArray)
@@ -534,8 +947,6 @@ export function vdomRenderer(root: ShadowRoot, vnodeOrArray: VNode | VNode[]) {
     : wrap(vnodeOrArray);
 
   newVNode = assignKeysDeep(newVNode, String(newVNode.key ?? "root")) as VNode;
-
-  console.log("[vdomRenderer] newVNode:", newVNode);
 
   // Track previous VNode and DOM node
   const prevVNode: VNode | null = (root as any)._prevVNode ?? null;
@@ -552,13 +963,13 @@ export function vdomRenderer(root: ShadowRoot, vnodeOrArray: VNode | VNode[]) {
       prevVNode.tag === newVNode.tag &&
       prevVNode.key === newVNode.key
     ) {
-      newDom = patch(prevDom, prevVNode, newVNode);
+      newDom = patch(prevDom, prevVNode, newVNode, context);
     } else {
-      newDom = createElement(newVNode);
+      newDom = createElement(newVNode, context);
       root.replaceChild(newDom, prevDom);
     }
   } else {
-    newDom = createElement(newVNode);
+    newDom = createElement(newVNode, context);
     if (root.firstChild) root.replaceChild(newDom, root.firstChild);
     else root.appendChild(newDom);
   }
