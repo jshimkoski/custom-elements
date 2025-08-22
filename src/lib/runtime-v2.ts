@@ -162,11 +162,11 @@ function createElementClass<
 
       // --- Inject config methods into state ---
       Object.keys(config).forEach((key) => {
-        if (
-          typeof (config as any)[key] === "function" &&
-          !key.startsWith("on")
-        ) {
-          (this._state as any)[key] = (config as any)[key];
+        const fn = (config as any)[key];
+        if (typeof fn === "function" && !key.startsWith("on")) {
+          // Wrap the function so it receives state as the first argument
+          (this._state as any)[key] = (...args: any[]) =>
+            fn(this._state, ...args);
         }
       });
 
@@ -296,7 +296,7 @@ function createElementClass<
           if (stateProp && stateProp in state) {
             // Set initial value from state
             if (el instanceof HTMLInputElement && el.type === "checkbox") {
-              el.checked = Boolean(state[stateProp as keyof typeof state]);
+              el.checked = Boolean((state as Record<string, unknown>)[stateProp]);
             } else if (el instanceof HTMLInputElement && el.type === "radio") {
               el.checked =
                 el.value === String(state[stateProp as keyof typeof state]);
@@ -398,35 +398,40 @@ function createElementClass<
     private _initState(cfg: ComponentConfig<S, C, P>): S & C & P {
       try {
         const self = this;
-        const state = { ...cfg.state };
-        return new Proxy(state as S & C & P, {
-          get(target, prop, receiver) {
-            return Reflect.get(target, prop, receiver);
-          },
-          set(target, prop, value) {
-            if (target[prop as keyof typeof target] !== value) {
-              target[prop as keyof typeof target] = value;
-              if (!self._initializing) {
-                self._render(cfg);
+        function createReactive(obj: any): any {
+          if (Array.isArray(obj)) {
+            return new Proxy(obj, {
+              set(target, prop, value) {
+                target[prop as any] = value;
+                if (!self._initializing) self._render(cfg);
+                return true;
+              },
+              deleteProperty(target, prop) {
+                delete target[prop as any];
+                if (!self._initializing) self._render(cfg);
+                return true;
               }
-            }
-            return true;
-          },
-        });
-      } catch (error) {
-        this._hasError = true;
-        if (cfg.onError) {
-          cfg.onError(error as Error | null, this._state, this._api);
-        }
-        if (cfg.errorFallback) {
-          if (this.shadowRoot) {
-            this.shadowRoot.innerHTML = cfg.errorFallback(
-              error as Error | null,
-              this._state,
-            );
+            });
           }
+          if (obj && typeof obj === "object") {
+            Object.keys(obj).forEach(key => {
+              obj[key] = createReactive(obj[key]);
+            });
+            return new Proxy(obj, {
+              set(target, prop, value) {
+                target[prop as any] = createReactive(value);
+                if (!self._initializing) self._render(cfg);
+                return true;
+              },
+              get(target, prop, receiver) {
+                return Reflect.get(target, prop, receiver);
+              }
+            });
+          }
+          return obj;
         }
-        // Return a default state to satisfy the return type
+        return createReactive({ ...cfg.state }) as S & C & P;
+      } catch (error) {
         return {} as S & C & P;
       }
     }
@@ -578,7 +583,9 @@ component("my-greeting", {
   onError(error, state, api) {
     console.error("Component error:", error, state, api);
   },
-  handleSomething(e: Event) {
-    console.log("component did something", e);
+  handleSomething(state, e: Event) {
+    state.name = "Updated Name";
+    state.array.push("New Item");
+    console.log("component did something", state, e);
   },
 });
