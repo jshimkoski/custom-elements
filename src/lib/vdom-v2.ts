@@ -9,18 +9,20 @@ export interface VNode {
   key?: string;
   props?: { key?: string; props?: any; attrs?: Record<string, any> };
   children?: VNode[] | string;
-};
+}
 
 export interface AnchorBlockVNode extends VNode {
-  tag: '#anchor';
+  tag: "#anchor";
   key: string;
   children: VNode[];
   _startNode?: Comment;
   _endNode?: Comment;
 }
 
-
-function assignKeysDeep(nodeOrNodes: VNode | VNode[], baseKey: string): VNode | VNode[] {
+function assignKeysDeep(
+  nodeOrNodes: VNode | VNode[],
+  baseKey: string,
+): VNode | VNode[] {
   if (Array.isArray(nodeOrNodes)) {
     const usedKeys = new Set<string>();
 
@@ -38,7 +40,9 @@ function assignKeysDeep(nodeOrNodes: VNode | VNode[], baseKey: string): VNode | 
           child.props?.attrs?.name ??
           child.props?.attrs?.["data-key"] ??
           "";
-        key = idPart ? `${baseKey}:${tagPart}:${idPart}` : `${baseKey}:${tagPart}`;
+        key = idPart
+          ? `${baseKey}:${tagPart}:${idPart}`
+          : `${baseKey}:${tagPart}`;
       }
 
       // Ensure uniqueness among siblings
@@ -71,25 +75,31 @@ function assignKeysDeep(nodeOrNodes: VNode | VNode[], baseKey: string): VNode | 
   return { ...node, key, children };
 }
 
-
-
 /**
  * Patch props on an element.
  * Only update changed props, remove old, add new.
  */
-function patchProps(el: HTMLElement, oldProps: Record<string, any>, newProps: Record<string, any>) {
+function patchProps(
+  el: HTMLElement,
+  oldProps: Record<string, any>,
+  newProps: Record<string, any>,
+) {
   const oldPropProps = oldProps.props ?? {};
   const newPropProps = newProps.props ?? {};
   for (const key in { ...oldPropProps, ...newPropProps }) {
     const oldVal = oldPropProps[key];
     const newVal = newPropProps[key];
     if (oldVal !== newVal) {
-      if (key === 'value' && (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement)) {
-        if (el.value !== newVal) el.value = newVal ?? '';
-      } else if (key === 'checked' && el instanceof HTMLInputElement) {
+      if (
+        key === "value" &&
+        (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement)
+      ) {
+        if (el.value !== newVal) el.value = newVal ?? "";
+      } else if (key === "checked" && el instanceof HTMLInputElement) {
         el.checked = !!newVal;
-      } else if (key.startsWith('on') && typeof newVal === 'function') {
-        if (typeof oldVal === 'function') el.removeEventListener(key.slice(2).toLowerCase(), oldVal);
+      } else if (key.startsWith("on") && typeof newVal === "function") {
+        if (typeof oldVal === "function")
+          el.removeEventListener(key.slice(2).toLowerCase(), oldVal);
         el.addEventListener(key.slice(2).toLowerCase(), newVal);
       } else if (newVal === undefined || newVal === null) {
         el.removeAttribute(key);
@@ -112,43 +122,40 @@ function patchProps(el: HTMLElement, oldProps: Record<string, any>, newProps: Re
 
 function createElement(vnode: VNode | string): Node {
   // String VNode → plain text node (no key)
-  if (typeof vnode === 'string') {
+  if (typeof vnode === "string") {
     return document.createTextNode(vnode);
   }
 
   // Text VNode
-  if (vnode.tag === '#text') {
+  if (vnode.tag === "#text") {
     const textNode = document.createTextNode(
-      typeof vnode.children === 'string' ? vnode.children : ''
+      typeof vnode.children === "string" ? vnode.children : "",
     );
     if (vnode.key != null) (textNode as any).key = vnode.key; // attach key
     return textNode;
   }
 
-  // Anchor block VNode
-  if (vnode.tag === '#anchor') {
+  // Anchor block VNode - ALWAYS create start/end boundaries
+  if (vnode.tag === "#anchor") {
     const anchorVNode = vnode as AnchorBlockVNode;
-    const hasChildren = Array.isArray(anchorVNode.children) && anchorVNode.children.length > 0;
+    const children = Array.isArray(anchorVNode.children)
+      ? anchorVNode.children
+      : [];
 
-    if (!hasChildren) {
-      const placeholder = document.createComment(`block:anchor:${anchorVNode.key}`);
-      if (anchorVNode.key != null) (placeholder as any).key = anchorVNode.key; // attach key
-      anchorVNode._startNode = placeholder;
-      return placeholder;
-    }
+    // Always create start/end markers for stable boundaries
+    const start = document.createTextNode("");
+    const end = document.createTextNode("");
 
-    const start = document.createComment(`block:start:${anchorVNode.key}`);
-    const end = document.createComment(`block:end:${anchorVNode.key}`);
     if (anchorVNode.key != null) {
-      (start as any).key = anchorVNode.key;
-      (end as any).key = anchorVNode.key;
+      (start as any).key = `${anchorVNode.key}:start`;
+      (end as any).key = `${anchorVNode.key}:end`;
     }
     anchorVNode._startNode = start;
     anchorVNode._endNode = end;
 
     const frag = document.createDocumentFragment();
     frag.appendChild(start);
-    for (const child of anchorVNode.children) {
+    for (const child of children) {
       frag.appendChild(createElement(child));
     }
     frag.appendChild(end);
@@ -169,13 +176,16 @@ function createElement(vnode: VNode | string): Node {
   // Set props and event listeners
   for (const key in props) {
     const val = props[key];
-    if (key === 'value' && (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement)) {
-      el.value = val ?? '';
-    } else if (key === 'checked' && el instanceof HTMLInputElement) {
+    if (
+      key === "value" &&
+      (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement)
+    ) {
+      el.value = val ?? "";
+    } else if (key === "checked" && el instanceof HTMLInputElement) {
       el.checked = !!val;
-    } else if (key.startsWith('on') && typeof val === 'function') {
+    } else if (key.startsWith("on") && typeof val === "function") {
       el.addEventListener(key.slice(2).toLowerCase(), val);
-    } else if (key.startsWith('on') && val === undefined) {
+    } else if (key.startsWith("on") && val === undefined) {
       continue; // skip undefined event handlers
     } else {
       el.setAttribute(key, String(val));
@@ -187,14 +197,12 @@ function createElement(vnode: VNode | string): Node {
     for (const child of vnode.children) {
       el.appendChild(createElement(child));
     }
-  } else if (typeof vnode.children === 'string') {
+  } else if (typeof vnode.children === "string") {
     el.textContent = vnode.children;
   }
 
   return el;
 }
-
-
 
 /**
  * Patch children using keys for node matching.
@@ -202,9 +210,9 @@ function createElement(vnode: VNode | string): Node {
 function patchChildren(
   parent: HTMLElement,
   oldChildren: VNode[] | string | undefined,
-  newChildren: VNode[] | string | undefined
+  newChildren: VNode[] | string | undefined,
 ) {
-  if (typeof newChildren === 'string') {
+  if (typeof newChildren === "string") {
     if (parent.textContent !== newChildren) parent.textContent = newChildren;
     return;
   }
@@ -222,24 +230,11 @@ function patchChildren(
   // Map DOM nodes by key (elements, text, anchors)
   const oldNodeByKey = new Map<string | number, Node>();
 
-  function parseAnchorComment(c: Comment) {
-    const data = c.data;
-    if (data.startsWith('block:anchor:')) return { type: 'anchor', key: data.slice(13) };
-    if (data.startsWith('block:start:')) return { type: 'start', key: data.slice(12) };
-    if (data.startsWith('block:end:')) return { type: 'end', key: data.slice(10) };
-    return null;
-  }
-
-  // Scan DOM for keyed nodes and anchors
+  // Scan DOM for keyed nodes including anchor boundaries
   for (const node of oldNodes) {
     const k = (node as any).key;
     if (k != null) {
       oldNodeByKey.set(k, node);
-      continue;
-    }
-    if (node.nodeType === Node.COMMENT_NODE) {
-      const info = parseAnchorComment(node as Comment);
-      if (info) oldNodeByKey.set(info.key, node);
     }
   }
 
@@ -260,7 +255,7 @@ function patchChildren(
     start: Comment,
     end: Comment,
     oldChildren: VNode[] | undefined,
-    newChildren: VNode[]
+    newChildren: VNode[],
   ) {
     const oldNodesInRange: Node[] = [];
     let cur: Node | null = start.nextSibling;
@@ -269,10 +264,12 @@ function patchChildren(
       cur = cur.nextSibling;
     }
 
-    const oldVNodesInRange: VNode[] = Array.isArray(oldChildren) ? oldChildren : [];
+    const oldVNodesInRange: VNode[] = Array.isArray(oldChildren)
+      ? oldChildren
+      : [];
     const hasKeys =
-      newChildren.some(c => c && c.key != null) ||
-      oldVNodesInRange.some(c => c && c.key != null);
+      newChildren.some((c) => c && c.key != null) ||
+      oldVNodesInRange.some((c) => c && c.key != null);
 
     if (hasKeys) {
       // Keyed diff
@@ -294,7 +291,11 @@ function patchChildren(
         let node: Node;
         if (newVNode.key != null && oldNodeByKeyRange.has(newVNode.key)) {
           const oldVNode = oldVNodeByKeyRange.get(newVNode.key)!;
-          node = patch(oldNodeByKeyRange.get(newVNode.key)!, oldVNode, newVNode);
+          node = patch(
+            oldNodeByKeyRange.get(newVNode.key)!,
+            oldVNode,
+            newVNode,
+          );
           usedInRange.add(node);
           if (node !== next && parent.contains(node)) {
             parent.insertBefore(node, next);
@@ -315,7 +316,10 @@ function patchChildren(
       }
     } else {
       // Keyless fallback: index-based patch
-      const commonLength = Math.min(oldVNodesInRange.length, newChildren.length);
+      const commonLength = Math.min(
+        oldVNodesInRange.length,
+        newChildren.length,
+      );
 
       for (let i = 0; i < commonLength; i++) {
         const oldVNode = oldVNodesInRange[i];
@@ -344,53 +348,45 @@ function patchChildren(
     let node: Node;
 
     // Handle AnchorBlocks
-    if (newVNode.tag === '#anchor') {
+    if (newVNode.tag === "#anchor") {
       const aKey = newVNode.key!;
-      const startNode = oldNodeByKey.get(aKey) as Comment | undefined;
-      const hasChildren = Array.isArray(newVNode.children) && newVNode.children.length > 0;
+      const startKey = `${aKey}:start`;
+      const endKey = `${aKey}:end`;
 
-      if (!hasChildren) {
-        const placeholder = startNode ?? document.createComment(`block:anchor:${aKey}`);
-        if (!parent.contains(placeholder)) parent.insertBefore(placeholder, nextSibling);
-        usedNodes.add(placeholder);
-        nextSibling = placeholder.nextSibling;
-        continue;
+      let start = oldNodeByKey.get(startKey) as Node;
+      let end = oldNodeByKey.get(endKey) as Node;
+      const children = Array.isArray(newVNode.children)
+        ? newVNode.children
+        : [];
+
+      // Create boundaries if they don't exist
+      if (!start) {
+        start = document.createTextNode("");
+        (start as any).key = startKey;
+      }
+      if (!end) {
+        end = document.createTextNode("");
+        (end as any).key = endKey;
       }
 
-      let start = startNode;
-      let end: Comment | undefined;
+      // Preserve anchor references on the new VNode
+      (newVNode as AnchorBlockVNode)._startNode = start;
+      (newVNode as AnchorBlockVNode)._endNode = end;
 
-      if (start && start.nodeType === Node.COMMENT_NODE) {
-        // find matching end
-        let cur: Node | null = start.nextSibling;
-        while (cur) {
-          if (cur.nodeType === Node.COMMENT_NODE) {
-            const info = parseAnchorComment(cur as Comment);
-            if (info && info.type === 'end' && info.key === aKey) {
-              end = cur as Comment;
-              break;
-            }
-          }
-          cur = cur.nextSibling;
-        }
-      }
-
-      if (!start) start = document.createComment(`block:start:${aKey}`);
-      if (!end) end = document.createComment(`block:end:${aKey}`);
-
+      // If boundaries aren't in DOM, insert the whole fragment
       if (!parent.contains(start) || !parent.contains(end)) {
         parent.insertBefore(start, nextSibling);
-        for (const child of newVNode.children as VNode[]) {
+        for (const child of children) {
           parent.insertBefore(createElement(child), nextSibling);
         }
         parent.insertBefore(end, nextSibling);
       } else {
-        // Diff children between start and end
+        // Patch children between existing boundaries
         patchChildrenBetween(
-          start,
-          end,
+          start as Comment,
+          end as Comment,
           (oldVNodeByKey.get(aKey) as VNode)?.children as VNode[] | undefined,
-          newVNode.children as VNode[]
+          children,
         );
       }
 
@@ -426,15 +422,17 @@ function patchChildren(
   }
 }
 
-
-
 /**
  * Patch a node using keys for node matching.
  */
-function patch(dom: Node, oldVNode: VNode | string | null, newVNode: VNode | string | null): Node {
+function patch(
+  dom: Node,
+  oldVNode: VNode | string | null,
+  newVNode: VNode | string | null,
+): Node {
   if (oldVNode === newVNode) return dom;
 
-  if (typeof newVNode === 'string') {
+  if (typeof newVNode === "string") {
     if (dom.nodeType === Node.TEXT_NODE) {
       if (dom.textContent !== newVNode) dom.textContent = newVNode;
       return dom;
@@ -445,48 +443,61 @@ function patch(dom: Node, oldVNode: VNode | string | null, newVNode: VNode | str
     }
   }
 
-  if (newVNode && typeof newVNode !== 'string' && newVNode.tag === '#anchor') {
+  if (newVNode && typeof newVNode !== "string" && newVNode.tag === "#anchor") {
     const anchorVNode = newVNode as AnchorBlockVNode;
-    const hasChildren = Array.isArray(anchorVNode.children) && anchorVNode.children.length > 0;
-    if (!hasChildren) {
-      const placeholder = anchorVNode._startNode ?? document.createComment(`block:anchor:${anchorVNode.key}`);
-      anchorVNode._startNode = placeholder;
-      dom.parentNode?.replaceChild(placeholder, dom);
-      return placeholder;
+    const children = Array.isArray(anchorVNode.children)
+      ? anchorVNode.children
+      : [];
+
+    const start = anchorVNode._startNode ?? document.createTextNode("");
+    const end = anchorVNode._endNode ?? document.createTextNode("");
+
+    if (anchorVNode.key != null) {
+      (start as any).key = `${anchorVNode.key}:start`;
+      (end as any).key = `${anchorVNode.key}:end`;
     }
-    const start = anchorVNode._startNode ?? document.createComment(`block:start:${anchorVNode.key}`);
-    const end = anchorVNode._endNode ?? document.createComment(`block:end:${anchorVNode.key}`);
+
     anchorVNode._startNode = start;
     anchorVNode._endNode = end;
+
     const frag = document.createDocumentFragment();
     frag.appendChild(start);
-    for (const child of anchorVNode.children) frag.appendChild(createElement(child));
+    for (const child of children) {
+      frag.appendChild(createElement(child));
+    }
     frag.appendChild(end);
     dom.parentNode?.replaceChild(frag, dom);
     return start;
   }
 
   if (!newVNode) {
-    const placeholder = document.createComment('removed');
+    const placeholder = document.createComment("removed");
     dom.parentNode?.replaceChild(placeholder, dom);
     return placeholder;
   }
 
-  if (!oldVNode || typeof oldVNode === 'string') {
+  if (!oldVNode || typeof oldVNode === "string") {
     const newEl = createElement(newVNode);
     dom.parentNode?.replaceChild(newEl, dom);
     return newEl;
   }
 
-  if (newVNode.tag === '#anchor') {
-    const start = (newVNode as any)._startNode ?? document.createComment(`block:start:${newVNode.key}`);
-    const end = (newVNode as any)._endNode ?? document.createComment(`block:end:${newVNode.key}`);
+  if (newVNode.tag === "#anchor") {
+    const children = Array.isArray(newVNode.children) ? newVNode.children : [];
+    const start = (newVNode as any)._startNode ?? document.createTextNode("");
+    const end = (newVNode as any)._endNode ?? document.createTextNode("");
+
+    if (newVNode.key != null) {
+      (start as any).key = `${newVNode.key}:start`;
+      (end as any).key = `${newVNode.key}:end`;
+    }
+
     (newVNode as any)._startNode = start;
     (newVNode as any)._endNode = end;
 
     const frag = document.createDocumentFragment();
     frag.appendChild(start);
-    for (const child of newVNode.children as VNode[]) {
+    for (const child of children) {
       frag.appendChild(createElement(child));
     }
     frag.appendChild(end);
@@ -495,8 +506,8 @@ function patch(dom: Node, oldVNode: VNode | string | null, newVNode: VNode | str
   }
 
   if (
-    typeof oldVNode !== 'string' &&
-    typeof newVNode !== 'string' &&
+    typeof oldVNode !== "string" &&
+    typeof newVNode !== "string" &&
     oldVNode.tag === newVNode.tag &&
     oldVNode.key === newVNode.key
   ) {
@@ -511,32 +522,33 @@ function patch(dom: Node, oldVNode: VNode | string | null, newVNode: VNode | str
   return newEl;
 }
 
-
-
 /**
  * Main renderer: uses patching and keys for node reuse.
  * Never uses innerHTML. Only updates what has changed.
  */
 export function vdomRenderer(root: ShadowRoot, vnodeOrArray: VNode | VNode[]) {
-  const wrap = (v: VNode): VNode => (v.key == null ? { ...v, key: '__root__' } : v);
+  const wrap = (v: VNode): VNode =>
+    v.key == null ? { ...v, key: "__root__" } : v;
   let newVNode = Array.isArray(vnodeOrArray)
-    ? { tag: 'div', key: '__root__', children: vnodeOrArray }
+    ? { tag: "div", key: "__root__", children: vnodeOrArray }
     : wrap(vnodeOrArray);
 
-  newVNode = assignKeysDeep(newVNode, String(newVNode.key ?? 'root')) as VNode;
-  console.log('vdomRenderer newVNode:', newVNode);
+  newVNode = assignKeysDeep(newVNode, String(newVNode.key ?? "root")) as VNode;
+
+  console.log("[vdomRenderer] newVNode:", newVNode);
 
   // Track previous VNode and DOM node
   const prevVNode: VNode | null = (root as any)._prevVNode ?? null;
-  const prevDom: Node | null = (root as any)._prevDom ?? root.firstChild ?? null;
+  const prevDom: Node | null =
+    (root as any)._prevDom ?? root.firstChild ?? null;
 
   let newDom: Node;
 
   if (prevVNode && prevDom) {
     // Only replace if tag or key changed
     if (
-      typeof prevVNode !== 'string' &&
-      typeof newVNode !== 'string' &&
+      typeof prevVNode !== "string" &&
+      typeof newVNode !== "string" &&
       prevVNode.tag === newVNode.tag &&
       prevVNode.key === newVNode.key
     ) {
@@ -563,10 +575,24 @@ export function vdomRenderer(root: ShadowRoot, vnodeOrArray: VNode | VNode[]) {
  * SSR-friendly: serialize VNode to HTML string.
  */
 export function renderToString(vnode: VNode): string {
-  if (typeof vnode === 'string') return vnode;
-  const props = vnode.props ? Object.entries(vnode.props).map(([k, v]) => ` ${k}="${v}"`).join('') : '';
+  if (typeof vnode === "string") return vnode;
+
+  if (vnode.tag === "#text") {
+    return typeof vnode.children === "string" ? vnode.children : "";
+  }
+
+  if (vnode.tag === "#anchor") {
+    const children = Array.isArray(vnode.children) ? vnode.children : [];
+    return children.map(renderToString).join("");
+  }
+
+  const props = vnode.props
+    ? Object.entries(vnode.props)
+        .map(([k, v]) => ` ${k}="${v}"`)
+        .join("")
+    : "";
   const children = Array.isArray(vnode.children)
-    ? vnode.children.map(renderToString).join('')
-    : vnode.children || '';
+    ? vnode.children.map(renderToString).join("")
+    : vnode.children || "";
   return `<${vnode.tag}${props}>${children}</${vnode.tag}>`;
 }

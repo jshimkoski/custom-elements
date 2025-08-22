@@ -1,10 +1,10 @@
-import type { VNode } from './vdom-v2';
+import type { VNode } from "./vdom-v2";
 
 export function h(
   tag: string,
   props: Record<string, any> = {},
   children?: VNode[] | string,
-  key?: string | number
+  key?: string | number,
 ): VNode {
   // Do NOT invent keys here; use only what the caller passes (or props.key).
   const finalKey = key ?? props.key;
@@ -12,15 +12,16 @@ export function h(
 }
 
 function isAnchorBlock(v: any): boolean {
-  return !!v && typeof v === 'object' && ((v as any).type === 'AnchorBlock' || (v as any).tag === '#anchor');
+  return (
+    !!v &&
+    typeof v === "object" &&
+    ((v as any).type === "AnchorBlock" || (v as any).tag === "#anchor")
+  );
 }
 
 function isElementVNode(v: any): v is VNode {
   return (
-    typeof v === 'object' &&
-    v !== null &&
-    'tag' in v &&
-    !isAnchorBlock(v) // exclude anchor blocks from being treated as normal elements
+    typeof v === "object" && v !== null && "tag" in v && !isAnchorBlock(v) // exclude anchor blocks from being treated as normal elements
   );
 }
 
@@ -28,14 +29,10 @@ function ensureKey(v: VNode, k: string): VNode {
   return v.key != null ? v : { ...v, key: k };
 }
 
-
-
-
-
 function parseProps(
   str: string,
   values: unknown[],
-  context?: Record<string, any>
+  context?: Record<string, any>,
 ): {
   props: Record<string, any>;
   attrs: Record<string, any>;
@@ -55,7 +52,7 @@ function parseProps(
     // Interpolation detection
     const interpMatch = rawVal.match(/^{{(\d+)}}$/);
 
-    if (prefix === ':') {
+    if (prefix === ":") {
       // Property binding
       if (interpMatch) {
         const idx = Number(interpMatch[1]);
@@ -63,14 +60,16 @@ function parseProps(
       } else {
         props[rawName] = rawVal;
       }
-    } else if (prefix === '@') {
-      const toOnName = (ev: string) => 'on' + ev.charAt(0).toUpperCase() + ev.slice(1);
+    } else if (prefix === "@") {
+      const toOnName = (ev: string) =>
+        "on" + ev.charAt(0).toUpperCase() + ev.slice(1);
       const onName = toOnName(rawName);
       if (interpMatch) {
         const idx = Number(interpMatch[1]);
         if (values[idx] !== undefined) props[onName] = values[idx];
       } else {
-        if (context && typeof context[rawVal] === 'function') props[onName] = context[rawVal];
+        if (context && typeof context[rawVal] === "function")
+          props[onName] = context[rawVal];
       }
     } else {
       // Plain attribute (string)
@@ -86,16 +85,20 @@ function parseProps(
  * Fixes:
  *  - Recognize interpolation markers embedded in text ("World{{1}}") and replace them.
  *  - Skip empty arrays from directives so markers don't leak as text.
- *  - Pass AnchorBlocks through (and deep-normalize their children’s keys) so the renderer can mount/patch them surgically.
+ *  - Pass AnchorBlocks through (and deep-normalize their children's keys) so the renderer can mount/patch them surgically.
  *  - Do not rewrap interpolated VNodes (preserve their keys); only fill in missing keys.
  */
-function htmlImpl(strings: TemplateStringsArray, values: unknown[], context?: Record<string, any>): VNode | VNode[] {
+function htmlImpl(
+  strings: TemplateStringsArray,
+  values: unknown[],
+  context?: Record<string, any>,
+): VNode | VNode[] {
   function textVNode(text: string, key: string): VNode {
-    return h('#text', {}, text, key);
+    return h("#text", {}, text, key);
   }
 
   // Stitch template with interpolation markers
-  let template = '';
+  let template = "";
   for (let i = 0; i < strings.length; i++) {
     template += strings[i];
     if (i < values.length) template += `{{${i}}}`;
@@ -104,7 +107,12 @@ function htmlImpl(strings: TemplateStringsArray, values: unknown[], context?: Re
   // Matches: tags (open/close/self), standalone interpolation markers, or any other text
   const tagRegex = /<\/?([a-zA-Z0-9-]+)([^>]*)\/?>|{{(\d+)}}|([^<]+)/g;
 
-  const stack: Array<{ tag: string; props: Record<string, any>; children: VNode[]; key: string | number | undefined }> = [];
+  const stack: Array<{
+    tag: string;
+    props: Record<string, any>;
+    children: VNode[];
+    key: string | number | undefined;
+  }> = [];
   let root: VNode | null = null;
   let match: RegExpExecArray | null;
   let currentChildren: VNode[] = [];
@@ -115,13 +123,15 @@ function htmlImpl(strings: TemplateStringsArray, values: unknown[], context?: Re
 
   // Helper: merge object-like interpolation into currentProps
   function mergeIntoCurrentProps(maybe: any) {
-    if (!maybe || typeof maybe !== 'object') return;
+    if (!maybe || typeof maybe !== "object") return;
     if (isAnchorBlock(maybe)) return; // do not merge AnchorBlocks
     if (maybe.props || maybe.attrs) {
-      if (maybe.props) Object.assign((currentProps as any).props ?? (currentProps as any), maybe.props);
-      if (maybe.attrs) Object.assign((currentProps as any).attrs ?? (currentProps as any), maybe.attrs);
+      if (maybe.props)
+        Object.assign(currentProps.props ?? currentProps, maybe.props);
+      if (maybe.attrs)
+        Object.assign(currentProps.attrs ?? currentProps, maybe.attrs);
     } else {
-      Object.assign((currentProps as any).props ?? (currentProps as any), maybe);
+      Object.assign(currentProps.props ?? currentProps, maybe);
     }
   }
 
@@ -133,19 +143,13 @@ function htmlImpl(strings: TemplateStringsArray, values: unknown[], context?: Re
       const anchorKey = (val as VNode).key ?? baseKey;
       let anchorChildren = (val as any).children as VNode[] | undefined;
 
-      // if (Array.isArray(anchorChildren)) {
-      //   // Pass anchorKey as the base, but let assignKeysDeep append _0, _1, etc.
-      //   anchorChildren = assignKeysDeep(anchorChildren, String(anchorKey)) as VNode[];
-      // }
-
       currentChildren.push({
         ...(val as VNode),
         key: anchorKey,
-        children: anchorChildren
+        children: anchorChildren,
       });
       return;
     }
-
 
     if (isElementVNode(val)) {
       // Leave key undefined so assignKeysDeep can generate a stable one
@@ -160,7 +164,7 @@ function htmlImpl(strings: TemplateStringsArray, values: unknown[], context?: Re
         if (isAnchorBlock(v) || isElementVNode(v) || Array.isArray(v)) {
           // recurse or push without forcing a key
           pushInterpolation(v, `${baseKey}-${i}`);
-        } else if (v !== null && typeof v === 'object') {
+        } else if (v !== null && typeof v === "object") {
           mergeIntoCurrentProps(v);
         } else {
           currentChildren.push(textVNode(String(v), `${baseKey}-${i}`));
@@ -169,7 +173,7 @@ function htmlImpl(strings: TemplateStringsArray, values: unknown[], context?: Re
       return;
     }
 
-    if (val !== null && typeof val === 'object') {
+    if (val !== null && typeof val === "object") {
       mergeIntoCurrentProps(val);
       return;
     }
@@ -177,18 +181,24 @@ function htmlImpl(strings: TemplateStringsArray, values: unknown[], context?: Re
     currentChildren.push(textVNode(String(val), baseKey));
   }
 
-
   while ((match = tagRegex.exec(template))) {
     if (match[1]) {
       // Tag token
       const tagName = match[1];
-      const isClosing = match[0][1] === '/';
-      const isSelfClosing = match[0][match[0].length - 2] === '/';
+      const isClosing = match[0][1] === "/";
+      const isSelfClosing = match[0][match[0].length - 2] === "/";
 
-      const { props: rawProps, attrs: rawAttrs } = parseProps(match[2] || '', values, context);
+      const { props: rawProps, attrs: rawAttrs } = parseProps(
+        match[2] || "",
+        values,
+        context,
+      );
 
       // Shape props into { props, attrs } expected by VDOM
-      const vnodeProps: { props: Record<string, unknown>; attrs: Record<string, unknown> } = { props: {}, attrs: {} };
+      const vnodeProps: {
+        props: Record<string, unknown>;
+        attrs: Record<string, unknown>;
+      } = { props: {}, attrs: {} };
 
       for (const k in rawProps) vnodeProps.props[k] = rawProps[k];
       for (const k in rawAttrs) vnodeProps.attrs[k] = rawAttrs[k];
@@ -198,15 +208,15 @@ function htmlImpl(strings: TemplateStringsArray, values: unknown[], context?: Re
           currentTag!,
           currentProps,
           currentChildren.length === 1 &&
-          isElementVNode(currentChildren[0]) &&
-          currentChildren[0].tag === '#text'
-            ? (typeof currentChildren[0].children === 'string'
-                ? currentChildren[0].children
-                : '')
+            isElementVNode(currentChildren[0]) &&
+            currentChildren[0].tag === "#text"
+            ? typeof currentChildren[0].children === "string"
+              ? currentChildren[0].children
+              : ""
             : currentChildren.length
-            ? currentChildren
-            : undefined,
-          currentKey
+              ? currentChildren
+              : undefined,
+          currentKey,
         );
         const prev = stack.pop();
         if (prev) {
@@ -219,17 +229,22 @@ function htmlImpl(strings: TemplateStringsArray, values: unknown[], context?: Re
           root = node;
         }
       } else if (isSelfClosing) {
-        const key = undefined
+        const key = undefined;
         currentChildren.push(h(tagName, vnodeProps, undefined, key));
       } else {
         if (currentTag) {
-          stack.push({ tag: currentTag, props: currentProps, children: currentChildren, key: currentKey });
+          stack.push({
+            tag: currentTag,
+            props: currentProps,
+            children: currentChildren,
+            key: currentKey,
+          });
         }
         currentTag = tagName;
         currentProps = vnodeProps;
         currentChildren = [];
       }
-    } else if (typeof match[3] !== 'undefined') {
+    } else if (typeof match[3] !== "undefined") {
       // Standalone interpolation marker {{N}}
       const idx = Number(match[3]);
       const val = values[idx];
@@ -265,21 +280,27 @@ function htmlImpl(strings: TemplateStringsArray, values: unknown[], context?: Re
     root.children = (root.children as VNode[]).filter(
       (child): child is VNode =>
         isElementVNode(child)
-          ? child.tag !== '#text' ||
-            (typeof child.children === 'string' && child.children.trim() !== '')
-          : true // keep non-element VNodes (including anchors) as-is
+          ? child.tag !== "#text" ||
+            (typeof child.children === "string" && child.children.trim() !== "")
+          : true, // keep non-element VNodes (including anchors) as-is
     );
   }
 
-  return root ?? h('div', {}, '', 'fallback-root');
+  return root ?? h("div", {}, "", "fallback-root");
 }
 
 /**
  * Default export: plain html.
  */
-export function html(strings: TemplateStringsArray, ...values: unknown[]): VNode | VNode[] {
+export function html(
+  strings: TemplateStringsArray,
+  ...values: unknown[]
+): VNode | VNode[] {
   // If last value is a context object, use it
   const last = values[values.length - 1];
-  const context = typeof last === 'object' && last && !Array.isArray(last) ? (last as Record<string, any>) : undefined;
+  const context =
+    typeof last === "object" && last && !Array.isArray(last)
+      ? (last as Record<string, any>)
+      : undefined;
   return htmlImpl(strings, values, context);
 }

@@ -1,86 +1,37 @@
-import type { VNode } from './vdom-v2';
+import type { VNode } from "./vdom-v2";
 
 /**
- * Wrap dynamic content in a stable anchor block and propagate the key to children.
+ * Create a stable anchor block with consistent boundaries.
+ * This works like Vue's fragments - always has start/end boundaries.
  */
 export function anchorBlock(
   children: VNode | VNode[] | null | undefined,
-  anchorKey: string
+  anchorKey: string,
 ): VNode {
-  function assignKeys(
-    nodeOrArray: VNode | VNode[],
-    parentKey: string
-  ): VNode | VNode[] {
-    if (Array.isArray(nodeOrArray)) {
-      const used = new Set<string>();
-      return nodeOrArray.map((child) => {
-        if (!child || typeof child !== 'object') return child;
-
-        // Keep explicit key if present
-        let key: string | undefined = child.props?.key ?? child.key;
-        if (!key) {
-          // Fallback: derive from tag + stable attrs
-          const tagPart = child.tag || 'node';
-          const idPart =
-            child.props?.attrs?.id ??
-            child.props?.attrs?.name ??
-            child.props?.attrs?.['data-key'] ??
-            '';
-          key = idPart
-            ? `${parentKey}:${tagPart}:${idPart}`
-            : `${parentKey}:${tagPart}`;
-        }
-
-        // Ensure uniqueness among siblings
-        let uniqueKey = key;
-        let counter = 1;
-        while (used.has(uniqueKey)) {
-          uniqueKey = `${key}#${counter++}`;
-        }
-        used.add(uniqueKey);
-
-        // Recurse into children
-        let newChildren = child.children;
-        if (Array.isArray(newChildren)) {
-          newChildren = assignKeys(newChildren, uniqueKey) as VNode[];
-        }
-
-        return { ...child, key: `${uniqueKey}:child`, children: newChildren };
-      });
-    }
-
-    const node = nodeOrArray;
-    let key: string = node.props?.key ?? node.key ?? parentKey;
-
-    let newChildren = node.children;
-    if (Array.isArray(newChildren)) {
-      newChildren = assignKeys(newChildren, key) as VNode[];
-    }
-
-    return { ...node, key: `${key}:child`, children: newChildren };
-  }
-
-  const keyedChildren = assignKeys(children ?? [], anchorKey);
+  // Normalize children to array, filtering out null/undefined
+  const childArray = !children
+    ? []
+    : Array.isArray(children)
+      ? children.filter(Boolean)
+      : [children].filter(Boolean);
 
   return {
-    tag: '#anchor',
+    tag: "#anchor",
     key: anchorKey,
-    children: Array.isArray(keyedChildren) ? keyedChildren : [keyedChildren]
+    children: childArray,
   };
 }
 
-
-
 /* --- vIf --- */
 export function vIf(cond: boolean, children: VNode | VNode[]): VNode {
-  const anchorKey = 'vIf-block'; // stable key regardless of condition
+  const anchorKey = "vIf-block"; // stable key regardless of condition
   return anchorBlock(cond ? children : [], anchorKey);
 }
 
 /* --- vFor --- */
 export function vFor<T extends { id?: string | number; key?: string }>(
   list: T[],
-  render: (item: T, index: number) => VNode | VNode[]
+  render: (item: T, index: number) => VNode | VNode[],
 ): VNode[] {
   return list.map((item, i) => {
     const itemKey =
@@ -103,12 +54,12 @@ export function vBind(bindings: Record<string, any>) {
 
 /* --- vShow --- */
 export function vShow(visible: boolean) {
-  return { attrs: { style: `display: ${visible ? '' : 'none'}` } };
+  return { attrs: { style: `display: ${visible ? "" : "none"}` } };
 }
 
 /* --- vClass --- */
 export function vClass(...classes: Array<string | false | null | undefined>) {
-  return { attrs: { class: classes.filter(Boolean).join(' ') } };
+  return { attrs: { class: classes.filter(Boolean).join(" ") } };
 }
 
 /* --- vModel --- */
@@ -119,8 +70,8 @@ export function vModel<T>(value: T, onInput: (val: T) => void) {
       onInput: (e: Event) => {
         const target = e.target as HTMLInputElement | HTMLTextAreaElement;
         onInput(target.value as unknown as T);
-      }
-    }
+      },
+    },
   };
 }
 
@@ -132,7 +83,7 @@ export function vIfChain(...branches: Branch[]): VNode[] {
     const [cond, content] = branches[idx];
     if (cond) return [anchorBlock(content, `vIfChain-branch-${idx}`)];
   }
-  return [anchorBlock({ tag: '#text', children: [] } as VNode, 'vIfChain-empty')];
+  return [anchorBlock([], "vIfChain-empty")];
 }
 
 /* --- vIfBuilder --- */
@@ -153,7 +104,7 @@ export function vIfBuilder() {
     },
     done() {
       return vIfChain(...branches);
-    }
+    },
   };
 }
 
@@ -163,15 +114,15 @@ type CaseBranch = [matchValue: any, content: VNode | VNode[]];
 export function vSwitch(
   value: any,
   cases: CaseBranch[],
-  defaultContent?: VNode | VNode[]
+  defaultContent?: VNode | VNode[],
 ): VNode[] {
-  const anchorKey = 'vSwitch-block'; // stable container key
+  const anchorKey = "vSwitch-block"; // stable container key
   for (const [matchValue, content] of cases) {
     if (value === matchValue) {
       return [anchorBlock(content, anchorKey)];
     }
   }
-  return [anchorBlock(defaultContent || { tag: '#text', children: [] } as VNode, anchorKey)];
+  return [anchorBlock(defaultContent || [], anchorKey)];
 }
 
 /* --- vSwitchBuilder --- */
@@ -189,6 +140,6 @@ export function vSwitchBuilder(value: any) {
     },
     done() {
       return vSwitch(value, cases, defaultContent);
-    }
+    },
   };
 }
