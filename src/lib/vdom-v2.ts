@@ -574,11 +574,25 @@ export function vdomRenderer(root: ShadowRoot, vnodeOrArray: VNode | VNode[]) {
 /**
  * SSR-friendly: serialize VNode to HTML string.
  */
+function escapeHTML(str: string): string {
+  return str.replace(
+    /[&<>"']/g,
+    (c) =>
+      ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+      })[c]!,
+  );
+}
+
 export function renderToString(vnode: VNode): string {
-  if (typeof vnode === "string") return vnode;
+  if (typeof vnode === "string") return escapeHTML(vnode);
 
   if (vnode.tag === "#text") {
-    return typeof vnode.children === "string" ? vnode.children : "";
+    return typeof vnode.children === "string" ? escapeHTML(vnode.children) : "";
   }
 
   if (vnode.tag === "#anchor") {
@@ -588,11 +602,11 @@ export function renderToString(vnode: VNode): string {
 
   const props = vnode.props
     ? Object.entries(vnode.props)
-        .map(([k, v]) => ` ${k}="${v}"`)
+        .map(([k, v]) => ` ${k}="${escapeHTML(String(v))}"`)
         .join("")
     : "";
   const children = Array.isArray(vnode.children)
     ? vnode.children.map(renderToString).join("")
-    : vnode.children || "";
+    : escapeHTML(vnode.children || "");
   return `<${vnode.tag}${props}>${children}</${vnode.tag}>`;
 }
