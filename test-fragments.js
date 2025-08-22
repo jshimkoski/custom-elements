@@ -1,12 +1,12 @@
-import { component } from './src/lib/runtime-v2.js';
-import { html } from './src/lib/template-compiler-v2.js';
-import { vFor } from './src/lib/directives-v2.js';
+import { component } from "./src/lib/runtime-v2.js";
+import { html } from "./src/lib/template-compiler-v2.js";
+import { vFor } from "./src/lib/directives-v2.js";
 
 // Test component to verify fragment support in vFor
-component('fragment-test', {
+component("fragment-test", {
   state: {
-    items: ['apple', 'banana', 'cherry'],
-    selectedItems: []
+    items: ["apple", "banana", "cherry"],
+    selectedItems: [],
   },
 
   methods: {
@@ -17,7 +17,7 @@ component('fragment-test', {
       } else {
         this.state.selectedItems.push(item);
       }
-    }
+    },
   },
 
   render() {
@@ -27,38 +27,53 @@ component('fragment-test', {
         <p>This should render items with fragments (no wrapper divs):</p>
 
         <div class="fragment-list">
-          ${vFor(this.state.items, (item) => html`
-            ${item}:
-            <input
-              type="checkbox"
-              value="${item}"
-              @change="${() => this.toggleItem(item)}"
-              .checked="${this.state.selectedItems.includes(item)}"
-            />
-            <br>
-          `)}
+          ${vFor(
+            this.state.items,
+            (item) => html`
+              ${item}:
+              <input type="checkbox" value="${item}" data-bind="array" />
+            `,
+          )}
         </div>
 
-        <p>Selected items: ${this.state.selectedItems.join(', ')}</p>
+        <h3>Self-Closing Input Only Test</h3>
+        <div class="self-closing-test">
+          ${vFor(
+            this.state.items,
+            (item) => html`
+              <input type="checkbox" value="${item}" data-bind="array" />
+            `,
+          )}
+        </div>
+
+        <p>Selected items: ${this.state.selectedItems.join(", ")}</p>
 
         <h3>Multiple Root Nodes Test</h3>
         <div class="multi-root">
-          ${vFor(this.state.items, (item, index) => html`
-            <span class="item-label">${index + 1}.</span>
-            <strong>${item}</strong>
-            <span class="separator"> | </span>
-          `)}
+          ${vFor(
+            this.state.items,
+            (item, index) => html`
+              <span class="item-label">${index + 1}.</span>
+              <strong>${item}</strong>
+              <span class="separator"> | </span>
+            `,
+          )}
         </div>
 
         <h3>Mixed Content Test</h3>
         <div class="mixed-content">
-          ${vFor(this.state.items, (item) => html`
-            Item: ${item}
-            <button @click="${() => this.toggleItem(item)}">
-              ${this.state.selectedItems.includes(item) ? 'Unselect' : 'Select'}
-            </button>
-            <hr>
-          `)}
+          ${vFor(
+            this.state.items,
+            (item) => html`
+              Item: ${item}
+              <button @click="${() => this.toggleItem(item)}">
+                ${this.state.selectedItems.includes(item)
+                  ? "Unselect"
+                  : "Select"}
+              </button>
+              <hr />
+            `,
+          )}
         </div>
       </div>
     `;
@@ -83,6 +98,12 @@ component('fragment-test', {
       margin: 10px 0;
     }
 
+    .self-closing-test {
+      border: 1px solid #333;
+      padding: 10px;
+      margin: 10px 0;
+    }
+
     .item-label {
       color: blue;
       font-weight: bold;
@@ -102,5 +123,5 @@ component('fragment-test', {
       border: none;
       border-top: 1px solid #eee;
     }
-  `
+  `,
 });

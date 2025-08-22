@@ -231,7 +231,8 @@ function htmlImpl(
         }
       } else if (isSelfClosing) {
         const key = undefined;
-        currentChildren.push(h(tagName, vnodeProps, undefined, key));
+        const targetChildren = currentTag ? currentChildren : fragmentChildren;
+        targetChildren.push(h(tagName, vnodeProps, undefined, key));
       } else {
         if (currentTag) {
           stack.push({
