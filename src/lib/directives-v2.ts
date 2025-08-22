@@ -7,24 +7,57 @@ export function anchorBlock(
   children: VNode | VNode[] | null | undefined,
   anchorKey: string
 ): VNode {
-  function assignKeys(nodeOrArray: VNode | VNode[], path: string): VNode | VNode[] {
+  function assignKeys(
+    nodeOrArray: VNode | VNode[],
+    parentKey: string
+  ): VNode | VNode[] {
     if (Array.isArray(nodeOrArray)) {
-      // Flatten any nested arrays returned by assignKeys
-      return nodeOrArray
-        .map((child, i) => assignKeys(child, `${path}_${i}`))
-        .flat();
-    }
-    if (!nodeOrArray) return [];
+      const used = new Set<string>();
+      return nodeOrArray.map((child) => {
+        if (!child || typeof child !== 'object') return child;
 
-    const cloned: VNode = {
-      ...nodeOrArray,
-      key: `${path}` // always overwrite here
-    };
+        // Keep explicit key if present
+        let key: string | undefined = child.props?.key ?? child.key;
+        if (!key) {
+          // Fallback: derive from tag + stable attrs
+          const tagPart = child.tag || 'node';
+          const idPart =
+            child.props?.attrs?.id ??
+            child.props?.attrs?.name ??
+            child.props?.attrs?.['data-key'] ??
+            '';
+          key = idPart
+            ? `${parentKey}:${tagPart}:${idPart}`
+            : `${parentKey}:${tagPart}`;
+        }
 
-    if (Array.isArray(cloned.children)) {
-      cloned.children = assignKeys(cloned.children, `${path}c`) as VNode[];
+        // Ensure uniqueness among siblings
+        let uniqueKey = key;
+        let counter = 1;
+        while (used.has(uniqueKey)) {
+          uniqueKey = `${key}#${counter++}`;
+        }
+        used.add(uniqueKey);
+
+        // Recurse into children
+        let newChildren = child.children;
+        if (Array.isArray(newChildren)) {
+          newChildren = assignKeys(newChildren, uniqueKey) as VNode[];
+        }
+
+        return { ...child, key: `${uniqueKey}:child`, children: newChildren };
+      });
     }
-    return cloned;
+
+    const node = nodeOrArray;
+    let key: string = node.props?.key ?? node.key ?? parentKey;
+
+    let newChildren = node.children;
+    if (Array.isArray(newChildren)) {
+      newChildren = assignKeys(newChildren, key) as VNode[];
+    }
+
+    return { ...node, key: `${key}:child`, children: newChildren };
   }
 
   const keyedChildren = assignKeys(children ?? [], anchorKey);
@@ -38,27 +71,22 @@ export function anchorBlock(
 
 
 
-
-
 /* --- vIf --- */
 export function vIf(cond: boolean, children: VNode | VNode[]): VNode {
   const anchorKey = 'vIf-block'; // stable key regardless of condition
-  return {
-    tag: '#anchor',
-    key: anchorKey,
-    children: cond ? (Array.isArray(children) ? children : [children]) : []
-  };
+  return anchorBlock(cond ? children : [], anchorKey);
 }
 
-
-
 /* --- vFor --- */
-export function vFor<T extends { id?: string | number }>(
+export function vFor<T extends { id?: string | number; key?: string }>(
   list: T[],
   render: (item: T, index: number) => VNode | VNode[]
 ): VNode[] {
   return list.map((item, i) => {
-    const itemKey = (item as any)?.key ?? item.id ?? i;
+    const itemKey =
+      (item as any)?.key ??
+      (item.id !== undefined ? String(item.id) : undefined) ??
+      `idx-${i}`;
     return anchorBlock(render(item, i), `vFor-${itemKey}`);
   });
 }
@@ -104,7 +132,7 @@ export function vIfChain(...branches: Branch[]): VNode[] {
     const [cond, content] = branches[idx];
     if (cond) return [anchorBlock(content, `vIfChain-branch-${idx}`)];
   }
-  return [anchorBlock({ tag: '#text', children: '' }, 'vIfChain-empty')];
+  return [anchorBlock({ tag: '#text', children: [] } as VNode, 'vIfChain-empty')];
 }
 
 /* --- vIfBuilder --- */
@@ -137,12 +165,13 @@ export function vSwitch(
   cases: CaseBranch[],
   defaultContent?: VNode | VNode[]
 ): VNode[] {
+  const anchorKey = 'vSwitch-block'; // stable container key
   for (const [matchValue, content] of cases) {
     if (value === matchValue) {
-      return [anchorBlock(content, `vSwitch-case-${matchValue}`)];
+      return [anchorBlock(content, anchorKey)];
     }
   }
-  return [anchorBlock(defaultContent || { tag: '#text', children: '' }, 'vSwitch-default')];
+  return [anchorBlock(defaultContent || { tag: '#text', children: [] } as VNode, anchorKey)];
 }
 
 /* --- vSwitchBuilder --- */

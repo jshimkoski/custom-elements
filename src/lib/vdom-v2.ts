@@ -6,37 +6,62 @@
 
 export interface VNode {
   tag: string;
-  key?: string | number;
-  props?: {
-    props?: Record<string, any>;
-    attrs?: Record<string, any>;
-  };
+  key?: string;
+  props?: { key?: string; props?: any; attrs?: Record<string, any> };
   children?: VNode[] | string;
-}
+};
 
 export interface AnchorBlockVNode extends VNode {
   tag: '#anchor';
-  key: string | number;
+  key: string;
   children: VNode[];
   _startNode?: Comment;
   _endNode?: Comment;
 }
 
+
 function assignKeysDeep(nodeOrNodes: VNode | VNode[], baseKey: string): VNode | VNode[] {
   if (Array.isArray(nodeOrNodes)) {
-    return nodeOrNodes.map((child, index) => {
-      if (child && typeof child === 'object') {
-        return assignKeysDeep(child, `${baseKey}_${index}`) as VNode;
+    const usedKeys = new Set<string>();
+
+    return nodeOrNodes.map((child) => {
+      if (!child || typeof child !== "object") return child;
+
+      // Determine the starting key
+      let key = child.props?.key ?? child.key;
+
+      if (!key) {
+        // Build a stable identity from tag + stable attributes
+        const tagPart = child.tag || "node";
+        const idPart =
+          child.props?.attrs?.id ??
+          child.props?.attrs?.name ??
+          child.props?.attrs?.["data-key"] ??
+          "";
+        key = idPart ? `${baseKey}:${tagPart}:${idPart}` : `${baseKey}:${tagPart}`;
       }
-      return child;
+
+      // Ensure uniqueness among siblings
+      let uniqueKey = key;
+      let counter = 1;
+      while (usedKeys.has(uniqueKey)) {
+        uniqueKey = `${key}#${counter++}`;
+      }
+      usedKeys.add(uniqueKey);
+
+      // Recurse into children with this node's unique key
+      let children = child.children;
+      if (Array.isArray(children)) {
+        children = assignKeysDeep(children, uniqueKey) as VNode[];
+      }
+
+      return { ...child, key: uniqueKey, children };
     });
   }
 
+  // Single node case
   const node = nodeOrNodes as VNode;
-
-  // Prefer an explicit key on the node if provided (e.g., from template props)
-  const explicit = (node as any).props?.key ?? node.key;
-  const key = explicit ?? baseKey;
+  let key = node.props?.key ?? node.key ?? baseKey;
 
   let children = node.children;
   if (Array.isArray(children)) {
@@ -45,6 +70,8 @@ function assignKeysDeep(nodeOrNodes: VNode | VNode[], baseKey: string): VNode | 
 
   return { ...node, key, children };
 }
+
+
 
 /**
  * Patch props on an element.
