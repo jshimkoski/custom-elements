@@ -28,8 +28,14 @@ export interface ComponentAPI<T extends ComponentState = ComponentState> {
  * @template S - State type
  * @template C - Computed type
  */
-export interface ComponentConfig<S extends ComponentState, C extends Record<string, any> = {}> {
-  readonly template: (state: S & C, api: ComponentAPI<S & C>) => string | Promise<string> | CompiledTemplate<S & C>;
+export interface ComponentConfig<
+  S extends ComponentState,
+  C extends Record<string, any> = {},
+> {
+  readonly template: (
+    state: S & C,
+    api: ComponentAPI<S & C>,
+  ) => string | Promise<string> | CompiledTemplate<S & C>;
   readonly state?: S;
   readonly computed?: { [K in keyof C]: (state: S) => C[K] };
   readonly style?: string | ((state: S & C) => string);
@@ -41,7 +47,11 @@ export interface ComponentConfig<S extends ComponentState, C extends Record<stri
    * Whitelist of state keys to reflect as attributes. If omitted, no keys are reflected.
    */
   readonly reflect?: string[];
-  hydrate?: (el: Element | ShadowRoot, state: S & C, api: ComponentAPI<S & C>) => void;
+  hydrate?: (
+    el: Element | ShadowRoot,
+    state: S & C,
+    api: ComponentAPI<S & C>,
+  ) => void;
   [handler: string]: ((...args: unknown[]) => unknown) | unknown;
 }
 /**
@@ -53,7 +63,7 @@ export interface ComponentConfig<S extends ComponentState, C extends Record<stri
 export type RefHandler<T extends ComponentState> = (
   element: Element,
   state: T,
-  api: ComponentAPI<T>
+  api: ComponentAPI<T>,
 ) => void;
 export type ComputedHandler<T extends ComponentState> = (state: T) => unknown;
 /**
@@ -63,61 +73,103 @@ export type ComputedHandler<T extends ComponentState> = (state: T) => unknown;
  */
 export type LifecycleHandler<T extends ComponentState> = (
   state: T,
-  api: ComponentAPI<T>
+  api: ComponentAPI<T>,
 ) => void;
 
 /**
  * Plugin interface for runtime hooks (init, render, error).
  */
-export type RuntimePlugin<S extends ComponentState, C extends Record<string, any>> = {
+export type RuntimePlugin<
+  S extends ComponentState,
+  C extends Record<string, any>,
+> = {
   onInit?: (config: ComponentConfig<S, C>) => void;
   onRender?: (state: S & C, api: ComponentAPI<S & C>) => void;
   onError?: (error: Error, state: S & C, api: ComponentAPI<S & C>) => void;
 };
-export const runtimePlugins: RuntimePlugin<ComponentState, Record<string, unknown>>[] = [];
+export const runtimePlugins: RuntimePlugin<
+  ComponentState,
+  Record<string, unknown>
+>[] = [];
 /**
  * Registers a runtime plugin for hooks (init, render, error).
  * @param plugin - RuntimePlugin instance
  */
-export function useRuntimePlugin<S extends ComponentState, C extends Record<string, any>>(plugin: RuntimePlugin<S, C>) {
-  runtimePlugins.push(plugin as RuntimePlugin<ComponentState, Record<string, unknown>>);
+export function useRuntimePlugin<
+  S extends ComponentState,
+  C extends Record<string, any>,
+>(plugin: RuntimePlugin<S, C>) {
+  runtimePlugins.push(
+    plugin as RuntimePlugin<ComponentState, Record<string, unknown>>,
+  );
 }
 
-export { Store } from './store';
-export { eventBus } from './event-bus';
-export { renderToString, renderComponentsToString, generateHydrationScript } from './ssr';
-export type { SSRComponentConfig, SSRRenderOptions, SSRContext } from './ssr';
-export { html, compile, css, classes, styles } from './template-helpers';
-export { useDataModel } from './data-binding';
-export { compileTemplate, renderCompiledTemplate, updateCompiledTemplate } from './template-compiler';
-export { mountVNode, patchVNode, createVNodeFromElement, parseVNodeFromHTML, safeReplaceChild, getVNodeKey } from './v-dom';
-export type { VNode } from './v-dom';
+export { Store } from "./store";
+export { eventBus } from "./event-bus";
+export {
+  renderToString,
+  renderComponentsToString,
+  generateHydrationScript,
+} from "./ssr";
+export type { SSRComponentConfig, SSRRenderOptions, SSRContext } from "./ssr";
+export { html, compile, css, classes, styles } from "./template-helpers";
+export { useDataModel } from "./data-binding";
+export {
+  compileTemplate,
+  renderCompiledTemplate,
+  updateCompiledTemplate,
+} from "./template-compiler";
+export {
+  mountVNode,
+  patchVNode,
+  createVNodeFromElement,
+  parseVNodeFromHTML,
+  safeReplaceChild,
+  getVNodeKey,
+} from "./v-dom";
+export type { VNode } from "./v-dom";
+
+// Directive API
+export {
+  vIf,
+  vBind,
+  vClass,
+  vFor,
+  vModel,
+  vShow,
+  vSwitch,
+  vStyle,
+  anchorBlock,
+  vIfChain,
+  vIfBuilder,
+  vSwitchBuilder,
+} from "./directives-v2";
 
 // Router API
-export { useRouter, matchRouteSSR, resolveRouteComponent } from './router';
-export type { Route, RouterConfig, RouteState } from './router';
-
+export { useRouter, matchRouteSSR, resolveRouteComponent } from "./router";
+export type { Route, RouterConfig, RouteState } from "./router";
 
 // ============================================================================
 // Imports
 // ============================================================================
 
-import { reactive } from './computed-state';
-import { eventBus } from './event-bus';
-import { renderCompiledTemplate, updateCompiledTemplate } from './template-compiler';
-import { useDataModel } from './data-binding';
-import { mountVNode, patchVNode, parseVNodeFromHTML } from './v-dom';
-import { useRouter } from './router';
-import type { VNode } from './v-dom';
-import type { CompiledTemplate } from './template-compiler';
-import type { RouterConfig } from './router';
-import { css, html } from './template-helpers';
-
+import { reactive } from "./computed-state";
+import { eventBus } from "./event-bus";
+import {
+  renderCompiledTemplate,
+  updateCompiledTemplate,
+} from "./template-compiler";
+import { useDataModel } from "./data-binding";
+import { mountVNode, patchVNode, parseVNodeFromHTML } from "./v-dom";
+import { useRouter } from "./router";
+import type { VNode } from "./v-dom";
+import type { CompiledTemplate } from "./template-compiler";
+import type { RouterConfig } from "./router";
+import { css, html } from "./template-helpers";
 
 // ============================================================================
 // Utilities
 // ============================================================================
-
 
 /**
  * Recursively sanitizes an object, removing dangerous keys and prototype pollution.
@@ -126,19 +178,26 @@ import { css, html } from './template-helpers';
  * @param seen - WeakSet to track visited objects
  */
 export function deepSanitizeObject<T>(obj: T, seen = new WeakSet<object>()): T {
-  if (obj === null || typeof obj !== 'object') return obj;
+  if (obj === null || typeof obj !== "object") return obj;
   if (seen.has(obj as object)) return obj;
   seen.add(obj as object);
-  if (Array.isArray(obj)) return obj.map(item => deepSanitizeObject(item, seen)) as unknown as T;
+  if (Array.isArray(obj))
+    return obj.map((item) => deepSanitizeObject(item, seen)) as unknown as T;
   // Prevent prototype pollution
-  if (Object.getPrototypeOf(obj) !== Object.prototype && Object.getPrototypeOf(obj) !== null) {
+  if (
+    Object.getPrototypeOf(obj) !== Object.prototype &&
+    Object.getPrototypeOf(obj) !== null
+  ) {
     Object.setPrototypeOf(obj, null);
   }
-  const dangerousKeys = ['__proto__', 'constructor', 'prototype'];
+  const dangerousKeys = ["__proto__", "constructor", "prototype"];
   const sanitized: Record<string, unknown> = Object.create(null);
   for (const key of Object.keys(obj as Record<string, unknown>)) {
     if (dangerousKeys.includes(key)) continue;
-    sanitized[key] = deepSanitizeObject((obj as Record<string, unknown>)[key], seen);
+    sanitized[key] = deepSanitizeObject(
+      (obj as Record<string, unknown>)[key],
+      seen,
+    );
   }
   return sanitized as T;
 }
@@ -147,9 +206,8 @@ export function deepSanitizeObject<T>(obj: T, seen = new WeakSet<object>()): T {
  * Type guard to check if a value is Promise-like.
  */
 export function isPromise(val: unknown): val is Promise<unknown> {
-  return !!val && typeof (val as any).then === 'function';
+  return !!val && typeof (val as any).then === "function";
 }
-
 
 // ============================================================================
 // Component Lifecycle
@@ -176,16 +234,24 @@ type ExtendedHTMLElement = HTMLElement & {
 // SSR-safe ComponentElement definition
 let ComponentElement: CustomElementConstructor | { new (): object };
 
-if (typeof HTMLElement !== 'undefined') {
-  ComponentElement = class<S extends ComponentState, C extends Record<string, any> = {}> extends HTMLElement {
+if (typeof HTMLElement !== "undefined") {
+  ComponentElement = class<
+    S extends ComponentState,
+    C extends Record<string, any> = {},
+  > extends HTMLElement {
     /**
      * Syncs whitelisted state properties to attributes after render.
      * Only keys listed in config.reflect are reflected.
      */
     private syncStateToAttributes(): void {
-      if (!this.stateObj || !this.config?.reflect || !Array.isArray(this.config.reflect)) return;
-      const dangerousKeys = ['__proto__', 'constructor', 'prototype'];
-      this.config.reflect.forEach(key => {
+      if (
+        !this.stateObj ||
+        !this.config?.reflect ||
+        !Array.isArray(this.config.reflect)
+      )
+        return;
+      const dangerousKeys = ["__proto__", "constructor", "prototype"];
+      this.config.reflect.forEach((key) => {
         if (dangerousKeys.includes(key)) {
           this.removeAttribute(key);
           return;
@@ -207,10 +273,17 @@ if (typeof HTMLElement !== 'undefined') {
      * Allows updating the template function at runtime and triggers a re-render.
      * @param newTemplate - New template function or string
      */
-    public setTemplate(newTemplate: ((state: S & C, api: ComponentAPI<S & C>) => string | Promise<string> | CompiledTemplate<S & C>) | string): void {
+    public setTemplate(
+      newTemplate:
+        | ((
+            state: S & C,
+            api: ComponentAPI<S & C>,
+          ) => string | Promise<string> | CompiledTemplate<S & C>)
+        | string,
+    ): void {
       // Override readonly via type assertion for runtime mutability
       const config = this.config as any;
-      if (typeof newTemplate === 'function') {
+      if (typeof newTemplate === "function") {
         config.template = newTemplate;
       } else {
         config.template = () => newTemplate;
@@ -224,23 +297,33 @@ if (typeof HTMLElement !== 'undefined') {
     /**
      * Tracks auto-wired config event handlers for removal
      */
-    private _autoWiredHandlers: Record<string, EventListenerOrEventListenerObject[]> = {};
+    private _autoWiredHandlers: Record<
+      string,
+      EventListenerOrEventListenerObject[]
+    > = {};
 
     /**
      * Override removeEventListener to support auto-wired config handler removal
      */
-    override removeEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | EventListenerOptions): void {
+    override removeEventListener(
+      type: string,
+      listener: EventListenerOrEventListenerObject,
+      options?: boolean | EventListenerOptions,
+    ): void {
       super.removeEventListener(type, listener, options);
       // Also remove auto-wired config handlers if present
       if (this._autoWiredHandlers[type]) {
-        this._autoWiredHandlers[type] = this._autoWiredHandlers[type].filter(fn => {
-          if (fn === listener) {
-            super.removeEventListener(type, fn, options);
-            return false;
-          }
-          return true;
-        });
-        if (this._autoWiredHandlers[type].length === 0) delete this._autoWiredHandlers[type];
+        this._autoWiredHandlers[type] = this._autoWiredHandlers[type].filter(
+          (fn) => {
+            if (fn === listener) {
+              super.removeEventListener(type, fn, options);
+              return false;
+            }
+            return true;
+          },
+        );
+        if (this._autoWiredHandlers[type].length === 0)
+          delete this._autoWiredHandlers[type];
       }
     }
 
@@ -251,39 +334,53 @@ if (typeof HTMLElement !== 'undefined') {
     static get observedAttributes() {
       // @ts-ignore: allow dynamic static property access
       const state = this.stateObj || {};
-      return Object.keys(state).filter(
-        key => ['string', 'number', 'boolean'].includes(typeof state[key])
+      return Object.keys(state).filter((key) =>
+        ["string", "number", "boolean"].includes(typeof state[key]),
       );
     }
 
     /**
      * Called when an observed attribute changes. Syncs attribute to state and triggers render.
      */
-    attributeChangedCallback(name: string, _oldValue: string, newValue: string) {
-      if (name === '__proto__' || name === 'constructor' || name === 'prototype') return;
+    attributeChangedCallback(
+      name: string,
+      _oldValue: string,
+      newValue: string,
+    ) {
+      if (
+        name === "__proto__" ||
+        name === "constructor" ||
+        name === "prototype"
+      )
+        return;
       if (!this.stateObj) return;
       // Map kebab-case to camelCase
       const camelName = name.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
-      const stateKey = (name in this.stateObj) ? name : (camelName in this.stateObj ? camelName : null);
+      const stateKey =
+        name in this.stateObj
+          ? name
+          : camelName in this.stateObj
+            ? camelName
+            : null;
       if (stateKey) {
-        const initialType = typeof (this.config?.state?.[stateKey]);
+        const initialType = typeof this.config?.state?.[stateKey];
         let value: any = newValue;
         if (newValue === null) {
           value = undefined;
-        } else if (initialType === 'number') {
-          if (value === undefined || value === '') {
+        } else if (initialType === "number") {
+          if (value === undefined || value === "") {
             value = this.config?.state?.[stateKey];
           } else {
             const num = Number(value);
             value = isNaN(num) ? this.config?.state?.[stateKey] : num;
           }
-        } else if (initialType === 'boolean') {
-          value = value === 'true';
+        } else if (initialType === "boolean") {
+          value = value === "true";
         }
         value = deepSanitizeObject(value);
         if ((this.stateObj as any)[stateKey] !== value) {
           if (this.config?.debug) {
-            console.log('[runtime] state update:', { stateKey, value });
+            console.log("[runtime] state update:", { stateKey, value });
           }
           (this.stateObj as any)[stateKey] = value;
           this.render();
@@ -296,18 +393,23 @@ if (typeof HTMLElement !== 'undefined') {
      */
     private forceSyncControlledInputs(): void {
       if (!this.shadowRoot) return;
-      this.shadowRoot.querySelectorAll('input[data-model]').forEach(input => {
-        const modelAttr = input.getAttribute('data-model');
-        if (!modelAttr || !this.stateObj || typeof this.stateObj[modelAttr] === 'undefined') return;
+      this.shadowRoot.querySelectorAll("input[data-model]").forEach((input) => {
+        const modelAttr = input.getAttribute("data-model");
+        if (
+          !modelAttr ||
+          !this.stateObj ||
+          typeof this.stateObj[modelAttr] === "undefined"
+        )
+          return;
         const inputEl = input as HTMLInputElement;
         const stateValue = String(this.stateObj[modelAttr]);
         const isFocused = document.activeElement === inputEl;
         // Ensure dirty flag is set on input event
         if (!(inputEl as any)._hasDirtyListener) {
-          inputEl.addEventListener('input', () => {
+          inputEl.addEventListener("input", () => {
             (inputEl as any)._isDirty = true;
           });
-          inputEl.addEventListener('blur', () => {
+          inputEl.addEventListener("blur", () => {
             (inputEl as any)._isDirty = false;
           });
           (inputEl as any)._hasDirtyListener = true;
@@ -318,7 +420,11 @@ if (typeof HTMLElement !== 'undefined') {
           return;
         }
         // Only set value for unfocused and clean inputs if it differs and is not a radio or checkbox
-        if (inputEl.type !== 'radio' && inputEl.type !== 'checkbox' && inputEl.value !== stateValue) {
+        if (
+          inputEl.type !== "radio" &&
+          inputEl.type !== "checkbox" &&
+          inputEl.value !== stateValue
+        ) {
           inputEl.value = stateValue;
         }
       });
@@ -332,28 +438,39 @@ if (typeof HTMLElement !== 'undefined') {
     private syncControlledInputsAndEvents(): void {
       if (!this.shadowRoot) return;
       // --- Radio Groups ---
-      this.shadowRoot.querySelectorAll('input[type="radio"][data-model]').forEach((input) => {
-        const modelAttr = input.getAttribute('data-model');
-        if (!modelAttr || !this.stateObj || typeof this.stateObj[modelAttr] === 'undefined') {
-          return;
-        }
-        const inputEl = input as HTMLInputElement;
-        const stateValue = String(this.stateObj[modelAttr]);
-        inputEl.checked = inputEl.value === stateValue;
-      });
+      this.shadowRoot
+        .querySelectorAll('input[type="radio"][data-model]')
+        .forEach((input) => {
+          const modelAttr = input.getAttribute("data-model");
+          if (
+            !modelAttr ||
+            !this.stateObj ||
+            typeof this.stateObj[modelAttr] === "undefined"
+          ) {
+            return;
+          }
+          const inputEl = input as HTMLInputElement;
+          const stateValue = String(this.stateObj[modelAttr]);
+          inputEl.checked = inputEl.value === stateValue;
+        });
       // --- Checkbox, Text, Number ---
-      this.shadowRoot.querySelectorAll('input[data-model]').forEach(input => {
-        const modelAttr = input.getAttribute('data-model');
-        if (!modelAttr || !this.stateObj || typeof this.stateObj[modelAttr] === 'undefined') return;
+      this.shadowRoot.querySelectorAll("input[data-model]").forEach((input) => {
+        const modelAttr = input.getAttribute("data-model");
+        if (
+          !modelAttr ||
+          !this.stateObj ||
+          typeof this.stateObj[modelAttr] === "undefined"
+        )
+          return;
         const inputEl = input as HTMLInputElement;
         const stateValue = String(this.stateObj[modelAttr]);
-        if (inputEl.type === 'checkbox') {
+        if (inputEl.type === "checkbox") {
           const stateVal = this.stateObj[modelAttr];
           if (Array.isArray(stateVal)) {
             inputEl.checked = stateVal.includes(inputEl.value);
           } else {
-            const trueValue = inputEl.getAttribute('data-true-value');
-            const falseValue = inputEl.getAttribute('data-false-value');
+            const trueValue = inputEl.getAttribute("data-true-value");
+            const falseValue = inputEl.getAttribute("data-false-value");
             if (trueValue !== null || falseValue !== null) {
               if (String(stateVal) === trueValue) {
                 inputEl.checked = true;
@@ -365,27 +482,46 @@ if (typeof HTMLElement !== 'undefined') {
                 inputEl.checked = false;
               }
             } else {
-              inputEl.checked = stateVal === true || stateVal === 'true' || stateVal === 1;
+              inputEl.checked =
+                stateVal === true || stateVal === "true" || stateVal === 1;
             }
           }
-        } else if (inputEl.type === 'radio') {
+        } else if (inputEl.type === "radio") {
           // Do not set value for radios
         } else {
           inputEl.value = stateValue;
         }
       });
       // --- Textarea ---
-      this.shadowRoot.querySelectorAll('textarea[data-model]').forEach(textarea => {
-        const modelAttr = textarea.getAttribute('data-model');
-        if (!modelAttr || !this.stateObj || typeof this.stateObj[modelAttr] === 'undefined') return;
-        (textarea as HTMLTextAreaElement).value = String(this.stateObj[modelAttr]);
-      });
+      this.shadowRoot
+        .querySelectorAll("textarea[data-model]")
+        .forEach((textarea) => {
+          const modelAttr = textarea.getAttribute("data-model");
+          if (
+            !modelAttr ||
+            !this.stateObj ||
+            typeof this.stateObj[modelAttr] === "undefined"
+          )
+            return;
+          (textarea as HTMLTextAreaElement).value = String(
+            this.stateObj[modelAttr],
+          );
+        });
       // --- Select ---
-      this.shadowRoot.querySelectorAll('select[data-model]').forEach(select => {
-        const modelAttr = select.getAttribute('data-model');
-        if (!modelAttr || !this.stateObj || typeof this.stateObj[modelAttr] === 'undefined') return;
-        (select as HTMLSelectElement).value = String(this.stateObj[modelAttr]);
-      });
+      this.shadowRoot
+        .querySelectorAll("select[data-model]")
+        .forEach((select) => {
+          const modelAttr = select.getAttribute("data-model");
+          if (
+            !modelAttr ||
+            !this.stateObj ||
+            typeof this.stateObj[modelAttr] === "undefined"
+          )
+            return;
+          (select as HTMLSelectElement).value = String(
+            this.stateObj[modelAttr],
+          );
+        });
     }
 
     /**
@@ -393,62 +529,93 @@ if (typeof HTMLElement !== 'undefined') {
      */
     private attachListItemModelListeners(): void {
       if (!this.shadowRoot) return;
-      this.shadowRoot.querySelectorAll('input[data-bind]').forEach(input => {
-        const bindExpr = input.getAttribute('data-bind');
+      this.shadowRoot.querySelectorAll("input[data-bind]").forEach((input) => {
+        const bindExpr = input.getAttribute("data-bind");
         if (!bindExpr) return;
         // Remove previous listener if present
         if ((input as any)._listItemModelListener) {
-          input.removeEventListener('input', (input as any)._listItemModelListener);
-          input.removeEventListener('change', (input as any)._listItemModelListener);
+          input.removeEventListener(
+            "input",
+            (input as any)._listItemModelListener,
+          );
+          input.removeEventListener(
+            "change",
+            (input as any)._listItemModelListener,
+          );
           delete (input as any)._listItemModelListener;
         }
         // Array item binding: arrKey[idx].propKey
-        const arrMatch = bindExpr.match(/^([a-zA-Z0-9_]+)\[(\d+)\]\.([a-zA-Z0-9_]+)$/);
+        const arrMatch = bindExpr.match(
+          /^([a-zA-Z0-9_]+)\[(\d+)\]\.([a-zA-Z0-9_]+)$/,
+        );
         if (arrMatch) {
           const [, arrKey, idxStr, propKey] = arrMatch;
           const idx = parseInt(idxStr, 10);
           const arr = this.stateObj[arrKey];
-          if (input instanceof HTMLInputElement && input.type === 'checkbox') {
-            input.checked = !!(Array.isArray(arr) && arr[idx] && arr[idx][propKey]);
+          if (input instanceof HTMLInputElement && input.type === "checkbox") {
+            input.checked = !!(
+              Array.isArray(arr) &&
+              arr[idx] &&
+              arr[idx][propKey]
+            );
           }
           const handler = (_e: Event) => {
             if (!Array.isArray(arr) || !arr[idx]) return;
-            if (input instanceof HTMLInputElement && input.type === 'checkbox') {
+            if (
+              input instanceof HTMLInputElement &&
+              input.type === "checkbox"
+            ) {
               arr[idx][propKey] = input.checked;
             } else {
               arr[idx][propKey] = (input as any).value;
             }
           };
-          input.addEventListener('input', handler);
-          input.addEventListener('change', handler);
+          input.addEventListener("input", handler);
+          input.addEventListener("change", handler);
           (input as any)._listItemModelListener = handler;
           return;
         }
         // Dot notation binding: user.name or user.amount|number|trim
-        const dotMatch = bindExpr.match(/^([a-zA-Z0-9_]+)\.([a-zA-Z0-9_]+)((?:\|[a-zA-Z0-9_]+)*)$/);
+        const dotMatch = bindExpr.match(
+          /^([a-zA-Z0-9_]+)\.([a-zA-Z0-9_]+)((?:\|[a-zA-Z0-9_]+)*)$/,
+        );
         if (dotMatch) {
           const [, objKey, propKey, modifierStr] = dotMatch;
           const obj = this.stateObj[objKey];
-          const modifiers = modifierStr ? modifierStr.split('|').map(s => s.trim()).filter(Boolean) : [];
-          if (input instanceof HTMLInputElement && input.type === 'checkbox') {
+          const modifiers = modifierStr
+            ? modifierStr
+                .split("|")
+                .map((s) => s.trim())
+                .filter(Boolean)
+            : [];
+          if (input instanceof HTMLInputElement && input.type === "checkbox") {
             input.checked = !!(obj && obj[propKey]);
           } else if (input instanceof HTMLInputElement) {
-            input.value = obj ? String(obj[propKey] ?? '') : '';
+            input.value = obj ? String(obj[propKey] ?? "") : "";
           }
           const handler = (_e: Event) => {
             if (!obj) return;
             let value: unknown;
-            if (input instanceof HTMLInputElement && input.type === 'checkbox') {
+            if (
+              input instanceof HTMLInputElement &&
+              input.type === "checkbox"
+            ) {
               value = input.checked;
             } else {
-              value = (input as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement).value;
-              if (modifiers.includes('number')) value = Number(value);
-              if (modifiers.includes('trim') && typeof value === 'string') value = value.trim();
+              value = (
+                input as
+                  | HTMLInputElement
+                  | HTMLTextAreaElement
+                  | HTMLSelectElement
+              ).value;
+              if (modifiers.includes("number")) value = Number(value);
+              if (modifiers.includes("trim") && typeof value === "string")
+                value = value.trim();
             }
             obj[propKey] = value;
           };
-          input.addEventListener('input', handler);
-          input.addEventListener('change', handler);
+          input.addEventListener("input", handler);
+          input.addEventListener("change", handler);
           (input as any)._listItemModelListener = handler;
         }
       });
@@ -461,8 +628,8 @@ if (typeof HTMLElement !== 'undefined') {
       const shadow = this.shadowRoot;
       if (!shadow) return;
       // --- Auto data-model binding ---
-      shadow.querySelectorAll('[data-model]').forEach((el) => {
-        const keyWithModifiers = el.getAttribute('data-model');
+      shadow.querySelectorAll("[data-model]").forEach((el) => {
+        const keyWithModifiers = el.getAttribute("data-model");
         if (!keyWithModifiers) return;
         // Only bind once per element
         if ((el as any)._dataModelBound) return;
@@ -470,14 +637,18 @@ if (typeof HTMLElement !== 'undefined') {
         (el as any)._dataModelBound = true;
       });
       // --- Post-render sync for all data-model inputs ---
-      shadow.querySelectorAll('[data-model]').forEach((el) => {
-        const [key] = el.getAttribute('data-model')?.split('|').map(s => s.trim()) ?? [];
+      shadow.querySelectorAll("[data-model]").forEach((el) => {
+        const [key] =
+          el
+            .getAttribute("data-model")
+            ?.split("|")
+            .map((s) => s.trim()) ?? [];
         if (!key || !(key in this.stateObj)) return;
         if (el instanceof HTMLInputElement) {
-          if (el.type === 'checkbox') {
+          if (el.type === "checkbox") {
             const stateVal = this.stateObj[key];
-            const trueValue = el.getAttribute('data-true-value');
-            const falseValue = el.getAttribute('data-false-value');
+            const trueValue = el.getAttribute("data-true-value");
+            const falseValue = el.getAttribute("data-false-value");
             if (Array.isArray(stateVal)) {
               el.checked = stateVal.includes(el.value);
             } else if (trueValue !== null || falseValue !== null) {
@@ -491,15 +662,19 @@ if (typeof HTMLElement !== 'undefined') {
                 el.checked = false;
               }
             } else {
-              el.checked = stateVal === true || stateVal === 'true' || stateVal === 1;
+              el.checked =
+                stateVal === true || stateVal === "true" || stateVal === 1;
             }
-          } else if (el.type === 'radio') {
+          } else if (el.type === "radio") {
             el.checked = el.value === String(this.stateObj[key]);
           } else {
-            el.value = String(this.stateObj[key] ?? '');
+            el.value = String(this.stateObj[key] ?? "");
           }
-        } else if (el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement) {
-          el.value = String(this.stateObj[key] ?? '');
+        } else if (
+          el instanceof HTMLTextAreaElement ||
+          el instanceof HTMLSelectElement
+        ) {
+          el.value = String(this.stateObj[key] ?? "");
         }
       });
     }
@@ -524,13 +699,15 @@ if (typeof HTMLElement !== 'undefined') {
     private initializeConfig() {
       if (this.config) return;
       const tag = this.tagName.toLowerCase();
-      const registry: ComponentRegistry = (window as unknown as { __componentRegistry?: ComponentRegistry }).__componentRegistry || {};
+      const registry: ComponentRegistry =
+        (window as unknown as { __componentRegistry?: ComponentRegistry })
+          .__componentRegistry || {};
       const config = registry[tag];
-      if (!config || typeof config !== 'object') {
-        throw new Error('Invalid component config: must be an object');
+      if (!config || typeof config !== "object") {
+        throw new Error("Invalid component config: must be an object");
       }
-      if (!config.state || typeof config.state !== 'object') {
-        throw new Error('Invalid component config: state must be an object');
+      if (!config.state || typeof config.state !== "object") {
+        throw new Error("Invalid component config: state must be an object");
       }
       this.config = config;
       // Always use the reactive proxy for state
@@ -539,26 +716,37 @@ if (typeof HTMLElement !== 'undefined') {
         : reactive(config.state);
       this.stateObj = computedState as S & C;
       // Subscribe to state changes and batch re-render
-      if (typeof (this.stateObj as any).subscribe === 'function') {
-        this.unsubscribes.push((this.stateObj as any).subscribe(() => {
-          this.scheduleRender();
-        }));
+      if (typeof (this.stateObj as any).subscribe === "function") {
+        this.unsubscribes.push(
+          (this.stateObj as any).subscribe(() => {
+            this.scheduleRender();
+          }),
+        );
       }
       // Create API
       this.api = {
         state: this.stateObj,
-        emit: (eventName: string, detail?: unknown) => this.dispatchEvent(new CustomEvent(eventName, { detail, bubbles: true })),
+        emit: (eventName: string, detail?: unknown) =>
+          this.dispatchEvent(
+            new CustomEvent(eventName, { detail, bubbles: true }),
+          ),
         onGlobal: <U = any>(eventName: string, handler: (data: U) => void) => {
           const unsub = eventBus.on(eventName, handler);
           this._globalUnsubscribes.push(unsub);
           return unsub;
         },
-        offGlobal: <U = any>(eventName: string, handler: (data: U) => void) => eventBus.off(eventName, handler),
-        emitGlobal: <U = any>(eventName: string, data?: U) => eventBus.emit(eventName, data),
-        render: () => this.render()
+        offGlobal: <U = any>(eventName: string, handler: (data: U) => void) =>
+          eventBus.off(eventName, handler),
+        emitGlobal: <U = any>(eventName: string, data?: U) =>
+          eventBus.emit(eventName, data),
+        render: () => this.render(),
       };
-      Object.keys(this.config).forEach(key => {
-        if (key.startsWith('on') && key.length > 2 && typeof this.config[key] === 'function') {
+      Object.keys(this.config).forEach((key) => {
+        if (
+          key.startsWith("on") &&
+          key.length > 2 &&
+          typeof this.config[key] === "function"
+        ) {
           const eventName = key.charAt(2).toLowerCase() + key.slice(3);
           const handler: EventListener = (e: Event) => {
             const detail = (e as CustomEvent).detail ?? e;
@@ -566,29 +754,37 @@ if (typeof HTMLElement !== 'undefined') {
           };
           this.addEventListener(eventName, handler);
           // Store for later removal
-          if (!this._autoWiredHandlers[eventName]) this._autoWiredHandlers[eventName] = [];
+          if (!this._autoWiredHandlers[eventName])
+            this._autoWiredHandlers[eventName] = [];
           this._autoWiredHandlers[eventName].push(handler);
         }
       });
       // Attach shadow DOM
-      this.attachShadow({ mode: 'open' });
+      this.attachShadow({ mode: "open" });
       // Setup style
       if (config.style) {
-        const styleEl = document.createElement('style');
-        styleEl.textContent = typeof config.style === 'function' ? config.style(this.stateObj) : config.style;
+        const styleEl = document.createElement("style");
+        styleEl.textContent =
+          typeof config.style === "function"
+            ? config.style(this.stateObj)
+            : config.style;
         this.shadowRoot!.appendChild(styleEl);
       }
       // SSR hydration support (selective)
-      if (typeof this.config.hydrate === 'function') {
-        const hydrateEls = this.shadowRoot?.querySelectorAll('[data-hydrate]');
+      if (typeof this.config.hydrate === "function") {
+        const hydrateEls = this.shadowRoot?.querySelectorAll("[data-hydrate]");
         try {
           if (hydrateEls && hydrateEls.length > 0) {
-            hydrateEls.forEach(el => {
+            hydrateEls.forEach((el) => {
               try {
                 this.config.hydrate!(el, this.stateObj, this.api);
               } catch (err) {
-                if (typeof this.config.onError === 'function') {
-                  this.config.onError(err instanceof Error ? err : new Error(String(err)), this.api.state, this.api);
+                if (typeof this.config.onError === "function") {
+                  this.config.onError(
+                    err instanceof Error ? err : new Error(String(err)),
+                    this.api.state,
+                    this.api,
+                  );
                 }
                 this._handleRenderError(err);
               }
@@ -597,36 +793,45 @@ if (typeof HTMLElement !== 'undefined') {
             this.config.hydrate!(this.shadowRoot!, this.stateObj, this.api);
           }
         } catch (err) {
-          if (typeof this.config.onError === 'function') {
-            this.config.onError(err instanceof Error ? err : new Error(String(err)), this.api.state, this.api);
+          if (typeof this.config.onError === "function") {
+            this.config.onError(
+              err instanceof Error ? err : new Error(String(err)),
+              this.api.state,
+              this.api,
+            );
           }
           this._handleRenderError(err);
         }
       }
-      const isSSRHydration = this.hasAttribute('data-hydrated');
+      const isSSRHydration = this.hasAttribute("data-hydrated");
       if (!isSSRHydration) {
         this.render();
       } else {
         this.processRefs();
       }
       // Only call onMounted here if not already called
-      if (!this._mountedCalled && typeof this.config.onMounted === 'function') {
+      if (!this._mountedCalled && typeof this.config.onMounted === "function") {
         try {
-          const result: unknown = this.config.onMounted(this.api.state, this.api);
+          const result: unknown = this.config.onMounted(
+            this.api.state,
+            this.api,
+          );
           if (isPromise(result)) {
-            result.catch((err: any) => {
-              if (typeof this.config.onError === 'function') {
-                this.config.onError(err, this.api.state, this.api);
-              }
-              this._handleRenderError(err);
-            }).finally(() => {
-              this._mountedCalled = true;
-            });
+            result
+              .catch((err: any) => {
+                if (typeof this.config.onError === "function") {
+                  this.config.onError(err, this.api.state, this.api);
+                }
+                this._handleRenderError(err);
+              })
+              .finally(() => {
+                this._mountedCalled = true;
+              });
           } else {
             this._mountedCalled = true;
           }
         } catch (err) {
-          if (typeof this.config.onError === 'function') {
+          if (typeof this.config.onError === "function") {
             this.config.onError(err, this.api.state, this.api);
           }
           this._handleRenderError(err);
@@ -641,42 +846,50 @@ if (typeof HTMLElement !== 'undefined') {
       if (this.stateObj) {
         for (const attr of this.getAttributeNames()) {
           // Always map kebab-case to camelCase for state keys
-          const camelName = attr.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+          const camelName = attr.replace(/-([a-z])/g, (_, c) =>
+            c.toUpperCase(),
+          );
           const stateKey = camelName;
           if (stateKey in this.stateObj) {
-            const initialType = typeof (this.config?.state?.[stateKey]);
+            const initialType = typeof this.config?.state?.[stateKey];
             let value: unknown = this.getAttribute(attr);
-            if (initialType === 'number') value = Number(value);
-            else if (initialType === 'boolean') value = value === 'true';
-            (this.stateObj as Record<string, unknown>)[stateKey] = value === null ? undefined : value;
+            if (initialType === "number") value = Number(value);
+            else if (initialType === "boolean") value = value === "true";
+            (this.stateObj as Record<string, unknown>)[stateKey] =
+              value === null ? undefined : value;
           }
         }
       }
       // Only call onMounted if not already called
-      if (!this._mountedCalled && typeof this.config.onMounted === 'function') {
+      if (!this._mountedCalled && typeof this.config.onMounted === "function") {
         try {
-          const result: unknown = this.config.onMounted(this.api.state, this.api);
+          const result: unknown = this.config.onMounted(
+            this.api.state,
+            this.api,
+          );
           if (isPromise(result)) {
-            result.catch((err: unknown) => {
-              if (typeof this.config.onError === 'function') {
-                this.config.onError(err, this.api.state, this.api);
-              }
-              this._handleRenderError(err);
-            }).finally(() => {
-              this._mountedCalled = true;
-            });
+            result
+              .catch((err: unknown) => {
+                if (typeof this.config.onError === "function") {
+                  this.config.onError(err, this.api.state, this.api);
+                }
+                this._handleRenderError(err);
+              })
+              .finally(() => {
+                this._mountedCalled = true;
+              });
           } else {
             this._mountedCalled = true;
           }
         } catch (err) {
-          if (typeof this.config.onError === 'function') {
+          if (typeof this.config.onError === "function") {
             this.config.onError(err, this.api.state, this.api);
           }
           this._handleRenderError(err);
           this._mountedCalled = true;
         }
       }
-      if (typeof this.render === 'function') this.render();
+      if (typeof this.render === "function") this.render();
     }
 
     /**
@@ -684,33 +897,43 @@ if (typeof HTMLElement !== 'undefined') {
      */
     disconnectedCallback(): void {
       // Remove all auto-wired config event handlers
-      Object.entries(this._autoWiredHandlers).forEach(([eventName, handlers]) => {
-        handlers.forEach(handler => {
-          super.removeEventListener(eventName, handler);
-        });
-      });
+      Object.entries(this._autoWiredHandlers).forEach(
+        ([eventName, handlers]) => {
+          handlers.forEach((handler) => {
+            super.removeEventListener(eventName, handler);
+          });
+        },
+      );
       this._autoWiredHandlers = {};
-      this.unsubscribes.forEach(fn => fn());
+      this.unsubscribes.forEach((fn) => fn());
       this.unsubscribes = [];
-      this._globalUnsubscribes.forEach(fn => fn());
+      this._globalUnsubscribes.forEach((fn) => fn());
       this._globalUnsubscribes = [];
-      if (!this._unmountedCalled && typeof this.config.onUnmounted === 'function') {
+      if (
+        !this._unmountedCalled &&
+        typeof this.config.onUnmounted === "function"
+      ) {
         try {
-          const result: unknown = this.config.onUnmounted(this.api.state, this.api);
+          const result: unknown = this.config.onUnmounted(
+            this.api.state,
+            this.api,
+          );
           if (isPromise(result)) {
-            result.catch((err: any) => {
-              if (typeof this.config.onError === 'function') {
-                this.config.onError(err, this.api.state, this.api);
-              }
-              this._handleRenderError(err);
-            }).finally(() => {
-              this._unmountedCalled = true;
-            });
+            result
+              .catch((err: any) => {
+                if (typeof this.config.onError === "function") {
+                  this.config.onError(err, this.api.state, this.api);
+                }
+                this._handleRenderError(err);
+              })
+              .finally(() => {
+                this._unmountedCalled = true;
+              });
           } else {
             this._unmountedCalled = true;
           }
         } catch (err) {
-          if (typeof this.config.onError === 'function') {
+          if (typeof this.config.onError === "function") {
             this.config.onError(err, this.api.state, this.api);
           }
           this._handleRenderError(err);
@@ -733,7 +956,7 @@ if (typeof HTMLElement !== 'undefined') {
       setTimeout(() => this.attachControlledInputListeners(), 0);
       try {
         // Plugin hook: onRender
-        runtimePlugins.forEach(p => {
+        runtimePlugins.forEach((p) => {
           try {
             p.onRender?.(this.stateObj, this.api);
           } catch (err) {
@@ -743,7 +966,7 @@ if (typeof HTMLElement !== 'undefined') {
         });
         // Error boundary for computed properties
         if (this.config.computed) {
-          Object.values(this.config.computed).forEach(fn => {
+          Object.values(this.config.computed).forEach((fn) => {
             try {
               fn(this.stateObj);
             } catch (err) {
@@ -752,19 +975,24 @@ if (typeof HTMLElement !== 'undefined') {
             }
           });
         }
-        const templateResultOrPromise = this.config.template(this.stateObj as S & C, this.api);
+        const templateResultOrPromise = this.config.template(
+          this.stateObj as S & C,
+          this.api,
+        );
         if (templateResultOrPromise instanceof Promise) {
-          templateResultOrPromise.then(templateResult => {
-            if (!this._hasError) {
-              this._renderTemplateResult(templateResult);
-              // Sync state to attributes after render
-              this.syncStateToAttributes();
-              // Attach list item listeners after VDOM patching
-              setTimeout(() => this.attachListItemModelListeners(), 0);
-            }
-          }).catch(error => {
-            this._handleRenderError(error);
-          });
+          templateResultOrPromise
+            .then((templateResult) => {
+              if (!this._hasError) {
+                this._renderTemplateResult(templateResult);
+                // Sync state to attributes after render
+                this.syncStateToAttributes();
+                // Attach list item listeners after VDOM patching
+                setTimeout(() => this.attachListItemModelListeners(), 0);
+              }
+            })
+            .catch((error) => {
+              this._handleRenderError(error);
+            });
         } else {
           if (!this._hasError) {
             this._renderTemplateResult(templateResultOrPromise);
@@ -777,7 +1005,9 @@ if (typeof HTMLElement !== 'undefined') {
       } catch (error) {
         this._handleRenderError(error);
         // Always render fallback UI on error, do NOT re-throw
-        this.renderError(error instanceof Error ? error : new Error(String(error)));
+        this.renderError(
+          error instanceof Error ? error : new Error(String(error)),
+        );
       }
     }
 
@@ -791,27 +1021,43 @@ if (typeof HTMLElement !== 'undefined') {
      */
     private rebindEventListeners(): void {
       if (!this.shadowRoot) return;
-      const eventAttrs = ['data-on-input', 'data-on-change', 'data-on-blur', 'data-on-click'];
-      eventAttrs.forEach(attr => {
-        this.shadowRoot!.querySelectorAll(`[${attr}]`).forEach(el => {
-          const eventType = attr.replace('data-on-', '');
+      const eventAttrs = [
+        "data-on-input",
+        "data-on-change",
+        "data-on-blur",
+        "data-on-click",
+      ];
+      eventAttrs.forEach((attr) => {
+        this.shadowRoot!.querySelectorAll(`[${attr}]`).forEach((el) => {
+          const eventType = attr.replace("data-on-", "");
           const handlerName = el.getAttribute(attr);
-          if (!handlerName || typeof this.config[handlerName] !== 'function') return;
+          if (!handlerName || typeof this.config[handlerName] !== "function")
+            return;
           // Remove previous listener if any
-          if ((el as any)._boundHandlers && (el as any)._boundHandlers[eventType]) {
-            el.removeEventListener(eventType, (el as any)._boundHandlers[eventType]);
+          if (
+            (el as any)._boundHandlers &&
+            (el as any)._boundHandlers[eventType]
+          ) {
+            el.removeEventListener(
+              eventType,
+              (el as any)._boundHandlers[eventType],
+            );
           }
           // Bind new handler
           const handler = this.config[handlerName];
-          const boundHandler = (e: Event) => handler.call(this, e, this.stateObj, this.api);
+          const boundHandler = (e: Event) =>
+            handler.call(this, e, this.stateObj, this.api);
           el.addEventListener(eventType, boundHandler);
           if (!(el as any)._boundHandlers) (el as any)._boundHandlers = {};
           (el as any)._boundHandlers[eventType] = boundHandler;
         });
       });
       // Recurse into children for rebinding
-      Array.from(this.shadowRoot.children).forEach(child => {
-        if (child instanceof HTMLElement && typeof (child as any).rebindEventListeners === 'function') {
+      Array.from(this.shadowRoot.children).forEach((child) => {
+        if (
+          child instanceof HTMLElement &&
+          typeof (child as any).rebindEventListeners === "function"
+        ) {
           (child as any).rebindEventListeners();
         }
       });
@@ -821,18 +1067,26 @@ if (typeof HTMLElement !== 'undefined') {
      * Handles VDOM patching, style updates, refs, and event binding.
      * @param templateResult - HTML string or compiled template
      */
-    private _renderTemplateResult(templateResult: string | CompiledTemplate<S & C>): void {
+    private _renderTemplateResult(
+      templateResult: string | CompiledTemplate<S & C>,
+    ): void {
       if (this._hasError) return;
       try {
-        if (typeof templateResult === 'string') {
+        if (typeof templateResult === "string") {
           // --- Sanitize HTML for XSS ---
           function sanitizeHTML(html: string): string {
             // Remove all on* attributes (e.g., onclick, onerror)
-            return html.replace(/<([a-zA-Z0-9]+)([^>]*)>/g, (_match, tag, attrs) => {
-              // Remove dangerous attributes
-              const safeAttrs = attrs.replace(/\s+on[a-zA-Z]+\s*=\s*(['"][^'"]*['"]|[^\s>]*)/gi, '');
-              return `<${tag}${safeAttrs}>`;
-            });
+            return html.replace(
+              /<([a-zA-Z0-9]+)([^>]*)>/g,
+              (_match, tag, attrs) => {
+                // Remove dangerous attributes
+                const safeAttrs = attrs.replace(
+                  /\s+on[a-zA-Z]+\s*=\s*(['"][^'"]*['"]|[^\s>]*)/gi,
+                  "",
+                );
+                return `<${tag}${safeAttrs}>`;
+              },
+            );
           }
           const sanitizedHTML = sanitizeHTML(templateResult);
           const newVNode = parseVNodeFromHTML(sanitizedHTML);
@@ -844,44 +1098,48 @@ if (typeof HTMLElement !== 'undefined') {
           if (!shadowRoot) {
             return;
           }
-          let styleEl = shadowRoot.querySelector('style');
+          let styleEl = shadowRoot.querySelector("style");
           if (!styleEl) {
-            styleEl = document.createElement('style');
+            styleEl = document.createElement("style");
             shadowRoot.appendChild(styleEl);
           }
           if (this.config.style) {
-            styleEl.textContent = typeof this.config.style === 'function' ? this.config.style(this.stateObj) : this.config.style;
+            styleEl.textContent =
+              typeof this.config.style === "function"
+                ? this.config.style(this.stateObj)
+                : this.config.style;
           } else {
-            styleEl.textContent = '';
+            styleEl.textContent = "";
           }
           // If fragment, reconcile all children
-          if (newVNode.type === '#fragment') {
+          if (newVNode.type === "#fragment") {
             // Use patchVNode for full parent/children reconciliation
             const containerEl = Array.from(shadowRoot.childNodes).find(
-              node => node.nodeType === 1 && node !== styleEl
+              (node) => node.nodeType === 1 && node !== styleEl,
             ) as Element | undefined;
             if (containerEl) {
               // Remove all non-style children from container
-              Array.from(containerEl.childNodes).forEach(node => {
+              Array.from(containerEl.childNodes).forEach((node) => {
                 // Keep only the <style> node, remove everything else (including text and comment nodes)
-                if (!(node.nodeType === 1 && node.nodeName === 'STYLE')) {
+                if (!(node.nodeType === 1 && node.nodeName === "STYLE")) {
                   containerEl.removeChild(node);
                 }
               });
               const fragmentVNode = {
-                type: '#fragment',
+                type: "#fragment",
                 dom: containerEl,
                 children: newVNode.children,
                 props: {},
-                key: undefined
+                key: undefined,
               };
-              const prevFragmentVNode = this._prevVNode && this._prevVNode.type === '#fragment'
-                ? { ...this._prevVNode, dom: containerEl }
-                : fragmentVNode;
+              const prevFragmentVNode =
+                this._prevVNode && this._prevVNode.type === "#fragment"
+                  ? { ...this._prevVNode, dom: containerEl }
+                  : fragmentVNode;
               patchVNode(containerEl, prevFragmentVNode, fragmentVNode);
             } else {
               // If no container, mount all children
-              newVNode.children.forEach(childVNode => {
+              newVNode.children.forEach((childVNode) => {
                 const dom = mountVNode(childVNode);
                 if (dom) shadowRoot.appendChild(dom);
                 childVNode.dom = dom ?? undefined;
@@ -891,11 +1149,15 @@ if (typeof HTMLElement !== 'undefined') {
           } else {
             // Find or create persistent root node
             let rootEl = Array.from(this.shadowRoot!.childNodes).find(
-              node => node !== styleEl && node.nodeType === 1
+              (node) => node !== styleEl && node.nodeType === 1,
             ) as Element | undefined;
             if (rootEl) {
               // If type or key differ, replace root node
-              if (this._prevVNode && (this._prevVNode.type !== newVNode.type || this._prevVNode.key !== newVNode.key)) {
+              if (
+                this._prevVNode &&
+                (this._prevVNode.type !== newVNode.type ||
+                  this._prevVNode.key !== newVNode.key)
+              ) {
                 const actualRootNode = mountVNode(newVNode);
                 if (actualRootNode) {
                   if (this.shadowRoot!.contains(rootEl)) {
@@ -922,32 +1184,53 @@ if (typeof HTMLElement !== 'undefined') {
           this.lastCompiledTemplate = null;
         } else {
           const isInitialRender = !this.shadowRoot!.firstElementChild;
-          const isSameTemplate = this.lastCompiledTemplate?.id === templateResult.id;
+          const isSameTemplate =
+            this.lastCompiledTemplate?.id === templateResult.id;
           if (isInitialRender) {
-            const fragment = renderCompiledTemplate(templateResult, this.stateObj, this.api);
+            const fragment = renderCompiledTemplate(
+              templateResult,
+              this.stateObj,
+              this.api,
+            );
             this.shadowRoot!.appendChild(fragment);
           } else if (isSameTemplate && this.shadowRoot!.firstElementChild) {
             const oldState = this.lastState;
-            updateCompiledTemplate(templateResult, this.shadowRoot!.firstElementChild, this.stateObj, this.api, oldState || undefined);
+            updateCompiledTemplate(
+              templateResult,
+              this.shadowRoot!.firstElementChild,
+              this.stateObj,
+              this.api,
+              oldState || undefined,
+            );
           } else {
-            const fragment = renderCompiledTemplate(templateResult, this.stateObj, this.api);
+            const fragment = renderCompiledTemplate(
+              templateResult,
+              this.stateObj,
+              this.api,
+            );
             // Always ensure <style> element is present and up-to-date
-            let styleEl = this.shadowRoot!.querySelector('style');
+            let styleEl = this.shadowRoot!.querySelector("style");
             if (!styleEl) {
-              styleEl = document.createElement('style');
-              this.shadowRoot!.insertBefore(styleEl, this.shadowRoot!.firstChild);
+              styleEl = document.createElement("style");
+              this.shadowRoot!.insertBefore(
+                styleEl,
+                this.shadowRoot!.firstChild,
+              );
             }
             if (this.config.style) {
-              styleEl.textContent = typeof this.config.style === 'function' ? this.config.style(this.stateObj) : this.config.style;
+              styleEl.textContent =
+                typeof this.config.style === "function"
+                  ? this.config.style(this.stateObj)
+                  : this.config.style;
             } else {
-              styleEl.textContent = '';
+              styleEl.textContent = "";
             }
 
             // Ensure <div data-root> is second child of shadow root
-            let rootEl = this.shadowRoot!.querySelector('[data-root]');
+            let rootEl = this.shadowRoot!.querySelector("[data-root]");
             if (!rootEl) {
-              rootEl = document.createElement('div');
-              rootEl.setAttribute('data-root', '');
+              rootEl = document.createElement("div");
+              rootEl.setAttribute("data-root", "");
               this.shadowRoot!.appendChild(rootEl);
             }
             // Remove all children from rootEl before patching
@@ -968,7 +1251,7 @@ if (typeof HTMLElement !== 'undefined') {
         function safeClone<T>(obj: T): T {
           const seen = new WeakSet<object>();
           function clone(val: T): T {
-            if (val === null || typeof val !== 'object') return val;
+            if (val === null || typeof val !== "object") return val;
             if (seen.has(val as object)) return val;
             seen.add(val as object);
             if (Array.isArray(val)) return val.map(clone) as unknown as T;
@@ -998,23 +1281,41 @@ if (typeof HTMLElement !== 'undefined') {
      * Logs details and allows fallback UI.
      * @param error - Error object
      */
-  private _handleRenderError(error: unknown): void {
+    private _handleRenderError(error: unknown): void {
       this._hasError = true;
       // Improved error boundary: log details and always render fallback UI
       if (this.config.debug) {
-        console.error(`[runtime] Render error in <${this.tagName.toLowerCase()}>:`, error);
+        console.error(
+          `[runtime] Render error in <${this.tagName.toLowerCase()}>:`,
+          error,
+        );
       }
-      runtimePlugins.forEach(p => p.onError?.(error instanceof Error ? error : new Error(String(error)), this.stateObj, this.api));
-      if ('onError' in this.config && typeof (this.config.onError) === 'function') {
+      runtimePlugins.forEach((p) =>
+        p.onError?.(
+          error instanceof Error ? error : new Error(String(error)),
+          this.stateObj,
+          this.api,
+        ),
+      );
+      if (
+        "onError" in this.config &&
+        typeof this.config.onError === "function"
+      ) {
         try {
-          this.config.onError(error instanceof Error ? error : new Error(String(error)), this.api.state, this.api);
+          this.config.onError(
+            error instanceof Error ? error : new Error(String(error)),
+            this.api.state,
+            this.api,
+          );
         } catch (fallbackError) {
           if (this.config.debug) {
             console.error(`[runtime] Error in onError handler:`, fallbackError);
           }
         }
       }
-      this.renderError(error instanceof Error ? error : new Error(String(error)));
+      this.renderError(
+        error instanceof Error ? error : new Error(String(error)),
+      );
     }
 
     /**
@@ -1034,13 +1335,14 @@ if (typeof HTMLElement !== 'undefined') {
      * Updates the style element in the shadow root based on the current state.
      */
     private updateStyle(): void {
-      const styleEl = this.shadowRoot!.querySelector('style');
+      const styleEl = this.shadowRoot!.querySelector("style");
       if (!styleEl || !this.config.style) return;
 
-      const css = typeof this.config.style === 'function'
-        ? this.config.style(this.api.state)
-        : this.config.style;
-      
+      const css =
+        typeof this.config.style === "function"
+          ? this.config.style(this.api.state)
+          : this.config.style;
+
       styleEl.textContent = css;
     }
 
@@ -1053,7 +1355,9 @@ if (typeof HTMLElement !== 'undefined') {
       const listenerMap: WeakMap<Element, Set<string>> = new WeakMap();
 
       Object.entries(this.config.refs).forEach(([refName, handler]) => {
-        const element = this.shadowRoot!.querySelector(`[data-ref="${refName}"]`);
+        const element = this.shadowRoot!.querySelector(
+          `[data-ref="${refName}"]`,
+        );
         if (element) {
           // Only attach listeners once per element/type
           if (!listenerMap.has(element)) {
@@ -1063,10 +1367,10 @@ if (typeof HTMLElement !== 'undefined') {
 
           // Wrap addEventListener to prevent duplicates
           const originalAddEventListener = element.addEventListener;
-          (element as ExtendedHTMLElement).addEventListener = function(
+          (element as ExtendedHTMLElement).addEventListener = function (
             type: string,
             listener: EventListenerOrEventListenerObject,
-            options?: boolean | AddEventListenerOptions
+            options?: boolean | AddEventListenerOptions,
           ) {
             const key = `${type}`;
             if (attachedTypes.has(key)) return;
@@ -1075,7 +1379,7 @@ if (typeof HTMLElement !== 'undefined') {
           };
 
           // Mark as processed and call handler
-          element.setAttribute('data-refs-processed', 'true');
+          element.setAttribute("data-refs-processed", "true");
           try {
             handler(element, this.api.state, this.api);
           } catch (err) {
@@ -1093,24 +1397,34 @@ if (typeof HTMLElement !== 'undefined') {
      */
     private bindEvents(): void {
       if (!this.shadowRoot) return;
-      const walker = document.createTreeWalker(this.shadowRoot, NodeFilter.SHOW_ELEMENT);
+      const walker = document.createTreeWalker(
+        this.shadowRoot,
+        NodeFilter.SHOW_ELEMENT,
+      );
       let node = walker.nextNode();
       while (node) {
         const el = node as ExtendedHTMLElement;
-        Array.from(el.attributes).forEach(attr => {
-          if (attr.name.startsWith('data-on-')) {
-            const eventType = attr.name.slice('data-on-'.length);
+        Array.from(el.attributes).forEach((attr) => {
+          if (attr.name.startsWith("data-on-")) {
+            const eventType = attr.name.slice("data-on-".length);
             const handlerName = attr.value;
             // Look for handler on config, not api
-            const handler = (this.config as Record<string, unknown>)[handlerName];
-            if (typeof handler === 'function') {
+            const handler = (this.config as Record<string, unknown>)[
+              handlerName
+            ];
+            if (typeof handler === "function") {
               // Remove previous handler if present
               if (el._boundHandlers && el._boundHandlers[eventType]) {
                 el.removeEventListener(eventType, el._boundHandlers[eventType]);
               }
               // Bind new handler
               const boundHandler = (e: Event) => {
-                (handler as Function).call(this.config, e, this.api.state, this.api);
+                (handler as Function).call(
+                  this.config,
+                  e,
+                  this.api.state,
+                  this.api,
+                );
                 // Immediately sync controlled inputs after handler runs
                 this.syncControlledInputsAndEvents();
               };
@@ -1118,7 +1432,11 @@ if (typeof HTMLElement !== 'undefined') {
               if (!el._boundHandlers) el._boundHandlers = {};
               el._boundHandlers[eventType] = boundHandler;
             } else {
-              if (this.config.debug) console.warn(`[runtime] Handler '${handlerName}' not found on config for event '${eventType}'`, el);
+              if (this.config.debug)
+                console.warn(
+                  `[runtime] Handler '${handlerName}' not found on config for event '${eventType}'`,
+                  el,
+                );
             }
           }
         });
@@ -1132,8 +1450,10 @@ if (typeof HTMLElement !== 'undefined') {
      */
     private renderError(error: Error): void {
       const styleContent = this.config.style
-        ? (typeof this.config.style === 'function' ? this.config.style(this.api.state) : this.config.style)
-        : '';
+        ? typeof this.config.style === "function"
+          ? this.config.style(this.api.state)
+          : this.config.style
+        : "";
       this.shadowRoot!.innerHTML = `
         <style>${styleContent}</style>
         <div style="color: red; border: 1px solid red; padding: 1rem; border-radius: 4px;">
@@ -1142,7 +1462,7 @@ if (typeof HTMLElement !== 'undefined') {
         </div>
       `;
     }
-  }
+  };
 } else {
   // SSR fallback: minimal class, no DOM, no lifecycle, no "this"
   ComponentElement = class {
@@ -1164,7 +1484,10 @@ if (typeof HTMLElement !== 'undefined') {
  * @param tag - Custom element tag name
  * @param config - Component configuration
  */
-export function component<S extends ComponentState, C extends Record<string, any> = {}>(tag: string, config: ComponentConfig<S, C>): void {
+export function component<
+  S extends ComponentState,
+  C extends Record<string, any> = {},
+>(tag: string, config: ComponentConfig<S, C>): void {
   // Prevent deep object injection in config and state
   const sanitizedConfig = deepSanitizeObject(config);
   config = sanitizedConfig as ComponentConfig<S, C>;
@@ -1175,101 +1498,135 @@ export function component<S extends ComponentState, C extends Record<string, any
 
   // Validate config
   if (!tag || !config.template) {
-    if (config && typeof config.onError === 'function') {
-      config.onError(new Error('Component requires tag and template'), config.state ?? {}, {
-        state: config.state ?? {},
-        emit: () => {},
-        onGlobal: () => () => {},
-        offGlobal: () => {},
-        emitGlobal: () => {}
-      });
+    if (config && typeof config.onError === "function") {
+      config.onError(
+        new Error("Component requires tag and template"),
+        config.state ?? {},
+        {
+          state: config.state ?? {},
+          emit: () => {},
+          onGlobal: () => () => {},
+          offGlobal: () => {},
+          emitGlobal: () => {},
+        },
+      );
     }
     if (config && config.debug) {
-      console.error('[runtime] Malformed config:', { tag, config });
+      console.error("[runtime] Malformed config:", { tag, config });
     }
     return;
   }
 
   // Plugin System: Call all plugins' onInit in registration order
-  runtimePlugins.forEach(p => {
+  runtimePlugins.forEach((p) => {
     try {
       p.onInit?.(config as any);
     } catch (err) {
-      if (config && typeof config.onError === 'function') {
-        config.onError(err instanceof Error ? err : new Error(String(err)), config.state, {
-          state: config.state,
-          emit: () => {},
-          onGlobal: () => () => {},
-          offGlobal: () => {},
-          emitGlobal: () => {}
-        });
+      if (config && typeof config.onError === "function") {
+        config.onError(
+          err instanceof Error ? err : new Error(String(err)),
+          config.state,
+          {
+            state: config.state,
+            emit: () => {},
+            onGlobal: () => () => {},
+            offGlobal: () => {},
+            emitGlobal: () => {},
+          },
+        );
       }
-      if (config && config.debug) console.error('[runtime] Plugin onInit error:', err);
+      if (config && config.debug)
+        console.error("[runtime] Plugin onInit error:", err);
     }
   });
 
   // HMR support: unregister previous definition if in dev and module.hot is available
-  const isDev = typeof window !== 'undefined' && (window as any).VITE_DEV_HMR;
-  const hasHMR = typeof import.meta !== 'undefined' && (import.meta as any).hot;
+  const isDev = typeof window !== "undefined" && (window as any).VITE_DEV_HMR;
+  const hasHMR = typeof import.meta !== "undefined" && (import.meta as any).hot;
 
-  if ((isDev || hasHMR) && typeof customElements !== 'undefined' && customElements.get(tag)) {
+  if (
+    (isDev || hasHMR) &&
+    typeof customElements !== "undefined" &&
+    customElements.get(tag)
+  ) {
     try {
-      document.querySelectorAll(tag).forEach(el => el.remove());
+      document.querySelectorAll(tag).forEach((el) => el.remove());
       // @ts-ignore
-      if ((window as unknown as { customElements: { _definitions?: Record<string, unknown> } }).customElements._definitions) {
-        delete (window as unknown as { customElements: { _definitions?: Record<string, unknown> } }).customElements._definitions![tag];
+      if (
+        (
+          window as unknown as {
+            customElements: { _definitions?: Record<string, unknown> };
+          }
+        ).customElements._definitions
+      ) {
+        delete (
+          window as unknown as {
+            customElements: { _definitions?: Record<string, unknown> };
+          }
+        ).customElements._definitions![tag];
       }
     } catch (_e) {}
   }
 
-  if (typeof customElements !== 'undefined' && customElements.get(tag)) {
-    if (config.debug) console.warn(`[runtime] Component "${tag}" already registered`);
+  if (typeof customElements !== "undefined" && customElements.get(tag)) {
+    if (config.debug)
+      console.warn(`[runtime] Component "${tag}" already registered`);
     return;
   }
 
   // Create reactive state with computed properties
-  const state = reactive(config.state ?? ({} as S), config.computed as Record<string, (state: S) => unknown>);
+  const state = reactive(
+    config.state ?? ({} as S),
+    config.computed as Record<string, (state: S) => unknown>,
+  );
   // @ts-expect-error: Overriding readonly property for runtime assignment
   (config as { state: S & C }).state = state;
   (config as { _subscribe?: unknown })._subscribe = state.subscribe;
 
   const stateObjForKeys = (config.state ?? {}) as Record<string, unknown>;
-  const primitiveKeys = Object.keys(stateObjForKeys).filter(
-    key => ['string', 'number', 'boolean'].includes(typeof stateObjForKeys[key])
+  const primitiveKeys = Object.keys(stateObjForKeys).filter((key) =>
+    ["string", "number", "boolean"].includes(typeof stateObjForKeys[key]),
   );
 
   class RuntimeComponent extends ComponentElement {
-      static get observedAttributes() {
-        return primitiveKeys;
-      }
-      constructor() {
-        super();
-      }
+    static get observedAttributes() {
+      return primitiveKeys;
     }
-    // Type assertion for CustomElementConstructor
-    const ComponentClass = RuntimeComponent as unknown as CustomElementConstructor;
+    constructor() {
+      super();
+    }
+  }
+  // Type assertion for CustomElementConstructor
+  const ComponentClass =
+    RuntimeComponent as unknown as CustomElementConstructor;
 
-    if (typeof customElements !== 'undefined' && !customElements.get(tag)) {
-      // Store config in a global registry for lookup in connectedCallback
-    (window as unknown as { __componentRegistry?: ComponentRegistry }).__componentRegistry = (window as unknown as { __componentRegistry?: ComponentRegistry }).__componentRegistry || {};
-    (window as unknown as { __componentRegistry?: ComponentRegistry }).__componentRegistry![tag] = config;
-      customElements.define(tag, ComponentClass);
-    }
+  if (typeof customElements !== "undefined" && !customElements.get(tag)) {
+    // Store config in a global registry for lookup in connectedCallback
+    (
+      window as unknown as { __componentRegistry?: ComponentRegistry }
+    ).__componentRegistry =
+      (window as unknown as { __componentRegistry?: ComponentRegistry })
+        .__componentRegistry || {};
+    (
+      window as unknown as { __componentRegistry?: ComponentRegistry }
+    ).__componentRegistry![tag] = config;
+    customElements.define(tag, ComponentClass);
+  }
 
-    // Accept HMR updates if available
-    if (
-      hasHMR &&
-      typeof import.meta !== 'undefined' &&
-      import.meta.hot &&
-      typeof import.meta.hot.accept === 'function' &&
-      typeof customElements !== 'undefined'
-    ) {
-      import.meta.hot.accept(() => {
-        if (!customElements.get(tag)) {
-          customElements.define(tag, ComponentClass);
-        }
-      });
-    }
+  // Accept HMR updates if available
+  if (
+    hasHMR &&
+    typeof import.meta !== "undefined" &&
+    import.meta.hot &&
+    typeof import.meta.hot.accept === "function" &&
+    typeof customElements !== "undefined"
+  ) {
+    import.meta.hot.accept(() => {
+      if (!customElements.get(tag)) {
+        customElements.define(tag, ComponentClass);
+      }
+    });
+  }
 }
 
 /**
@@ -1290,19 +1647,19 @@ export interface RouterLinkState extends ComponentState {
 
 /**
  * Singleton router instance for global access.
- * 
+ *
  * Define here to prevent circular dependency
  * issue with component.
  */
 export function initRouter(config: RouterConfig) {
   const router = useRouter(config);
-  component('router-view', {
+  component("router-view", {
     template: async () => {
-      if (!router) return '<div>Router not initialized.</div>';
-      const current = router.getCurrent() as import('./router').RouteState;
+      if (!router) return "<div>Router not initialized.</div>";
+      const current = router.getCurrent() as import("./router").RouteState;
       const { path } = current;
       const match = router.matchRoute(path);
-      if (!match.route) return '<div>Not found</div>';
+      if (!match.route) return "<div>Not found</div>";
       if (match.route.load) {
         await match.route.load();
       }
@@ -1310,22 +1667,22 @@ export function initRouter(config: RouterConfig) {
     },
     onMounted(_state, api) {
       // Subscribe to router state and re-render on change
-      if (router && typeof router.subscribe === 'function') {
+      if (router && typeof router.subscribe === "function") {
         router.subscribe(() => {
           api.render();
         });
       }
-    }
+    },
   });
-  component<RouterLinkState>('router-link', {
+  component<RouterLinkState>("router-link", {
     state: {
-      to: '',
-      tag: 'a',
+      to: "",
+      tag: "a",
       replace: false,
       exact: false,
-      activeClass: 'active',
-      exactActiveClass: 'exact-active',
-      ariaCurrentValue: 'page',
+      activeClass: "active",
+      exactActiveClass: "exact-active",
+      ariaCurrentValue: "page",
       disabled: false,
       external: false,
       style: css`
@@ -1347,7 +1704,7 @@ export function initRouter(config: RouterConfig) {
         const current = state.current as { path?: string } | undefined;
         return state.exact
           ? state.isExactActive
-          : current && typeof current.path === 'string'
+          : current && typeof current.path === "string"
             ? current.path.startsWith(state.to)
             : false;
       },
@@ -1355,59 +1712,78 @@ export function initRouter(config: RouterConfig) {
         return state.isExactActive
           ? state.exactActiveClass
           : state.isActive
-          ? state.activeClass
-          : '';
+            ? state.activeClass
+            : "";
       },
       ariaCurrent(state: RouterLinkState) {
-        return state.isExactActive ? `aria-current="${state.ariaCurrentValue}"` : '';
+        return state.isExactActive
+          ? `aria-current="${state.ariaCurrentValue}"`
+          : "";
       },
       isButton(state: RouterLinkState) {
-        return state.tag === 'button';
+        return state.tag === "button";
       },
       disabledAttr(state: RouterLinkState) {
         return state.disabled
           ? state.isButton
             ? 'disabled aria-disabled="true" tabindex="-1"'
             : 'aria-disabled="true" tabindex="-1"'
-          : '';
+          : "";
       },
       externalAttr(state: RouterLinkState) {
-        return state.external && (state.tag === 'a' || !state.tag)
+        return state.external && (state.tag === "a" || !state.tag)
           ? 'target="_blank" rel="noopener noreferrer"'
-          : '';
+          : "";
       },
     },
-    reflect: [ 'to', 'tag', 'replace', 'exact', 'activeClass', 'exactActiveClass', 'ariaCurrentValue', 'disabled', 'external', 'style' ],
+    reflect: [
+      "to",
+      "tag",
+      "replace",
+      "exact",
+      "activeClass",
+      "exactActiveClass",
+      "ariaCurrentValue",
+      "disabled",
+      "external",
+      "style",
+    ],
     style: (state: RouterLinkState) => state.style,
-    template: (state) => html`
-      ${state.isButton ? html`
-        <button
-          part="button"
-          class="${state.className}"
-          ${state.ariaCurrent}
-          ${state.disabledAttr}
-          ${state.externalAttr}
-          data-on-click="navigate"
-        ><slot></slot></button>
-      `(state) : html`
-        <a
-          part="link"
-          href="${state.to}"
-          class="${state.className}"
-          ${state.ariaCurrent}
-          ${state.disabledAttr}
-          ${state.externalAttr}
-          data-on-click="navigate"
-        ><slot></slot></a>
-      `(state)}
-    `(state),
+    template: (state) =>
+      html`
+        ${state.isButton
+          ? html`
+              <button
+                part="button"
+                class="${state.className}"
+                ${state.ariaCurrent}
+                ${state.disabledAttr}
+                ${state.externalAttr}
+                data-on-click="navigate"
+              >
+                <slot></slot>
+              </button>
+            `(state)
+          : html`
+              <a
+                part="link"
+                href="${state.to}"
+                class="${state.className}"
+                ${state.ariaCurrent}
+                ${state.disabledAttr}
+                ${state.externalAttr}
+                data-on-click="navigate"
+                ><slot></slot
+              ></a>
+            `(state)}
+      `(state),
     navigate: (e: MouseEvent, state: RouterLinkState) => {
       if (state.disabled) {
         e.preventDefault();
         return;
       }
       // If external, let browser handle navigation
-      if (state.external && (state.tag === 'a' || !state.tag)) {
+      if (state.external && (state.tag === "a" || !state.tag)) {
         return;
       }
       e.preventDefault();
@@ -1416,7 +1792,7 @@ export function initRouter(config: RouterConfig) {
       } else {
         router.push(state.to);
       }
-    }
+    },
   });
   return router;
 }

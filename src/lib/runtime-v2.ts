@@ -13,17 +13,31 @@ import { html } from "./template-compiler-v2";
 
 // Re-export html function for external use
 export { html } from "./template-compiler-v2";
+
+// Re-export directive functions for external use
+export {
+  vIf,
+  vBind,
+  vClass,
+  vFor,
+  vModel,
+  vShow,
+  vSwitch,
+  vStyle,
+  anchorBlock,
+  vIfChain,
+  vIfBuilder,
+  vSwitchBuilder,
+} from "./directives-v2";
+
 import {
   vIf,
   vBind,
   vClass,
   vFor,
-  vIfBuilder,
-  vIfChain,
   vModel,
   vShow,
   vSwitch,
-  vSwitchBuilder,
 } from "./directives-v2";
 
 // --- Types ---
@@ -159,6 +173,8 @@ export function createElementClass<
     private _hasError = false;
     private _initializing = true;
     private _cfg: ComponentConfig<S, C, P>;
+    private _lastRenderTime = 0;
+    private _renderCount = 0;
 
     constructor() {
       super();
@@ -208,8 +224,8 @@ export function createElementClass<
           config.onDisconnected(this._state, this._api);
         this._listeners.forEach((unsub) => unsub());
         this._listeners = [];
-        this._inputListeners.forEach((unsub) => unsub());
-        this._inputListeners = [];
+        this._listeners.forEach((unsub) => unsub());
+        this._listeners = [];
         this._mounted = false;
       });
     }
@@ -295,12 +311,12 @@ export function createElementClass<
 
               const nestedTarget = keys.reduce((obj, key) => {
                 if (!(key in obj)) {
-                  obj[key] = {};
+                  (obj as any)[key] = {};
                 }
-                return obj[key];
-              }, target);
+                return (obj as any)[key];
+              }, target as any);
 
-              nestedTarget[lastKey] = value;
+              (nestedTarget as any)[lastKey] = value;
               return true;
             }
             target[prop as keyof typeof target] = value;
@@ -313,20 +329,30 @@ export function createElementClass<
       });
     }
 
-    private _hasNestedProperty(obj: any, path: string): boolean {
-      try {
-        return path.split(".").reduce((o, key) => o?.[key], obj) !== undefined;
-      } catch {
-        return false;
-      }
-    }
-
     private _requestRender(): void {
       // Debounced render request to avoid excessive re-renders
       if (this._renderTimeoutId !== null) {
         clearTimeout(this._renderTimeoutId);
       }
+
+      // Prevent infinite render loops
+      const now = Date.now();
+      if (now - this._lastRenderTime < 16) {
+        // Less than 16ms since last render
+        this._renderCount++;
+        if (this._renderCount > 10) {
+          console.warn(
+            `[${this.tagName}] Potential infinite render loop detected. Skipping render.`,
+          );
+          this._renderTimeoutId = null;
+          return;
+        }
+      } else {
+        this._renderCount = 0;
+      }
+
       this._renderTimeoutId = setTimeout(() => {
+        this._lastRenderTime = Date.now();
         this._render(this._cfg);
         this._renderTimeoutId = null;
       }, 0);
@@ -512,16 +538,16 @@ component("my-greeting", {
           <input type="text" v-model="name" />
 
           <div class="form-group">
-          <label>Name (vModel):</label>
-          <p>None of these work at the moment:</p>
-          <input
-            type="text"
-            ${vModel(state.name, val => state.name = val)}
-            ${vClass("form-control", "cool")}
-            ${vShow(false)}
-          />
-          <button ${vBind({ disabled: state.isActive })}>Submit</button>
-        </div>
+            <label>Name (vModel):</label>
+            <p>None of these work at the moment:</p>
+            <input
+              type="text"
+              ${vModel(state.name, (val) => (state.name = val))}
+              ${vClass(["form-control", "cool"])}
+              ${vShow(false)}
+            />
+            <button ${vBind({ disabled: state.isActive })}>Submit</button>
+          </div>
         </div>
 
         <div class="form-group">
@@ -550,9 +576,12 @@ component("my-greeting", {
 
         <div class="form-group">
           <label>Active group:</label>
-          ${vFor(state.array, (item) => html`
-            ${item}: <input type="checkbox" value="${item}" v-model="array" />
-          `)}
+          ${vFor(
+            state.array,
+            (item) => html`
+              ${item}: <input type="checkbox" value="${item}" v-model="array" />
+            `,
+          )}
         </div>
 
         <div class="form-group">
@@ -582,7 +611,7 @@ component("my-greeting", {
   onError(error, state, api) {
     console.error("Component error:", error, state, api);
   },
-  handleSomething(state, e: Event) {
+  handleSomething(state: any, e: Event) {
     state.name = "Updated Name";
     state.array.push("New Item");
     console.log("component did something", state, e);

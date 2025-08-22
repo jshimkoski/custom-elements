@@ -57,10 +57,10 @@ function processVModelDirective(
   value: string,
   modifiers: string[],
   props: Record<string, any>,
+  attrs: Record<string, any>,
   listeners: Record<string, EventListener>,
   context?: any,
   el?: HTMLElement,
-  vnodeAttrs?: Record<string, any>,
 ): void {
   if (!context) return;
 
@@ -73,45 +73,80 @@ function processVModelDirective(
   const actualState = context._state || context;
   const currentValue = getNestedValue(actualState, value);
 
-  // Determine input type from VNode attrs (since element attrs aren't set yet)
+  // Determine input type from attrs or element
   let inputType = "text";
-  const vnodeInputType = vnodeAttrs?.type;
+  const attrInputType = attrs?.type;
 
   if (el instanceof HTMLInputElement) {
-    inputType = vnodeInputType || el.type || "text";
+    inputType = attrInputType || el.type || "text";
   } else if (el instanceof HTMLSelectElement) {
     inputType = "select";
   } else if (el instanceof HTMLTextAreaElement) {
     inputType = "textarea";
   }
 
-  // Set initial value
+  // Set initial value only if different from current DOM value to prevent infinite loops
   if (inputType === "checkbox") {
     if (Array.isArray(currentValue)) {
       // Multiple checkboxes bound to array
-      const checkboxValue =
-        el?.getAttribute("value") || vnodeAttrs?.value || "";
-      props.checked = currentValue.includes(checkboxValue);
+      const checkboxValue = el?.getAttribute("value") || attrs?.value || "";
+      const shouldBeChecked = currentValue.includes(checkboxValue);
+      if (el && (el as HTMLInputElement).checked !== shouldBeChecked) {
+        props.checked = shouldBeChecked;
+      }
     } else {
       // Single checkbox bound to boolean or custom values
       const trueValue = el?.getAttribute("true-value") || true;
-      props.checked = currentValue === trueValue;
+      const shouldBeChecked = currentValue === trueValue;
+      if (el && (el as HTMLInputElement).checked !== shouldBeChecked) {
+        props.checked = shouldBeChecked;
+      }
     }
   } else if (inputType === "radio") {
-    const radioValue = vnodeAttrs?.value || "";
-    props.checked = currentValue === radioValue;
+    const radioValue = attrs?.value || "";
+    const shouldBeChecked = currentValue === radioValue;
+    if (el && (el as HTMLInputElement).checked !== shouldBeChecked) {
+      props.checked = shouldBeChecked;
+    }
   } else if (inputType === "select") {
-    // For select elements, defer value setting until after options are rendered
-    setTimeout(() => {
-      if (el instanceof HTMLSelectElement) {
-        el.value = String(currentValue);
-      }
-    }, 0);
+    // Handle both single and multiple select
+    if (el && el.hasAttribute("multiple")) {
+      // Multiple select - currentValue should be an array
+      const selectEl = el as HTMLSelectElement;
+      const currentArray = Array.isArray(currentValue) ? currentValue : [];
+
+      // Only update if different to prevent loops
+      setTimeout(() => {
+        Array.from(selectEl.options).forEach((option) => {
+          const shouldBeSelected = currentArray.includes(option.value);
+          if (option.selected !== shouldBeSelected) {
+            option.selected = shouldBeSelected;
+          }
+        });
+      }, 0);
+    } else {
+      // Single select
+      setTimeout(() => {
+        if (
+          el instanceof HTMLSelectElement &&
+          el.value !== String(currentValue)
+        ) {
+          el.value = String(currentValue);
+        }
+      }, 0);
+    }
   } else {
-    props.value = currentValue;
+    // Only set value prop if different from current DOM value to prevent infinite loops
+    const stringValue = String(currentValue ?? "");
+    if (
+      !el ||
+      (el as HTMLInputElement | HTMLTextAreaElement).value !== stringValue
+    ) {
+      props.value = currentValue;
+    }
   }
 
-  // Create event listener
+  // Create event listener with loop prevention
   const eventType =
     hasLazy ||
     inputType === "checkbox" ||
@@ -124,10 +159,16 @@ function processVModelDirective(
     // Skip during IME composition - check multiple ways
     if ((event as any).isComposing || (listeners as any)._isComposing) return;
 
+    // Skip if this is a programmatic change (not user-initiated)
+    if ((event as any).isTrusted === false) return;
+
     const target = event.target as
       | HTMLInputElement
       | HTMLTextAreaElement
       | HTMLSelectElement;
+
+    // Skip if event is fired during our own value updates
+    if ((target as any)._vModelUpdating) return;
     let newValue: any = target.value;
 
     // Handle different input types
@@ -157,8 +198,17 @@ function processVModelDirective(
       }
     } else if (inputType === "radio") {
       newValue = target.getAttribute("value") || target.value;
+    } else if (
+      inputType === "select" &&
+      (target as HTMLSelectElement).multiple
+    ) {
+      // Handle multiple select
+      const selectEl = target as HTMLSelectElement;
+      newValue = Array.from(selectEl.selectedOptions).map(
+        (option) => option.value,
+      );
     } else {
-      // Apply modifiers
+      // Apply modifiers for text inputs
       if (hasTrim) {
         newValue = newValue.trim();
       }
@@ -170,15 +220,35 @@ function processVModelDirective(
       }
     }
 
-    // Update state
-
-    // Update using the actual state object for proper nested property support
+    // Get current state value to check if update is needed
     const actualState = context._state || context;
-    setNestedValue(actualState, value, newValue);
+    const currentStateValue = getNestedValue(actualState, value);
 
-    // Trigger re-render if context has a render method
-    if (context._requestRender) {
-      context._requestRender();
+    // Only update if the value has actually changed (prevent infinite loops)
+    // For arrays, do a deep comparison
+    const hasChanged =
+      Array.isArray(newValue) && Array.isArray(currentStateValue)
+        ? JSON.stringify(newValue.sort()) !==
+          JSON.stringify(currentStateValue.sort())
+        : newValue !== currentStateValue;
+
+    if (hasChanged) {
+      // Mark element as updating to prevent feedback loops
+      const element = event.target as HTMLElement;
+      (element as any)._vModelUpdating = true;
+
+      // Update using the actual state object for proper nested property support
+      setNestedValue(actualState, value, newValue);
+
+      // Clear the updating flag after a tick
+      setTimeout(() => {
+        (element as any)._vModelUpdating = false;
+      }, 0);
+
+      // Trigger re-render if context has a render method
+      if (context._requestRender) {
+        context._requestRender();
+      }
     }
   };
 
@@ -212,10 +282,31 @@ function processVModelDirective(
             }
           }
 
-          setNestedValue(actualState, value, newValue);
+          // Get current state value and only update if different
+          const actualState = context._state || context;
+          const currentStateValue = getNestedValue(actualState, value);
 
-          if (context._requestRender) {
-            context._requestRender();
+          // For arrays, do a deep comparison
+          const hasChanged =
+            Array.isArray(newValue) && Array.isArray(currentStateValue)
+              ? JSON.stringify(newValue.sort()) !==
+                JSON.stringify(currentStateValue.sort())
+              : newValue !== currentStateValue;
+
+          if (hasChanged) {
+            // Mark element as updating to prevent feedback loops
+            if (target) {
+              (target as any)._vModelUpdating = true;
+              setTimeout(() => {
+                (target as any)._vModelUpdating = false;
+              }, 0);
+            }
+
+            setNestedValue(actualState, value, newValue);
+
+            if (context._requestRender) {
+              context._requestRender();
+            }
           }
         }
       }, 0);
@@ -320,11 +411,80 @@ function processVClassDirective(
   }
 }
 
+function processVStyleDirective(
+  value: any,
+  attrs: Record<string, any>,
+  context?: any,
+): void {
+  let styleValue: any;
+
+  if (typeof value === "string") {
+    if (!context) return;
+    styleValue = getNestedValue(context, value);
+  } else {
+    styleValue = value;
+  }
+
+  let styleString = "";
+
+  if (typeof styleValue === "string") {
+    styleString = styleValue;
+  } else if (styleValue && typeof styleValue === "object") {
+    const styleRules: string[] = [];
+    for (const [property, val] of Object.entries(styleValue)) {
+      if (val != null && val !== "") {
+        const kebabProperty = property.replace(
+          /[A-Z]/g,
+          (match) => `-${match.toLowerCase()}`,
+        );
+        const needsPx = [
+          "width",
+          "height",
+          "top",
+          "right",
+          "bottom",
+          "left",
+          "margin",
+          "margin-top",
+          "margin-right",
+          "margin-bottom",
+          "margin-left",
+          "padding",
+          "padding-top",
+          "padding-right",
+          "padding-bottom",
+          "padding-left",
+          "font-size",
+          "line-height",
+          "border-width",
+          "border-radius",
+          "min-width",
+          "max-width",
+          "min-height",
+          "max-height",
+        ];
+        let cssValue = String(val);
+        if (typeof val === "number" && needsPx.includes(kebabProperty)) {
+          cssValue = `${val}px`;
+        }
+        styleRules.push(`${kebabProperty}: ${cssValue}`);
+      }
+    }
+    styleString = styleRules.join("; ") + (styleRules.length > 0 ? ";" : "");
+  }
+
+  const existingStyle = attrs.style || "";
+  attrs.style =
+    existingStyle +
+    (existingStyle && !existingStyle.endsWith(";") ? "; " : "") +
+    styleString;
+}
+
 /**
  * Process Vue-like directives and return merged props, attrs, and event listeners
  */
 function processDirectives(
-  directives: Record<string, { value: string; modifiers: string[] }>,
+  directives: Record<string, { value: any; modifiers: string[] }>,
   context?: any,
   el?: HTMLElement,
   vnodeAttrs?: Record<string, any>,
@@ -334,22 +494,22 @@ function processDirectives(
   listeners: Record<string, EventListener>;
 } {
   const props: Record<string, any> = {};
-  const attrs: Record<string, any> = {};
+  const attrs: Record<string, any> = { ...(vnodeAttrs || {}) };
   const listeners: Record<string, EventListener> = {};
 
-  for (const [directiveName, { value, modifiers }] of Object.entries(
-    directives,
-  )) {
+  for (const [directiveName, directive] of Object.entries(directives)) {
+    const { value, modifiers } = directive;
+
     switch (directiveName) {
       case "model":
         processVModelDirective(
-          value,
+          typeof value === "string" ? value : String(value),
           modifiers,
           props,
+          attrs,
           listeners,
           context,
           el,
-          vnodeAttrs,
         );
         break;
       case "bind":
@@ -361,8 +521,13 @@ function processDirectives(
       case "class":
         processVClassDirective(value, attrs, context);
         break;
+      case "style":
+        processVStyleDirective(value, attrs, context);
+        break;
+      // Add other directive cases here as needed
     }
   }
+
   return { props, attrs, listeners };
 }
 

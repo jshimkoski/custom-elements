@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Directive Tests</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+        line-height: 1.6;
+      }
+
+      .active {
+        background-color: #e8f5e8;
+        border: 2px solid #4caf50;
+        padding: 10px;
+        border-radius: 4px;
+      }
+
+      .inactive {
+        background-color: #f5f5f5;
+        border: 2px solid #ccc;
+        padding: 10px;
+        border-radius: 4px;
+      }
+
+      .error-class {
+        border-color: #f44336 !important;
+        background-color: #ffeaea !important;
+      }
+
+      .base-class {
+        margin: 10px 0;
+        transition: all 0.3s ease;
+      }
+
+      button {
+        margin: 5px;
+        padding: 8px 16px;
+        border: none;
+        border-radius: 4px;
+        background-color: #2196f3;
+        color: white;
+        cursor: pointer;
+      }
+
+      button:hover {
+        background-color: #1976d2;
+      }
+
+      input,
+      select {
+        margin: 5px;
+        padding: 5px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+      }
+
+      label {
+        display: block;
+        margin: 5px 0;
+      }
+
+      label input[type="radio"] {
+        margin-right: 8px;
+      }
+
+      div[v-show] {
+        transition: opacity 0.3s ease;
+      }
+
+      h2,
+      h3 {
+        color: #333;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 10px;
+      }
+
+      p {
+        background-color: #f9f9f9;
+        padding: 5px 10px;
+        border-radius: 4px;
+        margin: 5px 0;
+      }
+
+      div > div {
+        margin: 15px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Custom Elements with Directives Test</h1>
+    <p>
+      This page tests the directive functionality including v-bind, v-show,
+      v-class, v-style, and v-model.
+    </p>
+
+    <test-directives></test-directives>
+
+    <script type="module">
+      // Import the runtime and directives
+      import {
+        component,
+        html,
+        vBind,
+        vShow,
+        vClass,
+        vStyle,
+        vModel,
+      } from "./dist/custom-elements-runtime.es.js";
+
+      // Define the test component
+      const TestDirectives = component("test-directives", {
+        state: {
+          isVisible: true,
+          dynamicClass: "active",
+          hasError: false,
+          width: 200,
+          height: 100,
+          backgroundColor: "lightblue",
+          attributes: {
+            disabled: true,
+            placeholder: "Enter text",
+            "data-test": "directive-test",
+          },
+          styles: {
+            color: "red",
+            fontSize: 16,
+            marginTop: 10,
+          },
+          textValue: "",
+          checkboxValue: false,
+          radioValue: "",
+          selectValue: "",
+        },
+
+        template(state) {
+          return html`
+            <div>
+              <h2>Directive Tests</h2>
+
+              <!-- v-show test -->
+              <div v-show="${state.isVisible}">
+                This div should be visible when isVisible is true
+              </div>
+
+              <!-- v-class with string -->
+              <div v-class="${state.dynamicClass}">
+                Dynamic class: ${state.dynamicClass}
+              </div>
+
+              <!-- v-class with object -->
+              <div
+                v-class="${{
+                  active: state.dynamicClass === "active",
+                  error: state.hasError,
+                }}"
+              >
+                Conditional classes based on state
+              </div>
+
+              <!-- v-style with object -->
+              <div
+                v-style="${{
+                  width: state.width,
+                  height: state.height,
+                  backgroundColor: state.backgroundColor,
+                }}"
+              >
+                Dynamic styles: ${state.width}px x ${state.height}px
+              </div>
+
+              <!-- v-style with computed styles -->
+              <div v-style="${state.styles}">Styles from state object</div>
+
+              <!-- v-bind test -->
+              <input v-bind="${state.attributes}" type="text" />
+
+              <!-- Helper function tests -->
+              <div ${vShow(state.isVisible)}>vShow helper function test</div>
+
+              <div
+                ${vClass([
+                  "base-class",
+                  state.dynamicClass,
+                  { "error-class": state.hasError },
+                ])}
+              >
+                vClass helper with mixed array/object
+              </div>
+
+              <div
+                ${vStyle({
+                  color: "blue",
+                  fontSize: state.styles.fontSize + 4,
+                })}
+              >
+                vStyle helper function test
+              </div>
+
+              <input
+                ${vBind({
+                  placeholder: "Helper function bind",
+                  disabled: state.attributes.disabled,
+                })}
+              />
+
+              <!-- Control buttons -->
+              <div style="margin-top: 20px;">
+                <button data-on-click="toggleVisibility">
+                  Toggle Visibility
+                </button>
+
+                <button data-on-click="toggleError">Toggle Error State</button>
+
+                <button data-on-click="toggleClass">Toggle Class</button>
+
+                <button data-on-click="toggleSize">Toggle Size</button>
+
+                <button data-on-click="toggleBackground">
+                  Toggle Background Color
+                </button>
+              </div>
+
+              <!-- v-model test -->
+              <div style="margin-top: 20px;">
+                <h3>v-model Tests</h3>
+                <input v-model="textValue" placeholder="Type here..." />
+                <p>Text value: ${state.textValue || "empty"}</p>
+
+                <label>
+                  <input type="checkbox" v-model="checkboxValue" />
+                  Checkbox (${state.checkboxValue || "false"})
+                </label>
+
+                <div>
+                  <label
+                    ><input type="radio" v-model="radioValue" value="option1" />
+                    Option 1</label
+                  >
+                  <label
+                    ><input type="radio" v-model="radioValue" value="option2" />
+                    Option 2</label
+                  >
+                  <p>Radio value: ${state.radioValue || "none selected"}</p>
+                </div>
+
+                <select v-model="selectValue">
+                  <option value="">Choose...</option>
+                  <option value="red">Red</option>
+                  <option value="blue">Blue</option>
+                  <option value="green">Green</option>
+                </select>
+                <p>Select value: ${state.selectValue || "none selected"}</p>
+              </div>
+            </div>
+          `;
+        },
+
+        toggleVisibility(e, state) {
+          state.isVisible = !state.isVisible;
+        },
+
+        toggleError(e, state) {
+          state.hasError = !state.hasError;
+        },
+
+        toggleClass(e, state) {
+          state.dynamicClass =
+            state.dynamicClass === "active" ? "inactive" : "active";
+        },
+
+        toggleSize(e, state) {
+          state.width = state.width === 200 ? 300 : 200;
+          state.height = state.height === 100 ? 150 : 100;
+        },
+
+        toggleBackground(e, state) {
+          state.backgroundColor =
+            state.backgroundColor === "lightblue" ? "lightgreen" : "lightblue";
+        },
+      });
+
+      console.log("Test component registered successfully");
+    </script>
+  </body>
+</html>
