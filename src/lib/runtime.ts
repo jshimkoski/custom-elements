@@ -36,7 +36,12 @@ interface WatchOptions {
   deep?: boolean;
 }
 
-type WatchCallback<T = any> = (newValue: T, oldValue: T) => void;
+type WatchCallback<T = any, S = any, A = any> = (
+  newValue: T,
+  oldValue: T,
+  state?: S,
+  api?: A
+) => void;
 
 interface WatcherState {
   callback: WatchCallback;
@@ -57,6 +62,7 @@ type InferMethods<T> = {
     ? T[K]
     : never;
 };
+
 export interface ComponentConfig<
   S extends object,
   C extends object = {},
@@ -114,7 +120,6 @@ export interface ComponentAPI<S> {
   state?: S & { [key: string]: any };
   emit: (event: string, detail?: any) => void;
   on: (event: string, handler: (detail: any) => void) => void;
-  refs?: Record<string, HTMLElement>;
 }
 
 // --- Internal registry ---
@@ -213,7 +218,6 @@ export function createElementClass<
   }
   return class extends HTMLElement {
     private _state: S & C & P & InferMethods<T>;
-    private _refs: Record<string, HTMLElement> = {};
     private _api: ComponentAPI<S & C & P & InferMethods<T>>;
     private _listeners: Array<() => void> = [];
     private _watchers: Map<string, WatcherState> = new Map();
@@ -271,7 +275,6 @@ export function createElementClass<
           this.addEventListener(event, (e) =>
             handler((e as CustomEvent).detail),
           ),
-        refs: this._refs,
       };
       this._applyProps(config);
       this._applyComputed(config);
@@ -322,6 +325,7 @@ export function createElementClass<
       newValue: string | null,
     ) {
       this._runLogicWithinErrorBoundary(config, () => {
+        this._applyProps(config);
         if (config.onAttributeChanged) {
           config.onAttributeChanged(
             this._state,
@@ -336,18 +340,6 @@ export function createElementClass<
 
     static get observedAttributes() {
       return config.props ? Object.keys(config.props).map(toKebab) : [];
-    }
-
-    // --- Reference collection ---
-    private _collectRefs() {
-      this._runLogicWithinErrorBoundary(config, () => {
-        if (!this.shadowRoot) return;
-        this._refs = {};
-        this.shadowRoot.querySelectorAll("[ref]").forEach((el) => {
-          const refName = el.getAttribute("ref");
-          if (refName) this._refs[refName] = el as HTMLElement;
-        });
-      });
     }
 
     private _applyComputed(cfg: ComponentConfig<S, C, P>) {
@@ -415,7 +407,6 @@ export function createElementClass<
         // this._templateCache = outputOrPromise;
         this._renderOutput(outputOrPromise);
         this._applyStyle(cfg);
-        this._collectRefs();
       });
     }
 
@@ -467,7 +458,6 @@ export function createElementClass<
       );
 
       this._requestStyleUpdate();
-      this._collectRefs();
     }
 
     _requestRender() {
@@ -676,12 +666,11 @@ export function createElementClass<
                   ];
                   if (mutatingMethods.includes(prop)) {
                     return function (...args: any[]) {
-                      const oldArray = [...target]; // Create snapshot before mutation
                       const result = value.apply(target, args);
 
                       if (!self._initializing) {
                         const fullPath = path || "root";
-                        self._triggerWatchers(fullPath, target, oldArray);
+                        self._triggerWatchers(fullPath, target);
                         self._render(cfg);
                       }
 
@@ -693,7 +682,6 @@ export function createElementClass<
                 return value;
               },
               set(target, prop, value) {
-                const oldValue = target[prop as any];
                 target[prop as any] = value;
                 if (!self._initializing) {
                   const fullPath = path
@@ -704,7 +692,7 @@ export function createElementClass<
                   self._styleDependencies.add(String(prop));
                   self._styleCache.invalidate(String(prop));
 
-                  self._triggerWatchers(fullPath, value, oldValue);
+                  self._triggerWatchers(fullPath, value);
 
                   // Check if only style dependencies changed for optimization
                   const styleConfig = cfg.style;
@@ -734,7 +722,6 @@ export function createElementClass<
                 return true;
               },
               deleteProperty(target, prop) {
-                const oldValue = target[prop as any];
                 delete target[prop as any];
                 if (!self._initializing) {
                   const fullPath = path
@@ -744,7 +731,7 @@ export function createElementClass<
                   // Track style dependencies
                   self._styleDependencies.add(String(prop));
 
-                  self._triggerWatchers(fullPath, undefined, oldValue);
+                  self._triggerWatchers(fullPath, undefined);
                   self._render(cfg);
                 }
                 return true;
@@ -758,7 +745,6 @@ export function createElementClass<
             });
             return new Proxy(obj, {
               set(target, prop, value) {
-                const oldValue = target[prop as any];
                 const fullPath = path
                   ? `${path}.${String(prop)}`
                   : String(prop);
@@ -766,8 +752,7 @@ export function createElementClass<
                 if (!self._initializing) {
                   self._triggerWatchers(
                     fullPath,
-                    target[prop as any],
-                    oldValue,
+                    target[prop as any]
                   );
                   self._render(cfg);
                 }
@@ -810,7 +795,7 @@ export function createElementClass<
         if (options.immediate) {
           try {
             const currentValue = this._getNestedValue(key);
-            callback(currentValue, undefined);
+            callback(currentValue, undefined, this._state, this._api);
           } catch (error) {
             console.error(`Error in immediate watcher for "${key}":`, error);
           }
@@ -825,31 +810,52 @@ export function createElementClass<
       );
     }
 
-    private _triggerWatchers(path: string, newValue: any, oldValue: any): void {
-      // Check for exact path matches
+    private _triggerWatchers(path: string, newValue: any): void {
+      const isEqual = (a: any, b: any): boolean => {
+        // Simple deep equality check
+        if (a === b) return true;
+        if (typeof a !== typeof b) return false;
+        if (typeof a !== "object" || a === null || b === null) return false;
+
+        if (Array.isArray(a) && Array.isArray(b)) {
+          if (a.length !== b.length) return false;
+          return a.every((val, i) => isEqual(val, b[i]));
+        }
+
+        const keysA = Object.keys(a);
+        const keysB = Object.keys(b);
+        if (keysA.length !== keysB.length) return false;
+
+        return keysA.every(key => isEqual(a[key], b[key]));
+      };
+
+      // Exact path watcher
       const watcher = this._watchers.get(path);
-      if (watcher) {
+      if (watcher && !isEqual(newValue, watcher.oldValue)) {
         try {
-          watcher.callback(newValue, oldValue);
+          watcher.callback(newValue, watcher.oldValue, this._state, this._api);
           watcher.oldValue = newValue;
         } catch (error) {
           console.error(`Error in watcher for "${path}":`, error);
         }
       }
 
-      // Check for parent path matches (for deep watching)
+      // Deep watchers for parent paths
       for (const [watchPath, watcherConfig] of this._watchers.entries()) {
         if (watcherConfig.options.deep && path.startsWith(watchPath + ".")) {
           try {
             const currentValue = this._getNestedValue(watchPath);
-            watcherConfig.callback(currentValue, watcherConfig.oldValue);
-            watcherConfig.oldValue = currentValue;
+            if (!isEqual(currentValue, watcherConfig.oldValue)) {
+              watcherConfig.callback(currentValue, watcherConfig.oldValue, this._state, this._api);
+              watcherConfig.oldValue = currentValue;
+            }
           } catch (error) {
             console.error(`Error in deep watcher for "${watchPath}":`, error);
           }
         }
       }
     }
+
 
     private _applyProps(cfg: ComponentConfig<S, C, P>): void {
       try {
@@ -860,11 +866,10 @@ export function createElementClass<
             (this._state as any)[key] = escapeHTML(
               this._parseProp(attr, def.type),
             );
-          } else {
-            throw new Error(
-              `[runtime] _applyProps - Missing required prop: ${key}`,
-            );
+          } else if ('default' in def && def.default !== undefined) {
+            (this._state as any)[key] = escapeHTML(def.default);
           }
+          // else: leave undefined if no default
         });
       } catch (error) {
         this._hasError = true;

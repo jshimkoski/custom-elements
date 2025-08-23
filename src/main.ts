@@ -1,5 +1,5 @@
 import './style.css';
-import { component, html, when, each, match } from "./lib/runtime";
+import { component, html, when, each, match, eventBus } from "./lib/runtime";
 // import './docs-site/docs-app.ts';
 // import './docs-site/docs-nav.ts';
 // import './docs-site/docs-content.ts';
@@ -25,18 +25,27 @@ component("stateless-component", {
 });
 
 component("child-component", {
+  props: { test: { type: String } },
   state: { message: "Hello from Child Component" },
   render(state) {
     return html`
       <div>
-        <stateless-component></stateless-component>
+        <p>From parent: ${state.test}</p>
+        <slot></slot>
+        <p>Slot is right above me</p>
         <p>${state.message}</p>
         <button @click="${state.handleSomething}">Click Me</button>
         <button @click="${() => (state.message = "cool")}">
-          Another button
+          Change Message
         </button>
       </div>
     `;
+  },
+  watch: {
+    message(newValue, oldValue, _state, api) {
+      console.log(`Watcher called: message changed from ${oldValue} to ${newValue}`);
+      eventBus.emit("messageChanged", { newValue, oldValue });
+    },
   },
   handleSomething() {
     console.log("component did something");
@@ -51,6 +60,12 @@ component("my-greeting", {
     age: 25,
     isActive: true,
     color: "red",
+  },
+  onConnected(state, api) {
+    console.log("Component connected:", state, api);
+    eventBus.on("messageChanged", (detail) => {
+      console.log("Message changed event received in my-greeting", detail);
+    });
   },
   computed: {
     funnyName(state) {
@@ -88,7 +103,9 @@ component("my-greeting", {
   render(state) {
     return html`
       <div>
-        <child-component></child-component>
+        <child-component test="${state.name}">
+          <stateless-component></stateless-component>
+        </child-component>
         <h2>Hello, <span>${state.name}</span></h2>
         <h3>You have a funny name: ${state.funnyName}</h3>
         ${when(state.name === "World", html`<span>Welcome to the world!</span>`)}
@@ -172,9 +189,6 @@ component("my-greeting", {
           .done()}
       </div>
     `;
-  },
-  onConnected(state, api) {
-    console.log("Component connected:", state, api);
   },
   onError(error, state, api) {
     console.error("Component error:", error, state, api);
