@@ -31,8 +31,8 @@ function ensureKey(v: VNode, k: string): VNode {
 
 function parseProps(
   str: string,
-  values: unknown[],
-  context?: Record<string, any>,
+  values: unknown[] = [],
+  context: Record<string, any> = {}
 ): {
   props: Record<string, any>;
   attrs: Record<string, any>;
@@ -42,91 +42,62 @@ function parseProps(
   const attrs: Record<string, any> = {};
   const directives: Record<string, { value: any; modifiers: string[] }> = {};
 
-  // Allow ":" for props, "@" for events, "#" for directives.
-  const attrRegex = /([:@]|#)?([a-zA-Z0-9-:\.]+)="([^"]*)"/g;
+  // Match attributes with optional prefix and support for single/double quotes
+  const attrRegex =
+    /([:@#]?)([a-zA-Z0-9-:\.]+)=("([^"\\]*(\\.[^"\\]*)*)"|'([^'\\]*(\\.[^'\\]*)*)')/g;
+
   let match: RegExpExecArray | null;
 
   while ((match = attrRegex.exec(str))) {
-    const prefix = match[1]; // ":" or "@" or "#" or undefined
+    const prefix = match[1];
     const rawName = match[2];
-    const rawVal = match[3];
+    const rawVal = match[4] || match[6]; // Extract value from either quote type
 
     // Interpolation detection
     const interpMatch = rawVal.match(/^{{(\d+)}}$/);
+    let value: any = interpMatch
+      ? values[Number(interpMatch[1])] ?? null
+      : rawVal;
+
+    // Type inference
+    if (!interpMatch) {
+      if (value === "true") value = true;
+      else if (value === "false") value = false;
+      else if (value === "null") value = null;
+      else if (!isNaN(Number(value))) value = Number(value);
+    }
 
     if (prefix === ":") {
-      // Property binding - determine if it should be a prop or attr
-      const value = interpMatch ? values[Number(interpMatch[1])] : rawVal;
-
-      // HTML boolean attributes should go to attrs, not props
-      const htmlBooleanAttrs = [
-        "disabled",
-        "checked",
-        "selected",
-        "readonly",
-        "required",
-        "autofocus",
-        "autoplay",
-        "controls",
-        "defer",
-        "hidden",
-        "loop",
-        "multiple",
-        "muted",
-        "open",
-        "reversed",
-      ];
-
-      if (htmlBooleanAttrs.includes(rawName)) {
-        // Handle as HTML attribute with proper boolean logic
-        if (typeof value === "boolean") {
-          if (value) {
-            attrs[rawName] = rawName; // For boolean attributes like disabled, checked
-          }
-          // false values are omitted entirely for boolean attributes
-        } else if (value != null) {
-          attrs[rawName] = String(value);
-        }
-      } else {
-        // Regular property binding
+      if (typeof value === "boolean") {
+        attrs[rawName] = value;
+      } else if (value !== undefined && value !== null) {
         props[rawName] = value;
       }
     } else if (prefix === "@") {
-      const toOnName = (ev: string) =>
-        "on" + ev.charAt(0).toUpperCase() + ev.slice(1);
-      const onName = toOnName(rawName);
-      if (interpMatch) {
-        const idx = Number(interpMatch[1]);
-        if (values[idx] !== undefined) props[onName] = values[idx];
-      } else {
-        if (context && typeof context[rawVal] === "function")
-          props[onName] = context[rawVal];
-      }
+      const onName = "on" + rawName.charAt(0).toUpperCase() + rawName.slice(1);
+      props[onName] =
+        typeof value === "function"
+          ? value
+          : typeof context[value] === "function"
+          ? context[value]
+          : undefined;
     } else if (prefix === "#") {
-      // Vue-like directive - rawName includes the full directive name (e.g., "model" from "#model")
       const [directiveName, ...modifierParts] = rawName.split(".");
-      const modifiers = modifierParts || [];
+      const modifiers = [...modifierParts];
 
-      let finalValue = interpMatch ? values[Number(interpMatch[1])] : rawVal;
+      let finalValue = value;
       let finalModifiers = [...modifiers];
 
-      // For #model, check if modifiers are in the directive name (e.g., #model.trim)
-      // vs. in the value (e.g., #model="text.trim")
       if (
         directiveName === "model" &&
         typeof finalValue === "string" &&
         finalValue.includes(".")
       ) {
-        // Check if the dots in the value represent nested properties vs modifiers
-        // Common modifiers: trim, number, lazy
         const commonModifiers = ["trim", "number", "lazy"];
         const valueParts = finalValue.split(".");
-
-        // Check if the last parts are common modifiers
         let actualValue = finalValue;
         const valueModifiers: string[] = [];
 
-        // Work backwards from the end to find modifiers
         for (let i = valueParts.length - 1; i > 0; i--) {
           if (commonModifiers.includes(valueParts[i])) {
             valueModifiers.unshift(valueParts[i]);
@@ -145,8 +116,7 @@ function parseProps(
         modifiers: finalModifiers,
       };
     } else {
-      // Plain attribute (string)
-      attrs[rawName] = interpMatch ? values[Number(interpMatch[1])] : rawVal;
+      attrs[rawName] = value;
     }
   }
 
@@ -323,10 +293,7 @@ function htmlImpl(
             // #bind object syntax: #bind="{ disabled: true, class: 'foo' }"
             for (const [key, value] of Object.entries(directive.value)) {
               if (typeof value === "boolean") {
-                if (value) {
-                  vnodeProps.attrs[key] = key; // For boolean attributes like disabled, checked
-                }
-                // false values are omitted entirely for boolean attributes
+                vnodeProps.attrs[key] = value;
               } else if (value != null) {
                 vnodeProps.attrs[key] = String(value);
               }

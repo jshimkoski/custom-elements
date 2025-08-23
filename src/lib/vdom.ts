@@ -664,7 +664,11 @@ function patchProps(
     const oldVal = oldAttrs[key];
     const newVal = newAttrs[key];
     if (oldVal !== newVal) {
-      if (newVal === undefined || newVal === null) el.removeAttribute(key);
+      if (
+        newVal === undefined ||
+        newVal === null ||
+        newVal === false
+      ) el.removeAttribute(key);
       else el.setAttribute(key, String(newVal));
     }
   }
