@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Watch Demo - Custom Elements</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .demo-section {
+            border: 1px solid #ddd;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+        .demo-section h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        .log {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            max-height: 200px;
+            overflow-y: auto;
+            margin: 10px 0;
+        }
+        .log-entry {
+            margin: 2px 0;
+            padding: 2px 4px;
+            border-left: 3px solid #007acc;
+            background: white;
+        }
+        input, button {
+            margin: 5px;
+            padding: 8px;
+        }
+        .controls {
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Watch Functionality Demo</h1>
+    <p>This demo showcases the Vue-like watch capability in our custom element system.</p>
+
+    <div class="demo-section">
+        <h3>Basic Watch Example</h3>
+        <basic-watch-demo></basic-watch-demo>
+    </div>
+
+    <div class="demo-section">
+        <h3>Deep Watch Example</h3>
+        <deep-watch-demo></deep-watch-demo>
+    </div>
+
+    <div class="demo-section">
+        <h3>Immediate Watch Example</h3>
+        <immediate-watch-demo></immediate-watch-demo>
+    </div>
+
+    <script type="module">
+        import { component } from './src/lib/runtime.js';
+        import { html } from './src/lib/template-compiler.js';
+        import { vModel } from './src/lib/directives.js';
+
+        // Basic Watch Demo
+        component('basic-watch-demo', {
+            state: {
+                counter: 0,
+                message: 'Hello',
+                logs: []
+            },
+            watch: {
+                counter: (newValue, oldValue) => {
+                    console.log(`Counter changed from ${oldValue} to ${newValue}`);
+                },
+                message: (newValue, oldValue) => {
+                    console.log(`Message changed from "${oldValue}" to "${newValue}"`);
+                }
+            },
+            render(state) {
+                const addLog = (message) => {
+                    state.logs = [...state.logs, `${new Date().toLocaleTimeString()}: ${message}`];
+                };
+
+                // Update logs when counter changes
+                if (state.counter > 0) {
+                    const lastLog = state.logs[state.logs.length - 1];
+                    const expectedLog = `Counter is now: ${state.counter}`;
+                    if (!lastLog || !lastLog.includes(expectedLog)) {
+                        addLog(expectedLog);
+                    }
+                }
+
+                return html`
+                    <div>
+                        <h4>Counter: ${state.counter}</h4>
+                        <div class="controls">
+                            <button onclick=${() => state.counter++}>Increment Counter</button>
+                            <button onclick=${() => state.counter--}>Decrement Counter</button>
+                        </div>
+
+                        <h4>Message: "${state.message}"</h4>
+                        <div class="controls">
+                            <input type="text" ${vModel(state.message, (val) => state.message = val)} placeholder="Type a message...">
+                        </div>
+
+                        <div class="log">
+                            <strong>Watch Logs:</strong>
+                            ${state.logs.map(log => html`
+                                <div class="log-entry">${log}</div>
+                            `)}
+                        </div>
+                    </div>
+                `;
+            }
+        });
+
+        // Deep Watch Demo
+        component('deep-watch-demo', {
+            state: {
+                user: {
+                    name: 'John',
+                    profile: {
+                        email: 'john@example.com',
+                        settings: {
+                            theme: 'light'
+                        }
+                    }
+                },
+                watchLogs: []
+            },
+            watch: {
+                'user': [
+                    (newValue, oldValue) => {
+                        console.log('User object changed (deep watch):', newValue);
+                    },
+                    { deep: true }
+                ],
+                'user.name': (newValue, oldValue) => {
+                    console.log(`User name changed from "${oldValue}" to "${newValue}"`);
+                },
+                'user.profile.email': (newValue, oldValue) => {
+                    console.log(`Email changed from "${oldValue}" to "${newValue}"`);
+                }
+            },
+            render(state) {
+                const addWatchLog = (message) => {
+                    state.watchLogs = [...state.watchLogs, `${new Date().toLocaleTimeString()}: ${message}`];
+                };
+
+                return html`
+                    <div>
+                        <h4>User Data</h4>
+                        <div class="controls">
+                            <label>Name:
+                                <input type="text" ${vModel(state.user.name, (val) => {
+                                    const oldName = state.user.name;
+                                    state.user.name = val;
+                                    addWatchLog(`Name changed from "${oldName}" to "${val}"`);
+                                })}>
+                            </label>
+                        </div>
+
+                        <div class="controls">
+                            <label>Email:
+                                <input type="text" ${vModel(state.user.profile.email, (val) => {
+                                    const oldEmail = state.user.profile.email;
+                                    state.user.profile.email = val;
+                                    addWatchLog(`Email changed from "${oldEmail}" to "${val}"`);
+                                })}>
+                            </label>
+                        </div>
+
+                        <div class="controls">
+                            <label>Theme:
+                                <select ${vModel(state.user.profile.settings.theme, (val) => {
+                                    const oldTheme = state.user.profile.settings.theme;
+                                    state.user.profile.settings.theme = val;
+                                    addWatchLog(`Theme changed from "${oldTheme}" to "${val}"`);
+                                })}>
+                                    <option value="light">Light</option>
+                                    <option value="dark">Dark</option>
+                                    <option value="auto">Auto</option>
+                                </select>
+                            </label>
+                        </div>
+
+                        <div class="log">
+                            <strong>Deep Watch Logs:</strong>
+                            ${state.watchLogs.map(log => html`
+                                <div class="log-entry">${log}</div>
+                            `)}
+                        </div>
+
+                        <div style="margin-top: 10px; padding: 10px; background: #f9f9f9;">
+                            <strong>Current User Object:</strong>
+                            <pre>${JSON.stringify(state.user, null, 2)}</pre>
+                        </div>
+                    </div>
+                `;
+            }
+        });
+
+        // Immediate Watch Demo
+        component('immediate-watch-demo', {
+            state: {
+                value: 42,
+                logs: []
+            },
+            watch: {
+                value: [
+                    (newValue, oldValue) => {
+                        const message = oldValue === undefined
+                            ? `Initial value is: ${newValue}`
+                            : `Value changed from ${oldValue} to ${newValue}`;
+                        console.log(message);
+
+                        // We can't modify state directly in a watcher as it would cause recursion
+                        // So we use setTimeout to defer the log update
+                        setTimeout(() => {
+                            const currentComponent = document.querySelector('immediate-watch-demo');
+                            if (currentComponent && currentComponent._state) {
+                                currentComponent._state.logs = [...currentComponent._state.logs,
+                                    `${new Date().toLocaleTimeString()}: ${message}`];
+                                currentComponent._requestRender();
+                            }
+                        }, 0);
+                    },
+                    { immediate: true }
+                ]
+            },
+            render(state) {
+                return html`
+                    <div>
+                        <h4>Value with Immediate Watch: ${state.value}</h4>
+                        <div class="controls">
+                            <input type="number" ${vModel(state.value, (val) => state.value = Number(val))}>
+                            <button onclick=${() => state.value = Math.floor(Math.random() * 100)}>Random Value</button>
+                            <button onclick=${() => state.logs = []}>Clear Logs</button>
+                        </div>
+
+                        <div class="log">
+                            <strong>Immediate Watch Logs:</strong>
+                            <div style="font-size: 12px; color: #666; margin-bottom: 5px;">
+                                (Notice the initial log entry when component loads)
+                            </div>
+                            ${state.logs.map(log => html`
+                                <div class="log-entry">${log}</div>
+                            `)}
+                        </div>
+                    </div>
+                `;
+            }
+        });
+
+        // Add some global styles for better demo presentation
+        const style = document.createElement('style');
+        style.textContent = `
+            basic-watch-demo, deep-watch-demo, immediate-watch-demo {
+                display: block;
+            }
+        `;
+        document.head.appendChild(style);
+    </script>
+</body>
+</html>

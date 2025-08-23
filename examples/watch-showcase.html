@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Watch Functionality Showcase</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+
+        .showcase {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .showcase h2 {
+            color: #333;
+            border-bottom: 2px solid #007acc;
+            padding-bottom: 8px;
+        }
+
+        .demo-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .control-panel {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            border-left: 4px solid #007acc;
+        }
+
+        .watch-log {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            border-left: 4px solid #4CAF50;
+        }
+
+        .log-entry {
+            margin: 4px 0;
+            padding: 2px 0;
+        }
+
+        .log-entry.new {
+            animation: highlight 0.5s ease-out;
+        }
+
+        @keyframes highlight {
+            0% { background-color: #4CAF50; }
+            100% { background-color: transparent; }
+        }
+
+        input, select, textarea, button {
+            padding: 8px 12px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        button {
+            background: #007acc;
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background: #005a9e;
+        }
+
+        .json-view {
+            background: #f4f4f4;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+        }
+
+        .feature-badge {
+            display: inline-block;
+            background: #e3f2fd;
+            color: #1976d2;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: bold;
+            margin: 2px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 Watch Functionality Showcase</h1>
+    <p>This demo showcases the Vue-like watch capability in our custom element system. Open the browser console to see additional watch logs.</p>
+
+    <div class="showcase">
+        <h2>Basic Watching <span class="feature-badge">BASIC</span></h2>
+        <basic-watch-demo></basic-watch-demo>
+    </div>
+
+    <div class="showcase">
+        <h2>Deep & Nested Watching <span class="feature-badge">DEEP</span> <span class="feature-badge">NESTED</span></h2>
+        <deep-watch-demo></deep-watch-demo>
+    </div>
+
+    <div class="showcase">
+        <h2>Immediate Watching <span class="feature-badge">IMMEDIATE</span></h2>
+        <immediate-watch-demo></immediate-watch-demo>
+    </div>
+
+    <div class="showcase">
+        <h2>Array Mutations <span class="feature-badge">ARRAYS</span></h2>
+        <array-watch-demo></array-watch-demo>
+    </div>
+
+    <div class="showcase">
+        <h2>Performance & Advanced <span class="feature-badge">ADVANCED</span></h2>
+        <advanced-watch-demo></advanced-watch-demo>
+    </div>
+
+    <script type="module">
+        import { component } from '../src/lib/runtime.js';
+        import { html } from '../src/lib/template-compiler.js';
+        import { vModel } from '../src/lib/directives.js';
+
+        // Basic Watch Demo
+        component('basic-watch-demo', {
+            state: {
+                counter: 0,
+                message: 'Hello World',
+                logs: []
+            },
+
+            watch: {
+                counter: (newValue, oldValue) => {
+                    console.log(`🔢 Counter changed: ${oldValue} → ${newValue}`);
+                },
+                message: (newValue, oldValue) => {
+                    console.log(`💬 Message changed: "${oldValue}" → "${newValue}"`);
+                }
+            },
+
+            addLog(message) {
+                this.logs = [...this.logs, {
+                    time: new Date().toLocaleTimeString(),
+                    message
+                }];
+            },
+
+            render(state) {
+                return html`
+                    <div class="demo-grid">
+                        <div class="control-panel">
+                            <h4>Controls</h4>
+                            <div>
+                                <label>Counter: <strong>${state.counter}</strong></label><br>
+                                <button onclick=${() => {
+                                    state.counter++;
+                                    state.addLog(`Counter incremented to ${state.counter}`);
+                                }}>+1</button>
+                                <button onclick=${() => {
+                                    state.counter--;
+                                    state.addLog(`Counter decremented to ${state.counter}`);
+                                }}>-1</button>
+                                <button onclick=${() => {
+                                    const newValue = Math.floor(Math.random() * 100);
+                                    state.counter = newValue;
+                                    state.addLog(`Counter set to random value: ${newValue}`);
+                                }}>Random</button>
+                            </div>
+                            <div style="margin-top: 15px;">
+                                <label>Message:</label><br>
+                                <input type="text" ${vModel(state.message, (val) => {
+                                    const oldMessage = state.message;
+                                    state.message = val;
+                                    state.addLog(`Message changed from "${oldMessage}" to "${val}"`);
+                                })} style="width: 200px;">
+                            </div>
+                        </div>
+                        <div class="watch-log">
+                            <strong>📜 Watch Logs</strong>
+                            ${state.logs.map(log => html`
+                                <div class="log-entry">[${log.time}] ${log.message}</div>
+                            `)}
+                        </div>
+                    </div>
+                `;
+            }
+        });
+
+        // Deep Watch Demo
+        component('deep-watch-demo', {
+            state: {
+                user: {
+                    profile: {
+                        name: 'John Doe',
+                        email: 'john@example.com',
+                        preferences: {
+                            theme: 'light',
+                            notifications: true,
+                            language: 'en'
+                        }
+                    },
+                    metadata: {
+                        lastLogin: new Date().toISOString(),
+                        loginCount: 42
+                    }
+                },
+                watchLogs: []
+            },
+
+            watch: {
+                'user': [
+                    (newValue, oldValue) => {
+                        console.log('🔍 Deep watch triggered on user object');
+                    },
+                    { deep: true }
+                ],
+                'user.profile.name': (newValue, oldValue) => {
+                    console.log(`👤 Name changed: "${oldValue}" → "${newValue}"`);
+                },
+                'user.profile.email': (newValue, oldValue) => {
+                    console.log(`📧 Email changed: "${oldValue}" → "${newValue}"`);
+                },
+                'user.profile.preferences.theme': (newValue, oldValue) => {
+                    console.log(`🎨 Theme changed: "${oldValue}" → "${newValue}"`);
+                }
+            },
+
+            addWatchLog(message) {
+                this.watchLogs = [...this.watchLogs, {
+                    time: new Date().toLocaleTimeString(),
+                    message
+                }].slice(-10); // Keep only last 10 logs
+            },
+
+            render(state) {
+                return html`
+                    <div class="demo-grid">
+                        <div class="control-panel">
+                            <h4>Nested Object Controls</h4>
+                            <div>
+                                <label>Name:</label><br>
+                                <input type="text" ${vModel(state.user.profile.name, (val) => {
+                                    const oldName = state.user.profile.name;
+                                    state.user.profile.name = val;
+                                    state.addWatchLog(`Name: "${oldName}" → "${val}"`);
+                                })}>
+                            </div>
+                            <div>
+                                <label>Email:</label><br>
+                                <input type="email" ${vModel(state.user.profile.email, (val) => {
+                                    const oldEmail = state.user.profile.email;
+                                    state.user.profile.email = val;
+                                    state.addWatchLog(`Email: "${oldEmail}" → "${val}"`);
+                                })}>
+                            </div>
+                            <div>
+                                <label>Theme:</label><br>
+                                <select ${vModel(state.user.profile.preferences.theme, (val) => {
+                                    const oldTheme = state.user.profile.preferences.theme;
+                                    state.user.profile.preferences.theme = val;
+                                    state.addWatchLog(`Theme: "${oldTheme}" → "${val}"`);
+                                })}>
+                                    <option value="light">Light</option>
+                                    <option value="dark">Dark</option>
+                                    <option value="auto">Auto</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label>
+                                    <input type="checkbox" ${vModel(state.user.profile.preferences.notifications, (val) => {
+                                        const oldValue = state.user.profile.preferences.notifications;
+                                        state.user.profile.preferences.notifications = val;
+                                        state.addWatchLog(`Notifications: ${oldValue} → ${val}`);
+                                    })}>
+                                    Notifications
+                                </label>
+                            </div>
+                        </div>
+                        <div class="watch-log">
+                            <strong>🕵️ Deep Watch Logs</strong>
+                            ${state.watchLogs.map(log => html`
+                                <div class="log-entry">[${log.time}] ${log.message}</div>
+                            `)}
+                            <div class="json-view">
+                                Current User Object:
+                                ${JSON.stringify(state.user, null, 2)}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+        });
+
+        // Immediate Watch Demo
+        component('immediate-watch-demo', {
+            state: {
+                config: {
+                    apiUrl: 'https://api.example.com',
+                    timeout: 5000,
+                    retries: 3
+                },
+                initLogs: []
+            },
+
+            watch: {
+                'config.apiUrl': [
+                    (newValue, oldValue) => {
+                        const message = oldValue === undefined
+                            ? `🚀 Initial API URL: ${newValue}`
+                            : `🔗 API URL changed: ${oldValue} → ${newValue}`;
+                        console.log(message);
+
+                        // Simulate API connection check
+                        setTimeout(() => {
+                            const component = document.querySelector('immediate-watch-demo');
+                            if (component && component._state) {
+                                component._state.addInitLog(message + ' (Connection verified)');
+                            }
+                        }, 100);
+                    },
+                    { immediate: true }
+                ],
+                'config.timeout': [
+                    (newValue, oldValue) => {
+                        const message = oldValue === undefined
+                            ? `⏱️ Initial timeout: ${newValue}ms`
+                            : `⏱️ Timeout changed: ${oldValue}ms → ${newValue}ms`;
+                        console.log(message);
+
+                        setTimeout(() => {
+                            const component = document.querySelector('immediate-watch-demo');
+                            if (component && component._state) {
+                                component._state.addInitLog(message);
+                            }
+                        }, 50);
+                    },
+                    { immediate: true }
+                ]
+            },
+
+            addInitLog(message) {
+                this.initLogs = [...this.initLogs, {
+                    time: new Date().toLocaleTimeString(),
+                    message
+                }];
+            },
+
+            render(state) {
+                return html`
+                    <div class="demo-grid">
+                        <div class="control-panel">
+                            <h4>Configuration (Immediate Watchers)</h4>
+                            <p style="font-size: 12px; color: #666;">
+                                These watchers execute immediately when the component loads
+                            </p>
+                            <div>
+                                <label>API URL:</label><br>
+                                <input type="text" ${vModel(state.config.apiUrl, (val) => {
+                                    state.config.apiUrl = val;
+                                })} style="width: 250px;">
+                            </div>
+                            <div>
+                                <label>Timeout (ms):</label><br>
+                                <input type="number" ${vModel(state.config.timeout, (val) => {
+                                    state.config.timeout = parseInt(val) || 0;
+                                })} min="1000" max="30000" step="1000">
+                            </div>
+                            <div>
+                                <label>Retries:</label><br>
+                                <input type="range" ${vModel(state.config.retries, (val) => {
+                                    state.config.retries = parseInt(val);
+                                })} min="0" max="10" step="1">
+                                <span>${state.config.retries}</span>
+                            </div>
+                        </div>
+                        <div class="watch-log">
+                            <strong>🎯 Immediate Watch Logs</strong>
+                            <div style="font-size: 11px; color: #888; margin-bottom: 8px;">
+                                Notice the initial entries when component loads
+                            </div>
+                            ${state.initLogs.map(log => html`
+                                <div class="log-entry">[${log.time}] ${log.message}</div>
+                            `)}
+                        </div>
+                    </div>
+                `;
+            }
+        });
+
+        // Array Watch Demo
+        component('array-watch-demo', {
+            state: {
+                items: ['Apple', 'Banana', 'Cherry'],
+                newItem: '',
+                arrayLogs: []
+            },
+
+            watch: {
+                items: (newArray, oldArray) => {
+                    const message = `📊 Array changed: length ${oldArray?.length || 0} → ${newArray.length}`;
+                    console.log(message, { old: oldArray, new: newArray });
+                }
+            },
+
+            addArrayLog(message) {
+                this.arrayLogs = [...this.arrayLogs, {
+                    time: new Date().toLocaleTimeString(),
+                    message
+                }].slice(-8);
+            },
+
+            render(state) {
+                return html`
+                    <div class="demo-grid">
+                        <div class="control-panel">
+                            <h4>Array Mutation Operations</h4>
+                            <div>
+                                <strong>Current Items:</strong>
+                                <ul>
+                                    ${state.items.map((item, index) => html`
+                                        <li>
+                                            ${item}
+                                            <button onclick=${() => {
+                                                state.items.splice(index, 1);
+                                                state.addArrayLog(`Removed "${item}" at index ${index}`);
+                                            }} style="font-size: 10px; padding: 2px 6px;">×</button>
+                                        </li>
+                                    `)}
+                                </ul>
+                            </div>
+
+                            <div>
+                                <input type="text" ${vModel(state.newItem, (val) => state.newItem = val)}
+                                       placeholder="New item..." style="width: 120px;">
+                                <button onclick=${() => {
+                                    if (state.newItem.trim()) {
+                                        state.items.push(state.newItem.trim());
+                                        state.addArrayLog(`Added "${state.newItem}" via push()`);
+                                        state.newItem = '';
+                                    }
+                                }}>Add</button>
+                            </div>
+
+                            <div style="margin-top: 10px;">
+                                <button onclick=${() => {
+                                    if (state.items.length) {
+                                        const removed = state.items.pop();
+                                        state.addArrayLog(`Removed "${removed}" via pop()`);
+                                    }
+                                }}>Pop Last</button>
+
+                                <button onclick=${() => {
+                                    if (state.items.length) {
+                                        const removed = state.items.shift();
+                                        state.addArrayLog(`Removed "${removed}" via shift()`);
+                                    }
+                                }}>Shift First</button>
+
+                                <button onclick=${() => {
+                                    state.items.reverse();
+                                    state.addArrayLog('Array reversed');
+                                }}>Reverse</button>
+
+                                <button onclick=${() => {
+                                    state.items.sort();
+                                    state.addArrayLog('Array sorted');
+                                }}>Sort</button>
+                            </div>
+                        </div>
+
+                        <div class="watch-log">
+                            <strong>🔄 Array Mutation Logs</strong>
+                            <div style="font-size: 11px; color: #888; margin-bottom: 8px;">
+                                Watching for: push, pop, shift, unshift, splice, sort, reverse
+                            </div>
+                            ${state.arrayLogs.map(log => html`
+                                <div class="log-entry">[${log.time}] ${log.message}</div>
+                            `)}
+                            <div style="margin-top: 10px; font-size: 11px;">
+                                <strong>Array JSON:</strong> ${JSON.stringify(state.items)}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+        });
+
+        // Advanced Watch Demo
+        component('advanced-watch-demo', {
+            state: {
+                performance: {
+                    watchCount: 0,
+                    renderCount: 0,
+                    lastUpdate: Date.now()
+                },
+                stressTest: {
+                    value: 0,
+                    isRunning: false
+                },
+                complexObject: {
+                    level1: {
+                        level2: {
+                            level3: {
+                                data: 'Deep nested value'
+                            }
+                        }
+                    }
+                },
+                perfLogs: []
+            },
+
+            watch: {
+                'stressTest.value': (newValue, oldValue) => {
+                    // High frequency watcher
+                    const component = document.querySelector('advanced-watch-demo');
+                    if (component && component._state) {
+                        component._state.performance.watchCount++;
+                        component._state.performance.lastUpdate = Date.now();
+                    }
+                },
+                'complexObject': [
+                    (newValue, oldValue) => {
+                        console.log('🏗️ Complex object deep watch triggered');
+                    },
+                    { deep: true }
+                ],
+                'complexObject.level1.level2.level3.data': (newValue, oldValue) => {
+                    console.log(`🎯 Deep nested data changed: "${oldValue}" → "${newValue}"`);
+                }
+            },
+
+            addPerfLog(message) {
+                this.perfLogs = [...this.perfLogs, {
+                    time: new Date().toLocaleTimeString(),
+                    message
+                }].slice(-5);
+            },
+
+            startStressTest() {
+                if (this.stressTest.isRunning) return;
+
+                this.stressTest.isRunning = true;
+                this.addPerfLog('🚀 Stress test started');
+
+                let count = 0;
+                const interval = setInterval(() => {
+                    if (count >= 50 || !this.stressTest.isRunning) {
+                        clearInterval(interval);
+                        this.stressTest.isRunning = false;
+                        this.addPerfLog(`✅ Stress test completed: ${count} updates`);
+                        return;
+                    }
+
+                    this.stressTest.value = Math.random() * 1000;
+                    count++;
+                }, 10);
+            },
+
+            stopStressTest() {
+                this.stressTest.isRunning = false;
+                this.addPerfLog('⏹️ Stress test stopped');
+            },
+
+            render(state) {
+                // Count renders
+                state.performance.renderCount++;
+
+                return html`
+                    <div class="demo-grid">
+                        <div class="control-panel">
+                            <h4>Performance & Edge Cases</h4>
+
+                            <div style="background: #e8f5e8; padding: 10px; border-radius: 4px; margin-bottom: 15px;">
+                                <strong>📊 Performance Metrics</strong><br>
+                                <small>Watch executions: ${state.performance.watchCount}</small><br>
+                                <small>Render count: ${state.performance.renderCount}</small><br>
+                                <small>Last update: ${new Date(state.performance.lastUpdate).toLocaleTimeString()}</small>
+                            </div>
+
+                            <div>
+                                <strong>Stress Test:</strong><br>
+                                <button onclick=${() => state.startStressTest()}
+                                        disabled=${state.stressTest.isRunning}>
+                                    ${state.stressTest.isRunning ? 'Running...' : 'Start Stress Test'}
+                                </button>
+                                <button onclick=${() => state.stopStressTest()}>Stop</button>
+                                <br><small>Current value: ${state.stressTest.value.toFixed(2)}</small>
+                            </div>
+
+                            <div style="margin-top: 15px;">
+                                <strong>Deep Nested Data:</strong><br>
+                                <input type="text"
+                                       value=${state.complexObject.level1.level2.level3.data}
+                                       oninput=${(e) => {
+                                           state.complexObject.level1.level2.level3.data = e.target.value;
+                                           state.addPerfLog(`Deep data updated: "${e.target.value}"`);
+                                       }}
+                                       style="width: 200px;">
+                            </div>
+
+                            <div style="margin-top: 15px;">
+                                <button onclick=${() => {
+                                    state.complexObject = {
+                                        level1: {
+                                            level2: {
+                                                level3: {
+                                                    data: 'Completely replaced object'
+                                                }
+                                            }
+                                        }
+                                    };
+                                    state.addPerfLog('🔄 Entire complex object replaced');
+                                }}>Replace Entire Object</button>
+                            </div>
+                        </div>
+
+                        <div class="watch-log">
+                            <strong>⚡ Performance Logs</strong>
+                            ${state.perfLogs.map(log => html`
+                                <div class="log-entry">[${log.time}] ${log.message}</div>
+                            `)}
+
+                            <div class="json-view" style="margin-top: 10px;">
+                                Complex Object Structure:
+                                ${JSON.stringify(state.complexObject, null, 2)}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+        });
+    </script>
+
+    <footer style="text-align: center; margin-top: 40px; color: #666; font-size: 14px;">
+        <p>🔍 Watch functionality provides Vue-like reactive watching with support for:</p>
+        <div>
+            <span class="feature-badge">Basic Watching</span>
+            <span class="feature-badge">Deep Watching</span>
+            <span class="feature-badge">Immediate Execution</span>
+            <span class="feature-badge">Nested Paths</span>
+            <span class="feature-badge">Array Mutations</span>
+        </div>
+    </footer>
+</body>
+</html>

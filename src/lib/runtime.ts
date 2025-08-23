@@ -29,12 +29,33 @@ import { vIf, vBind, vClass, vFor, vModel, vShow, vSwitch } from "./directives";
 
 // --- Types ---
 type LifecycleKeys =
-  | "render"
   | "onConnected"
   | "onDisconnected"
   | "onAttributeChanged"
   | "onError"
   | "errorFallback";
+
+// Watch types
+interface WatchOptions {
+  immediate?: boolean;
+  deep?: boolean;
+}
+
+type WatchCallback<T = any> = (newValue: T, oldValue: T) => void;
+
+interface WatcherState {
+  callback: WatchCallback;
+  options: WatchOptions;
+  oldValue: any;
+}
+
+type WatchConfig<S> =
+  | {
+      [K in keyof S]?:
+        | WatchCallback<S[K]>
+        | [WatchCallback<S[K]>, WatchOptions?];
+    }
+  | Record<string, WatchCallback | [WatchCallback, WatchOptions?]>;
 
 type InferMethods<T> = {
   [K in keyof T as K extends LifecycleKeys ? never : K]: T[K] extends Function
@@ -56,6 +77,7 @@ export interface ComponentConfig<
       default?: string | number | boolean;
     }
   >;
+  watch?: WatchConfig<S & C & P>;
   style?: string | ((state: S & C) => string);
   render: (state: S & C & P & InferMethods<T>) => VNode | VNode[];
   onConnected?: (
@@ -153,7 +175,8 @@ export function createElementClass<
       refs: Record<string, HTMLElement>;
     };
     private _listeners: Array<() => void> = [];
-
+    private _watchers: Map<string, WatcherState> = new Map();
+    /** @internal */
     private _renderTimeoutId: number | null = null;
     private _mounted = false;
     private _hasError = false;
@@ -191,6 +214,11 @@ export function createElementClass<
       this._applyProps(config);
       this._applyComputed(config);
       this._initializing = false;
+
+      // Initialize watchers after initialization phase is complete
+      this._initWatchers(config);
+
+      // Initial render and style application
       this._render(config);
       if (config.style) this._applyStyle(config);
     }
@@ -210,8 +238,7 @@ export function createElementClass<
           config.onDisconnected(this._state, this._api);
         this._listeners.forEach((unsub) => unsub());
         this._listeners = [];
-        this._listeners.forEach((unsub) => unsub());
-        this._listeners = [];
+        this._watchers.clear();
         this._mounted = false;
       });
     }
@@ -315,7 +342,7 @@ export function createElementClass<
       });
     }
 
-    private _requestRender(): void {
+    _requestRender() {
       // Debounced render request to avoid excessive re-renders
       if (this._renderTimeoutId !== null) {
         clearTimeout(this._renderTimeoutId);
@@ -390,29 +417,88 @@ export function createElementClass<
     private _initState(cfg: ComponentConfig<S, C, P>): S & C & P {
       try {
         const self = this;
-        function createReactive(obj: any): any {
+        function createReactive(obj: any, path = ""): any {
           if (Array.isArray(obj)) {
+            // Create a proxy that intercepts array mutations
             return new Proxy(obj, {
+              get(target, prop, receiver) {
+                const value = Reflect.get(target, prop, receiver);
+
+                // Intercept array mutating methods
+                if (typeof value === "function" && typeof prop === "string") {
+                  const mutatingMethods = [
+                    "push",
+                    "pop",
+                    "shift",
+                    "unshift",
+                    "splice",
+                    "sort",
+                    "reverse",
+                  ];
+                  if (mutatingMethods.includes(prop)) {
+                    return function (...args: any[]) {
+                      const oldArray = [...target]; // Create snapshot before mutation
+                      const result = value.apply(target, args);
+
+                      if (!self._initializing) {
+                        const fullPath = path || "root";
+                        self._triggerWatchers(fullPath, target, oldArray);
+                        self._render(cfg);
+                      }
+
+                      return result;
+                    };
+                  }
+                }
+
+                return value;
+              },
               set(target, prop, value) {
+                const oldValue = target[prop as any];
                 target[prop as any] = value;
-                if (!self._initializing) self._render(cfg);
+                if (!self._initializing) {
+                  const fullPath = path
+                    ? `${path}.${String(prop)}`
+                    : String(prop);
+                  self._triggerWatchers(fullPath, value, oldValue);
+                  self._render(cfg);
+                }
                 return true;
               },
               deleteProperty(target, prop) {
+                const oldValue = target[prop as any];
                 delete target[prop as any];
-                if (!self._initializing) self._render(cfg);
+                if (!self._initializing) {
+                  const fullPath = path
+                    ? `${path}.${String(prop)}`
+                    : String(prop);
+                  self._triggerWatchers(fullPath, undefined, oldValue);
+                  self._render(cfg);
+                }
                 return true;
               },
             });
           }
           if (obj && typeof obj === "object") {
             Object.keys(obj).forEach((key) => {
-              obj[key] = createReactive(obj[key]);
+              const newPath = path ? `${path}.${key}` : key;
+              obj[key] = createReactive(obj[key], newPath);
             });
             return new Proxy(obj, {
               set(target, prop, value) {
-                target[prop as any] = createReactive(value);
-                if (!self._initializing) self._render(cfg);
+                const oldValue = target[prop as any];
+                const fullPath = path
+                  ? `${path}.${String(prop)}`
+                  : String(prop);
+                target[prop as any] = createReactive(value, fullPath);
+                if (!self._initializing) {
+                  self._triggerWatchers(
+                    fullPath,
+                    target[prop as any],
+                    oldValue,
+                  );
+                  self._render(cfg);
+                }
                 return true;
               },
               get(target, prop, receiver) {
@@ -428,7 +514,69 @@ export function createElementClass<
       }
     }
 
-    private _applyProps(cfg: ComponentConfig<S, C, P>) {
+    private _initWatchers(cfg: ComponentConfig<S, C, P>): void {
+      if (!cfg.watch) return;
+
+      for (const [key, watchConfig] of Object.entries(cfg.watch)) {
+        let callback: WatchCallback;
+        let options: WatchOptions = {};
+
+        if (Array.isArray(watchConfig)) {
+          callback = watchConfig[0];
+          options = watchConfig[1] || {};
+        } else {
+          callback = watchConfig;
+        }
+
+        this._watchers.set(key, {
+          callback,
+          options,
+          oldValue: this._getNestedValue(key),
+        });
+
+        // Execute immediately if requested
+        if (options.immediate) {
+          try {
+            const currentValue = this._getNestedValue(key);
+            callback(currentValue, undefined);
+          } catch (error) {
+            console.error(`Error in immediate watcher for "${key}":`, error);
+          }
+        }
+      }
+    }
+
+    private _getNestedValue(path: string): any {
+      return path.split(".").reduce((obj, key) => obj?.[key], this._state);
+    }
+
+    private _triggerWatchers(path: string, newValue: any, oldValue: any): void {
+      // Check for exact path matches
+      const watcher = this._watchers.get(path);
+      if (watcher) {
+        try {
+          watcher.callback(newValue, oldValue);
+          watcher.oldValue = newValue;
+        } catch (error) {
+          console.error(`Error in watcher for "${path}":`, error);
+        }
+      }
+
+      // Check for parent path matches (for deep watching)
+      for (const [watchPath, watcherConfig] of this._watchers.entries()) {
+        if (watcherConfig.options.deep && path.startsWith(watchPath + ".")) {
+          try {
+            const currentValue = this._getNestedValue(watchPath);
+            watcherConfig.callback(currentValue, watcherConfig.oldValue);
+            watcherConfig.oldValue = currentValue;
+          } catch (error) {
+            console.error(`Error in deep watcher for "${watchPath}":`, error);
+          }
+        }
+      }
+    }
+
+    private _applyProps(cfg: ComponentConfig<S, C, P>): void {
       try {
         if (!cfg.props) return;
         Object.entries(cfg.props).forEach(([key, def]) => {
@@ -497,6 +645,14 @@ component("my-greeting", {
   computed: {
     funnyName(state) {
       return `Funny ${state.name}`;
+    },
+  },
+  watch: {
+    name(newValue, oldValue) {
+      console.log(`Watcher called: Name changed from ${oldValue} to ${newValue}`);
+    },
+    email(newValue, oldValue) {
+      console.log(`Watcher called: Email changed from ${oldValue} to ${newValue}`);
     },
   },
   style: `

@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Watch Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .test-section {
+            border: 1px solid #ccc;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+        }
+        .log {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 3px;
+            font-family: monospace;
+            min-height: 50px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        button, input {
+            margin: 5px;
+            padding: 5px 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Simple Watch Test</h1>
+
+    <div class="test-section">
+        <h3>Basic Watch Test</h3>
+        <watch-test></watch-test>
+    </div>
+
+    <script type="module">
+        import { component } from './src/lib/runtime.js';
+        import { html } from './src/lib/template-compiler.js';
+
+        // Simple watch test component
+        component('watch-test', {
+            state: {
+                count: 0,
+                message: 'Hello',
+                watchLog: 'No changes yet'
+            },
+
+            watch: {
+                count: (newVal, oldVal) => {
+                    console.log(`Count watcher: ${oldVal} -> ${newVal}`);
+                    // We need to be careful not to modify state directly in watchers
+                    // as it could cause infinite loops
+                },
+
+                message: (newVal, oldVal) => {
+                    console.log(`Message watcher: "${oldVal}" -> "${newVal}"`);
+                }
+            },
+
+            render(state) {
+                return html`
+                    <div>
+                        <h4>Count: ${state.count}</h4>
+                        <button onclick=${() => {
+                            const oldCount = state.count;
+                            state.count++;
+                            state.watchLog = `Count changed from ${oldCount} to ${state.count}`;
+                        }}>Increment</button>
+
+                        <button onclick=${() => {
+                            const oldCount = state.count;
+                            state.count--;
+                            state.watchLog = `Count changed from ${oldCount} to ${state.count}`;
+                        }}>Decrement</button>
+
+                        <h4>Message: ${state.message}</h4>
+                        <input type="text"
+                               value=${state.message}
+                               oninput=${(e) => {
+                                   const oldMessage = state.message;
+                                   state.message = e.target.value;
+                                   state.watchLog = `Message changed from "${oldMessage}" to "${state.message}"`;
+                               }}
+                               placeholder="Type here...">
+
+                        <div class="log">
+                            <strong>Watch Log:</strong><br>
+                            ${state.watchLog}
+                        </div>
+
+                        <div style="margin-top: 10px; font-size: 12px; color: #666;">
+                            Check the browser console to see watcher output
+                        </div>
+                    </div>
+                `;
+            }
+        });
+    </script>
+</body>
+</html>
