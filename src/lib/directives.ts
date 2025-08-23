@@ -51,7 +51,7 @@ function whenChain(...branches: Branch[]): VNode[] {
 
 /**
  * Create a stable anchor block with consistent boundaries.
- * This works like Vue's fragments - always has start/end boundaries.
+ * Always has start/end boundaries.
  */
 function anchorBlock(
   children: VNode | VNode[] | null | undefined,

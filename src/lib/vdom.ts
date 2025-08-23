@@ -487,7 +487,7 @@ function processStyleDirective(
 }
 
 /**
- * Process Vue-like directives and return merged props, attrs, and event listeners
+ * Process directives and return merged props, attrs, and event listeners
  */
 function processDirectives(
   directives: Record<string, { value: any; modifiers: string[] }>,
