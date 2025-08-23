@@ -20,17 +20,17 @@ describe("Runtime V2 Form Bindings", () => {
     });
   });
 
-  describe("v-model basic functionality", () => {
-    it("should bind text input with v-model", async () => {
+  describe("#model basic functionality", () => {
+    it("should bind text input with #model", async () => {
       const ElementClass = createElementClass({
         state: { message: "hello" },
-        render: (state) => html`<input type="text" v-model="message" />`,
+        render: (state) => html`<input type="text" #model="message" />`,
         style: "",
       });
 
-      customElements.define("v-model-text-test", ElementClass);
+      customElements.define("#model-text-test", ElementClass);
 
-      const el = document.createElement("v-model-text-test") as any;
+      const el = document.createElement("#model-text-test") as any;
       container.appendChild(el);
 
       await new Promise((resolve) => setTimeout(resolve, 100));
@@ -46,16 +46,16 @@ describe("Runtime V2 Form Bindings", () => {
       expect(el._state.message).toBe("world");
     });
 
-    it("should handle v-model with .trim modifier", async () => {
+    it("should handle #model with .trim modifier", async () => {
       const ElementClass = createElementClass({
         state: { text: "" },
-        render: (state) => html`<input type="text" v-model="text.trim" />`,
+        render: (state) => html`<input type="text" #model="text.trim" />`,
         style: "",
       });
 
-      customElements.define("v-model-trim-test", ElementClass);
+      customElements.define("#model-trim-test", ElementClass);
 
-      const el = document.createElement("v-model-trim-test") as any;
+      const el = document.createElement("#model-trim-test") as any;
       container.appendChild(el);
 
       await new Promise((resolve) => setTimeout(resolve, 100));
@@ -69,16 +69,16 @@ describe("Runtime V2 Form Bindings", () => {
       expect(el._state.text).toBe("hello world");
     });
 
-    it("should handle v-model with .number modifier", async () => {
+    it("should handle #model with .number modifier", async () => {
       const ElementClass = createElementClass({
         state: { count: 0 },
-        render: (state) => html`<input type="text" v-model="count.number" />`,
+        render: (state) => html`<input type="text" #model="count.number" />`,
         style: "",
       });
 
-      customElements.define("v-model-number-test", ElementClass);
+      customElements.define("#model-number-test", ElementClass);
 
-      const el = document.createElement("v-model-number-test") as any;
+      const el = document.createElement("#model-number-test") as any;
       container.appendChild(el);
 
       await new Promise((resolve) => setTimeout(resolve, 100));
@@ -93,16 +93,16 @@ describe("Runtime V2 Form Bindings", () => {
       expect(typeof el._state.count).toBe("number");
     });
 
-    it("should handle v-model with .lazy modifier", async () => {
+    it("should handle #model with .lazy modifier", async () => {
       const ElementClass = createElementClass({
         state: { text: "" },
-        render: (state) => html`<input type="text" v-model="text.lazy" />`,
+        render: (state) => html`<input type="text" #model="text.lazy" />`,
         style: "",
       });
 
-      customElements.define("v-model-lazy-test", ElementClass);
+      customElements.define("#model-lazy-test", ElementClass);
 
-      const el = document.createElement("v-model-lazy-test") as any;
+      const el = document.createElement("#model-lazy-test") as any;
       container.appendChild(el);
 
       await new Promise((resolve) => setTimeout(resolve, 100));
@@ -121,17 +121,17 @@ describe("Runtime V2 Form Bindings", () => {
       expect(el._state.text).toBe("typing...");
     });
 
-    it("should handle combined modifiers v-model.trim.number", async () => {
+    it("should handle combined modifiers #model.trim.number", async () => {
       const ElementClass = createElementClass({
         state: { value: 0 },
         render: (state) =>
-          html`<input type="text" v-model="value.trim.number" />`,
+          html`<input type="text" #model="value.trim.number" />`,
         style: "",
       });
 
-      customElements.define("v-model-combined-test", ElementClass);
+      customElements.define("#model-combined-test", ElementClass);
 
-      const el = document.createElement("v-model-combined-test") as any;
+      const el = document.createElement("#model-combined-test") as any;
       container.appendChild(el);
 
       await new Promise((resolve) => setTimeout(resolve, 100));
@@ -151,7 +151,7 @@ describe("Runtime V2 Form Bindings", () => {
     it("should handle single checkbox with boolean value", async () => {
       const ElementClass = createElementClass({
         state: { agreed: false },
-        render: (state) => html`<input type="checkbox" v-model="agreed" />`,
+        render: (state) => html`<input type="checkbox" #model="agreed" />`,
         style: "",
       });
 
@@ -178,7 +178,7 @@ describe("Runtime V2 Form Bindings", () => {
         render: (state) =>
           html`<input
             type="checkbox"
-            v-model="status"
+            #model="status"
             true-value="yes"
             false-value="no"
           />`,
@@ -212,9 +212,9 @@ describe("Runtime V2 Form Bindings", () => {
       const ElementClass = createElementClass({
         state: { selected: ["apple"] },
         render: (state) => html`
-          <input type="checkbox" value="apple" v-model="selected" />
-          <input type="checkbox" value="banana" v-model="selected" />
-          <input type="checkbox" value="cherry" v-model="selected" />
+          <input type="checkbox" value="apple" #model="selected" />
+          <input type="checkbox" value="banana" #model="selected" />
+          <input type="checkbox" value="cherry" #model="selected" />
         `,
         style: "",
       });
@@ -256,9 +256,9 @@ describe("Runtime V2 Form Bindings", () => {
       const ElementClass = createElementClass({
         state: { color: "red" },
         render: (state) => html`
-          <input type="radio" name="color" value="red" v-model="color" />
-          <input type="radio" name="color" value="blue" v-model="color" />
-          <input type="radio" name="color" value="green" v-model="color" />
+          <input type="radio" name="color" value="red" #model="color" />
+          <input type="radio" name="color" value="blue" #model="color" />
+          <input type="radio" name="color" value="green" #model="color" />
         `,
         style: "",
       });
@@ -297,7 +297,7 @@ describe("Runtime V2 Form Bindings", () => {
       const ElementClass = createElementClass({
         state: { option: "b" },
         render: (state) => html`
-          <select v-model="option">
+          <select #model="option">
             <option value="a">Option A</option>
             <option value="b">Option B</option>
             <option value="c">Option C</option>
@@ -328,7 +328,7 @@ describe("Runtime V2 Form Bindings", () => {
     it("should handle textarea element", async () => {
       const ElementClass = createElementClass({
         state: { message: "Hello\nWorld" },
-        render: (state) => html`<textarea v-model="message"></textarea>`,
+        render: (state) => html`<textarea #model="message"></textarea>`,
         style: "",
       });
 
@@ -357,7 +357,7 @@ describe("Runtime V2 Form Bindings", () => {
       const ElementClass = createElementClass({
         state: { user: { profile: { name: "John" } } },
         render: (state) =>
-          html`<input type="text" v-model="user.profile.name" />`,
+          html`<input type="text" #model="user.profile.name" />`,
         style: "",
       });
 
@@ -383,7 +383,7 @@ describe("Runtime V2 Form Bindings", () => {
     it("should not update state during IME composition", async () => {
       const ElementClass = createElementClass({
         state: { text: "" },
-        render: (state) => html`<input type="text" v-model="text" />`,
+        render: (state) => html`<input type="text" #model="text" />`,
         style: "",
       });
 

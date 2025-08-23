@@ -30,33 +30,33 @@ export const TestDirectives = component({
       <div>
         <h2>Directive Tests</h2>
 
-        <!-- v-show test -->
-        <div v-show="${this.state.isVisible}">
+        <!-- #show test -->
+        <div #show="${this.state.isVisible}">
           This div should be visible when isVisible is true
         </div>
 
-        <!-- v-class with string -->
-        <div v-class="${this.state.dynamicClass}">
+        <!-- #class with string -->
+        <div #class="${this.state.dynamicClass}">
           Dynamic class: ${this.state.dynamicClass}
         </div>
 
-        <!-- v-class with object -->
-        <div v-class="${{ active: this.state.dynamicClass === 'active', error: this.state.hasError }}">
+        <!-- #class with object -->
+        <div #class="${{ active: this.state.dynamicClass === 'active', error: this.state.hasError }}">
           Conditional classes based on state
         </div>
 
-        <!-- v-style with object -->
-        <div v-style="${{ width: this.state.width, height: this.state.height, backgroundColor: this.state.backgroundColor }}">
+        <!-- #style with object -->
+        <div #style="${{ width: this.state.width, height: this.state.height, backgroundColor: this.state.backgroundColor }}">
           Dynamic styles: ${this.state.width}px x ${this.state.height}px
         </div>
 
-        <!-- v-style with computed styles -->
-        <div v-style="${this.state.styles}">
+        <!-- #style with computed styles -->
+        <div #style="${this.state.styles}">
           Styles from state object
         </div>
 
-        <!-- v-bind test -->
-        <input v-bind="${this.state.attributes}" type="text" />
+        <!-- #bind test -->
+        <input #bind="${this.state.attributes}" type="text" />
 
         <!-- Helper function tests -->
         <div ${vShow(this.state.isVisible)}>
@@ -103,24 +103,24 @@ export const TestDirectives = component({
           </button>
         </div>
 
-        <!-- v-model test -->
+        <!-- #model test -->
         <div style="margin-top: 20px;">
-          <h3>v-model Tests</h3>
-          <input v-model="textValue" placeholder="Type here..." />
+          <h3>#model Tests</h3>
+          <input #model="textValue" placeholder="Type here..." />
           <p>Text value: ${this.state.textValue || 'empty'}</p>
 
           <label>
-            <input type="checkbox" v-model="checkboxValue" />
+            <input type="checkbox" #model="checkboxValue" />
             Checkbox (${this.state.checkboxValue || 'false'})
           </label>
 
           <div>
-            <label><input type="radio" v-model="radioValue" value="option1" /> Option 1</label>
-            <label><input type="radio" v-model="radioValue" value="option2" /> Option 2</label>
+            <label><input type="radio" #model="radioValue" value="option1" /> Option 1</label>
+            <label><input type="radio" #model="radioValue" value="option2" /> Option 2</label>
             <p>Radio value: ${this.state.radioValue || 'none selected'}</p>
           </div>
 
-          <select v-model="selectValue">
+          <select #model="selectValue">
             <option value="">Choose...</option>
             <option value="red">Red</option>
             <option value="blue">Blue</option>
@@ -133,7 +133,7 @@ export const TestDirectives = component({
   }
 });
 
-// Initialize additional state for v-model tests
+// Initialize additional state for #model tests
 TestDirectives.prototype.state.textValue = "";
 TestDirectives.prototype.state.checkboxValue = false;
 TestDirectives.prototype.state.radioValue = "";

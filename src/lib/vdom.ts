@@ -51,7 +51,7 @@ function setNestedValue(obj: any, path: string, value: any): void {
 }
 
 /**
- * Process v-model directive for two-way data binding
+ * Process #model directive for two-way data binding
  */
 function processVModelDirective(
   value: string,
@@ -324,7 +324,7 @@ function processVModelDirective(
 }
 
 /**
- * Process v-bind directive for attribute/property binding
+ * Process #bind directive for attribute/property binding
  */
 function processVBindDirective(
   value: string,
@@ -351,7 +351,7 @@ function processVBindDirective(
 }
 
 /**
- * Process v-show directive for conditional display
+ * Process #show directive for conditional display
  */
 function processVShowDirective(
   value: string,
@@ -384,7 +384,7 @@ function processVShowDirective(
 }
 
 /**
- * Process v-class directive for conditional CSS classes
+ * Process #class directive for conditional CSS classes
  */
 function processVClassDirective(
   value: string,

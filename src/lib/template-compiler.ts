@@ -42,12 +42,12 @@ function parseProps(
   const attrs: Record<string, any> = {};
   const directives: Record<string, { value: any; modifiers: string[] }> = {};
 
-  // Allow ":" for props, "@" for events, "v-" for directives.
-  const attrRegex = /([:@]|v-)?([a-zA-Z0-9-:\.]+)="([^"]*)"/g;
+  // Allow ":" for props, "@" for events, "#" for directives.
+  const attrRegex = /([:@]|#)?([a-zA-Z0-9-:\.]+)="([^"]*)"/g;
   let match: RegExpExecArray | null;
 
   while ((match = attrRegex.exec(str))) {
-    const prefix = match[1]; // ":" or "@" or "v-" or undefined
+    const prefix = match[1]; // ":" or "@" or "#" or undefined
     const rawName = match[2];
     const rawVal = match[3];
 
@@ -102,16 +102,16 @@ function parseProps(
         if (context && typeof context[rawVal] === "function")
           props[onName] = context[rawVal];
       }
-    } else if (prefix === "v-") {
-      // Vue-like directive - rawName includes the full directive name (e.g., "model" from "v-model")
+    } else if (prefix === "#") {
+      // Vue-like directive - rawName includes the full directive name (e.g., "model" from "#model")
       const [directiveName, ...modifierParts] = rawName.split(".");
       const modifiers = modifierParts || [];
 
       let finalValue = interpMatch ? values[Number(interpMatch[1])] : rawVal;
       let finalModifiers = [...modifiers];
 
-      // For v-model, check if modifiers are in the directive name (e.g., v-model.trim)
-      // vs. in the value (e.g., v-model="text.trim")
+      // For #model, check if modifiers are in the directive name (e.g., #model.trim)
+      // vs. in the value (e.g., #model="text.trim")
       if (
         directiveName === "model" &&
         typeof finalValue === "string" &&
@@ -154,7 +154,7 @@ function parseProps(
 }
 
 /**
- * Internal implementation allowing an optional compile context for v-model.
+ * Internal implementation allowing an optional compile context for #model.
  * Fixes:
  *  - Recognize interpolation markers embedded in text ("World{{1}}") and replace them.
  *  - Skip empty arrays from directives so markers don't leak as text.
@@ -318,9 +318,9 @@ function htmlImpl(
       // Process built-in directives that should be converted to props/attrs
       for (const [directiveName, directive] of Object.entries(directives)) {
         if (directiveName === "bind") {
-          // v-bind directive - can be object syntax or simple value
+          // #bind directive - can be object syntax or simple value
           if (typeof directive.value === "object" && directive.value !== null) {
-            // v-bind object syntax: v-bind="{ disabled: true, class: 'foo' }"
+            // #bind object syntax: #bind="{ disabled: true, class: 'foo' }"
             for (const [key, value] of Object.entries(directive.value)) {
               if (typeof value === "boolean") {
                 if (value) {
@@ -332,17 +332,17 @@ function htmlImpl(
               }
             }
           } else if (directive.value != null) {
-            // Simple v-bind (though this is unusual - typically it's object syntax)
+            // Simple #bind (though this is unusual - typically it's object syntax)
             vnodeProps.attrs[directiveName] = String(directive.value);
           }
         } else if (directiveName === "show") {
-          // v-show directive
+          // #show directive
           const visible = Boolean(directive.value);
           vnodeProps.attrs.style =
             (vnodeProps.attrs.style || "") +
             (visible ? "" : "; display: none !important");
         } else if (directiveName === "class") {
-          // v-class directive
+          // #class directive
           const classValue = directive.value;
           let classNames: string[] = [];
 
@@ -377,7 +377,7 @@ function htmlImpl(
           ];
           vnodeProps.attrs.class = newClasses.join(" ");
         } else if (directiveName === "style") {
-          // v-style directive
+          // #style directive
           const styleValue = directive.value;
           let styleString = "";
 

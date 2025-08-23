@@ -1,8 +1,8 @@
-import { DevTools } from '../../src/lib/dev-tools';
+import { DevTools } from '../../src/lib/de#tools';
 import { describe, it, expect, vi } from 'vitest';
-import { DevPerformance } from '../../src/lib/dev-tools';
+import { DevPerformance } from '../../src/lib/de#tools';
 
-describe('dev-tools', () => {
+describe('de#tools', () => {
   it('should export expected functions', () => {
     expect(typeof DevTools.log).toBe('function');
     expect(typeof DevTools.warn).toBe('function');

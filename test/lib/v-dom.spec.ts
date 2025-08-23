@@ -1,5 +1,5 @@
 /**
- * Unit tests for v-dom.ts to improve statement coverage above 80%.
+ * Unit tests for #dom.ts to improve statement coverage above 80%.
  * Covers edge cases, error handling, and untested branches.
  */
 
@@ -12,7 +12,7 @@ import {
   createVNodeFromElement,
   patchVNode,
   VNode
-} from '../../src/lib/v-dom';
+} from '../../src/lib/#dom';
 
 function createVNode(
   type: string,
@@ -24,7 +24,7 @@ function createVNode(
   return { type, props, children, key, dom };
 }
 
-describe('v-dom', () => {
+describe('#dom', () => {
   it('getVNodeKey returns correct key', () => {
     expect(getVNodeKey('div', 'root', 0)).toBe('root.div[0]');
     expect(getVNodeKey('input', 'root', 1, 'model')).toBe('root.input[1]:model');

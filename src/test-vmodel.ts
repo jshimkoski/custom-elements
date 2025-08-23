@@ -48,7 +48,7 @@ export const TestVModel = component({
           <!-- Basic text input -->
           <div style="margin-bottom: 10px;">
             <label>Text Input: </label>
-            <input type="text" v-model="textInput" placeholder="Enter text..." />
+            <input type="text" #model="textInput" placeholder="Enter text..." />
             <span>Value: "${this.state.textInput}"</span>
           </div>
 
@@ -65,20 +65,20 @@ export const TestVModel = component({
           <!-- Nested property binding -->
           <div style="margin-bottom: 10px;">
             <label>User Name: </label>
-            <input type="text" v-model="user.name" />
+            <input type="text" #model="user.name" />
             <span>Value: "${this.state.user.name}"</span>
           </div>
 
           <div style="margin-bottom: 10px;">
             <label>User Email: </label>
-            <input type="email" v-model="user.email" />
+            <input type="email" #model="user.email" />
             <span>Value: "${this.state.user.email}"</span>
           </div>
 
           <!-- Deep nested property -->
           <div style="margin-bottom: 10px;">
             <label>Theme Preference: </label>
-            <select v-model="user.preferences.theme">
+            <select #model="user.preferences.theme">
               <option value="light">Light</option>
               <option value="dark">Dark</option>
               <option value="auto">Auto</option>
@@ -92,13 +92,13 @@ export const TestVModel = component({
 
           <div style="margin-bottom: 10px;">
             <label>Number Input: </label>
-            <input type="number" v-model="numberInput" min="0" max="100" />
+            <input type="number" #model="numberInput" min="0" max="100" />
             <span>Value: ${this.state.numberInput} (Type: ${typeof this.state.numberInput})</span>
           </div>
 
           <div style="margin-bottom: 10px;">
             <label>Range Input: </label>
-            <input type="range" v-model="rangeValue" min="0" max="100" />
+            <input type="range" #model="rangeValue" min="0" max="100" />
             <span>Value: ${this.state.rangeValue}</span>
           </div>
         </div>
@@ -109,7 +109,7 @@ export const TestVModel = component({
           <!-- Single checkbox -->
           <div style="margin-bottom: 10px;">
             <label>
-              <input type="checkbox" v-model="checkboxValue" />
+              <input type="checkbox" #model="checkboxValue" />
               Single Checkbox (${this.state.checkboxValue})
             </label>
           </div>
@@ -117,7 +117,7 @@ export const TestVModel = component({
           <!-- Nested checkbox -->
           <div style="margin-bottom: 10px;">
             <label>
-              <input type="checkbox" v-model="user.preferences.notifications" />
+              <input type="checkbox" #model="user.preferences.notifications" />
               Notifications (${this.state.user.preferences.notifications})
             </label>
           </div>
@@ -125,10 +125,10 @@ export const TestVModel = component({
           <!-- Multiple checkboxes bound to array -->
           <div style="margin-bottom: 10px;">
             <p>Selected Items: [${this.state.selectedItems.join(', ')}]</p>
-            <label><input type="checkbox" v-model="selectedItems" value="item1" /> Item 1</label><br>
-            <label><input type="checkbox" v-model="selectedItems" value="item2" /> Item 2</label><br>
-            <label><input type="checkbox" v-model="selectedItems" value="item3" /> Item 3</label><br>
-            <label><input type="checkbox" v-model="selectedItems" value="item4" /> Item 4</label>
+            <label><input type="checkbox" #model="selectedItems" value="item1" /> Item 1</label><br>
+            <label><input type="checkbox" #model="selectedItems" value="item2" /> Item 2</label><br>
+            <label><input type="checkbox" #model="selectedItems" value="item3" /> Item 3</label><br>
+            <label><input type="checkbox" #model="selectedItems" value="item4" /> Item 4</label>
           </div>
         </div>
 
@@ -137,9 +137,9 @@ export const TestVModel = component({
 
           <div style="margin-bottom: 10px;">
             <p>Selected Option: "${this.state.radioValue}"</p>
-            <label><input type="radio" v-model="radioValue" value="option1" /> Option 1</label><br>
-            <label><input type="radio" v-model="radioValue" value="option2" /> Option 2</label><br>
-            <label><input type="radio" v-model="radioValue" value="option3" /> Option 3</label>
+            <label><input type="radio" #model="radioValue" value="option1" /> Option 1</label><br>
+            <label><input type="radio" #model="radioValue" value="option2" /> Option 2</label><br>
+            <label><input type="radio" #model="radioValue" value="option3" /> Option 3</label>
           </div>
         </div>
 
@@ -148,7 +148,7 @@ export const TestVModel = component({
 
           <div style="margin-bottom: 10px;">
             <label>Color Selection: </label>
-            <select v-model="selectValue">
+            <select #model="selectValue">
               <option value="">Choose a color...</option>
               <option value="red">Red</option>
               <option value="blue">Blue</option>
@@ -161,7 +161,7 @@ export const TestVModel = component({
           <!-- Multiple select -->
           <div style="margin-bottom: 10px;">
             <label>Multiple Selection: </label>
-            <select v-model="selectedItems" multiple size="4">
+            <select #model="selectedItems" multiple size="4">
               <option value="item1">Item 1</option>
               <option value="item2">Item 2</option>
               <option value="item3">Item 3</option>
@@ -175,7 +175,7 @@ export const TestVModel = component({
 
           <div style="margin-bottom: 10px;">
             <label>Textarea: </label><br>
-            <textarea v-model="textareaValue" rows="4" cols="50" placeholder="Enter multi-line text..."></textarea>
+            <textarea #model="textareaValue" rows="4" cols="50" placeholder="Enter multi-line text..."></textarea>
             <div style="border: 1px solid #ccc; padding: 10px; margin-top: 5px; white-space: pre-wrap;">
               ${this.state.textareaValue}
             </div>

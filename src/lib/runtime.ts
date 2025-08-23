@@ -1,7 +1,7 @@
 /**
  * runtime.ts
  * Lightweight, strongly typed, functional custom element runtime for two-way binding, event, and prop support.
- * Supports: state, computed, props, style, render, lifecycle hooks, v-model-* and data-on-* attributes.
+ * Supports: state, computed, props, style, render, lifecycle hooks, #model-* and data-on-* attributes.
  * No external dependencies. Mobile-first, secure, and developer friendly.
  */
 
@@ -32,8 +32,6 @@ import {
   type DynamicStyleConfig,
   type StyleOptimizations,
 } from "./style-utils";
-import { html } from "./template-compiler";
-import { vIf, vBind, vClass, vFor, vModel, vShow, vIfBuilder } from "./directives";
 
 // --- Types ---
 type LifecycleKeys =
@@ -88,10 +86,9 @@ export interface ComponentConfig<
   watch?: WatchConfig<S & C & P>;
   style?: string | ((state: S & C) => string) | DynamicStyleConfig;
   styleOptimizations?: Partial<StyleOptimizations>;
-  render?: (state: S & C & P & InferMethods<T>) => VNode | VNode[];
-  renderAsync?: (
-    state: S & C & P & InferMethods<T>,
-  ) => Promise<VNode | VNode[]>;
+  render: (
+    state: S & C & P & InferMethods<T>
+  ) => VNode | VNode[] | Promise<VNode | VNode[]>
   loadingTemplate?: (state: S & C & P & InferMethods<T>) => VNode | VNode[];
   errorTemplate?: (
     error: Error,
@@ -128,6 +125,7 @@ export interface ComponentAPI<S> {
   state: S & { [key: string]: any };
   emit: (event: string, detail?: any) => void;
   on: (event: string, handler: (detail: any) => void) => void;
+  refs: Record<string, HTMLElement>;
 }
 
 // --- Internal registry ---
@@ -167,6 +165,33 @@ function sanitizeCSS(css: string): string {
 // ######################################
 // ######################################
 
+// --- Hot Module Replacement (HMR) ---
+if (
+  typeof import.meta !== 'undefined' &&
+  (import.meta as any).hot &&
+  import.meta && import.meta.hot
+) {
+  import.meta.hot.accept((newModule) => {
+    // Update registry with new configs from the hot module
+    if (newModule && newModule.registry) {
+      for (const [tag, newConfig] of newModule.registry.entries()) {
+        registry.set(tag, newConfig);
+        // Update all instances to use new config
+        if (typeof document !== "undefined") {
+          document.querySelectorAll(tag).forEach((el) => {
+            if (typeof (el as any)._cfg !== "undefined") {
+              (el as any)._cfg = newConfig;
+            }
+            if (typeof (el as any)._render === "function") {
+              (el as any)._render(newConfig);
+            }
+          });
+        }
+      }
+    }
+  });
+}
+
 // --- Main component registration ---
 export function component<
   S extends object,
@@ -175,8 +200,8 @@ export function component<
   T extends object = any,
 >(tag: string, config: ComponentConfig<S, C, P, T>): void {
   registry.set(tag, config);
-  if (!customElements.get(tag)) {
-    customElements.define(tag, createElementClass<S, C, P, T>(config));
+  if (typeof window !== "undefined" && !customElements.get(tag)) {
+    customElements.define(tag, createElementClass<S, C, P, T>(config) as CustomElementConstructor);
   }
 }
 
@@ -186,24 +211,21 @@ export function createElementClass<
   C extends object,
   P extends object,
   T extends object = any,
->(config: ComponentConfig<S, C, P, T>): CustomElementConstructor {
+>(config: ComponentConfig<S, C, P, T>): CustomElementConstructor | { new (): object } {
   // Validate that either render or renderAsync is provided
-  if (!config.render && !config.renderAsync) {
+  if (!config.render) {
     throw new Error(
-      "Component must have either render or renderAsync function",
+      "Component must have a render function",
     );
   }
-  if (config.render && config.renderAsync) {
-    throw new Error(
-      "Component cannot have both render and renderAsync functions",
-    );
+  if (typeof window === "undefined") {
+    // SSR fallback: minimal class, no DOM, no lifecycle, no "this"
+    return class { constructor() {} };
   }
   return class extends HTMLElement {
-    private _state: S & C & P & { [key: string]: any };
+    private _state: S & C & P & InferMethods<T>;
     private _refs: Record<string, HTMLElement> = {};
-    private _api: ComponentAPI<S & C & P> & {
-      refs: Record<string, HTMLElement>;
-    };
+    private _api: ComponentAPI<S & C & P & InferMethods<T>>;
     private _listeners: Array<() => void> = [];
     private _watchers: Map<string, WatcherState> = new Map();
     /** @internal */
@@ -225,8 +247,6 @@ export function createElementClass<
     private _renderCount = 0;
     private _templateLoading = false;
     private _templateError: Error | null = null;
-    private _templateCache: VNode | VNode[] | null = null;
-    private _templatePromise: Promise<VNode | VNode[]> | null = null;
 
     constructor() {
       super();
@@ -302,8 +322,6 @@ export function createElementClass<
         // Clean up async template state
         this._templateLoading = false;
         this._templateError = null;
-        this._templateCache = null;
-        this._templatePromise = null;
 
         this._mounted = false;
       });
@@ -363,118 +381,53 @@ export function createElementClass<
       this._runLogicWithinErrorBoundary(cfg, () => {
         if (!this.shadowRoot) return;
 
-        // Clear style dependencies tracking for this render cycle
         this._styleDependencies.clear();
 
-        // --- Handle Async Templates ---
-        if (cfg.renderAsync) {
-          this._renderAsync(cfg);
+        // If loading, show loading template
+        if (this._templateLoading && cfg.loadingTemplate) {
+          this._renderOutput(cfg.loadingTemplate(this._state));
           return;
         }
 
-        // --- Render VDOM (Sync) ---
-        const output = cfg.render!(this._state);
-        // Create context with state and render method for directive processing
-        // Use a proxy to avoid modifying the actual state object
-        const context = new Proxy(this._state, {
-          get: (target, prop) => {
-            if (prop === "_requestRender") {
-              return () => this._requestRender();
-            }
-            if (prop === "_state") {
-              return target;
-            }
-            // Handle nested property access for v-model directives
-            if (typeof prop === "string" && prop.includes(".")) {
-              return prop.split(".").reduce((obj, key) => obj?.[key], target);
-            }
-            return target[prop as keyof typeof target];
-          },
-          set: (target, prop, value) => {
-            // Handle nested property assignment for v-model directives
-            if (typeof prop === "string" && prop.includes(".")) {
-              const keys = prop.split(".");
-              const lastKey = keys.pop();
-              if (!lastKey) return false;
+        // If error, show error template
+        if (this._templateError && cfg.errorTemplate) {
+          this._renderOutput(cfg.errorTemplate(this._templateError, this._state));
+          return;
+        }
 
-              const nestedTarget = keys.reduce((obj, key) => {
-                if (!(key in obj)) {
-                  (obj as any)[key] = {};
-                }
-                return (obj as any)[key];
-              }, target as any);
+        // Call render function
+        const outputOrPromise = cfg.render(this._state);
 
-              (nestedTarget as any)[lastKey] = value;
-              return true;
-            }
-            target[prop as keyof typeof target] = value;
-            return true;
-          },
-        });
-        vdomRenderer(this.shadowRoot, output, context);
+        if (outputOrPromise instanceof Promise) {
+          this._templateLoading = true;
+          outputOrPromise
+            .then((output) => {
+              this._templateLoading = false;
+              this._templateError = null;
+              this._renderOutput(output);
+              return output;
+            })
+            .catch((error) => {
+              this._templateLoading = false;
+              this._templateError = error;
+              if (cfg.errorTemplate) {
+                const fallback = cfg.errorTemplate(error, this._state);
+                this._renderOutput(fallback);
+                return fallback;
+              }
+              throw error;
+            });
 
-        // Apply styles after VDOM rendering
+          if (cfg.loadingTemplate)
+            this._renderOutput(cfg.loadingTemplate(this._state));
+          return;
+        }
+
+        // this._templateCache = outputOrPromise;
+        this._renderOutput(outputOrPromise);
         this._applyStyle(cfg);
         this._collectRefs();
       });
-    }
-
-    // --- Async Render ---
-    private _renderAsync(cfg: ComponentConfig<S, C, P>) {
-      // If template is loading, show loading state
-      if (this._templateLoading) {
-        const loadingOutput = cfg.loadingTemplate
-          ? cfg.loadingTemplate(this._state)
-          : null;
-        if (loadingOutput) {
-          this._renderOutput(loadingOutput);
-        }
-        return;
-      }
-
-      // If there's an error, show error state
-      if (this._templateError && cfg.errorTemplate) {
-        const errorOutput = cfg.errorTemplate(this._templateError, this._state);
-        this._renderOutput(errorOutput);
-        return;
-      }
-
-      // If we have cached template, use it
-      if (this._templateCache) {
-        this._renderOutput(this._templateCache);
-        return;
-      }
-
-      // Start loading template if not already loading
-      if (!this._templatePromise) {
-        this._templateLoading = true;
-        this._templatePromise = cfg.renderAsync!(this._state)
-          .then((result) => {
-            this._templateLoading = false;
-            this._templateError = null;
-            this._templateCache = result;
-            // Re-render with the loaded template
-            this._requestRender();
-            return result;
-          })
-          .catch((error) => {
-            this._templateLoading = false;
-            this._templateError = error;
-            this._templatePromise = null;
-            console.error("Template loading error:", error);
-            // Re-render with error state
-            this._requestRender();
-            throw error;
-          });
-
-        // Show loading state immediately
-        const loadingOutput = cfg.loadingTemplate
-          ? cfg.loadingTemplate(this._state)
-          : null;
-        if (loadingOutput) {
-          this._renderOutput(loadingOutput);
-        }
-      }
     }
 
     // --- Helper to render output ---
@@ -490,14 +443,14 @@ export function createElementClass<
           if (prop === "_state") {
             return target;
           }
-          // Handle nested property access for v-model directives
+          // Handle nested property access for #model directives
           if (typeof prop === "string" && prop.includes(".")) {
-            return prop.split(".").reduce((obj, key) => obj?.[key], target);
+            return prop.split(".").reduce((obj: any, key) => obj?.[key], target as any);
           }
           return target[prop as keyof typeof target];
         },
         set: (target, prop, value) => {
-          // Handle nested property assignment for v-model directives
+          // Handle nested property assignment for #model directives
           if (typeof prop === "string" && prop.includes(".")) {
             const keys = prop.split(".");
             const lastKey = keys.pop();
@@ -578,8 +531,10 @@ export function createElementClass<
               "style",
             ) as HTMLStyleElement;
             if (!this._styleElement) {
-              this._styleElement = document.createElement("style");
-              this.shadowRoot.prepend(this._styleElement);
+              if (typeof document !== "undefined") {
+                this._styleElement = document.createElement("style");
+                this.shadowRoot.prepend(this._styleElement);
+              }
             }
           }
 
@@ -629,7 +584,7 @@ export function createElementClass<
           // Create a hash of dependent state values for caching
           let stateHash = "";
           if (shouldCache && dependencies.length > 0) {
-            const dependentValues = dependencies.map((dep) => this._state[dep]);
+            const dependentValues = dependencies.map((dep) => (this._state as Record<string, unknown>)[dep]);
             stateHash = createStateHash(dependentValues);
 
             // Check cache first
@@ -712,7 +667,7 @@ export function createElementClass<
     }
 
     // --- State, props, computed ---
-    private _initState(cfg: ComponentConfig<S, C, P>): S & C & P {
+    private _initState(cfg: ComponentConfig<S, C, P>): S & C & P & InferMethods<T> {
       try {
         const self = this;
         function createReactive(obj: any, path = ""): any {
@@ -776,7 +731,7 @@ export function createElementClass<
                   ) {
                     const styleDeps = styleConfig.dependencies || [];
                     onlyStyleChanged =
-                      styleDeps.includes(prop as keyof (S & C)) &&
+                      styleDeps.includes(String(prop)) &&
                       styleDeps.every(
                         (dep) =>
                           !self._styleDependencies.has(String(dep)) ||
@@ -823,12 +778,6 @@ export function createElementClass<
                   : String(prop);
                 target[prop as any] = createReactive(value, fullPath);
                 if (!self._initializing) {
-                  // Invalidate async template cache on state changes
-                  if (cfg.renderAsync && self._templateCache) {
-                    self._templateCache = null;
-                    self._templatePromise = null;
-                    self._templateError = null;
-                  }
                   self._triggerWatchers(
                     fullPath,
                     target[prop as any],
@@ -845,9 +794,9 @@ export function createElementClass<
           }
           return obj;
         }
-        return createReactive({ ...cfg.state }) as S & C & P;
+        return createReactive({ ...cfg.state }) as S & C & P & InferMethods<T>;
       } catch (error) {
-        return {} as S & C & P;
+        return {} as S & C & P & InferMethods<T>;
       }
     }
 
@@ -884,7 +833,10 @@ export function createElementClass<
     }
 
     private _getNestedValue(path: string): any {
-      return path.split(".").reduce((obj, key) => obj?.[key], this._state);
+      return path.split(".").reduce(
+        (obj: any, key: string) => obj?.[key],
+        this._state as any,
+      );
     }
 
     private _triggerWatchers(path: string, newValue: any, oldValue: any): void {
@@ -950,356 +902,4 @@ export function createElementClass<
       return val;
     }
   };
-}
-
-component("child-component", {
-  state: { message: "Hello from Child Component" },
-  render(state) {
-    return html`
-      <div>
-        <p>${state.message}</p>
-        <button @click="${state.handleSomething}">Click Me</button>
-        <button @click="${() => (state.message = "cool")}">
-          Another button
-        </button>
-      </div>
-    `;
-  },
-  handleSomething() {
-    console.log("component did something");
-  },
-});
-
-component("my-greeting", {
-  state: {
-    name: "World",
-    array: ["A", "B", "C"],
-    email: "test@me.com",
-    age: 25,
-    isActive: true,
-    color: "red",
-  },
-  computed: {
-    funnyName(state) {
-      return `Funny ${state.name}`;
-    },
-  },
-  watch: {
-    name(newValue, oldValue) {
-      console.log(
-        `Watcher called: Name changed from ${oldValue} to ${newValue}`,
-      );
-    },
-    email(newValue, oldValue) {
-      console.log(
-        `Watcher called: Email changed from ${oldValue} to ${newValue}`,
-      );
-    },
-  },
-  style: `
-    div {
-      color: blue;
-      padding: 20px;
-    }
-    .form-group {
-      margin: 10px 0;
-    }
-    label {
-      display: inline-block;
-      width: 100px;
-    }
-  `,
-  render(state) {
-    return html`
-      <div>
-        <h2>Hello, <span>${state.name}</span></h2>
-        <h3>You have a funny name: ${state.funnyName}</h3>
-        ${vIf(state.name === "World", html`<span>Welcome to the world!</span>`)}
-
-        <div class="form-group">
-          <label>Name:</label>
-          <input type="text" v-model="name" />
-
-          <div class="form-group">
-            <label>Name (vModel):</label>
-            <input
-              v-if="${state.isActive}"
-              type="text"
-              v-model="name"
-              v-class="${ ['form-control', { 'active': state.isActive }] }"
-              v-show="${true}"
-              v-style="${ { color: state.isActive ? 'green' : 'red' } }"
-            />
-            <button v-bind="${ { disabled: state.isActive } }">Submit</button>
-            <button :disabled="${state.isActive}">Submit</button>
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label>Email:</label>
-          <input type="email" v-model="email" />
-        </div>
-
-        <div class="form-group">
-          <label>Age:</label>
-          <input type="number" v-model="age" />
-        </div>
-
-        <div class="form-group">
-          <label>Active:</label>
-          <input type="checkbox" v-model="isActive" />
-        </div>
-
-        <div class="form-group">
-          <label>Color:</label>
-          <select v-model="color">
-            <option value="red">Red</option>
-            <option value="green">Green</option>
-            <option value="blue">Blue</option>
-          </select>
-        </div>
-
-        <div class="form-group">
-          <label>Active group:</label>
-          ${vFor(
-            state.array,
-            (item) => html`
-              ${item}:
-              <input
-                type="checkbox"
-                key="checkbox-${item}"
-                value="${item}"
-                v-model="array"
-                v-class="['item', item === 'A' ? 'active' : '']"
-              />
-            `,
-          )}
-        </div>
-
-        <div class="form-group">
-          <p>State: ${JSON.stringify(state, null, 2)}</p>
-        </div>
-
-        <button
-          @click="${() => {
-            state.name = "Custom Element";
-            state.array = ["D", "E", "F"];
-          }}"
-        >
-          Change Name
-        </button>
-        <button @click="${state.handleSomething}">Click Me</button>
-        ${vFor(state.array, (item) => html`<span>${item}</span>`)}
-        ${vIfBuilder()
-          .if(state.name === "World", html`<span>Welcome to the world!</span>`)
-          .elseIf(state.name === "Custom Element", html`<span>Welcome to the custom element!</span>`)
-          .done()}
-      </div>
-    `;
-  },
-  onConnected(state, api) {
-    console.log("Component connected:", state, api);
-  },
-  onError(error, state, api) {
-    console.error("Component error:", error, state, api);
-  },
-  handleSomething(state: any, e: Event) {
-    state.name = "Updated Name";
-    state.array.push("New Item");
-    console.log("component did something", state, e);
-  },
-});
-
-// --- Template Loading Utilities ---
-
-/**
- * Template cache for async templates
- */
-export class TemplateCache {
-  private cache = new Map<string, VNode | VNode[]>();
-  private loadingPromises = new Map<string, Promise<VNode | VNode[]>>();
-
-  get(key: string): VNode | VNode[] | null {
-    return this.cache.get(key) || null;
-  }
-
-  set(key: string, template: VNode | VNode[]): void {
-    this.cache.set(key, template);
-  }
-
-  has(key: string): boolean {
-    return this.cache.has(key);
-  }
-
-  isLoading(key: string): boolean {
-    return this.loadingPromises.has(key);
-  }
-
-  getLoadingPromise(key: string): Promise<VNode | VNode[]> | null {
-    return this.loadingPromises.get(key) || null;
-  }
-
-  setLoadingPromise(key: string, promise: Promise<VNode | VNode[]>): void {
-    this.loadingPromises.set(key, promise);
-    promise.finally(() => {
-      this.loadingPromises.delete(key);
-    });
-  }
-
-  clear(): void {
-    this.cache.clear();
-    this.loadingPromises.clear();
-  }
-
-  invalidate(key: string): void {
-    this.cache.delete(key);
-    this.loadingPromises.delete(key);
-  }
-}
-
-/**
- * Global template cache instance
- */
-export const templateCache = new TemplateCache();
-
-/**
- * Create an async template loader function
- */
-export function createAsyncTemplate<T extends object>(
-  loader: (state: T) => Promise<VNode | VNode[]>,
-  options: {
-    cacheKey?: (state: T) => string;
-    dependencies?: (keyof T)[];
-  } = {},
-): (state: T) => Promise<VNode | VNode[]> {
-  const { cacheKey, dependencies } = options;
-
-  return async (state: T): Promise<VNode | VNode[]> => {
-    // Generate cache key
-    const key = cacheKey
-      ? cacheKey(state)
-      : dependencies
-        ? dependencies.map((dep) => `${String(dep)}:${state[dep]}`).join("|")
-        : "default";
-
-    // Check cache first
-    if (templateCache.has(key)) {
-      return templateCache.get(key)!;
-    }
-
-    // Check if already loading
-    const loadingPromise = templateCache.getLoadingPromise(key);
-    if (loadingPromise) {
-      return loadingPromise;
-    }
-
-    // Load template
-    const promise = loader(state);
-    templateCache.setLoadingPromise(key, promise);
-
-    try {
-      const result = await promise;
-      templateCache.set(key, result);
-      return result;
-    } catch (error) {
-      templateCache.invalidate(key);
-      throw error;
-    }
-  };
-}
-
-/**
- * Create a route-based async template loader
- */
-export function createRouteTemplate(
-  routeLoader: () => Promise<{ default: string | Function }>,
-  options: {
-    cacheByPath?: boolean;
-  } = {},
-): (state: any) => Promise<VNode | VNode[]> {
-  const { cacheByPath = true } = options;
-
-  return createAsyncTemplate(
-    async (state) => {
-      const module = await routeLoader();
-      const component = module.default;
-
-      if (typeof component === "string") {
-        // If it's a string, assume it's HTML
-        return { tag: "div", props: { innerHTML: component } };
-      } else if (typeof component === "function") {
-        // If it's a function, call it with state
-        return component(state);
-      } else {
-        throw new Error("Route component must be a string or function");
-      }
-    },
-    {
-      cacheKey: cacheByPath
-        ? (state: any) => state.path || "default"
-        : undefined,
-    },
-  );
-}
-
-/**
- * Create a component with async template support
- */
-export function asyncComponent<
-  S extends object,
-  C extends object = {},
-  P extends object = {},
-  T extends object = any,
->(
-  tag: string,
-  config: Omit<ComponentConfig<S, C, P, T>, "render"> & {
-    renderAsync: (
-      state: S & C & P & InferMethods<T>,
-    ) => Promise<VNode | VNode[]>;
-    loadingTemplate?: (state: S & C & P & InferMethods<T>) => VNode | VNode[];
-    errorTemplate?: (
-      error: Error,
-      state: S & C & P & InferMethods<T>,
-    ) => VNode | VNode[];
-  },
-): void {
-  component(tag, config);
-}
-
-/**
- * Create a router-compatible async component
- */
-export function routeComponent<
-  S extends object = {},
-  C extends object = {},
-  P extends object = {},
->(
-  tag: string,
-  config: Omit<ComponentConfig<S, C, P>, "render"> & {
-    routeLoader: () => Promise<{ default: string | Function }>;
-    state?: S;
-    computed?: { [K in keyof C]: (state: S & C) => C[K] };
-    loadingTemplate?: (state: S & C & P) => VNode | VNode[];
-    errorTemplate?: (error: Error, state: S & C & P) => VNode | VNode[];
-  },
-): void {
-  const { routeLoader, loadingTemplate, errorTemplate, ...restConfig } = config;
-
-  asyncComponent(tag, {
-    ...restConfig,
-    renderAsync: createRouteTemplate(routeLoader),
-    loadingTemplate,
-    errorTemplate,
-  });
-}
-
-/**
- * Utility to invalidate template cache
- */
-export function invalidateTemplateCache(key?: string): void {
-  if (key) {
-    templateCache.invalidate(key);
-  } else {
-    templateCache.clear();
-  }
 }
