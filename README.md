@@ -21,10 +21,30 @@ import { component, html } from '@jasonshimmy/custom-elements-runtime';
 
 component('my-counter', {
   state: { count: 0 },
-  template: ({ count }) => html`
-    <button data-on-click="increment">Count: ${count}</button>
-  `({ count }),
-  increment(event, state) { state.count++; }
+  render: (state) => html`
+    <button @click="${() => state.count++}">Count: ${state.count}</button>
+  `
+});
+```
+
+### Async Templates
+
+```ts
+import { asyncComponent, html } from '@jasonshimmy/custom-elements-runtime';
+
+asyncComponent('user-profile', {
+  state: { userId: 1, user: null },
+  renderAsync: async (state) => {
+    const user = await fetch(`/api/users/${state.userId}`).then(r => r.json());
+    return html`
+      <div>
+        <h2>${user.name}</h2>
+        <p>${user.email}</p>
+      </div>
+    `;
+  },
+  loadingTemplate: () => html`<div>Loading user...</div>`,
+  errorTemplate: (error) => html`<div>Error: ${error.message}</div>`
 });
 ```
 
@@ -38,14 +58,15 @@ No config needed — TypeScript support is built-in.
 
 - **Stateful or Stateless:** Flexible components with or without internal state  
 - **Reactive & Declarative:** Auto updates, attribute sync, and data binding  
+- **Async Templates:** Dynamic template loading with caching, loading states, and error handling
 - **Functional Templates:** Tagged helpers (`html`, `compile`), Promises, and styles  
 - **Refs & Computed:** Access elements or create derived state easily  
 - **Built-in Store & Events:** Global state and event bus included  
 - **SSR & Hydration:** Universal rendering with opt-in hydration  
 - **Error Handling & Focus Retention:** Smooth updates without breaking UX  
 - **Plugin System:** Hooks like `onInit`, `onRender`, `onError`  
-- **Lightweight Router:** SSR-ready with `<router-view>` and programmatic navigation  
-- **Tiny & Fast:** Tree-shakable, modular, no dependencies  
+- **Lightweight Router:** SSR-ready with dynamic route loading and programmatic navigation  
+- **Tiny & Fast:** Tree-shakable, modular, no dependencies
 
 ---
 
@@ -108,6 +129,7 @@ No config needed — TypeScript support is built-in.
 
 - [⚙️ Advanced Use Cases](docs/advanced-use-cases.md)  
 - [🛠 API Reference](docs/api-reference.md)  
+- [⚡ Async Templates](docs/async-templates.md)  
 - [🌱 Core Concepts](docs/core-concepts.md)  
 - [🥊 Data Model vs Data Bind](docs/data-model-vs-data-bind.md)  
 - [📦 Examples](docs/examples.md)  

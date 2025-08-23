@@ -90,7 +90,15 @@ export interface ComponentConfig<
   watch?: WatchConfig<S & C & P>;
   style?: string | ((state: S & C) => string) | DynamicStyleConfig;
   styleOptimizations?: Partial<StyleOptimizations>;
-  render: (state: S & C & P & InferMethods<T>) => VNode | VNode[];
+  render?: (state: S & C & P & InferMethods<T>) => VNode | VNode[];
+  renderAsync?: (
+    state: S & C & P & InferMethods<T>,
+  ) => Promise<VNode | VNode[]>;
+  loadingTemplate?: (state: S & C & P & InferMethods<T>) => VNode | VNode[];
+  errorTemplate?: (
+    error: Error,
+    state: S & C & P & InferMethods<T>,
+  ) => VNode | VNode[];
   onConnected?: (
     state: S & C & P & InferMethods<T>,
     api: ComponentAPI<S & C & P & InferMethods<T>>,
@@ -181,6 +189,17 @@ export function createElementClass<
   P extends object,
   T extends object = any,
 >(config: ComponentConfig<S, C, P, T>): CustomElementConstructor {
+  // Validate that either render or renderAsync is provided
+  if (!config.render && !config.renderAsync) {
+    throw new Error(
+      "Component must have either render or renderAsync function",
+    );
+  }
+  if (config.render && config.renderAsync) {
+    throw new Error(
+      "Component cannot have both render and renderAsync functions",
+    );
+  }
   return class extends HTMLElement {
     private _state: S & C & P & { [key: string]: any };
     private _refs: Record<string, HTMLElement> = {};
@@ -206,6 +225,10 @@ export function createElementClass<
     private _cfg: ComponentConfig<S, C, P, T>;
     private _lastRenderTime = 0;
     private _renderCount = 0;
+    private _templateLoading = false;
+    private _templateError: Error | null = null;
+    private _templateCache: VNode | VNode[] | null = null;
+    private _templatePromise: Promise<VNode | VNode[]> | null = null;
 
     constructor() {
       super();
@@ -278,6 +301,12 @@ export function createElementClass<
         this._lastStyleHash = "";
         this._styleUpdateDebounced.cancel();
 
+        // Clean up async template state
+        this._templateLoading = false;
+        this._templateError = null;
+        this._templateCache = null;
+        this._templatePromise = null;
+
         this._mounted = false;
       });
     }
@@ -339,8 +368,14 @@ export function createElementClass<
         // Clear style dependencies tracking for this render cycle
         this._styleDependencies.clear();
 
-        // --- Render VDOM ---
-        const output = cfg.render(this._state);
+        // --- Handle Async Templates ---
+        if (cfg.renderAsync) {
+          this._renderAsync(cfg);
+          return;
+        }
+
+        // --- Render VDOM (Sync) ---
+        const output = cfg.render!(this._state);
         // Create context with state and render method for directive processing
         // Use a proxy to avoid modifying the actual state object
         const context = new Proxy(this._state, {
@@ -384,6 +419,115 @@ export function createElementClass<
         this._applyStyle(cfg);
         this._collectRefs();
       });
+    }
+
+    // --- Async Render ---
+    private _renderAsync(cfg: ComponentConfig<S, C, P>) {
+      // If template is loading, show loading state
+      if (this._templateLoading) {
+        const loadingOutput = cfg.loadingTemplate
+          ? cfg.loadingTemplate(this._state)
+          : null;
+        if (loadingOutput) {
+          this._renderOutput(loadingOutput);
+        }
+        return;
+      }
+
+      // If there's an error, show error state
+      if (this._templateError && cfg.errorTemplate) {
+        const errorOutput = cfg.errorTemplate(this._templateError, this._state);
+        this._renderOutput(errorOutput);
+        return;
+      }
+
+      // If we have cached template, use it
+      if (this._templateCache) {
+        this._renderOutput(this._templateCache);
+        return;
+      }
+
+      // Start loading template if not already loading
+      if (!this._templatePromise) {
+        this._templateLoading = true;
+        this._templatePromise = cfg.renderAsync!(this._state)
+          .then((result) => {
+            this._templateLoading = false;
+            this._templateError = null;
+            this._templateCache = result;
+            // Re-render with the loaded template
+            this._requestRender();
+            return result;
+          })
+          .catch((error) => {
+            this._templateLoading = false;
+            this._templateError = error;
+            this._templatePromise = null;
+            console.error("Template loading error:", error);
+            // Re-render with error state
+            this._requestRender();
+            throw error;
+          });
+
+        // Show loading state immediately
+        const loadingOutput = cfg.loadingTemplate
+          ? cfg.loadingTemplate(this._state)
+          : null;
+        if (loadingOutput) {
+          this._renderOutput(loadingOutput);
+        }
+      }
+    }
+
+    // --- Helper to render output ---
+    private _renderOutput(output: VNode | VNode[]) {
+      if (!this.shadowRoot) return;
+
+      // Create context with state and render method for directive processing
+      const context = new Proxy(this._state, {
+        get: (target, prop) => {
+          if (prop === "_requestRender") {
+            return () => this._requestRender();
+          }
+          if (prop === "_state") {
+            return target;
+          }
+          // Handle nested property access for v-model directives
+          if (typeof prop === "string" && prop.includes(".")) {
+            return prop.split(".").reduce((obj, key) => obj?.[key], target);
+          }
+          return target[prop as keyof typeof target];
+        },
+        set: (target, prop, value) => {
+          // Handle nested property assignment for v-model directives
+          if (typeof prop === "string" && prop.includes(".")) {
+            const keys = prop.split(".");
+            const lastKey = keys.pop();
+            if (!lastKey) return false;
+
+            const nestedTarget = keys.reduce((obj, key) => {
+              if (!(key in obj)) {
+                (obj as any)[key] = {};
+              }
+              return (obj as any)[key];
+            }, target as any);
+
+            (nestedTarget as any)[lastKey] = value;
+            return true;
+          }
+          (target as any)[prop] = value;
+          return true;
+        },
+      });
+
+      vdomRenderer(
+        this.shadowRoot,
+        Array.isArray(output) ? output : [output],
+        context,
+      );
+
+      this._requestStyleUpdate();
+      this._collectRefs();
     }
 
     _requestRender() {
@@ -681,6 +825,12 @@ export function createElementClass<
                   : String(prop);
                 target[prop as any] = createReactive(value, fullPath);
                 if (!self._initializing) {
+                  // Invalidate async template cache on state changes
+                  if (cfg.renderAsync && self._templateCache) {
+                    self._templateCache = null;
+                    self._templatePromise = null;
+                    self._templateError = null;
+                  }
                   self._triggerWatchers(
                     fullPath,
                     target[prop as any],
@@ -958,3 +1108,197 @@ component("my-greeting", {
     console.log("component did something", state, e);
   },
 });
+
+// --- Template Loading Utilities ---
+
+/**
+ * Template cache for async templates
+ */
+export class TemplateCache {
+  private cache = new Map<string, VNode | VNode[]>();
+  private loadingPromises = new Map<string, Promise<VNode | VNode[]>>();
+
+  get(key: string): VNode | VNode[] | null {
+    return this.cache.get(key) || null;
+  }
+
+  set(key: string, template: VNode | VNode[]): void {
+    this.cache.set(key, template);
+  }
+
+  has(key: string): boolean {
+    return this.cache.has(key);
+  }
+
+  isLoading(key: string): boolean {
+    return this.loadingPromises.has(key);
+  }
+
+  getLoadingPromise(key: string): Promise<VNode | VNode[]> | null {
+    return this.loadingPromises.get(key) || null;
+  }
+
+  setLoadingPromise(key: string, promise: Promise<VNode | VNode[]>): void {
+    this.loadingPromises.set(key, promise);
+    promise.finally(() => {
+      this.loadingPromises.delete(key);
+    });
+  }
+
+  clear(): void {
+    this.cache.clear();
+    this.loadingPromises.clear();
+  }
+
+  invalidate(key: string): void {
+    this.cache.delete(key);
+    this.loadingPromises.delete(key);
+  }
+}
+
+/**
+ * Global template cache instance
+ */
+export const templateCache = new TemplateCache();
+
+/**
+ * Create an async template loader function
+ */
+export function createAsyncTemplate<T extends object>(
+  loader: (state: T) => Promise<VNode | VNode[]>,
+  options: {
+    cacheKey?: (state: T) => string;
+    dependencies?: (keyof T)[];
+  } = {},
+): (state: T) => Promise<VNode | VNode[]> {
+  const { cacheKey, dependencies } = options;
+
+  return async (state: T): Promise<VNode | VNode[]> => {
+    // Generate cache key
+    const key = cacheKey
+      ? cacheKey(state)
+      : dependencies
+        ? dependencies.map((dep) => `${String(dep)}:${state[dep]}`).join("|")
+        : "default";
+
+    // Check cache first
+    if (templateCache.has(key)) {
+      return templateCache.get(key)!;
+    }
+
+    // Check if already loading
+    const loadingPromise = templateCache.getLoadingPromise(key);
+    if (loadingPromise) {
+      return loadingPromise;
+    }
+
+    // Load template
+    const promise = loader(state);
+    templateCache.setLoadingPromise(key, promise);
+
+    try {
+      const result = await promise;
+      templateCache.set(key, result);
+      return result;
+    } catch (error) {
+      templateCache.invalidate(key);
+      throw error;
+    }
+  };
+}
+
+/**
+ * Create a route-based async template loader
+ */
+export function createRouteTemplate(
+  routeLoader: () => Promise<{ default: string | Function }>,
+  options: {
+    cacheByPath?: boolean;
+  } = {},
+): (state: any) => Promise<VNode | VNode[]> {
+  const { cacheByPath = true } = options;
+
+  return createAsyncTemplate(
+    async (state) => {
+      const module = await routeLoader();
+      const component = module.default;
+
+      if (typeof component === "string") {
+        // If it's a string, assume it's HTML
+        return { tag: "div", props: { innerHTML: component } };
+      } else if (typeof component === "function") {
+        // If it's a function, call it with state
+        return component(state);
+      } else {
+        throw new Error("Route component must be a string or function");
+      }
+    },
+    {
+      cacheKey: cacheByPath
+        ? (state: any) => state.path || "default"
+        : undefined,
+    },
+  );
+}
+
+/**
+ * Create a component with async template support
+ */
+export function asyncComponent<
+  S extends object,
+  C extends object = {},
+  P extends object = {},
+  T extends object = any,
+>(
+  tag: string,
+  config: Omit<ComponentConfig<S, C, P, T>, "render"> & {
+    renderAsync: (
+      state: S & C & P & InferMethods<T>,
+    ) => Promise<VNode | VNode[]>;
+    loadingTemplate?: (state: S & C & P & InferMethods<T>) => VNode | VNode[];
+    errorTemplate?: (
+      error: Error,
+      state: S & C & P & InferMethods<T>,
+    ) => VNode | VNode[];
+  },
+): void {
+  component(tag, config);
+}
+
+/**
+ * Create a router-compatible async component
+ */
+export function routeComponent<
+  S extends object = {},
+  C extends object = {},
+  P extends object = {},
+>(
+  tag: string,
+  config: Omit<ComponentConfig<S, C, P>, "render"> & {
+    routeLoader: () => Promise<{ default: string | Function }>;
+    state?: S;
+    computed?: { [K in keyof C]: (state: S & C) => C[K] };
+    loadingTemplate?: (state: S & C & P) => VNode | VNode[];
+    errorTemplate?: (error: Error, state: S & C & P) => VNode | VNode[];
+  },
+): void {
+  const { routeLoader, loadingTemplate, errorTemplate, ...restConfig } = config;
+
+  asyncComponent(tag, {
+    ...restConfig,
+    renderAsync: createRouteTemplate(routeLoader),
+    loadingTemplate,
+    errorTemplate,
+  });
+}
+
+/**
+ * Utility to invalidate template cache
+ */
+export function invalidateTemplateCache(key?: string): void {
+  if (key) {
+    templateCache.invalidate(key);
+  } else {
+    templateCache.clear();
+  }
+}
