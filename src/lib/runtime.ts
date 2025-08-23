@@ -8,18 +8,7 @@
 export { createStore } from "./store";
 export { eventBus } from "./event-bus";
 export { html } from "./template-compiler";
-export {
-  vIf,
-  vBind,
-  vClass,
-  vFor,
-  vModel,
-  vShow,
-  vStyle,
-  anchorBlock,
-  vIfChain,
-  vIfBuilder,
-} from "./directives";
+export { when, each, match } from "./directives";
 
 import { vdomRenderer, type VNode } from "./vdom";
 import {
@@ -74,7 +63,7 @@ export interface ComponentConfig<
   P extends object = {},
   T extends object = any,
 > {
-  state: S;
+  state?: S;
   computed?: { [K in keyof C]: (state: S & C) => C[K] };
   props?: Record<
     string,
@@ -122,10 +111,10 @@ export interface ComponentConfig<
 }
 
 export interface ComponentAPI<S> {
-  state: S & { [key: string]: any };
+  state?: S & { [key: string]: any };
   emit: (event: string, detail?: any) => void;
   on: (event: string, handler: (detail: any) => void) => void;
-  refs: Record<string, HTMLElement>;
+  refs?: Record<string, HTMLElement>;
 }
 
 // --- Internal registry ---
@@ -539,12 +528,9 @@ export function createElementClass<
           }
 
           if (!cfg.style) {
-            // console.log("[Style Debug] No style config provided");
             this._styleElement.textContent = "";
             return;
           }
-
-          // console.log("[Style Debug] Style config type:", typeof cfg.style);
 
           // Get style optimizations config
           const optimizations = {

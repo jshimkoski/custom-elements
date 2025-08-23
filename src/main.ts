@@ -1,5 +1,5 @@
 import './style.css';
-import { component, html, vIf, vFor, vIfBuilder } from "./lib/runtime";
+import { component, html, when, each, match } from "./lib/runtime";
 // import './docs-site/docs-app.ts';
 // import './docs-site/docs-nav.ts';
 // import './docs-site/docs-content.ts';
@@ -14,11 +14,22 @@ import { component, html, vIf, vFor, vIfBuilder } from "./lib/runtime";
 // The new runtime is completely self-contained
 // Components automatically register themselves when imported
 
+component("stateless-component", {
+  render() {
+    return html`
+      <div>
+        <p>This is a stateless component</p>
+      </div>
+    `;
+  },
+});
+
 component("child-component", {
   state: { message: "Hello from Child Component" },
   render(state) {
     return html`
       <div>
+        <stateless-component></stateless-component>
         <p>${state.message}</p>
         <button @click="${state.handleSomething}">Click Me</button>
         <button @click="${() => (state.message = "cool")}">
@@ -77,22 +88,21 @@ component("my-greeting", {
   render(state) {
     return html`
       <div>
+        <child-component></child-component>
         <h2>Hello, <span>${state.name}</span></h2>
         <h3>You have a funny name: ${state.funnyName}</h3>
-        ${vIf(state.name === "World", html`<span>Welcome to the world!</span>`)}
+        ${when(state.name === "World", html`<span>Welcome to the world!</span>`)}
 
         <div class="form-group">
           <label>Name:</label>
-          <input type="text" #model="name" />
+          <input type="text" #model="name" #show="${state.isActive}" />
 
           <div class="form-group">
-            <label>Name (vModel):</label>
+            <label>Name (#model):</label>
             <input
-              #if="${state.isActive}"
               type="text"
               #model="name"
               #class="${ ['form-control', { 'active': state.isActive }] }"
-              #show="${true}"
               #style="${ { color: state.isActive ? 'green' : 'red' } }"
             />
             <button #bind="${ { disabled: state.isActive } }">Submit</button>
@@ -126,7 +136,7 @@ component("my-greeting", {
 
         <div class="form-group">
           <label>Active group:</label>
-          ${vFor(
+          ${each(
             state.array,
             (item) => html`
               ${item}:
@@ -154,10 +164,11 @@ component("my-greeting", {
           Change Name
         </button>
         <button @click="${state.handleSomething}">Click Me</button>
-        ${vFor(state.array, (item) => html`<span>${item}</span>`)}
-        ${vIfBuilder()
-          .if(state.name === "World", html`<span>Welcome to the world!</span>`)
-          .elseIf(state.name === "Custom Element", html`<span>Welcome to the custom element!</span>`)
+        ${each(state.array, (item) => html`<span>${item}</span>`)}
+        ${match()
+          .when(state.name === "World", html`<span>Welcome to the world!</span>`)
+          .when(state.name === "Custom Element", html`<span>Welcome to the custom element!</span>`)
+          .otherwise(html`<span>In otherwise statement</span>`)
           .done()}
       </div>
     `;

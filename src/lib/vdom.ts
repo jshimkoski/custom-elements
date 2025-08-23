@@ -53,7 +53,7 @@ function setNestedValue(obj: any, path: string, value: any): void {
 /**
  * Process #model directive for two-way data binding
  */
-function processVModelDirective(
+function processModelDirective(
   value: string,
   modifiers: string[],
   props: Record<string, any>,
@@ -170,7 +170,7 @@ function processVModelDirective(
       | HTMLSelectElement;
 
     // Skip if event is fired during our own value updates
-    if ((target as any)._vModelUpdating) return;
+    if ((target as any)._modelUpdating) return;
 
     // Always get fresh current value to avoid stale closures
     const freshCurrentValue = getCurrentValue();
@@ -241,14 +241,14 @@ function processVModelDirective(
     if (hasChanged) {
       // Mark element as updating to prevent feedback loops
       const element = event.target as HTMLElement;
-      (element as any)._vModelUpdating = true;
+      (element as any)._modelUpdating = true;
 
       // Update using the actual state object for proper nested property support
       setNestedValue(actualState, value, newValue);
 
       // Clear the updating flag after a tick
       setTimeout(() => {
-        (element as any)._vModelUpdating = false;
+        (element as any)._modelUpdating = false;
       }, 0);
 
       // Trigger re-render if context has a render method
@@ -302,9 +302,9 @@ function processVModelDirective(
           if (hasChanged) {
             // Mark element as updating to prevent feedback loops
             if (target) {
-              (target as any)._vModelUpdating = true;
+              (target as any)._modelUpdating = true;
               setTimeout(() => {
-                (target as any)._vModelUpdating = false;
+                (target as any)._modelUpdating = false;
               }, 0);
             }
 
@@ -326,7 +326,7 @@ function processVModelDirective(
 /**
  * Process #bind directive for attribute/property binding
  */
-function processVBindDirective(
+function processBindDirective(
   value: string,
   props: Record<string, any>,
   attrs: Record<string, any>,
@@ -353,7 +353,7 @@ function processVBindDirective(
 /**
  * Process #show directive for conditional display
  */
-function processVShowDirective(
+function processShowDirective(
   value: string,
   attrs: Record<string, any>,
   context?: any,
@@ -386,7 +386,7 @@ function processVShowDirective(
 /**
  * Process #class directive for conditional CSS classes
  */
-function processVClassDirective(
+function processClassDirective(
   value: string,
   attrs: Record<string, any>,
   context?: any,
@@ -417,7 +417,7 @@ function processVClassDirective(
   }
 }
 
-function processVStyleDirective(
+function processStyleDirective(
   value: any,
   attrs: Record<string, any>,
   context?: any,
@@ -508,7 +508,7 @@ function processDirectives(
 
     switch (directiveName) {
       case "model":
-        processVModelDirective(
+        processModelDirective(
           typeof value === "string" ? value : String(value),
           modifiers,
           props,
@@ -519,16 +519,16 @@ function processDirectives(
         );
         break;
       case "bind":
-        processVBindDirective(value, props, attrs, context);
+        processBindDirective(value, props, attrs, context);
         break;
       case "show":
-        processVShowDirective(value, attrs, context);
+        processShowDirective(value, attrs, context);
         break;
       case "class":
-        processVClassDirective(value, attrs, context);
+        processClassDirective(value, attrs, context);
         break;
       case "style":
-        processVStyleDirective(value, attrs, context);
+        processStyleDirective(value, attrs, context);
         break;
       // Add other directive cases here as needed
     }
