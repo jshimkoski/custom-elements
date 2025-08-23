@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { createElementClass, html } from "../src/lib/runtime-v2";
+import { createElementClass, html } from "../src/lib/runtime";
 
 describe("Runtime V2 Form Bindings", () => {
   let container: HTMLDivElement;

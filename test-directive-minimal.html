@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minimal Directive Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .test-box {
+            padding: 20px;
+            margin: 10px 0;
+            border: 2px solid #ccc;
+            border-radius: 8px;
+        }
+        .red { color: red; }
+        .blue { color: blue; }
+        .large { font-size: 1.5em; }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+    <h1>Minimal Directive Test</h1>
+    <div id="app"></div>
+
+    <script type="module">
+        import { component } from './src/lib/runtime.js';
+        import { html } from './src/lib/template-compiler.js';
+        import { vBind, vShow, vClass, vStyle } from './src/lib/directives.js';
+
+        // Test what the helpers return
+        console.log('=== Helper Function Returns ===');
+        console.log('vShow(true):', vShow(true));
+        console.log('vClass("red"):', vClass("red"));
+        console.log('vStyle({color: "blue"}):', vStyle({color: "blue"}));
+        console.log('vBind({disabled: true}):', vBind({disabled: true}));
+
+        const TestComponent = component({
+            name: 'minimal-test',
+
+            state: {
+                visible: true,
+                className: 'red',
+                disabled: false
+            },
+
+            render() {
+                console.log('=== Rendering with state ===', this.state);
+
+                return html`
+                    <div class="test-box">
+                        <h2>Test Results</h2>
+
+                        <!-- Test 1: vShow helper -->
+                        <div ${vShow(this.state.visible)} style="background: lightgreen;">
+                            vShow Helper: Should be visible (${this.state.visible})
+                        </div>
+
+                        <!-- Test 2: vClass helper -->
+                        <div ${vClass(this.state.className)}>
+                            vClass Helper: Should be ${this.state.className}
+                        </div>
+
+                        <!-- Test 3: vStyle helper -->
+                        <div ${vStyle({backgroundColor: 'yellow', padding: '10px'})}>
+                            vStyle Helper: Should have yellow background
+                        </div>
+
+                        <!-- Test 4: vBind helper -->
+                        <button ${vBind({disabled: this.state.disabled})}>
+                            vBind Helper: Should be ${this.state.disabled ? 'disabled' : 'enabled'}
+                        </button>
+
+                        <!-- Controls -->
+                        <div style="margin-top: 20px;">
+                            <button @click="${() => { this.state.visible = !this.state.visible; }}">
+                                Toggle Visibility
+                            </button>
+                            <button @click="${() => {
+                                this.state.className = this.state.className === 'red' ? 'blue' : 'red';
+                            }}">
+                                Toggle Class
+                            </button>
+                            <button @click="${() => { this.state.disabled = !this.state.disabled; }}">
+                                Toggle Disabled
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }
+        });
+
+        customElements.define('minimal-test', TestComponent);
+        document.getElementById('app').innerHTML = '<minimal-test></minimal-test>';
+
+        // Debug after render
+        setTimeout(() => {
+            const comp = document.querySelector('minimal-test');
+            console.log('=== Component Debug ===');
+            console.log('Component:', comp);
+            console.log('Shadow DOM HTML:', comp.shadowRoot?.innerHTML);
+            console.log('Component State:', comp._state);
+        }, 100);
+    </script>
+</body>
+</html>

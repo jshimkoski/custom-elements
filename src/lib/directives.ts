@@ -1,4 +1,4 @@
-import type { VNode } from "./vdom-v2";
+import type { VNode } from "./vdom";
 
 /**
  * Create a stable anchor block with consistent boundaries.

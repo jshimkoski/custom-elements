@@ -1,11 +1,4 @@
-/**
- * Lightweight, scalable router for Custom Elements Runtime
- * - Functional API, zero dependencies, SSR/static site compatible
- * - Integrates with Store and runtime.ts
- */
-
-
-import { Store } from './store';
+import { createStore } from './store';
 
 export interface Route {
   path: string;
@@ -78,7 +71,7 @@ export function useRouter(config: RouterConfig) {
   const { routes, base = '' } = config;
   let getLocation: () => { path: string; query: Record<string, string> };
   let initial: { path: string; query: Record<string, string> };
-  let store: ReturnType<typeof Store>;
+  let store: ReturnType<typeof createStore>;
   let update: () => void;
   let push: (path: string) => void;
   let replace: (path: string) => void;
@@ -93,7 +86,7 @@ export function useRouter(config: RouterConfig) {
     };
     initial = getLocation();
     const match = matchRoute(routes, initial.path);
-    store = Store<RouteState>({
+    store = createStore<RouteState>({
       path: initial.path,
       params: match.params,
       query: initial.query
@@ -121,7 +114,7 @@ export function useRouter(config: RouterConfig) {
     getLocation = () => ({ path: '/', query: {} });
     initial = getLocation();
     const match = matchRoute(routes, initial.path);
-    store = Store<RouteState>({
+    store = createStore<RouteState>({
       path: initial.path,
       params: match.params,
       query: initial.query

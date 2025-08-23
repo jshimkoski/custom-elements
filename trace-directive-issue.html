@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trace Directive Issue</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .test-box {
+            border: 2px solid #ccc;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+        .red { color: red !important; }
+        .blue { color: blue !important; }
+        .bold { font-weight: bold !important; }
+        .hidden { display: none !important; }
+        .debug {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 15px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 Trace Directive Issue</h1>
+
+    <div class="debug" id="console-output">Console output will appear here...</div>
+
+    <div class="test-box">
+        <h2>Test Component</h2>
+        <trace-test></trace-test>
+    </div>
+
+    <div class="test-box">
+        <h2>My-Greeting Component</h2>
+        <my-greeting></my-greeting>
+    </div>
+
+    <script type="module">
+        // Capture console logs for display
+        const originalLog = console.log;
+        const logs = [];
+        console.log = function(...args) {
+            logs.push(args.map(arg =>
+                typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+            ).join(' '));
+            originalLog.apply(console, arguments);
+            updateConsoleOutput();
+        };
+
+        function updateConsoleOutput() {
+            document.getElementById('console-output').textContent = logs.join('\n');
+        }
+
+        console.log('=== TRACE START ===');
+
+        // Import and test each piece
+        console.log('Importing modules...');
+
+        import { component } from './src/lib/runtime.js';
+        import { html } from './src/lib/template-compiler.js';
+        import { vBind, vShow, vClass, vStyle } from './src/lib/directives.js';
+
+        console.log('Modules imported successfully');
+
+        // Test directive helpers directly
+        console.log('=== DIRECTIVE HELPER OUTPUTS ===');
+        const vShowResult = vShow(true);
+        const vClassResult = vClass('red bold');
+        const vStyleResult = vStyle({color: 'blue', fontSize: '18px'});
+        const vBindResult = vBind({disabled: true, placeholder: 'test'});
+
+        console.log('vShow(true) =', vShowResult);
+        console.log('vClass("red bold") =', vClassResult);
+        console.log('vStyle({color: "blue", fontSize: "18px"}) =', vStyleResult);
+        console.log('vBind({disabled: true, placeholder: "test"}) =', vBindResult);
+
+        // Test template compilation
+        console.log('=== TEMPLATE COMPILATION TEST ===');
+
+        try {
+            const testTemplate = html`<div ${vShow(true)}>Test</div>`;
+            console.log('Template created:', typeof testTemplate);
+
+            const rendered = testTemplate({});
+            console.log('Template rendered:', rendered);
+        } catch (error) {
+            console.log('Template compilation error:', error.message);
+        }
+
+        // Create trace test component
+        console.log('=== CREATING TRACE TEST COMPONENT ===');
+
+        const TraceTest = component({
+            name: 'trace-test',
+            state: {
+                visible: true,
+                color: 'red',
+                disabled: false
+            },
+            render() {
+                console.log('TraceTest render() called with state:', this.state);
+
+                // Test each directive individually with detailed logging
+                const showDirective = vShow(this.state.visible);
+                const classDirective = vClass(this.state.color);
+                const styleDirective = vStyle({backgroundColor: 'yellow', padding: '10px'});
+                const bindDirective = vBind({disabled: this.state.disabled});
+
+                console.log('Directives in render():');
+                console.log('  vShow result:', showDirective);
+                console.log('  vClass result:', classDirective);
+                console.log('  vStyle result:', styleDirective);
+                console.log('  vBind result:', bindDirective);
+
+                // Test template compilation with each directive
+                console.log('Creating template with directives...');
+
+                const template = html`
+                    <div style="border: 1px solid #ccc; padding: 15px; margin: 10px;">
+                        <h3>Trace Test Results</h3>
+
+                        <div ${showDirective} style="background: lightgreen; padding: 10px; margin: 5px;">
+                            vShow Test: Should be ${this.state.visible ? 'VISIBLE' : 'HIDDEN'}
+                        </div>
+
+                        <div ${classDirective} style="padding: 10px; margin: 5px; border: 1px solid #999;">
+                            vClass Test: Should have "${this.state.color}" class
+                        </div>
+
+                        <div ${styleDirective} style="margin: 5px;">
+                            vStyle Test: Should have yellow background
+                        </div>
+
+                        <input ${bindDirective} value="test input" style="margin: 5px; padding: 5px;" />
+                        <span>vBind Test: Input should be ${this.state.disabled ? 'DISABLED' : 'ENABLED'}</span>
+
+                        <div style="margin-top: 15px;">
+                            <button onclick="window.toggleTrace()">Toggle Visible</button>
+                            <button onclick="window.changeColor()">Change Color</button>
+                            <button onclick="window.toggleDisabled()">Toggle Disabled</button>
+                        </div>
+
+                        <pre style="background: #f5f5f5; padding: 10px; font-size: 11px;">
+State: ${JSON.stringify(this.state, null, 2)}
+                        </pre>
+                    </div>
+                `;
+
+                console.log('Template created, type:', typeof template);
+                return template;
+            }
+        });
+
+        console.log('TraceTest component created');
+
+        // Register component
+        customElements.define('trace-test', TraceTest);
+        console.log('trace-test component registered');
+
+        // Global test functions
+        window.toggleTrace = function() {
+            const comp = document.querySelector('trace-test');
+            if (comp && comp._state) {
+                console.log('Toggling visible from', comp._state.visible, 'to', !comp._state.visible);
+                comp._state.visible = !comp._state.visible;
+            }
+        };
+
+        window.changeColor = function() {
+            const comp = document.querySelector('trace-test');
+            if (comp && comp._state) {
+                const newColor = comp._state.color === 'red' ? 'blue' : 'red';
+                console.log('Changing color from', comp._state.color, 'to', newColor);
+                comp._state.color = newColor;
+            }
+        };
+
+        window.toggleDisabled = function() {
+            const comp = document.querySelector('trace-test');
+            if (comp && comp._state) {
+                console.log('Toggling disabled from', comp._state.disabled, 'to', !comp._state.disabled);
+                comp._state.disabled = !comp._state.disabled;
+            }
+        };
+
+        // Inspect results after components load
+        setTimeout(() => {
+            console.log('=== POST-LOAD INSPECTION ===');
+
+            const traceComp = document.querySelector('trace-test');
+            const greetingComp = document.querySelector('my-greeting');
+
+            if (traceComp) {
+                console.log('trace-test component found');
+                console.log('  shadowRoot:', !!traceComp.shadowRoot);
+                console.log('  state:', traceComp._state);
+                if (traceComp.shadowRoot) {
+                    console.log('  shadow DOM HTML length:', traceComp.shadowRoot.innerHTML.length);
+
+                    // Look for evidence of directive application
+                    const hiddenElements = traceComp.shadowRoot.querySelectorAll('[style*="display: none"]');
+                    const classElements = traceComp.shadowRoot.querySelectorAll('.red, .blue');
+                    const disabledElements = traceComp.shadowRoot.querySelectorAll('[disabled]');
+
+                    console.log('  Hidden elements (vShow):', hiddenElements.length);
+                    console.log('  Class elements (vClass):', classElements.length);
+                    console.log('  Disabled elements (vBind):', disabledElements.length);
+
+                    // Log actual HTML for inspection
+                    console.log('  First 500 chars of shadow DOM:', traceComp.shadowRoot.innerHTML.substring(0, 500));
+                }
+            } else {
+                console.log('trace-test component NOT FOUND');
+            }
+
+            if (greetingComp) {
+                console.log('my-greeting component found');
+                console.log('  shadowRoot:', !!greetingComp.shadowRoot);
+                console.log('  state:', greetingComp._state);
+                if (greetingComp.shadowRoot) {
+                    // Look for directive evidence in my-greeting
+                    const inputsWithClass = greetingComp.shadowRoot.querySelectorAll('input[class]');
+                    const hiddenInputs = greetingComp.shadowRoot.querySelectorAll('input[style*="display"]');
+                    const disabledButtons = greetingComp.shadowRoot.querySelectorAll('button[disabled]');
+
+                    console.log('  my-greeting inputs with class:', inputsWithClass.length);
+                    console.log('  my-greeting hidden inputs:', hiddenInputs.length);
+                    console.log('  my-greeting disabled buttons:', disabledButtons.length);
+                }
+            } else {
+                console.log('my-greeting component NOT FOUND');
+            }
+
+            console.log('=== TRACE COMPLETE ===');
+        }, 2000);
+    </script>
+</body>
+</html>

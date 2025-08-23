@@ -1,6 +1,6 @@
-import { component } from "./lib/runtime-v2";
-import { html } from "./lib/template-compiler-v2";
-import { vBind, vShow, vClass, vStyle } from "./lib/directives-v2";
+import { component } from "./lib/runtime";
+import { html } from "./lib/template-compiler";
+import { vBind, vShow, vClass, vStyle } from "./lib/directives";
 
 // Test component to verify directive functionality
 export const TestDirectives = component({

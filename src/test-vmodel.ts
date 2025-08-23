@@ -1,6 +1,6 @@
-import { component } from "./lib/runtime-v2";
-import { html } from "./lib/template-compiler-v2";
-import { vModel } from "./lib/directives-v2";
+import { component } from "./lib/runtime";
+import { html } from "./lib/template-compiler";
+import { vModel } from "./lib/directives";
 
 export const TestVModel = component({
   name: "test-vmodel",

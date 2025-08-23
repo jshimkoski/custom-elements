@@ -1,5 +1,5 @@
 import './style.css';
-import "./lib/runtime-v2";
+import "./lib/runtime";
 // import './docs-site/docs-app.ts';
 // import './docs-site/docs-nav.ts';
 // import './docs-site/docs-content.ts';

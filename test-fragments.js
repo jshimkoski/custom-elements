@@ -1,6 +1,6 @@
-import { component } from "./src/lib/runtime-v2.js";
-import { html } from "./src/lib/template-compiler-v2.js";
-import { vFor } from "./src/lib/directives-v2.js";
+import { component } from "./src/lib/runtime.js";
+import { html } from "./src/lib/template-compiler.js";
+import { vFor } from "./src/lib/directives.js";
 
 // Test component to verify fragment support in vFor
 component("fragment-test", {

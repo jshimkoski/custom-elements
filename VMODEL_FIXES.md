@@ -36,7 +36,7 @@ The original vModel implementation suffered from several infinite loop scenarios
 
 ## Implemented Fixes
 
-### 1. Event Handling Improvements (`vdom-v2.ts`)
+### 1. Event Handling Improvements (`vdom.ts`)
 
 #### Trusted Event Filtering
 ```typescript
@@ -72,7 +72,7 @@ setTimeout(() => {
 }, 0);
 ```
 
-### 2. DOM Value Synchronization (`vdom-v2.ts`)
+### 2. DOM Value Synchronization (`vdom.ts`)
 
 #### Smart Initial Value Setting
 ```typescript
@@ -101,7 +101,7 @@ setTimeout(() => {
 }, 0);
 ```
 
-### 3. Helper Function Improvements (`directives-v2.ts`)
+### 3. Helper Function Improvements (`directives.ts`)
 
 #### Event Trust Validation
 ```typescript
@@ -117,7 +117,7 @@ if (currentValue !== value) {
 }
 ```
 
-### 4. Render Loop Protection (`runtime-v2.ts`)
+### 4. Render Loop Protection (`runtime.ts`)
 
 #### Render Throttling
 ```typescript
@@ -225,7 +225,7 @@ const hasChanged = Array.isArray(newValue) && Array.isArray(currentStateValue)
 
 ### Helper Function Usage
 ```javascript
-import { vModel } from './lib/directives-v2';
+import { vModel } from './lib/directives';
 
 // In component render method
 html`
@@ -265,9 +265,9 @@ html`
 
 ## Files Modified
 
-1. **`src/lib/vdom-v2.ts`** - Core vModel directive processing
-2. **`src/lib/directives-v2.ts`** - vModel helper function
-3. **`src/lib/runtime-v2.ts`** - Render loop protection
+1. **`src/lib/vdom.ts`** - Core vModel directive processing
+2. **`src/lib/directives.ts`** - vModel helper function
+3. **`src/lib/runtime.ts`** - Render loop protection
 4. **`test-vmodel-simple.html`** - Simple test file
 5. **`src/test-vmodel.ts`** - Comprehensive test component
 

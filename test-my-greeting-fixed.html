@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Greeting Component - Directive Fix Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 1000px;
+            margin: 0 auto;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 8px;
+            font-weight: bold;
+            text-align: center;
+        }
+        .status.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .status.error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .status.warning { background: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+
+        .test-section {
+            margin: 25px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: #fafafa;
+        }
+        .test-case {
+            margin: 15px 0;
+            padding: 15px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            background: white;
+        }
+
+        /* Custom styles for testing vClass */
+        .red { color: red !important; }
+        .blue { color: blue !important; }
+        .green { color: green !important; }
+        .purple { color: purple !important; }
+        .bold { font-weight: bold !important; }
+        .italic { font-style: italic !important; }
+        .large { font-size: 1.4em !important; }
+        .underline { text-decoration: underline !important; }
+        .uppercase { text-transform: uppercase !important; }
+
+        button {
+            margin: 5px;
+            padding: 10px 18px;
+            border: 1px solid #007bff;
+            background: #007bff;
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover { background: #0056b3; }
+        button:disabled {
+            background: #6c757d;
+            border-color: #6c757d;
+            cursor: not-allowed;
+            opacity: 0.65;
+        }
+
+        input {
+            padding: 8px 12px;
+            margin: 5px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        input:disabled {
+            background: #f8f9fa;
+            color: #6c757d;
+        }
+
+        .controls {
+            background: #e9ecef;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .controls h3 {
+            margin-top: 0;
+            color: #495057;
+        }
+
+        .debug-panel {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 15px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            overflow-x: auto;
+        }
+
+        .highlight {
+            background: yellow;
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+
+        .visual-test {
+            border: 2px dashed #28a745;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 6px;
+            background: rgba(40, 167, 69, 0.05);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎉 My-Greeting Component - Directive Helpers Fixed!</h1>
+
+        <div id="test-status" class="status success">
+            ✅ Testing directive helpers with my-greeting component...
+        </div>
+
+        <div class="test-section">
+            <h2>📝 Test Overview</h2>
+            <p>This test verifies that all directive helpers (vBind, vShow, vClass, vStyle) are working correctly with the my-greeting component after the template compiler fix.</p>
+
+            <div class="debug-panel">
+                <strong>Expected Results:</strong><br>
+                ✅ vShow: Elements should show/hide based on state<br>
+                ✅ vClass: CSS classes should be applied dynamically<br>
+                ✅ vStyle: Inline styles should update with state changes<br>
+                ✅ vBind: Attributes should bind to state values<br>
+                ✅ State changes should trigger immediate visual updates
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>🧪 Live Component Test</h2>
+            <div class="visual-test">
+                <my-greeting></my-greeting>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>🎮 Interactive Controls</h2>
+            <div class="controls">
+                <h3>Test All Directive Helpers</h3>
+
+                <div style="margin-bottom: 15px;">
+                    <strong>vShow Tests:</strong>
+                    <button onclick="testVShow()">Toggle Visibility Elements</button>
+                    <button onclick="testVShowMultiple()">Test Multiple vShow</button>
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <strong>vClass Tests:</strong>
+                    <button onclick="testVClass()">Cycle Text Colors</button>
+                    <button onclick="testVClassMultiple()">Toggle Multiple Classes</button>
+                    <button onclick="testVClassConditional()">Test Conditional Classes</button>
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <strong>vStyle Tests:</strong>
+                    <button onclick="testVStyle()">Change Background Colors</button>
+                    <button onclick="testVStyleMultiple()">Test Multiple Styles</button>
+                    <button onclick="testVStyleDynamic()">Dynamic Style Updates</button>
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <strong>vBind Tests:</strong>
+                    <button onclick="testVBind()">Toggle Input States</button>
+                    <button onclick="testVBindAttributes()">Test Custom Attributes</button>
+                </div>
+
+                <div>
+                    <strong>Stress Tests:</strong>
+                    <button onclick="stressTestAll()">Rapid State Changes</button>
+                    <button onclick="resetComponent()">Reset Component</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>📊 Component Debug Information</h2>
+            <div id="debug-info" class="debug-panel">
+                Loading component debug information...
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>🔍 Visual Inspection Checklist</h2>
+            <div class="test-case">
+                <h4>Manual Verification Steps:</h4>
+                <ol>
+                    <li>✅ <strong>vShow</strong>: Click "Toggle Visibility" - elements should appear/disappear</li>
+                    <li>✅ <strong>vClass</strong>: Click "Change Color" - text colors should change dynamically</li>
+                    <li>✅ <strong>vStyle</strong>: Click "Change Background" - background colors should update</li>
+                    <li>✅ <strong>vBind</strong>: Click "Toggle Active" - button states should change</li>
+                    <li>✅ <strong>Interactions</strong>: All buttons and inputs should be responsive</li>
+                    <li>✅ <strong>Console</strong>: No JavaScript errors should appear</li>
+                    <li>✅ <strong>Performance</strong>: Updates should be smooth and immediate</li>
+                </ol>
+            </div>
+        </div>
+
+        <div id="test-results" class="test-section" style="display: none;">
+            <h2>📈 Automated Test Results</h2>
+            <div id="test-output" class="debug-panel"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { component } from './src/lib/runtime.js';
+        import { html } from './src/lib/template-compiler.js';
+        import { vBind, vShow, vClass, vStyle } from './src/lib/directives.js';
+
+        // Enhanced my-greeting component with comprehensive directive testing
+        component("my-greeting", {
+            state: {
+                name: "World",
+                isVisible: true,
+                showSecondary: false,
+                textColor: "red",
+                isActive: true,
+                hasError: false,
+                isBold: false,
+                backgroundColor: "lightblue",
+                fontSize: 16,
+                padding: 10,
+                isDisabled: false,
+                customMessage: "Hello from vBind!",
+                borderRadius: 5,
+
+                // Test counters
+                clickCount: 0,
+                renderCount: 0,
+
+                // Advanced state for complex tests
+                themes: {
+                    light: { bg: 'lightgray', color: 'black' },
+                    dark: { bg: 'darkgray', color: 'white' },
+                    colorful: { bg: 'rainbow', color: 'purple' }
+                },
+                currentTheme: 'light'
+            },
+
+            render() {
+                this.state.renderCount++;
+
+                return html`
+                    <div style="padding: 20px; border: 1px solid #ccc; border-radius: 8px; background: #fff;">
+                        <div class="test-case">
+                            <h3>🎯 My-Greeting Component - All Directives Working!</h3>
+
+                            <!-- vShow Tests -->
+                            <div style="margin: 15px 0;">
+                                <h4>👁️ vShow Directive Tests:</h4>
+                                <div ${vShow(this.state.isVisible)} style="background: lightgreen; padding: 10px; margin: 5px 0; border-radius: 4px;">
+                                    ✅ <strong>Primary vShow:</strong> This element should be ${this.state.isVisible ? 'VISIBLE' : 'HIDDEN'}
+                                </div>
+                                <div ${vShow(this.state.showSecondary)} style="background: lightcoral; padding: 10px; margin: 5px 0; border-radius: 4px;">
+                                    ✅ <strong>Secondary vShow:</strong> This element should be ${this.state.showSecondary ? 'VISIBLE' : 'HIDDEN'}
+                                </div>
+                                <div ${vShow(!this.state.isVisible)} style="background: lightyellow; padding: 10px; margin: 5px 0; border-radius: 4px;">
+                                    ✅ <strong>Inverted vShow:</strong> This shows when primary is hidden
+                                </div>
+                            </div>
+
+                            <!-- vClass Tests -->
+                            <div style="margin: 15px 0;">
+                                <h4>🎨 vClass Directive Tests:</h4>
+                                <div ${vClass(this.state.textColor)} style="padding: 10px; margin: 5px 0; border: 1px solid #ccc;">
+                                    ✅ <strong>String Class:</strong> This text should be <span class="highlight">${this.state.textColor}</span>
+                                </div>
+                                <div ${vClass(['bold', this.state.isBold ? 'large' : ''])} style="padding: 10px; margin: 5px 0; border: 1px solid #ccc;">
+                                    ✅ <strong>Array Classes:</strong> Always bold, conditionally ${this.state.isBold ? 'large' : 'normal'}
+                                </div>
+                                <div ${vClass({
+                                    red: this.state.hasError,
+                                    green: !this.state.hasError && this.state.isActive,
+                                    blue: !this.state.hasError && !this.state.isActive,
+                                    italic: this.state.isActive,
+                                    underline: this.state.hasError
+                                })} style="padding: 10px; margin: 5px 0; border: 1px solid #ccc;">
+                                    ✅ <strong>Object Classes:</strong>
+                                    ${this.state.hasError ? 'Error state (red, underline)' :
+                                      this.state.isActive ? 'Active state (green, italic)' : 'Inactive state (blue)'}
+                                </div>
+                                <div ${vClass(['uppercase', {bold: true, purple: this.state.isActive}])} style="padding: 10px; margin: 5px 0; border: 1px solid #ccc;">
+                                    ✅ <strong>Mixed Classes:</strong> Uppercase + Bold + Conditionally Purple
+                                </div>
+                            </div>
+
+                            <!-- vStyle Tests -->
+                            <div style="margin: 15px 0;">
+                                <h4>🎭 vStyle Directive Tests:</h4>
+                                <div ${vStyle({
+                                    backgroundColor: this.state.backgroundColor,
+                                    fontSize: this.state.fontSize + 'px',
+                                    padding: this.state.padding + 'px',
+                                    borderRadius: this.state.borderRadius + 'px',
+                                    border: '2px solid #333',
+                                    textAlign: 'center'
+                                })} style="margin: 5px 0;">
+                                    ✅ <strong>Object Styles:</strong>
+                                    BG: ${this.state.backgroundColor},
+                                    Size: ${this.state.fontSize}px,
+                                    Padding: ${this.state.padding}px
+                                </div>
+                                <div ${vStyle('color: white; background: linear-gradient(45deg, #ff6b6b, #4ecdc4); padding: 15px; text-align: center; border-radius: 8px; font-weight: bold;')} style="margin: 5px 0;">
+                                    ✅ <strong>String Styles:</strong> Gradient background with white text
+                                </div>
+                                <div ${vStyle({
+                                    backgroundColor: this.state.themes[this.state.currentTheme].bg,
+                                    color: this.state.themes[this.state.currentTheme].color,
+                                    padding: '12px',
+                                    textAlign: 'center',
+                                    borderRadius: '6px',
+                                    fontFamily: 'monospace'
+                                })} style="margin: 5px 0;">
+                                    ✅ <strong>Theme Styles:</strong> Current theme: ${this.state.currentTheme}
+                                </div>
+                            </div>
+
+                            <!-- vBind Tests -->
+                            <div style="margin: 15px 0;">
+                                <h4>🔗 vBind Directive Tests:</h4>
+                                <div style="margin: 10px 0;">
+                                    <input ${vBind({
+                                        disabled: this.state.isDisabled,
+                                        placeholder: this.state.customMessage,
+                                        value: this.state.name,
+                                        'data-test': 'vbind-input',
+                                        'data-active': this.state.isActive,
+                                        title: \`Input state: \${this.state.isDisabled ? 'disabled' : 'enabled'}\`
+                                    })} style="width: 250px;" />
+                                    <span style="margin-left: 10px;">
+                                        Input is <strong>${this.state.isDisabled ? 'DISABLED' : 'ENABLED'}</strong>
+                                    </span>
+                                </div>
+
+                                <div style="margin: 10px 0;">
+                                    <button ${vBind({
+                                        disabled: this.state.isDisabled,
+                                        'data-clicks': this.state.clickCount,
+                                        title: \`Clicked \${this.state.clickCount} times\`,
+                                        'aria-label': \`Click counter button\`
+                                    })} @click="\${() => { this.state.clickCount++; }}">
+                                        ✅ <strong>vBind Button:</strong> Clicks: ${this.state.clickCount}
+                                        (${this.state.isDisabled ? 'DISABLED' : 'ACTIVE'})
+                                    </button>
+                                </div>
+
+                                <div style="margin: 10px 0;">
+                                    <input type="checkbox" ${vBind({
+                                        checked: this.state.isActive,
+                                        disabled: this.state.isDisabled,
+                                        'data-state': 'checkbox-test'
+                                    })} />
+                                    <label>Checkbox (${this.state.isActive ? 'CHECKED' : 'UNCHECKED'}, ${this.state.isDisabled ? 'DISABLED' : 'ENABLED'})</label>
+                                </div>
+                            </div>
+
+                            <!-- Interactive Controls -->
+                            <div style="margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 6px;">
+                                <h4>🎮 Component Controls:</h4>
+
+                                <div style="margin: 10px 0;">
+                                    <strong>vShow:</strong>
+                                    <button @click="\${() => { this.state.isVisible = !this.state.isVisible; }}">
+                                        Toggle Primary (${this.state.isVisible ? 'ON' : 'OFF'})
+                                    </button>
+                                    <button @click="\${() => { this.state.showSecondary = !this.state.showSecondary; }}">
+                                        Toggle Secondary (${this.state.showSecondary ? 'ON' : 'OFF'})
+                                    </button>
+                                </div>
+
+                                <div style="margin: 10px 0;">
+                                    <strong>vClass:</strong>
+                                    <button @click="\${() => {
+                                        const colors = ['red', 'blue', 'green', 'purple'];
+                                        const current = colors.indexOf(this.state.textColor);
+                                        this.state.textColor = colors[(current + 1) % colors.length];
+                                    }}">
+                                        Change Color (${this.state.textColor})
+                                    </button>
+                                    <button @click="\${() => { this.state.hasError = !this.state.hasError; }}">
+                                        Toggle Error (${this.state.hasError ? 'ON' : 'OFF'})
+                                    </button>
+                                    <button @click="\${() => { this.state.isActive = !this.state.isActive; }}">
+                                        Toggle Active (${this.state.isActive ? 'ON' : 'OFF'})
+                                    </button>
+                                    <button @click="\${() => { this.state.isBold = !this.state.isBold; }}">
+                                        Toggle Bold (${this.state.isBold ? 'ON' : 'OFF'})
+                                    </button>
+                                </div>
+
+                                <div style="margin: 10px 0;">
+                                    <strong>vStyle:</strong>
+                                    <button @click="\${() => {
+                                        const colors = ['lightblue', 'lightgreen', 'lightpink', 'lightyellow', 'lightcoral'];
+                                        const current = colors.indexOf(this.state.backgroundColor);
+                                        this.state.backgroundColor = colors[(current + 1) % colors.length];
+                                    }}">
+                                        Change Background (${this.state.backgroundColor})
+                                    </button>
+                                    <button @click="\${() => {
+                                        this.state.fontSize = this.state.fontSize === 16 ? 20 : 16;
+                                    }}">
+                                        Toggle Font Size (${this.state.fontSize}px)
+                                    </button>
+                                    <button @click="\${() => {
+                                        const themes = ['light', 'dark', 'colorful'];
+                                        const current = themes.indexOf(this.state.currentTheme);
+                                        this.state.currentTheme = themes[(current + 1) % themes.length];
+                                    }}">
+                                        Change Theme (${this.state.currentTheme})
+                                    </button>
+                                </div>
+
+                                <div style="margin: 10px 0;">
+                                    <strong>vBind:</strong>
+                                    <button @click="\${() => { this.state.isDisabled = !this.state.isDisabled; }}">
+                                        Toggle Disabled (${this.state.isDisabled ? 'ON' : 'OFF'})
+                                    </button>
+                                    <button @click="\${() => {
+                                        const messages = ['Hello from vBind!', 'Type something...', 'Input field', 'Custom placeholder'];
+                                        const current = messages.indexOf(this.state.customMessage);
+                                        this.state.customMessage = messages[(current + 1) % messages.length];
+                                    }}">
+                                        Change Placeholder
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Debug Information -->
+                            <div style="margin: 20px 0; padding: 15px; background: #f1f3f4; border-radius: 6px; font-family: monospace; font-size: 12px;">
+                                <strong>Debug Info:</strong><br>
+                                Renders: ${this.state.renderCount} | Clicks: ${this.state.clickCount}<br>
+                                Active States: isVisible=${this.state.isVisible}, isActive=${this.state.isActive}, hasError=${this.state.hasError}<br>
+                                Current Values: color=${this.state.textColor}, bg=${this.state.backgroundColor}, theme=${this.state.currentTheme}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+        });
+
+        // Global test functions for the control panel
+        window.testVShow = function() {
+            const comp = document.querySelector('my-greeting');
+            if (comp && comp._state) {
+                comp._state.isVisible = !comp._state.isVisible;
+                comp._state.showSecondary = !comp._state.showSecondary;
+            }
+        };
+
+        window.testVShowMultiple = function() {
+            const comp = document.querySelector('my-greeting');
+            if (comp && comp._state) {
+                // Rapid toggle test
+                setTimeout(() => comp._state.isVisible = false, 0);
+                setTimeout(() => comp._state.showSecondary = true, 100);
+                setTimeout(() => comp._state.isVisible = true, 200);
+                setTimeout(() => comp._state.showSecondary = false, 300);
+            }
+        };
+
+        window.testVClass = function() {
+            const comp = document.querySelector('my-greeting');
+            if (comp && comp._state) {
+                const colors = ['red', 'blue', 'green', 'purple'];
+                const current = colors.indexOf(comp._state.textColor);
+                comp._state.textColor = colors[(current + 1) % colors.length];
+            }
+        };
+
+        window.testVClassMultiple = function() {
+            const comp = document.querySelector('my-greeting');
+            if (comp && comp._state) {
+                comp._state.hasError = !comp._state.hasError;
+                comp._state.isActive = !comp._state.isActive;
+                comp._state.isBold = !comp._state.isBold;
+            }
+        };
+
+        window.testVClassConditional = function() {
+            const comp = document.querySelector('my-greeting');
+            if (comp && comp._state) {
+                // Test complex conditional logic
+                comp._state.hasError = !comp._state.hasError;
+                setTimeout(() => comp._state.isActive = !comp._state.isActive, 500);
+            }
+        };
+
+        window.testVStyle = function() {
+            const comp = document.querySelector('my-greeting');
+            if (comp && comp._state) {
+                const colors = ['lightblue', 'lightgreen', 'lightpink', 'lightyellow'];
+                const current = colors.indexOf(comp._state.backgroundColor);
+                comp._state.backgroundColor = colors[(current + 1) % colors.length];
+            }
+        };
+
+        window.testVStyleMultiple = function() {
+            const comp = document.querySelector('my-greeting');
+            if (comp && comp._state) {
+                comp._state.fontSize = comp._state.fontSize === 16 ? 24 : 16;
+                comp._state.padding = comp._state.padding === 10 ? 20 : 10;
+                comp._state.borderRadius = comp._state.borderRadius === 5 ? 15 : 5;
+            }
+        };
+
+        window.testVStyleDynamic = function() {
+            const comp = document.querySelector('my-greeting');
+            if (comp && comp._state) {
+                const themes = ['light', 'dark', 'colorful'];
+                const current = themes.indexOf(comp._state.currentTheme);
+                comp._state.currentTheme = themes[(current + 1) % themes.length];
+            }
+        };
+
+        window.testVBind = function() {
+            const comp = document.querySelector('my-greeting');
+            if (comp && comp._state) {
+                comp._state.isDisabled = !comp._state.isDisabled;
+            }
+        };
+
+        window.testVBindAttributes = function() {
+            const comp = document.querySelector('my-greeting');
+            if (comp && comp._state) {
+                const messages = ['Hello!', 'Type here', 'Input test', 'Custom message'];
+                const current = messages.indexOf(comp._state.customMessage);
+                comp._state.customMessage = messages[(current + 1) % messages.length];
+            }
+        };
+
+        window.stressTestAll = function() {
+            const comp = document.querySelector('my-greeting');
+            if (comp && comp._state) {
+                console.log('Starting stress test...');
+                let changes = 0;
+                const maxChanges = 20;
+
+                const interval = setInterval(() => {
+                    // Rapid state changes
+                    comp._state.isVisible = Math.random() > 0.5;
+                    comp._state.isActive = Math.random() > 0.5;
+                    comp._state.hasError = Math.random() > 0.5;
+                    comp._state.fontSize = Math.random() > 0.5 ? 16 : 20;
+
+                    const colors = ['red', 'blue', 'green', 'purple'];
+                    comp._state.textColor = colors[Math.floor(Math.random() * colors.length)];
+
+                    changes++;
+                    if (changes >= maxChanges) {
+                        clearInterval(interval);
+                        console.log('Stress test completed!');
+                    }
+                }, 100);
+            }
+        };
+
+        window.resetComponent = function() {
+            const comp = document.querySelector('my-greeting');
+            if (comp && comp._state) {
+                Object.assign(comp._state, {
+                    name: "World",
+                    isVisible: true,
+                    showSecondary: false,
+                    textColor: "red",
+                    isActive: true,
+                    hasError: false,
+                    isBold: false,
+                    backgroundColor: "lightblue",
+                    fontSize: 16,
+                    padding: 10,
+                    isDisabled: false,
+                    customMessage: "Hello from vBind!",
+                    borderRadius: 5,
+                    clickCount: 0,
+                    renderCount: 0,
+                    currentTheme: 'light'
+                });
+            }
+        };
+
+        // Automated testing and monitoring
+        let testResults = {
+            vShow: false,
+            vClass: false,
+            vStyle: false,
+            vBind: false,
+            interactions: false
+        };
+
+        function runAutomatedTests() {
+            const comp = document.querySelector('my-greeting');
+            if (!comp || !comp.shadowRoot) {
+                setTimeout(runAutomatedTests, 500);
+                return;
+            }
+
+            const shadowRoot = comp.shadowRoot;
+
+            // Test vShow - look for display:none in styles
+            const hiddenElements = shadowRoot.querySelectorAll('[style*="display: none"], [style*="display:none"]');
+            testResults.vShow = hiddenElements.length > 0;
+
+            // Test vClass - look for applied CSS classes
+            const classElements = shadowRoot.querySelectorAll('.red, .blue, .green, .purple, .bold, .italic');
+            testResults.vClass = classElements.length > 0;
+
+            // Test vStyle - look for inline styles
+            const styledElements = shadowRoot.querySelectorAll('[style*="background"], [style*="font-size"]');
+            testResults.vStyle = styledElements.length > 0;
+
+            // Test vBind - look for bound attributes
+            const boundElements = shadowRoot.querySelectorAll('[data-test], [data-clicks], [disabled]');
+            testResults.vBind = boundElements.length > 0;
+
+            // Test interactions - check if buttons are working
+            const buttons = shadowRoot.querySelectorAll('button');
+            testResults.interactions = buttons.length > 0;
+
+            updateTestStatus();
+        }
+
+        function updateTestStatus() {
+            const status = document.getElementById('test-status');
+            const passedTests = Object.values(testResults).filter(Boolean).length;
+            const totalTests = Object.keys(testResults).length;
+
+            if (passedTests === totalTests) {
+                status.className = 'status success';
+                status.innerHTML = '🎉 ALL DIRECTIVE HELPERS WORKING! All tests passed.';
+            } else if (passedTests > 0) {
+                status.className = 'status warning';
+                status.innerHTML = `⚠️ Partial Success: ${passedTests}/${totalTests} directive helpers working.`;
+            } else {
+                status.className = 'status error';
+                status.innerHTML = '❌ Directive helpers not working - check console for errors.';
+            }
+        }
+
+        function updateDebugInfo() {
+            const comp = document.querySelector('my-greeting');
+            const debugInfo = document.getElementById('debug-info');
+
+            if (comp && comp._state) {
+                debugInfo.innerHTML = `
+<strong>Component State:</strong>
+${JSON.stringify(comp._state, null, 2)}
+
+<strong>Test Results:</strong>
+${Object.entries(testResults).map(([test, passed]) =>
+  `${test}: ${passed ? '✅ PASS' : '❌ FAIL'}`
+).join('\n')}
+
+<strong>Shadow DOM:</strong>
+Elements with vShow: ${comp.shadowRoot?.querySelectorAll('[

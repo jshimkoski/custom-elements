@@ -1,5 +1,5 @@
 /**
- * vdom-v2.ts
+ * vdom.ts
  * Lightweight, strongly typed, functional virtual DOM renderer for custom elements.
  * Features: keyed diffing, incremental patching, focus/caret preservation, event delegation, SSR-friendly, no dependencies.
  */
@@ -68,10 +68,12 @@ function processVModelDirective(
   const hasTrim = modifiers.includes("trim");
   const hasNumber = modifiers.includes("number");
 
-  // Get current value from state - use the actual state object, not the proxy
-  // The proxy is for setting values, but for getting we want direct access
-  const actualState = context._state || context;
-  const currentValue = getNestedValue(actualState, value);
+  // Get current value from state - always get fresh value to avoid stale closures
+  const getCurrentValue = () => {
+    const actualState = context._state || context;
+    return getNestedValue(actualState, value);
+  };
+  const currentValue = getCurrentValue();
 
   // Determine input type from attrs or element
   let inputType = "text";
@@ -169,14 +171,18 @@ function processVModelDirective(
 
     // Skip if event is fired during our own value updates
     if ((target as any)._vModelUpdating) return;
+
+    // Always get fresh current value to avoid stale closures
+    const freshCurrentValue = getCurrentValue();
+
     let newValue: any = target.value;
 
     // Handle different input types
     if (inputType === "checkbox") {
-      if (Array.isArray(currentValue)) {
+      if (Array.isArray(freshCurrentValue)) {
         // Multiple checkboxes bound to array
         const checkboxValue = target.getAttribute("value") || "";
-        const currentArray = [...currentValue];
+        const currentArray = [...freshCurrentValue];
         if ((target as HTMLInputElement).checked) {
           if (!currentArray.includes(checkboxValue)) {
             currentArray.push(checkboxValue);
@@ -228,8 +234,8 @@ function processVModelDirective(
     // For arrays, do a deep comparison
     const hasChanged =
       Array.isArray(newValue) && Array.isArray(currentStateValue)
-        ? JSON.stringify(newValue.sort()) !==
-          JSON.stringify(currentStateValue.sort())
+        ? JSON.stringify([...newValue].sort()) !==
+          JSON.stringify([...currentStateValue].sort())
         : newValue !== currentStateValue;
 
     if (hasChanged) {
@@ -289,8 +295,8 @@ function processVModelDirective(
           // For arrays, do a deep comparison
           const hasChanged =
             Array.isArray(newValue) && Array.isArray(currentStateValue)
-              ? JSON.stringify(newValue.sort()) !==
-                JSON.stringify(currentStateValue.sort())
+              ? JSON.stringify([...newValue].sort()) !==
+                JSON.stringify([...currentStateValue].sort())
               : newValue !== currentStateValue;
 
           if (hasChanged) {

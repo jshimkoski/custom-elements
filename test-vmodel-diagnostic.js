@@ -33,7 +33,7 @@ function checkFile(filePath, checks) {
   return allPassed;
 }
 
-// Check vdom-v2.ts fixes
+// Check vdom.ts fixes
 const vdomChecks = [
   {
     description: "Infinite loop prevention in processVModelDirective",
@@ -57,9 +57,9 @@ const vdomChecks = [
   },
 ];
 
-const vdomPassed = checkFile("src/lib/vdom-v2.ts", vdomChecks);
+const vdomPassed = checkFile("src/lib/vdom.ts", vdomChecks);
 
-// Check directives-v2.ts fixes
+// Check directives.ts fixes
 const directivesChecks = [
   {
     description: "Trusted event check in vModel helper",
@@ -72,11 +72,11 @@ const directivesChecks = [
 ];
 
 const directivesPassed = checkFile(
-  "src/lib/directives-v2.ts",
+  "src/lib/directives.ts",
   directivesChecks,
 );
 
-// Check runtime-v2.ts fixes
+// Check runtime.ts fixes
 const runtimeChecks = [
   {
     description: "Render loop protection properties",
@@ -96,7 +96,7 @@ const runtimeChecks = [
   },
 ];
 
-const runtimePassed = checkFile("src/lib/runtime-v2.ts", runtimeChecks);
+const runtimePassed = checkFile("src/lib/runtime.ts", runtimeChecks);
 
 // Summary
 console.log("\n=== Test Summary ===");

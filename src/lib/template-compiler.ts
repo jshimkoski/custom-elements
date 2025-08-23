@@ -1,860 +1,536 @@
-/**
- * Template Compiler for Custom Elements Runtime
- * 
- * Provides compile-time template optimization for better runtime performance.
- * Features:
- * - Static/dynamic separation
- * - Efficient DOM updates
- * - Treeshakable
- * - TypeScript-friendly
- * - Development-friendly fallbacks
- */
+import type { VNode } from "./vdom";
 
-// ============================================================================
-// CORE TYPES
-// ============================================================================
-
-export interface CompiledTemplate<T = any> {
-  /** Static HTML parts that never change */
-  readonly statics: readonly string[];
-  /** Dynamic update functions for each interpolation */
-  readonly dynamics: readonly UpdateFunction<T>[];
-  /** Pre-compiled DOM fragment for initial render */
-  readonly fragment: DocumentFragment | null;
-  /** Unique template ID for caching */
-  readonly id: string;
-  /** Whether this template has dynamic content */
-  readonly hasDynamics: boolean;
-  /** Render method supporting async output */
-  render: (state: T, api: any) => string | Promise<string>;
+export function h(
+  tag: string,
+  props: Record<string, any> = {},
+  children?: VNode[] | string,
+  key?: string | number,
+): VNode {
+  // Do NOT invent keys here; use only what the caller passes (or props.key).
+  const finalKey = key ?? props.key;
+  return { tag, key: finalKey, props, children };
 }
 
-export interface UpdateFunction<T = any> {
-  /** Target node path from root (e.g., [0, 1] means first child's second child) */
-  readonly path: readonly number[];
-  /** Type of update (text, attribute, property, etc.) */
-  readonly type: UpdateType;
-  /** Target property/attribute name (for non-text updates) */
-  readonly target?: string;
-  /** Function to extract value from state */
-  readonly getValue: (state: T, api: any) => unknown;
+function isAnchorBlock(v: any): boolean {
+  return (
+    !!v &&
+    typeof v === "object" &&
+    ((v as any).type === "AnchorBlock" || (v as any).tag === "#anchor")
+  );
 }
 
-export type UpdateType = 'text' | 'attribute' | 'property' | 'event' | 'class' | 'style';
-
-export interface TemplateCompilerOptions {
-  /** Enable development mode with better error messages */
-  development?: boolean;
-  /** Cache compiled templates */
-  cache?: boolean;
-  /** Enable static analysis optimizations */
-  optimize?: boolean;
+function isElementVNode(v: any): v is VNode {
+  return (
+    typeof v === "object" && v !== null && "tag" in v && !isAnchorBlock(v) // exclude anchor blocks from being treated as normal elements
+  );
 }
 
-// Global development mode detection
-const isDevelopment = (() => {
-  try {
-    // @ts-ignore - Check for Node.js environment
-    if (typeof process !== 'undefined' && process.env) {
-      // @ts-ignore
-      return process.env.NODE_ENV === 'development';
-    }
-  } catch {
-    // Ignore Node.js check in browser
-  }
-  if (typeof window !== 'undefined') {
-    return window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-  }
-  return false;
-})();
-
-// ============================================================================
-// TEMPLATE COMPILATION
-// ============================================================================
-
-/**
- * Compile a template string into an optimized template object
- * This is meant to be used at build time for best performance
- */
-export function compileTemplate<T = any>(
-  templateString: string,
-  options: TemplateCompilerOptions = {}
-): CompiledTemplate<T> {
-  const { development = isDevelopment, cache = true, optimize = true } = options;
-  
-  // Generate unique ID for caching
-  const id = generateTemplateId(templateString);
-  
-  // Check cache first
-  if (cache && templateCache.has(id)) {
-    // Track cache hit
-    if (development) {
-      const metrics = performanceMetrics.get(id) || {
-        compilationTime: 0,
-        renderTime: 0,
-        updateTime: 0,
-        cacheHits: 0,
-        cacheMisses: 0
-      };
-      metrics.cacheHits++;
-      performanceMetrics.set(id, metrics);
-    }
-    return templateCache.get(id)!;
-  }
-  
-  // Track cache miss
-  if (development) {
-    const metrics = performanceMetrics.get(id) || {
-      compilationTime: 0,
-      renderTime: 0,
-      updateTime: 0,
-      cacheHits: 0,
-      cacheMisses: 0
-    };
-    metrics.cacheMisses++;
-    performanceMetrics.set(id, metrics);
-  }
-  
-  try {
-    const compiled = parseAndCompileTemplate<T>(templateString, { development, optimize });
-    
-    if (cache) {
-      templateCache.set(id, compiled);
-    }
-    
-    return compiled;
-  } catch (error) {
-    if (development) {
-      console.error('[Template Compiler] Error compiling template:', error);
-      console.error('[Template Compiler] Template:', templateString);
-    }
-    
-    // Fallback: always return original template string as static content
-    return {
-      statics: [templateString],
-      dynamics: [],
-      fragment: null,
-      id,
-      hasDynamics: false,
-      render: () => templateString
-    };
-  }
+function ensureKey(v: VNode, k: string): VNode {
+  return v.key != null ? v : { ...v, key: k };
 }
 
-/**
- * Tagged template literal for compile-time optimization
- * Usage: compile`<div>${state.name}</div>`
- */
-/**
- * Find the DOM path to a placeholder in the template HTML
- */
-export function findDOMPath(templateHTML: string, placeholder: string): number[] {
-  // Create a temporary DOM to analyze the structure
-  if (typeof document === 'undefined') {
-    return [0]; // Fallback for server-side
-  }
-  
-  try {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(`<div>${templateHTML}</div>`, 'text/html');
-    const container = doc.body.firstElementChild!;
-    
-    // Find the element or text node containing the placeholder
-    function findPlaceholderPath(node: Node, currentPath: number[] = []): number[] | null {
-      if (node.nodeType === Node.TEXT_NODE) {
-        if (node.textContent?.includes(placeholder)) {
-          return currentPath;
-        }
-      } else if (node.nodeType === Node.ELEMENT_NODE) {
-        // Check child nodes, but use a more robust indexing that accounts for the actual DOM structure
-        let childIndex = 0;
-        for (let i = 0; i < node.childNodes.length; i++) {
-          const child = node.childNodes[i];
-          const result = findPlaceholderPath(child, [...currentPath, childIndex]);
-          if (result) {
-            return result;
-          }
-          childIndex++;
-        }
-      }
-      return null;
-    }
-    
-    const path = findPlaceholderPath(container);
-    return path || [0];
-  } catch (error) {
-    if (isDevelopment) {
-      console.warn('[Template Compiler] Error finding DOM path for placeholder:', placeholder, error);
-    }
-    return [0]; // Safe fallback
-  }
-}
+function parseProps(
+  str: string,
+  values: unknown[],
+  context?: Record<string, any>,
+): {
+  props: Record<string, any>;
+  attrs: Record<string, any>;
+  directives: Record<string, { value: string; modifiers: string[] }>;
+} {
+  const props: Record<string, any> = {};
+  const attrs: Record<string, any> = {};
+  const directives: Record<string, { value: any; modifiers: string[] }> = {};
 
-export function compile<T = any>(
-  strings: TemplateStringsArray,
-  ...expressions: Array<(state: T, api: any) => unknown>
-): CompiledTemplate<T> {
-  // Create statics array directly from strings
-  const statics: string[] = Array.from(strings);
-  const templateHTML = strings.map((str, i) => str + (i < expressions.length ? `__DYNAMIC_${i}__` : '')).join('');
-  const dynamics: UpdateFunction<T>[] = expressions.map((expr, index) => {
-    // Analyze the dynamic expression to determine type and target
-    let updateType: UpdateType = 'text';
-    let target: string | undefined;
-    let valueGetter: (state: T, api: any) => unknown = expr;
-    let exprString = expr.toString();
-    let prop = exprString.match(/state\.([a-zA-Z0-9_$]+)/)?.[1];
-    // Parse template HTML to detect attribute context for this dynamic
-    const dynMarker = `__DYNAMIC_${index}__`;
-    if (prop) {
-      const prevStatic = strings[index];
-      if (/class\s*=/.test(prevStatic)) {
-        updateType = 'class';
-        target = 'class';
-        valueGetter = (state: T) => {
-          const v = (state as any)[prop];
-          return v;
-        };
-      } else if (/style\s*=/.test(prevStatic) && /[a-zA-Z-]+:\s*$/.test(prevStatic)) {
-        const stylePropMatch = prevStatic.match(/([a-zA-Z-]+):\s*$/);
-        const styleProp = stylePropMatch ? stylePropMatch[1] : 'style';
-        updateType = 'style';
-        target = styleProp;
-        valueGetter = (state: T) => {
-          const v = (state as any)[prop];
-          return v;
-        };
-      } else if (/value\s*=/.test(prevStatic)) {
-        updateType = 'property';
-        target = 'value';
-        valueGetter = (state: T) => {
-          const v = (state as any)[prop];
-          return v;
-        };
-      } else if (/title\s*=/.test(prevStatic)) {
-        updateType = 'attribute';
-        target = 'title';
-        valueGetter = (state: T) => {
-          const v = (state as any)[prop];
-          return v;
-        };
-      } else if (/style="([a-zA-Z-]+):$/.test(prevStatic)) {
-        const stylePropMatch = prevStatic.match(/style="([a-zA-Z-]+):$/);
-        const styleProp = stylePropMatch ? stylePropMatch[1] : 'style';
-        updateType = 'style';
-        target = styleProp;
-        valueGetter = (state: T) => {
-          const v = (state as any)[prop];
-          return v;
-        };
-      } else if (prevStatic.endsWith('style="color:')) {
-        updateType = 'style';
-        target = 'color';
-        valueGetter = (state: T) => {
-          const v = (state as any)[prop];
-          return v;
-        };
+  // Allow ":" for props, "@" for events, "v-" for directives.
+  const attrRegex = /([:@]|v-)?([a-zA-Z0-9-:\.]+)="([^"]*)"/g;
+  let match: RegExpExecArray | null;
+
+  while ((match = attrRegex.exec(str))) {
+    const prefix = match[1]; // ":" or "@" or "v-" or undefined
+    const rawName = match[2];
+    const rawVal = match[3];
+
+    // Interpolation detection
+    const interpMatch = rawVal.match(/^{{(\d+)}}$/);
+
+    if (prefix === ":") {
+      // Property binding
+      if (interpMatch) {
+        const idx = Number(interpMatch[1]);
+        props[rawName] = values[idx];
       } else {
-        // Fallback to attribute
-        updateType = 'attribute';
-        target = prop;
-        valueGetter = (state: T) => {
-          const v = (state as any)[prop];
-          return v;
-        };
+        props[rawName] = rawVal;
+      }
+    } else if (prefix === "@") {
+      const toOnName = (ev: string) =>
+        "on" + ev.charAt(0).toUpperCase() + ev.slice(1);
+      const onName = toOnName(rawName);
+      if (interpMatch) {
+        const idx = Number(interpMatch[1]);
+        if (values[idx] !== undefined) props[onName] = values[idx];
+      } else {
+        if (context && typeof context[rawVal] === "function")
+          props[onName] = context[rawVal];
+      }
+    } else if (prefix === "v-") {
+      // Vue-like directive - rawName includes the full directive name (e.g., "model" from "v-model")
+      const [directiveName, ...modifierParts] = rawName.split(".");
+      const modifiers = modifierParts || [];
+
+      let finalValue = interpMatch ? values[Number(interpMatch[1])] : rawVal;
+      let finalModifiers = [...modifiers];
+
+      // For v-model, check if modifiers are in the directive name (e.g., v-model.trim)
+      // vs. in the value (e.g., v-model="text.trim")
+      if (
+        directiveName === "model" &&
+        typeof finalValue === "string" &&
+        finalValue.includes(".")
+      ) {
+        // Check if the dots in the value represent nested properties vs modifiers
+        // Common modifiers: trim, number, lazy
+        const commonModifiers = ["trim", "number", "lazy"];
+        const valueParts = finalValue.split(".");
+
+        // Check if the last parts are common modifiers
+        let actualValue = finalValue;
+        const valueModifiers: string[] = [];
+
+        // Work backwards from the end to find modifiers
+        for (let i = valueParts.length - 1; i > 0; i--) {
+          if (commonModifiers.includes(valueParts[i])) {
+            valueModifiers.unshift(valueParts[i]);
+            actualValue = valueParts.slice(0, i).join(".");
+          } else {
+            break;
+          }
+        }
+
+        finalValue = actualValue;
+        finalModifiers.push(...valueModifiers);
+      }
+
+      directives[directiveName] = {
+        value: finalValue,
+        modifiers: finalModifiers,
+      };
+    } else {
+      // Plain attribute (string)
+      attrs[rawName] = interpMatch ? values[Number(interpMatch[1])] : rawVal;
+    }
+  }
+
+  return { props, attrs, directives };
+}
+
+/**
+ * Internal implementation allowing an optional compile context for v-model.
+ * Fixes:
+ *  - Recognize interpolation markers embedded in text ("World{{1}}") and replace them.
+ *  - Skip empty arrays from directives so markers don't leak as text.
+ *  - Pass AnchorBlocks through (and deep-normalize their children's keys) so the renderer can mount/patch them surgically.
+ *  - Do not rewrap interpolated VNodes (preserve their keys); only fill in missing keys.
+ */
+function htmlImpl(
+  strings: TemplateStringsArray,
+  values: unknown[],
+  context?: Record<string, any>,
+): VNode | VNode[] {
+  function textVNode(text: string, key: string): VNode {
+    return h("#text", {}, text, key);
+  }
+
+  // Stitch template with interpolation markers
+  let template = "";
+  for (let i = 0; i < strings.length; i++) {
+    template += strings[i];
+    if (i < values.length) template += `{{${i}}}`;
+  }
+
+  // Matches: tags (open/close/self), standalone interpolation markers, or any other text
+  const tagRegex = /<\/?([a-zA-Z0-9-]+)([^>]*)\/?>|{{(\d+)}}|([^<]+)/g;
+
+  const stack: Array<{
+    tag: string;
+    props: Record<string, any>;
+    children: VNode[];
+    key: string | number | undefined;
+  }> = [];
+  let root: VNode | null = null;
+  let match: RegExpExecArray | null;
+  let currentChildren: VNode[] = [];
+  let currentTag: string | null = null;
+  let currentProps: Record<string, any> = {};
+  let currentKey: string | number | undefined = undefined;
+  let nodeIndex = 0;
+  let fragmentChildren: VNode[] = []; // Track root-level nodes for fragments
+
+  // Helper: merge object-like interpolation into currentProps
+  function mergeIntoCurrentProps(maybe: any) {
+    if (!maybe || typeof maybe !== "object") return;
+    if (isAnchorBlock(maybe)) return; // do not merge AnchorBlocks
+    if (maybe.props || maybe.attrs) {
+      if (maybe.props) {
+        // Ensure currentProps.props exists
+        if (!currentProps.props) currentProps.props = {};
+        Object.assign(currentProps.props, maybe.props);
+      }
+      if (maybe.attrs) {
+        // Ensure currentProps.attrs exists
+        if (!currentProps.attrs) currentProps.attrs = {};
+
+        // Handle special merging for style and class attributes
+        Object.keys(maybe.attrs).forEach((key) => {
+          if (key === "style" && currentProps.attrs.style) {
+            // Merge style attributes by concatenating with semicolon
+            const existingStyle = currentProps.attrs.style.replace(
+              /;?\s*$/,
+              "",
+            );
+            const newStyle = maybe.attrs.style.replace(/^;?\s*/, "");
+            currentProps.attrs.style = existingStyle + "; " + newStyle;
+          } else if (key === "class" && currentProps.attrs.class) {
+            // Merge class attributes by concatenating with space
+            const existingClasses = currentProps.attrs.class
+              .trim()
+              .split(/\s+/)
+              .filter(Boolean);
+            const newClasses = maybe.attrs.class
+              .trim()
+              .split(/\s+/)
+              .filter(Boolean);
+            const allClasses = [
+              ...new Set([...existingClasses, ...newClasses]),
+            ];
+            currentProps.attrs.class = allClasses.join(" ");
+          } else {
+            // For other attributes, just assign (later values override)
+            currentProps.attrs[key] = maybe.attrs[key];
+          }
+        });
       }
     } else {
-      // Fallback to previous logic for text, event, class.prop, style.prop
-      if (exprString.includes('class.') && exprString.match(/class\.([a-zA-Z0-9_$]+)/)) {
-        updateType = 'class';
-        target = exprString.match(/class\.([a-zA-Z0-9_$]+)/)?.[1];
-        valueGetter = (state: T) => (state as any)[target!];
-      } else if (exprString.includes('style.') && exprString.match(/style\.([a-zA-Z0-9_$]+)/)) {
-        updateType = 'style';
-        target = exprString.match(/style\.([a-zA-Z0-9_$]+)/)?.[1];
-        valueGetter = (state: T) => (state as any)[target!];
-      } else if (exprString.includes('@')) {
-        updateType = 'event';
-        target = exprString.split('@')[1];
-      }
+      // If no props/attrs structure, merge directly into props
+      if (!currentProps.props) currentProps.props = {};
+      Object.assign(currentProps.props, maybe);
     }
-    const path = findDOMPath(templateHTML, dynMarker);
-    return {
-      path,
-      type: updateType,
-      target,
-      getValue: valueGetter
-    };
-  });
-  const templateString = strings.join('{{PLACEHOLDER}}');
-  const id = generateTemplateId(templateString);
-  const render = (state: T, api: any): string | Promise<string> => {
-    let result = '';
-    let hasAsync = false;
-    const valuePromises: Promise<any>[] = [];
-    for (let i = 0; i < strings.length; i++) {
-      result += strings[i];
-      if (i < expressions.length) {
-        let value = expressions[i](state, api);
-        if (value instanceof Promise) {
-          hasAsync = true;
-          valuePromises.push(value);
-        } else {
-          // Escape double quotes if previous static ends with attribute=
-          const prevStatic = strings[i];
-          if (/=\s*"?$/.test(prevStatic) && typeof value === 'string') {
-            value = value.replace(/"/g, '&quot;');
-          }
-          result += value;
-        }
-      }
-    }
-    if (!hasAsync) return result;
-    return Promise.all(valuePromises).then(resolvedValues => {
-      let asyncResult = '';
-      let asyncIndex = 0;
-      for (let i = 0; i < strings.length; i++) {
-        asyncResult += strings[i];
-        if (i < expressions.length) {
-          let value = expressions[i](state, api);
-          if (value instanceof Promise) {
-            value = resolvedValues[asyncIndex++];
-          }
-          // Escape double quotes if previous static ends with attribute=
-          const prevStatic = strings[i];
-          if (/=\s*"?$/.test(prevStatic) && typeof value === 'string') {
-            value = value.replace(/"/g, '&quot;');
-          }
-          asyncResult += value;
-        }
-      }
-      return asyncResult;
-    });
-  };
-  return {
-    id,
-    statics,
-    dynamics,
-    hasDynamics: dynamics.length > 0,
-    fragment: null,
-    render
-  };
-}
-
-// ============================================================================
-// TEMPLATE PARSING & ANALYSIS
-// ============================================================================
-
-export function parseAndCompileTemplate<T>(
-  template: string,
-  options: { development: boolean; optimize: boolean }
-): CompiledTemplate<T> {
-  const parser = new TemplateAnalyzer(template, options);
-  return parser.compile<T>();
-}
-
-export class TemplateAnalyzer {
-  private readonly template: string;
-  private readonly options: { development: boolean; optimize: boolean };
-  private readonly dynamics: UpdateFunction<any>[] = [];
-  private statics: string[] = [];
-  
-  constructor(template: string, options: { development: boolean; optimize: boolean }) {
-    this.template = template;
-    this.options = options;
   }
-  
-  compile<T>(): CompiledTemplate<T> {
-    // Parse template for dynamic expressions
-    this.parseTemplate();
-    
-    // Create static fragment if possible
-    const fragment = this.createStaticFragment();
-    
-    // Generate unique ID
-    const id = generateTemplateId(this.template);
-    
-    // Render method for static/dynamic templates
-    const render = (state: T, api: any): string | Promise<string> => {
-      let result = '';
-      for (let i = 0; i < this.statics.length; i++) {
-        result += this.statics[i];
-        if (i < this.dynamics.length) {
-          let value = this.dynamics[i].getValue(state, api);
-          if (value instanceof Promise) {
-            // If any dynamic value is async, resolve all and reconstruct
-            return Promise.all(this.dynamics.map(d => {
-              const v = d.getValue(state, api);
-              return v instanceof Promise ? v : Promise.resolve(v);
-            })).then(resolvedValues => {
-              let asyncResult = '';
-              for (let j = 0; j < this.statics.length; j++) {
-                asyncResult += this.statics[j];
-                if (j < resolvedValues.length) asyncResult += resolvedValues[j];
+
+  // Helper: push an interpolated value into currentChildren/currentProps or fragments
+  function pushInterpolation(val: any, baseKey: string) {
+    const targetChildren = currentTag ? currentChildren : fragmentChildren;
+
+    if (isAnchorBlock(val)) {
+      const anchorKey = (val as VNode).key ?? baseKey;
+      let anchorChildren = (val as any).children as VNode[] | undefined;
+
+      targetChildren.push({
+        ...(val as VNode),
+        key: anchorKey,
+        children: anchorChildren,
+      });
+      return;
+    }
+
+    if (isElementVNode(val)) {
+      // Leave key undefined so assignKeysDeep can generate a stable one
+      targetChildren.push(ensureKey(val, undefined as any));
+      return;
+    }
+
+    if (Array.isArray(val)) {
+      if (val.length === 0) return;
+      for (let i = 0; i < val.length; i++) {
+        const v = val[i];
+        if (isAnchorBlock(v) || isElementVNode(v) || Array.isArray(v)) {
+          // recurse or push without forcing a key
+          pushInterpolation(v, `${baseKey}-${i}`);
+        } else if (v !== null && typeof v === "object") {
+          mergeIntoCurrentProps(v);
+        } else {
+          targetChildren.push(textVNode(String(v), `${baseKey}-${i}`));
+        }
+      }
+      return;
+    }
+
+    if (val !== null && typeof val === "object") {
+      mergeIntoCurrentProps(val);
+      return;
+    }
+
+    targetChildren.push(textVNode(String(val), baseKey));
+  }
+
+  while ((match = tagRegex.exec(template))) {
+    if (match[1]) {
+      // Tag token
+      const tagName = match[1];
+      const isClosing = match[0][1] === "/";
+      const isSelfClosing = match[0][match[0].length - 2] === "/";
+
+      const {
+        props: rawProps,
+        attrs: rawAttrs,
+        directives,
+      } = parseProps(match[2] || "", values, context);
+
+      // Shape props into { props, attrs, directives } expected by VDOM
+      const vnodeProps: {
+        props: Record<string, unknown>;
+        attrs: Record<string, unknown>;
+        directives?: Record<string, { value: any; modifiers: string[] }>;
+      } = { props: {}, attrs: {} };
+
+      for (const k in rawProps) vnodeProps.props[k] = rawProps[k];
+      for (const k in rawAttrs) vnodeProps.attrs[k] = rawAttrs[k];
+
+      // Process built-in directives that should be converted to props/attrs
+      for (const [directiveName, directive] of Object.entries(directives)) {
+        if (directiveName === "bind" && typeof directive.value === "object") {
+          // v-bind object syntax
+          Object.assign(vnodeProps.attrs, directive.value);
+        } else if (directiveName === "show") {
+          // v-show directive
+          const visible = Boolean(directive.value);
+          vnodeProps.attrs.style =
+            (vnodeProps.attrs.style || "") +
+            (visible ? "" : "; display: none !important");
+        } else if (directiveName === "class") {
+          // v-class directive
+          const classValue = directive.value;
+          let classNames: string[] = [];
+
+          if (typeof classValue === "string") {
+            classNames = classValue.split(/\s+/).filter(Boolean);
+          } else if (Array.isArray(classValue)) {
+            for (const cls of classValue as any[]) {
+              if (typeof cls === "string") {
+                classNames.push(...cls.split(/\s+/).filter(Boolean));
+              } else if (cls && typeof cls === "object") {
+                for (const [className, condition] of Object.entries(cls)) {
+                  if (condition) {
+                    classNames.push(...className.split(/\s+/).filter(Boolean));
+                  }
+                }
               }
-              return asyncResult;
-            });
+            }
+          } else if (classValue && typeof classValue === "object") {
+            for (const [className, condition] of Object.entries(classValue)) {
+              if (condition) {
+                classNames.push(...className.split(/\s+/).filter(Boolean));
+              }
+            }
           }
-          result += value;
+
+          const existingClass = (vnodeProps.attrs.class as string) || "";
+          const newClasses = [
+            ...new Set([
+              ...existingClass.split(/\s+/).filter(Boolean),
+              ...classNames,
+            ]),
+          ];
+          vnodeProps.attrs.class = newClasses.join(" ");
+        } else if (directiveName === "style") {
+          // v-style directive
+          const styleValue = directive.value;
+          let styleString = "";
+
+          if (typeof styleValue === "string") {
+            styleString = styleValue;
+          } else if (styleValue && typeof styleValue === "object") {
+            const styleRules: string[] = [];
+            for (const [property, value] of Object.entries(styleValue)) {
+              if (value != null && value !== "") {
+                const kebabProperty = property.replace(
+                  /[A-Z]/g,
+                  (match) => `-${match.toLowerCase()}`,
+                );
+                const needsPx = [
+                  "width",
+                  "height",
+                  "top",
+                  "right",
+                  "bottom",
+                  "left",
+                  "margin",
+                  "margin-top",
+                  "margin-right",
+                  "margin-bottom",
+                  "margin-left",
+                  "padding",
+                  "padding-top",
+                  "padding-right",
+                  "padding-bottom",
+                  "padding-left",
+                  "font-size",
+                  "line-height",
+                  "border-width",
+                  "border-radius",
+                  "min-width",
+                  "max-width",
+                  "min-height",
+                  "max-height",
+                ];
+                let cssValue = String(value);
+                if (
+                  typeof value === "number" &&
+                  needsPx.includes(kebabProperty)
+                ) {
+                  cssValue = `${value}px`;
+                }
+                styleRules.push(`${kebabProperty}: ${cssValue}`);
+              }
+            }
+            styleString =
+              styleRules.join("; ") + (styleRules.length > 0 ? ";" : "");
+          }
+
+          const existingStyle = (vnodeProps.attrs.style as string) || "";
+          vnodeProps.attrs.style =
+            existingStyle +
+            (existingStyle && !existingStyle.endsWith(";") ? "; " : "") +
+            styleString;
         }
       }
-      return result;
-    };
-    return {
-      statics: this.statics,
-      dynamics: this.dynamics as UpdateFunction<T>[],
-      fragment,
-      id,
-      hasDynamics: this.dynamics.length > 0,
-      render
-    };
-  }
-  
-  private parseTemplate(): void {
-    // Improved regex-based parsing for dynamic expressions
-    // Ensures statics never contain {{...}} placeholders
-    const dynamicRegex = /\{\{([^}]+)\}\}/g;
-    let lastIndex = 0;
-    let match;
-    while ((match = dynamicRegex.exec(this.template)) !== null) {
-      // Add static part before this match, excluding any {{...}}
-      const staticPart = this.template.slice(lastIndex, match.index);
-      this.statics.push(staticPart);
-      // Try to detect attribute/property/class/style name from staticPart
-      let attrMatch = staticPart.match(/([a-zA-Z0-9_-]+)\s*=\s*"?$/);
-      let attrName = attrMatch ? attrMatch[1] : undefined;
-      let styleProp: string | undefined;
-      // Special handling for style="color:{{value}}"
-      if (staticPart.endsWith('style="color:')) {
-        attrName = 'style';
-        styleProp = 'color';
-      } else if (attrName === 'style') {
-        // Try to extract style property name from staticPart
-        const styleMatch = staticPart.match(/style\s*=\s*"?([^:;]+):\s*$/);
-        if (styleMatch) {
-          styleProp = styleMatch[1].trim();
+
+      // Add remaining directives that need special handling by the VDOM renderer
+      const remainingDirectives: Record<
+        string,
+        { value: any; modifiers: string[] }
+      > = {};
+      for (const [directiveName, directive] of Object.entries(directives)) {
+        if (!["bind", "show", "class", "style"].includes(directiveName)) {
+          remainingDirectives[directiveName] = directive;
         }
       }
-      // Analyze the dynamic expression
-      const expression = match[1].trim();
-      this.analyzeDynamicExpression(expression, this.dynamics.length, attrName, styleProp);
-      lastIndex = match.index + match[0].length;
-    }
-    // Add final static part, ensuring no trailing {{...}}
-    const finalStatic = this.template.slice(lastIndex);
-    this.statics.push(finalStatic);
-  }
-  
-  private analyzeDynamicExpression(expression: string, _index: number, attrName?: string, styleProp?: string): void {
-    // Simple expression analysis
-    let updateType: UpdateType = 'text';
-    let target: string | undefined;
 
-    // Detect class/style/attribute/property updates
-    if (attrName) {
-      if (attrName === 'class') {
-        updateType = 'class';
-        target = 'class';
-      } else if (attrName === 'style') {
-        updateType = 'style';
-        target = styleProp || 'style';
-      } else if (attrName === 'value') {
-        updateType = 'property';
-        target = 'value';
-      } else {
-        updateType = 'attribute';
-        target = attrName;
+      if (Object.keys(remainingDirectives).length > 0) {
+        vnodeProps.directives = remainingDirectives;
       }
-    } else if (expression.includes('class.')) {
-      updateType = 'class';
-      target = expression.split('.')[1];
-    } else if (expression.includes('style.')) {
-      updateType = 'style';
-      target = expression.split('.')[1];
-    } else if (expression.includes('@')) {
-      updateType = 'event';
-      target = expression.split('@')[1];
-    } else if (expression === 'class') {
-      updateType = 'class';
-      target = 'class';
-    } else if (expression === 'style') {
-      updateType = 'style';
-      target = 'style';
-    } else if (expression === 'value') {
-      updateType = 'property';
-      target = 'value';
-    } else if (expression === 'title') {
-      updateType = 'attribute';
-      target = 'title';
-    }
 
-    // Use findDOMPath to locate the correct node for this dynamic expression
-    const marker = `__DYNAMIC_${_index}__`;
-    const templateHTML = this.statics.join(marker);
-    let path = findDOMPath(templateHTML, marker);
-    // If template is a single root element, use [0] as path for non-text updates
-    if (this.statics.length === 2 && (updateType !== 'text')) {
-      path = [0];
-    } else if (this.statics.length === 2 && path.length === 0) {
-      path = [0];
-    }
-    this.dynamics.push({
-      path,
-      type: updateType,
-      target,
-      getValue: this.createValueGetter(expression)
-    });
-  }
-  private createValueGetter(expression: string): (state: any, api: any) => unknown {
-    // Always evaluate at render time, never cache
-    return (state: any, _api: any) => {
-      try {
-        let value;
-        // Always use the dynamic expression for state lookup
-        if (expression && typeof expression === 'function') {
-          value = (expression as (s: any) => any)(state);
-        } else if (typeof expression === 'string' && expression.startsWith('state.')) {
-          const prop = expression.slice(6);
-          value = state[prop];
-        } else if (typeof expression === 'string' && /^[a-zA-Z0-9_$]+$/.test(expression)) {
-          value = state[expression];
-        } else if (typeof expression === 'string' && expression.includes('(')) {
-          value = '';
+      if (isClosing) {
+        const node = h(
+          currentTag!,
+          currentProps,
+          currentChildren.length === 1 &&
+            isElementVNode(currentChildren[0]) &&
+            currentChildren[0].tag === "#text"
+            ? typeof currentChildren[0].children === "string"
+              ? currentChildren[0].children
+              : ""
+            : currentChildren.length
+              ? currentChildren
+              : undefined,
+          currentKey,
+        );
+        const prev = stack.pop();
+        if (prev) {
+          currentTag = prev.tag;
+          currentProps = prev.props;
+          currentKey = prev.key;
+          currentChildren = prev.children;
+          currentChildren.push(node);
         } else {
-          value = '';
+          root = node;
         }
-        return value;
-      } catch (error) {
-        if (this.options.development) {
-          console.warn(`[Template Compiler] Error evaluating expression: ${expression}`, error);
+      } else if (isSelfClosing) {
+        const key = undefined;
+        const targetChildren = currentTag ? currentChildren : fragmentChildren;
+        targetChildren.push(h(tagName, vnodeProps, undefined, key));
+      } else {
+        if (currentTag) {
+          stack.push({
+            tag: currentTag,
+            props: currentProps,
+            children: currentChildren,
+            key: currentKey,
+          });
         }
-        return '';
+        currentTag = tagName;
+        currentProps = vnodeProps;
+        currentChildren = [];
       }
-    };
-  }
-  
-  private createStaticFragment(): DocumentFragment | null {
-    // Skip fragment creation on server
-    if (typeof document === 'undefined') {
-      return null;
-    }
-    
-    try {
-      // Create a static version by removing dynamic parts
-      const staticHTML = this.statics.join('');
-      
-      if (!staticHTML.trim()) {
-        return null;
-      }
-      
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(staticHTML, 'text/html');
-      const fragment = document.createDocumentFragment();
-      
-      while (doc.body.firstChild) {
-        fragment.appendChild(doc.body.firstChild);
-      }
-      
-      return fragment;
-    } catch (error) {
-      if (this.options.development) {
-        console.warn('[Template Compiler] Could not create static fragment:', error);
-      }
-      return null;
-    }
-  }
-}
+    } else if (typeof match[3] !== "undefined") {
+      // Standalone interpolation marker {{N}}
+      const idx = Number(match[3]);
+      const val = values[idx];
+      const baseKey = `interp-${idx}`;
+      pushInterpolation(val, baseKey);
+    } else if (match[4]) {
+      // Plain text (may contain embedded interpolation markers like "...{{N}}...")
+      const text = match[4];
 
-// Utility function for both initial render and updates
-function getNodeByPath(root: Element | DocumentFragment, path: readonly number[]): Node | null {
-  try {
-    if (path.length === 1 && path[0] === 0 && root instanceof Element) {
-      return root;
-    }
-    let current: Node = root;
-    for (let i = 0; i < path.length; i++) {
-      const index = path[i];
-      if (!current.childNodes || current.childNodes.length <= index) {
-        return null;
-      }
-      current = current.childNodes[index];
-    }
-    return current;
-  } catch {
-    return null;
-  }
-}
+      const targetChildren = currentTag ? currentChildren : fragmentChildren;
 
-// ============================================================================
-// OPTIMIZED RENDERER
-// ============================================================================
+      // Split text by embedded markers and handle parts
+      const parts = text.split(/({{\d+}})/);
+      for (const part of parts) {
+        if (!part) continue;
 
-/**
- * Render a compiled template efficiently
- */
-export function renderCompiledTemplate<T>(
-  compiled: CompiledTemplate<T>,
-  state: T,
-  api: any
-): DocumentFragment {
-  // Use pre-compiled fragment if available
-  let fragment: DocumentFragment;
-  
-  if (compiled.fragment && !compiled.hasDynamics) {
-    // Pure static template - just clone
-    fragment = compiled.fragment.cloneNode(true) as DocumentFragment;
-  } else {
-    // Dynamic template - reconstruct with current values
-    fragment = reconstructTemplate(compiled, state, api);
-  }
-  
-  return fragment;
-}
-
-/**
- * Update a rendered template with new state efficiently
- */
-export function updateCompiledTemplate<T>(
-  compiled: CompiledTemplate<T>,
-  element: Element,
-  newState: T,
-  api: any,
-  oldState?: T
-): void {
-  if (!compiled.hasDynamics) {
-    return; // Nothing to update in static templates
-  }
-  // Apply each dynamic update
-  for (const update of compiled.dynamics) {
-    try {
-      const newValue = update.getValue(newState, api);
-      if (oldState !== undefined) {
-        const oldValue = update.getValue(oldState, api);
-        if (oldValue === newValue) {
-          continue;
+        const interp = part.match(/^{{(\d+)}}$/);
+        if (interp) {
+          const idx = Number(interp[1]);
+          const val = values[idx];
+          const baseKey = `interp-${idx}`;
+          pushInterpolation(val, baseKey);
+        } else {
+          const key = `text-${nodeIndex++}`;
+          targetChildren.push(textVNode(part, key));
         }
       }
-      applyUpdate(element, update, newValue);
-    } catch (error) {
-      console.warn('[Template Compiler] Error applying update:', error);
     }
   }
-}
 
-function reconstructTemplate<T>(
-  compiled: CompiledTemplate<T>,
-  state: T,
-  api: any
-): DocumentFragment {
-  // Reconstruct HTML from statics and dynamics
-  let html = '';
-  
-  for (let i = 0; i < compiled.statics.length; i++) {
-    html += compiled.statics[i];
-    if (i < compiled.dynamics.length) {
-      const update = compiled.dynamics[i];
-      if (update.type === 'text' || update.type === 'attribute') {
-        const value = update.getValue(state, api);
-        html += String(value ?? '');
-      } else if (update.type === 'property' || update.type === 'class' || update.type === 'style') {
-        html += '';
-      }
-    }
-  }
-  
-  // Parse the reconstructed HTML
-  if (typeof document === 'undefined') {
-    // Server-side fallback - return empty fragment
-    return new DocumentFragment();
-  }
-  
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(html, 'text/html');
-  const fragment = document.createDocumentFragment();
-  
-  while (doc.body.firstChild) {
-    fragment.appendChild(doc.body.firstChild);
-  }
-
-  // Apply initial dynamic values to fragment
-  for (const update of compiled.dynamics) {
-    const value = update.getValue(state, api);
-    const targetNode = getNodeByPath(fragment, update.path) as Element;
-    applyUpdate(targetNode, update, value);
-  }
-
-  return fragment;
-}
-
-function applyUpdate(element: Element, update: UpdateFunction, value: unknown): void {
-  try {
-    if (update.type === 'text') {
-      // Use TreeWalker to find and update text nodes containing 'Count: '
-      const walker = document.createTreeWalker(
-        element,
-        NodeFilter.SHOW_TEXT
+  // If we have a single root element, return it
+  if (root) {
+    // Clean empty text nodes at root level
+    if (isElementVNode(root) && Array.isArray(root.children)) {
+      root.children = (root.children as VNode[]).filter(
+        (child): child is VNode =>
+          isElementVNode(child)
+            ? child.tag !== "#text" ||
+              (typeof child.children === "string" &&
+                child.children.trim() !== "")
+            : true, // keep non-element VNodes (including anchors) as-is
       );
-      let found = false;
-      let node;
-      while (node = walker.nextNode()) {
-        const textContent = node.textContent || '';
-        if (textContent.includes('Count: ')) {
-          // Replace the number after 'Count: '
-          const newText = textContent.replace(/Count: \d+/, `Count: ${value}`);
-          node.textContent = newText;
-          found = true;
-        }
-      }
-      if (found) return;
-      // Fallback to path-based update for general text nodes
-      const targetNode = getNodeByPath(element, update.path);
-      if (targetNode && targetNode.nodeType === Node.TEXT_NODE) {
-        targetNode.textContent = value == null ? '' : String(value);
-      }
-      return;
     }
-    // Fallback to path-based updates for other types
-    const targetNode = getNodeByPath(element, update.path);
-    if (!targetNode) {
-      return;
-    }
-    switch (update.type) {
-      case 'attribute':
-        if (targetNode.nodeType === Node.ELEMENT_NODE && update.target) {
-          const el = targetNode as Element;
-          if (value == null || value === '') {
-            el.removeAttribute(update.target);
-          } else {
-            el.setAttribute(update.target, String(value));
-          }
-        }
-        break;
-      case 'property':
-        if (targetNode.nodeType === Node.ELEMENT_NODE && update.target) {
-          (targetNode as any)[update.target] = value == null ? '' : value;
-          (targetNode as Element).setAttribute(update.target, value == null ? '' : String(value));
-        }
-        break;
-      case 'class':
-        if (targetNode.nodeType === Node.ELEMENT_NODE && update.target) {
-          const el = targetNode as Element;
-          el.className = value == null ? '' : String(value);
-          el.setAttribute('class', value == null ? '' : String(value));
-        }
-        break;
-      case 'style':
-        if (targetNode.nodeType === Node.ELEMENT_NODE && update.target) {
-          const el = targetNode as HTMLElement;
-          el.style[update.target as any] = value == null ? '' : String(value);
-          el.setAttribute('style', value == null ? `${update.target}:` : `${update.target}:${value}`);
-        }
-        break;
-      default:
-        throw new Error(`Unknown update type: ${update.type}`);
-    }
-  } catch (error) {
-    if (typeof globalThis !== 'undefined' ? (globalThis as any)['isDevelopment'] : isDevelopment) {
-      console.warn('[Template Compiler] Error applying update:', update, error);
-    }
-    // Silently fail in production to prevent crashes
+    return root;
   }
-}
 
+  // If we have fragment children (multiple root nodes), return them as array
+  if (fragmentChildren.length > 0) {
+    // Filter out empty text nodes
+    const cleanedFragments = fragmentChildren.filter((child): child is VNode =>
+      isElementVNode(child)
+        ? child.tag !== "#text" ||
+          (typeof child.children === "string" && child.children.trim() !== "")
+        : true,
+    );
 
-// ============================================================================
-// UTILITIES
-// ============================================================================
-
-const templateCache = new Map<string, CompiledTemplate<any>>();
-
-// Performance tracking for production monitoring
-interface PerformanceMetrics {
-  compilationTime: number;
-  renderTime: number;
-  updateTime: number;
-  cacheHits: number;
-  cacheMisses: number;
-}
-
-const performanceMetrics = new Map<string, PerformanceMetrics>();
-
-function generateTemplateId(template: string): string {
-  // Simple hash function for template IDs
-  let hash = 0;
-  for (let i = 0; i < template.length; i++) {
-    const char = template.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash; // Convert to 32-bit integer
+    return cleanedFragments.length === 1
+      ? cleanedFragments[0]
+      : cleanedFragments;
   }
-  return `tpl_${Math.abs(hash).toString(36)}`;
-}
 
-// ============================================================================
-// DEVELOPMENT UTILITIES
-// ============================================================================
-
-/**
- * Development helper to analyze template performance
- */
-export function analyzeTemplate(template: string): {
-  staticParts: number;
-  dynamicParts: number;
-  complexity: 'low' | 'medium' | 'high';
-  recommendations: string[];
-} {
-  const compiled = compileTemplate(template, { development: true });
-  
-  const dynamicCount = compiled.dynamics.length;
-  const staticCount = compiled.statics.length;
-  
-  let complexity: 'low' | 'medium' | 'high' = 'low';
-  if (dynamicCount > 10) complexity = 'high';
-  else if (dynamicCount > 5) complexity = 'medium';
-  
-  const recommendations: string[] = [];
-  
-  if (dynamicCount === 0) {
-    recommendations.push('Consider using a static string instead of a template');
-  }
-  
-  if (dynamicCount > 10) {
-    recommendations.push('Consider breaking this template into smaller components');
-  }
-  
-  if (!compiled.fragment) {
-    recommendations.push('Template could benefit from static fragment optimization');
-  }
-  
-  return {
-    staticParts: staticCount,
-    dynamicParts: dynamicCount,
-    complexity,
-    recommendations
-  };
+  // Fallback for empty content
+  return h("div", {}, "", "fallback-root");
 }
 
 /**
- * Clear template cache for development/testing
+ * Default export: plain html.
  */
-export function clearTemplateCache(): void {
-  templateCache.clear();
-  performanceMetrics.clear();
-}
+export function html(
+  strings: TemplateStringsArray,
+  ...values: unknown[]
+): VNode | VNode[] {
+  // If last value is a context object, use it
+  const last = values[values.length - 1];
+  const context =
+    typeof last === "object" && last && !Array.isArray(last)
+      ? (last as Record<string, any>)
+      : undefined;
 
-/**
- * Get performance metrics for development monitoring
- */
-export function getPerformanceMetrics(): Map<string, PerformanceMetrics> {
-  return new Map(performanceMetrics);
+  return htmlImpl(strings, values, context);
 }
-
-/**
- * Get cache statistics
- */
-export function getCacheStats(): { size: number; entries: string[] } {
-  return {
-    size: templateCache.size,
-    entries: Array.from(templateCache.keys())
-  };
-}
-

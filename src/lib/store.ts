@@ -12,7 +12,7 @@
 // src/lib/store.ts
 type Listener<T> = (state: T) => void;
 
-export function Store<T extends object>(initial: T) {
+export function createStore<T extends object>(initial: T) {
   let state = new Proxy(initial, {
     set: (target, prop, value) => {
       (target as any)[prop] = value;
