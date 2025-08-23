@@ -276,39 +276,3 @@ export function vIfBuilder() {
     },
   };
 }
-
-/* --- vSwitch --- */
-type CaseBranch = [matchValue: any, content: VNode | VNode[]];
-
-export function vSwitch(
-  value: any,
-  cases: CaseBranch[],
-  defaultContent?: VNode | VNode[],
-): VNode[] {
-  const anchorKey = "vSwitch-block"; // stable container key
-  for (const [matchValue, content] of cases) {
-    if (value === matchValue) {
-      return [anchorBlock(content, anchorKey)];
-    }
-  }
-  return [anchorBlock(defaultContent || [], anchorKey)];
-}
-
-/* --- vSwitchBuilder --- */
-export function vSwitchBuilder(value: any) {
-  const cases: CaseBranch[] = [];
-  let defaultContent: VNode | VNode[] | undefined;
-  return {
-    case(matchValue: any, content: VNode | VNode[]) {
-      cases.push([matchValue, content]);
-      return this;
-    },
-    default(content: VNode | VNode[]) {
-      defaultContent = content;
-      return this;
-    },
-    done() {
-      return vSwitch(value, cases, defaultContent);
-    },
-  };
-}

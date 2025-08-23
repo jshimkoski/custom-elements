@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Exact Binding Issue Test</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    .form-group {
+      margin-bottom: 15px;
+    }
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+    }
+    input, button {
+      padding: 8px;
+      margin: 5px 0;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+    button {
+      background: #007bff;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+    .status {
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 4px;
+      background: #f8f9fa;
+      border: 1px solid #ddd;
+    }
+    .active {
+      border: 2px solid green;
+    }
+    .test-result {
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 4px;
+      font-weight: bold;
+    }
+    .success {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+    .error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+  </style>
+</head>
+<body>
+  <h1>Exact Binding Issue Test</h1>
+
+  <div class="status">
+    <strong>This test reproduces the exact binding issues from runtime.ts:</strong>
+    <ul>
+      <li><code>&lt;button v-bind="${ { disabled: state.isActive } }"&gt;Submit&lt;/button&gt;</code></li>
+      <li><code>&lt;button :disabled="${state.isActive}"&gt;Submit&lt;/button&gt;</code></li>
+    </ul>
+  </div>
+
+  <exact-binding-test></exact-binding-test>
+
+  <div id="test-results"></div>
+
+  <script type="module">
+    import { component, html } from './src/lib/runtime.js';
+    import { vIf } from './src/lib/directives.js';
+
+    component('exact-binding-test', {
+      state: {
+        isActive: true,
+        name: 'Test User'
+      },
+
+      methods: {
+        toggleActive() {
+          this.isActive = !this.isActive;
+          console.log('isActive toggled to:', this.isActive);
+
+          // Test validation after state change
+          setTimeout(() => this.validateBindings(), 100);
+        },
+
+        validateBindings() {
+          const vBindButton = document.querySelector('[data-test="vbind-button"]');
+          const colonButton = document.querySelector('[data-test="colon-button"]');
+          const resultsDiv = document.getElementById('test-results');
+
+          let results = '<div class="test-result">';
+          results += '<h3>Validation Results:</h3>';
+
+          // Check v-bind button
+          if (vBindButton) {
+            const isDisabled = vBindButton.hasAttribute('disabled');
+            const shouldBeDisabled = this.isActive;
+            const vBindWorking = isDisabled === shouldBeDisabled;
+
+            results += `<p>v-bind button: ${vBindWorking ? '✅ WORKING' : '❌ BROKEN'} `;
+            results += `(disabled=${isDisabled}, should be ${shouldBeDisabled})</p>`;
+          } else {
+            results += '<p>❌ v-bind button not found</p>';
+          }
+
+          // Check colon binding button
+          if (colonButton) {
+            const isDisabled = colonButton.hasAttribute('disabled');
+            const shouldBeDisabled = this.isActive;
+            const colonWorking = isDisabled === shouldBeDisabled;
+
+            results += `<p>:disabled button: ${colonWorking ? '✅ WORKING' : '❌ BROKEN'} `;
+            results += `(disabled=${isDisabled}, should be ${shouldBeDisabled})</p>`;
+          } else {
+            results += '<p>❌ :disabled button not found</p>';
+          }
+
+          results += '</div>';
+          resultsDiv.innerHTML = results;
+        }
+      },
+
+      onConnected() {
+        console.log('Component connected with isActive:', this.isActive);
+        setTimeout(() => this.validateBindings(), 200);
+      },
+
+      render(state) {
+        console.log('Rendering with state:', state);
+
+        return html`
+          <div>
+            <div class="status">
+              <strong>Current State:</strong><br>
+              isActive: ${state.isActive}<br>
+              Expected: Both buttons should be ${state.isActive ? 'disabled' : 'enabled'}
+            </div>
+
+            <div class="form-group">
+              <h3>1. Original v-bind Issue (from runtime.ts)</h3>
+              <button
+                v-bind="${ { disabled: state.isActive } }"
+                data-test="vbind-button"
+                @click="${() => alert('v-bind button clicked!')}"
+              >
+                v-bind Submit (${state.isActive ? 'should be disabled' : 'should be enabled'})
+              </button>
+            </div>
+
+            <div class="form-group">
+              <h3>2. Original :disabled Issue (from runtime.ts)</h3>
+              <button
+                :disabled="${state.isActive}"
+                data-test="colon-button"
+                @click="${() => alert('colon binding button clicked!')}"
+              >
+                :disabled Submit (${state.isActive ? 'should be disabled' : 'should be enabled'})
+              </button>
+            </div>
+
+            <div class="form-group">
+              <h3>Control</h3>
+              <button @click="${this.toggleActive}">
+                Toggle isActive (currently: ${state.isActive})
+              </button>
+            </div>
+
+            <div class="form-group">
+              <h3>3. Additional Test Context (from runtime.ts)</h3>
+              ${vIf(state.isActive, html`
+                <div style="background: lightcoral; padding: 10px; border-radius: 4px;">
+                  <p>isActive is true - buttons above should be DISABLED</p>
+                </div>
+              `)}
+
+              ${vIf(!state.isActive, html`
+                <div style="background: lightgreen; padding: 10px; border-radius: 4px;">
+                  <p>isActive is false - buttons above should be ENABLED</p>
+                </div>
+              `)}
+            </div>
+
+            <div class="form-group">
+              <label>Name (with v-model):</label>
+              <input
+                type="text"
+                v-model="name"
+                :disabled="${state.isActive}"
+              />
+              <p>Input value: ${state.name} (${state.isActive ? 'disabled' : 'enabled'})</p>
+            </div>
+          </div>
+        `;
+      }
+    });
+
+    // Global test validation
+    window.addEventListener('load', () => {
+      setTimeout(() => {
+        const component = document.querySelector('exact-binding-test');
+        if (component) {
+          console.log('Running initial validation...');
+        }
+      }, 500);
+    });
+  </script>
+</body>
+</html>

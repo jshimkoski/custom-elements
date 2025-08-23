@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Binding Browser Test</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      max-width: 800px;
+      margin: 0 auto;
+      line-height: 1.6;
+    }
+    .test-section {
+      border: 1px solid #ddd;
+      padding: 20px;
+      margin: 20px 0;
+      border-radius: 8px;
+      background: #f9f9f9;
+    }
+    .test-section h3 {
+      margin-top: 0;
+      color: #333;
+    }
+    button {
+      padding: 10px 16px;
+      margin: 5px;
+      background: #007bff;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    button:disabled {
+      background: #6c757d;
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+    input {
+      padding: 8px;
+      margin: 5px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    input:disabled {
+      background: #e9ecef;
+      cursor: not-allowed;
+    }
+    .status {
+      padding: 15px;
+      margin: 15px 0;
+      border-radius: 4px;
+      font-weight: bold;
+    }
+    .success {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+    .error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+    .info {
+      background: #cce7ff;
+      color: #004085;
+      border: 1px solid #99d6ff;
+    }
+    .form-group {
+      margin: 15px 0;
+    }
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+    }
+    .highlight {
+      background: yellow;
+      padding: 2px 4px;
+      border-radius: 2px;
+    }
+    code {
+      background: #f1f1f1;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: monospace;
+    }
+    .test-result {
+      margin: 10px 0;
+      padding: 10px;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🧪 Binding Browser Test</h1>
+
+  <div class="status info">
+    <strong>Testing the binding fixes:</strong>
+    <ul>
+      <li><code>v-bind="{ disabled: state.isActive }"</code> - Object syntax binding</li>
+      <li><code>:disabled="state.isActive"</code> - Colon shorthand binding</li>
+      <li><code>:value="state.message"</code> - Property binding</li>
+    </ul>
+  </div>
+
+  <div id="test-status" class="status info">
+    Loading component...
+  </div>
+
+  <binding-browser-test></binding-browser-test>
+
+  <div class="test-section">
+    <h3>📋 Manual Testing Checklist</h3>
+    <div id="checklist">
+      <p>After the component loads, verify:</p>
+      <ul>
+        <li>✅ Both buttons should start as <strong>disabled</strong> (isActive = true)</li>
+        <li>✅ Click "Toggle Active" to enable both buttons</li>
+        <li>✅ The input field should also toggle disabled/enabled state</li>
+        <li>✅ Button tooltips should update correctly</li>
+        <li>✅ No console errors should appear</li>
+      </ul>
+    </div>
+  </div>
+
+  <script type="module">
+    // Import from the TypeScript source files directly (modern browsers support this)
+    const { component, html } = await import('./src/lib/runtime.js').catch(async () => {
+      // Fallback: try importing from TypeScript files if JS compilation is available
+      console.log('Trying to import TypeScript modules directly...');
+      return await import('./src/lib/runtime.ts');
+    }).catch(() => {
+      // If all imports fail, show error
+      document.getElementById('test-status').innerHTML = `
+        <div class="status error">
+          <strong>❌ Import Error:</strong><br>
+          Could not import runtime modules. Please ensure the project is built or TypeScript modules are available.
+        </div>
+      `;
+      throw new Error('Cannot import runtime modules');
+    });
+
+    // Define the test component
+    component('binding-browser-test', {
+      state: {
+        isActive: true,
+        message: 'Hello World',
+        count: 0,
+        buttonText: 'Click Me'
+      },
+
+      methods: {
+        toggleActive() {
+          console.log('Toggling active from:', this.isActive);
+          this.isActive = !this.isActive;
+          console.log('Active is now:', this.isActive);
+          this.updateTestStatus();
+        },
+
+        incrementCount() {
+          this.count++;
+          console.log('Count incremented to:', this.count);
+        },
+
+        updateMessage(event) {
+          this.message = event.target.value;
+          console.log('Message updated to:', this.message);
+        },
+
+        updateTestStatus() {
+          const statusEl = document.getElementById('test-status');
+          if (statusEl) {
+            const status = this.isActive ? 'DISABLED' : 'ENABLED';
+            const bgColor = this.isActive ? '#f8d7da' : '#d4edda';
+            const textColor = this.isActive ? '#721c24' : '#155724';
+
+            statusEl.style.background = bgColor;
+            statusEl.style.color = textColor;
+            statusEl.innerHTML = `
+              <strong>Current State:</strong><br>
+              • isActive: <span class="highlight">${this.isActive}</span><br>
+              • Buttons should be: <span class="highlight">${status}</span><br>
+              • Message: "${this.message}"<br>
+              • Count: ${this.count}
+            `;
+          }
+        }
+      },
+
+      onConnected() {
+        console.log('Component connected with initial state:', {
+          isActive: this.isActive,
+          message: this.message,
+          count: this.count
+        });
+
+        // Update status after component is fully connected
+        setTimeout(() => {
+          this.updateTestStatus();
+
+          // Validate the bindings are working
+          this.validateBindings();
+        }, 100);
+      },
+
+      validateBindings() {
+        const vBindButton = this.shadowRoot?.querySelector('[data-test="vbind-button"]') ||
+                           document.querySelector('binding-browser-test [data-test="vbind-button"]');
+        const colonButton = this.shadowRoot?.querySelector('[data-test="colon-button"]') ||
+                           document.querySelector('binding-browser-test [data-test="colon-button"]');
+
+        console.log('Validating bindings...');
+        console.log('v-bind button:', vBindButton?.hasAttribute('disabled'));
+        console.log('colon button:', colonButton?.hasAttribute('disabled'));
+        console.log('Expected disabled state:', this.isActive);
+
+        // Show validation results
+        const results = [];
+
+        if (vBindButton) {
+          const isDisabled = vBindButton.hasAttribute('disabled');
+          const isCorrect = isDisabled === this.isActive;
+          results.push(`v-bind: ${isCorrect ? '✅' : '❌'} (disabled=${isDisabled})`);
+        }
+
+        if (colonButton) {
+          const isDisabled = colonButton.hasAttribute('disabled');
+          const isCorrect = isDisabled === this.isActive;
+          results.push(`colon binding: ${isCorrect ? '✅' : '❌'} (disabled=${isDisabled})`);
+        }
+
+        console.log('Validation results:', results);
+      },
+
+      render(state) {
+        console.log('Rendering with state:', state);
+
+        return html`
+          <div>
+            <div class="test-section">
+              <h3>1. v-bind Object Syntax Test</h3>
+              <p>Button should be ${state.isActive ? 'disabled' : 'enabled'}</p>
+              <button
+                v-bind="${{
+                  disabled: state.isActive,
+                  title: state.isActive ? 'Button is disabled' : 'Button is enabled',
+                  'data-count': state.count
+                }}"
+                data-test="vbind-button"
+                @click="${this.incrementCount}"
+              >
+                v-bind Button (Count: ${state.count})
+              </button>
+            </div>
+
+            <div class="test-section">
+              <h3>2. Colon Binding Test</h3>
+              <p>Button should be ${state.isActive ? 'disabled' : 'enabled'}</p>
+              <button
+                :disabled="${state.isActive}"
+                :title="${state.isActive ? 'Colon binding - disabled' : 'Colon binding - enabled'}"
+                data-test="colon-button"
+                @click="${this.incrementCount}"
+              >
+                :disabled Button (Count: ${state.count})
+              </button>
+            </div>
+
+            <div class="test-section">
+              <h3>3. Input Property Binding</h3>
+              <div class="form-group">
+                <label>Text Input (bound value):</label>
+                <input
+                  type="text"
+                  :value="${state.message}"
+                  :disabled="${state.isActive}"
+                  :placeholder="${state.isActive ? 'Input is disabled' : 'Type here'}"
+                  @input="${this.updateMessage}"
+                />
+                <p>Current value: <code>${state.message}</code></p>
+              </div>
+            </div>
+
+            <div class="test-section">
+              <h3>4. State Controls</h3>
+              <button @click="${this.toggleActive}">
+                Toggle Active State (currently: ${state.isActive ? 'true' : 'false'})
+              </button>
+              <p><em>This button should always be clickable to toggle the state</em></p>
+            </div>
+
+            <div class="test-section">
+              <h3>5. Expected Behavior</h3>
+              <div class="test-result ${state.isActive ? 'error' : 'success'}">
+                <strong>Current State: isActive = ${state.isActive}</strong><br>
+                Expected: Buttons above should be <strong>${state.isActive ? 'DISABLED' : 'ENABLED'}</strong>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+    });
+
+    // Global test validation
+    window.addEventListener('load', () => {
+      console.log('Page loaded, running global validation...');
+
+      setTimeout(() => {
+        // Check if component loaded successfully
+        const component = document.querySelector('binding-browser-test');
+        if (component) {
+          console.log('✅ Component found');
+
+          // Test automatic validation
+          const buttons = component.querySelectorAll('button[disabled]');
+          console.log(`Found ${buttons.length} disabled buttons`);
+
+          if (buttons.length >= 2) {
+            console.log('✅ Binding appears to be working - buttons are disabled as expected');
+          } else {
+            console.log('⚠️ Binding may not be working - expected disabled buttons');
+          }
+        } else {
+          console.log('❌ Component not found');
+        }
+      }, 1000);
+    });
+
+    // Export for debugging
+    window.debugBinding = {
+      testComponent: () => document.querySelector('binding-browser-test'),
+      checkButtons: () => {
+        const component = document.querySelector('binding-browser-test');
+        if (component) {
+          const vBind = component.querySelector('[data-test="vbind-button"]');
+          const colon = component.querySelector('[data-test="colon-button"]');
+          return {
+            vBind: vBind?.hasAttribute('disabled'),
+            colon: colon?.hasAttribute('disabled')
+          };
+        }
+        return null;
+      }
+    };
+
+  </script>
+</body>
+</html>

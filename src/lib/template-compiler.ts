@@ -55,12 +55,41 @@ function parseProps(
     const interpMatch = rawVal.match(/^{{(\d+)}}$/);
 
     if (prefix === ":") {
-      // Property binding
-      if (interpMatch) {
-        const idx = Number(interpMatch[1]);
-        props[rawName] = values[idx];
+      // Property binding - determine if it should be a prop or attr
+      const value = interpMatch ? values[Number(interpMatch[1])] : rawVal;
+
+      // HTML boolean attributes should go to attrs, not props
+      const htmlBooleanAttrs = [
+        "disabled",
+        "checked",
+        "selected",
+        "readonly",
+        "required",
+        "autofocus",
+        "autoplay",
+        "controls",
+        "defer",
+        "hidden",
+        "loop",
+        "multiple",
+        "muted",
+        "open",
+        "reversed",
+      ];
+
+      if (htmlBooleanAttrs.includes(rawName)) {
+        // Handle as HTML attribute with proper boolean logic
+        if (typeof value === "boolean") {
+          if (value) {
+            attrs[rawName] = rawName; // For boolean attributes like disabled, checked
+          }
+          // false values are omitted entirely for boolean attributes
+        } else if (value != null) {
+          attrs[rawName] = String(value);
+        }
       } else {
-        props[rawName] = rawVal;
+        // Regular property binding
+        props[rawName] = value;
       }
     } else if (prefix === "@") {
       const toOnName = (ev: string) =>
@@ -288,9 +317,24 @@ function htmlImpl(
 
       // Process built-in directives that should be converted to props/attrs
       for (const [directiveName, directive] of Object.entries(directives)) {
-        if (directiveName === "bind" && typeof directive.value === "object") {
-          // v-bind object syntax
-          Object.assign(vnodeProps.attrs, directive.value);
+        if (directiveName === "bind") {
+          // v-bind directive - can be object syntax or simple value
+          if (typeof directive.value === "object" && directive.value !== null) {
+            // v-bind object syntax: v-bind="{ disabled: true, class: 'foo' }"
+            for (const [key, value] of Object.entries(directive.value)) {
+              if (typeof value === "boolean") {
+                if (value) {
+                  vnodeProps.attrs[key] = key; // For boolean attributes like disabled, checked
+                }
+                // false values are omitted entirely for boolean attributes
+              } else if (value != null) {
+                vnodeProps.attrs[key] = String(value);
+              }
+            }
+          } else if (directive.value != null) {
+            // Simple v-bind (though this is unusual - typically it's object syntax)
+            vnodeProps.attrs[directiveName] = String(directive.value);
+          }
         } else if (directiveName === "show") {
           // v-show directive
           const visible = Boolean(directive.value);

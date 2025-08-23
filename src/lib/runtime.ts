@@ -15,12 +15,10 @@ export {
   vFor,
   vModel,
   vShow,
-  vSwitch,
   vStyle,
   anchorBlock,
   vIfChain,
   vIfBuilder,
-  vSwitchBuilder,
 } from "./directives";
 
 import { vdomRenderer, type VNode } from "./vdom";
@@ -35,7 +33,7 @@ import {
   type StyleOptimizations,
 } from "./style-utils";
 import { html } from "./template-compiler";
-import { vIf, vBind, vClass, vFor, vModel, vShow, vSwitch } from "./directives";
+import { vIf, vBind, vClass, vFor, vModel, vShow, vIfBuilder } from "./directives";
 
 // --- Types ---
 type LifecycleKeys =
@@ -1024,14 +1022,16 @@ component("my-greeting", {
 
           <div class="form-group">
             <label>Name (vModel):</label>
-            <p>None of these work at the moment:</p>
             <input
+              v-if="${state.isActive}"
               type="text"
-              ${vModel(state.name, (val) => (state.name = val))}
-              ${vClass(["form-control", "cool"])}
-              ${vShow(false)}
+              v-model="name"
+              v-class="${ ['form-control', { 'active': state.isActive }] }"
+              v-show="${true}"
+              v-style="${ { color: state.isActive ? 'green' : 'red' } }"
             />
-            <button ${vBind({ disabled: state.isActive })}>Submit</button>
+            <button v-bind="${ { disabled: state.isActive } }">Submit</button>
+            <button :disabled="${state.isActive}">Submit</button>
           </div>
         </div>
 
@@ -1070,6 +1070,7 @@ component("my-greeting", {
                 key="checkbox-${item}"
                 value="${item}"
                 v-model="array"
+                v-class="['item', item === 'A' ? 'active' : '']"
               />
             `,
           )}
@@ -1089,10 +1090,10 @@ component("my-greeting", {
         </button>
         <button @click="${state.handleSomething}">Click Me</button>
         ${vFor(state.array, (item) => html`<span>${item}</span>`)}
-        ${vSwitch(state.name, [
-          ["World", html`<span>Welcome to the world!</span>`],
-          ["Custom Element", html`<span>Welcome to the custom element!</span>`],
-        ])}
+        ${vIfBuilder()
+          .if(state.name === "World", html`<span>Welcome to the world!</span>`)
+          .elseIf(state.name === "Custom Element", html`<span>Welcome to the custom element!</span>`)
+          .done()}
       </div>
     `;
   },
