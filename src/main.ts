@@ -27,6 +27,69 @@ component("stateless-component", () => html`
   `
 });
 
+component('async-greeting', {
+  state: { name: 'World' },
+
+  reload: async (e: Event, state) => {
+    state.name = 'Dude';
+  },
+
+  render: async (state) => {
+    // Simulate API call or dynamic import
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    return html`
+      <div class="greeting">
+        <h1>Hello, ${state.name}!</h1>
+        <p>This content loaded asynchronously after 1 seconds.</p>
+        <small>Loaded at: ${new Date().toLocaleTimeString()}</small>
+        <button @click="${state.reload}">Reload</button>
+      </div>
+    `;
+  },
+
+  loadingTemplate: (state) => html`
+    <div class="loading">
+      <p>Loading greeting for ${state.name}...</p>
+      <div class="spinner">⏳</div>
+    </div>
+  `,
+
+  errorTemplate: (error, state) => html`
+    <div class="error">
+      <h3>Failed to load greeting</h3>
+      <p>Error: ${error.message}</p>
+      <button @click="${() => location.reload()}">Retry</button>
+    </div>
+  `,
+
+  style: `
+    .greeting {
+      padding: 20px;
+      border: 2px solid #4CAF50;
+      border-radius: 8px;
+    }
+    .loading {
+      text-align: center;
+      padding: 20px;
+    }
+    .spinner {
+      font-size: 24px;
+      animation: spin 1s linear infinite;
+    }
+    .error {
+      padding: 20px;
+      border: 2px solid #f44336;
+      border-radius: 8px;
+      background: #ffebee;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  `
+});
+
 component("child-component", {
   props: { test: { type: String } },
   state: { message: "Hello from Child Component" },
@@ -106,6 +169,7 @@ component("my-greeting", {
   render(state) {
     return html`
       <div>
+        <async-greeting></async-greeting>
         <child-component test="${state.name}">
           <stateless-component></stateless-component>
         </child-component>

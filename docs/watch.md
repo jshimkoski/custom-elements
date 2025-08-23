@@ -1,6 +1,6 @@
 # Watch Functionality
 
-The watch feature provides Vue-like reactive watching capabilities for component state properties. When watched properties change, registered callback functions are automatically executed.
+The watch feature provides reactive watching capabilities for component state properties. When watched properties change, registered callback functions are automatically executed.
 
 ## Basic Usage
 
