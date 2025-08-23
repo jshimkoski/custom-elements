@@ -24,6 +24,16 @@ export {
 } from "./directives";
 
 import { vdomRenderer, type VNode } from "./vdom";
+import {
+  StyleCache,
+  createStateHash,
+  minifyCSS,
+  deduplicateCSS,
+  createDebouncer,
+  stylePerformanceMonitor,
+  type DynamicStyleConfig,
+  type StyleOptimizations,
+} from "./style-utils";
 import { html } from "./template-compiler";
 import { vIf, vBind, vClass, vFor, vModel, vShow, vSwitch } from "./directives";
 
@@ -78,7 +88,8 @@ export interface ComponentConfig<
     }
   >;
   watch?: WatchConfig<S & C & P>;
-  style?: string | ((state: S & C) => string);
+  style?: string | ((state: S & C) => string) | DynamicStyleConfig;
+  styleOptimizations?: Partial<StyleOptimizations>;
   render: (state: S & C & P & InferMethods<T>) => VNode | VNode[];
   onConnected?: (
     state: S & C & P & InferMethods<T>,
@@ -155,10 +166,11 @@ export function component<
   S extends object,
   C extends object = {},
   P extends object = {},
->(tag: string, config: ComponentConfig<S, C, P>): void {
+  T extends object = any,
+>(tag: string, config: ComponentConfig<S, C, P, T>): void {
   registry.set(tag, config);
   if (!customElements.get(tag)) {
-    customElements.define(tag, createElementClass(config));
+    customElements.define(tag, createElementClass<S, C, P, T>(config));
   }
 }
 
@@ -167,7 +179,8 @@ export function createElementClass<
   S extends object,
   C extends object,
   P extends object,
->(config: ComponentConfig<S, C, P>): CustomElementConstructor {
+  T extends object = any,
+>(config: ComponentConfig<S, C, P, T>): CustomElementConstructor {
   return class extends HTMLElement {
     private _state: S & C & P & { [key: string]: any };
     private _refs: Record<string, HTMLElement> = {};
@@ -181,7 +194,16 @@ export function createElementClass<
     private _mounted = false;
     private _hasError = false;
     private _initializing = true;
-    private _cfg: ComponentConfig<S, C, P>;
+    private _styleElement: HTMLStyleElement | null = null;
+    private _styleCache = new StyleCache(100);
+    private _lastStyleHash = "";
+    private _styleDependencies: Set<string> = new Set();
+    private _styleUpdateDebounced: ((
+      cfg: ComponentConfig<S, C, P, T>,
+    ) => void) & {
+      cancel: () => void;
+    };
+    private _cfg: ComponentConfig<S, C, P, T>;
     private _lastRenderTime = 0;
     private _renderCount = 0;
 
@@ -189,6 +211,16 @@ export function createElementClass<
       super();
       this.attachShadow({ mode: "open" });
       this._cfg = config;
+
+      // Initialize debounced style update function
+      const optimizations = {
+        debounceMs: 16,
+        ...config.styleOptimizations,
+      };
+      this._styleUpdateDebounced = createDebouncer(
+        (cfg: ComponentConfig<S, C, P, T>) => this._applyStyle(cfg),
+        optimizations.debounceMs,
+      );
       this._state = this._initState(config);
 
       // --- Inject config methods into state ---
@@ -218,9 +250,8 @@ export function createElementClass<
       // Initialize watchers after initialization phase is complete
       this._initWatchers(config);
 
-      // Initial render and style application
+      // Initial render (styles are applied within render)
       this._render(config);
-      if (config.style) this._applyStyle(config);
     }
 
     connectedCallback() {
@@ -239,6 +270,14 @@ export function createElementClass<
         this._listeners.forEach((unsub) => unsub());
         this._listeners = [];
         this._watchers.clear();
+
+        // Clean up style caching
+        this._styleCache.clear();
+        this._styleDependencies.clear();
+        this._styleElement = null;
+        this._lastStyleHash = "";
+        this._styleUpdateDebounced.cancel();
+
         this._mounted = false;
       });
     }
@@ -297,6 +336,9 @@ export function createElementClass<
       this._runLogicWithinErrorBoundary(cfg, () => {
         if (!this.shadowRoot) return;
 
+        // Clear style dependencies tracking for this render cycle
+        this._styleDependencies.clear();
+
         // --- Render VDOM ---
         const output = cfg.render(this._state);
         // Create context with state and render method for directive processing
@@ -337,6 +379,8 @@ export function createElementClass<
           },
         });
         vdomRenderer(this.shadowRoot, output, context);
+
+        // Apply styles after VDOM rendering
         this._applyStyle(cfg);
         this._collectRefs();
       });
@@ -371,21 +415,133 @@ export function createElementClass<
       }, 0);
     }
 
+    // Request style-only update (more efficient than full render)
+    private _requestStyleUpdate() {
+      this._styleUpdateDebounced(this._cfg);
+    }
+
     // --- Style ---
-    private _applyStyle(cfg: ComponentConfig<S, C, P>) {
+    private _applyStyle(cfg: ComponentConfig<S, C, P, T>) {
       this._runLogicWithinErrorBoundary(cfg, () => {
-        if (!this.shadowRoot) return;
-        let style = this.shadowRoot.querySelector("style");
-        if (!style) {
-          style = document.createElement("style");
-          this.shadowRoot.prepend(style);
+        if (!this.shadowRoot) {
+          return;
         }
-        const rawStyle =
-          typeof cfg.style === "function"
-            ? cfg.style(this._state)
-            : cfg.style || "";
-        const safeStyle = sanitizeCSS(rawStyle);
-        style.textContent = safeStyle;
+
+        const timer = stylePerformanceMonitor.startTimer("applyStyle");
+
+        try {
+          // Get or create style element
+          if (!this._styleElement) {
+            this._styleElement = this.shadowRoot.querySelector(
+              "style",
+            ) as HTMLStyleElement;
+            if (!this._styleElement) {
+              this._styleElement = document.createElement("style");
+              this.shadowRoot.prepend(this._styleElement);
+            }
+          }
+
+          if (!cfg.style) {
+            // console.log("[Style Debug] No style config provided");
+            this._styleElement.textContent = "";
+            return;
+          }
+
+          // console.log("[Style Debug] Style config type:", typeof cfg.style);
+
+          // Get style optimizations config
+          const optimizations = {
+            enableCaching: true,
+            enableMinification: false,
+            enableDeduplication: true,
+            cacheSize: 100,
+            debounceMs: 16,
+            ...cfg.styleOptimizations,
+          };
+
+          // Handle different style configurations
+          let styleConfig: DynamicStyleConfig;
+
+          if (typeof cfg.style === "string") {
+            styleConfig = {
+              css: cfg.style,
+              cache: optimizations.enableCaching,
+            };
+          } else if (typeof cfg.style === "function") {
+            styleConfig = {
+              css: cfg.style,
+              cache: optimizations.enableCaching,
+            };
+          } else {
+            styleConfig = {
+              cache: optimizations.enableCaching,
+              ...cfg.style,
+            };
+          }
+
+          // Extract dependencies and check if style needs updating
+          const dependencies = styleConfig.dependencies || [];
+          const shouldCache =
+            styleConfig.cache !== false && optimizations.enableCaching;
+
+          // Create a hash of dependent state values for caching
+          let stateHash = "";
+          if (shouldCache && dependencies.length > 0) {
+            const dependentValues = dependencies.map((dep) => this._state[dep]);
+            stateHash = createStateHash(dependentValues);
+
+            // Check cache first
+            if (
+              this._lastStyleHash === stateHash &&
+              this._styleCache.has(stateHash)
+            ) {
+              const cachedStyle = this._styleCache.get(stateHash)!;
+              if (this._styleElement.textContent !== cachedStyle) {
+                this._styleElement.textContent = cachedStyle;
+              }
+              return;
+            }
+          }
+
+          // For styles without dependencies, always generate
+          if (!shouldCache || dependencies.length === 0) {
+            stateHash = "no-deps-" + Date.now();
+          }
+
+          // Generate style
+          const rawStyle =
+            typeof styleConfig.css === "function"
+              ? styleConfig.css(this._state)
+              : styleConfig.css;
+
+          let processedStyle = sanitizeCSS(rawStyle);
+
+          // Apply optimizations
+          if (optimizations.enableMinification) {
+            processedStyle = minifyCSS(processedStyle);
+          }
+
+          if (optimizations.enableDeduplication) {
+            processedStyle = deduplicateCSS(processedStyle);
+          }
+
+          // Cache the style if enabled and has dependencies
+          if (shouldCache && dependencies.length > 0) {
+            this._styleCache.set(
+              stateHash,
+              processedStyle,
+              dependencies.map(String),
+            );
+            this._lastStyleHash = stateHash;
+          }
+
+          // Only update DOM if style actually changed
+          if (this._styleElement.textContent !== processedStyle) {
+            this._styleElement.textContent = processedStyle;
+          }
+        } finally {
+          timer();
+        }
       });
     }
 
@@ -460,8 +616,37 @@ export function createElementClass<
                   const fullPath = path
                     ? `${path}.${String(prop)}`
                     : String(prop);
+
+                  // Track style dependencies and invalidate cache
+                  self._styleDependencies.add(String(prop));
+                  self._styleCache.invalidate(String(prop));
+
                   self._triggerWatchers(fullPath, value, oldValue);
-                  self._render(cfg);
+
+                  // Check if only style dependencies changed for optimization
+                  const styleConfig = cfg.style;
+                  let onlyStyleChanged = false;
+
+                  if (
+                    styleConfig &&
+                    typeof styleConfig === "object" &&
+                    "dependencies" in styleConfig
+                  ) {
+                    const styleDeps = styleConfig.dependencies || [];
+                    onlyStyleChanged =
+                      styleDeps.includes(prop as keyof (S & C)) &&
+                      styleDeps.every(
+                        (dep) =>
+                          !self._styleDependencies.has(String(dep)) ||
+                          dep === prop,
+                      );
+                  }
+
+                  if (onlyStyleChanged) {
+                    self._requestStyleUpdate();
+                  } else {
+                    self._render(cfg);
+                  }
                 }
                 return true;
               },
@@ -472,6 +657,10 @@ export function createElementClass<
                   const fullPath = path
                     ? `${path}.${String(prop)}`
                     : String(prop);
+
+                  // Track style dependencies
+                  self._styleDependencies.add(String(prop));
+
                   self._triggerWatchers(fullPath, undefined, oldValue);
                   self._render(cfg);
                 }
@@ -649,10 +838,14 @@ component("my-greeting", {
   },
   watch: {
     name(newValue, oldValue) {
-      console.log(`Watcher called: Name changed from ${oldValue} to ${newValue}`);
+      console.log(
+        `Watcher called: Name changed from ${oldValue} to ${newValue}`,
+      );
     },
     email(newValue, oldValue) {
-      console.log(`Watcher called: Email changed from ${oldValue} to ${newValue}`);
+      console.log(
+        `Watcher called: Email changed from ${oldValue} to ${newValue}`,
+      );
     },
   },
   style: `

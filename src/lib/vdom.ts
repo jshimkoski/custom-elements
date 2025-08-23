@@ -1145,8 +1145,15 @@ export function vdomRenderer(
     else root.appendChild(newDom);
   }
 
-  // Remove any extra nodes
-  while (root.childNodes.length > 1) root.removeChild(root.childNodes[0]);
+  // Remove any extra nodes, but preserve style elements
+  const nodesToRemove: Node[] = [];
+  for (let i = 0; i < root.childNodes.length; i++) {
+    const node = root.childNodes[i];
+    if (node !== newDom && node.nodeName !== "STYLE") {
+      nodesToRemove.push(node);
+    }
+  }
+  nodesToRemove.forEach((node) => root.removeChild(node));
 
   // Update tracked VNode and DOM node
   (root as any)._prevVNode = newVNode;

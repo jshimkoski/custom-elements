@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minimal Style Test</title>
+</head>
+<body>
+    <h1>Minimal Style Rendering Test</h1>
+
+    <div style="margin: 20px 0;">
+        <h2>Test 1: Basic String Style</h2>
+        <test-basic></test-basic>
+    </div>
+
+    <div style="margin: 20px 0;">
+        <h2>Test 2: Dynamic Function Style</h2>
+        <test-dynamic></test-dynamic>
+        <button onclick="changeTheme()">Toggle Theme</button>
+    </div>
+
+    <div style="margin: 20px 0;">
+        <h2>Test 3: New Style Caching System</h2>
+        <test-cached></test-cached>
+        <button onclick="updateCached()">Update Component</button>
+    </div>
+
+    <script type="module">
+        import { component, html } from './src/lib/runtime.js';
+
+        // Test 1: Basic string style
+        component('test-basic', {
+            state: { message: 'Basic String Style Test' },
+
+            style: `
+                :host {
+                    display: block;
+                    padding: 20px;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    border: 2px solid #4c63d2;
+                    border-radius: 12px;
+                    margin: 10px 0;
+                    color: white;
+                    font-family: Arial, sans-serif;
+                }
+                .content {
+                    font-size: 18px;
+                    font-weight: bold;
+                    text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+                }
+            `,
+
+            render: (state) => html`
+                <div class="content">${state.message}</div>
+            `
+        });
+
+        // Test 2: Dynamic function style (legacy method)
+        component('test-dynamic', {
+            state: {
+                theme: 'light',
+                message: 'Dynamic Function Style'
+            },
+
+            style: (state) => {
+                const isDark = state.theme === 'dark';
+                return `
+                    :host {
+                        display: block;
+                        padding: 20px;
+                        background: ${isDark ? '#1f2937' : '#f0f9ff'};
+                        border: 2px solid ${isDark ? '#374151' : '#3b82f6'};
+                        border-radius: 12px;
+                        margin: 10px 0;
+                        color: ${isDark ? '#f9fafb' : '#1e40af'};
+                        font-family: Arial, sans-serif;
+                        transition: all 0.3s ease;
+                    }
+                    .content {
+                        font-size: 18px;
+                        font-weight: bold;
+                    }
+                    .theme-indicator {
+                        font-size: 14px;
+                        opacity: 0.8;
+                        margin-top: 8px;
+                    }
+                `;
+            },
+
+            render: (state) => html`
+                <div class="content">${state.message}</div>
+                <div class="theme-indicator">Current theme: ${state.theme}</div>
+            `
+        });
+
+        // Test 3: New style caching system
+        component('test-cached', {
+            state: {
+                theme: 'blue',
+                count: 0,
+                data: []
+            },
+
+            style: {
+                css: (state) => {
+                    // This function will be called less frequently due to caching
+                    console.log('🎨 Generating CSS for theme:', state.theme, 'count:', state.count);
+
+                    const themes = {
+                        blue: { bg: '#dbeafe', color: '#1e40af', border: '#3b82f6' },
+                        green: { bg: '#dcfce7', color: '#166534', border: '#16a34a' },
+                        red: { bg: '#fee2e2', color: '#991b1b', border: '#dc2626' }
+                    };
+
+                    const theme = themes[state.theme] || themes.blue;
+
+                    return `
+                        :host {
+                            display: block;
+                            padding: 20px;
+                            background: ${theme.bg};
+                            border: 2px solid ${theme.border};
+                            border-radius: 12px;
+                            margin: 10px 0;
+                            color: ${theme.color};
+                            font-family: Arial, sans-serif;
+                            transition: all 0.3s ease;
+                        }
+                        .content {
+                            font-size: 18px;
+                            font-weight: bold;
+                        }
+                        .info {
+                            font-size: 14px;
+                            opacity: 0.8;
+                            margin-top: 8px;
+                        }
+                        .counter {
+                            background: ${theme.color};
+                            color: ${theme.bg};
+                            padding: 4px 12px;
+                            border-radius: 20px;
+                            display: inline-block;
+                            margin: 8px 0;
+                            font-weight: bold;
+                        }
+                    `;
+                },
+                dependencies: ['theme'], // Only recalculate when theme changes, NOT when count changes
+                cache: true
+            },
+
+            styleOptimizations: {
+                enableCaching: true,
+                enableMinification: false, // Keep readable for debugging
+                enableDeduplication: true,
+                debounceMs: 16
+            },
+
+            render: (state) => html`
+                <div class="content">Cached Style System</div>
+                <div class="counter">Count: ${state.count}</div>
+                <div class="info">
+                    Theme: ${state.theme} |
+                    Data items: ${state.data.length} |
+                    Notice: CSS only regenerates when theme changes!
+                </div>
+            `
+        });
+
+        // Global functions for buttons
+        window.changeTheme = () => {
+            const element = document.querySelector('test-dynamic');
+            if (element && element._state) {
+                element._state.theme = element._state.theme === 'light' ? 'dark' : 'light';
+            }
+        };
+
+        window.updateCached = () => {
+            const element = document.querySelector('test-cached');
+            if (element && element._state) {
+                // Increment count (should NOT trigger style recalculation)
+                element._state.count++;
+
+                // Add data item (should NOT trigger style recalculation)
+                element._state.data.push(`Item ${element._state.data.length + 1}`);
+
+                // Occasionally change theme (SHOULD trigger style recalculation)
+                if (element._state.count % 5 === 0) {
+                    const themes = ['blue', 'green', 'red'];
+                    const currentIndex = themes.indexOf(element._state.theme);
+                    element._state.theme = themes[(currentIndex + 1) % themes.length];
+                }
+            }
+        };
+
+        // Debug information
+        setTimeout(() => {
+            console.log('🔍 Debug Information:');
+            console.log('='.repeat(50));
+
+            document.querySelectorAll('test-basic, test-dynamic, test-cached').forEach((el, index) => {
+                console.log(`\n${index + 1}. ${el.tagName}:`);
+                console.log('   Shadow Root exists:', !!el.shadowRoot);
+
+                if (el.shadowRoot) {
+                    const style = el.shadowRoot.querySelector('style');
+                    console.log('   Style element exists:', !!style);
+
+                    if (style) {
+                        console.log('   Style content length:', style.textContent.length);
+                        console.log('   Style preview:', style.textContent.substring(0, 100) + '...');
+                    }
+
+                    console.log('   Full Shadow DOM HTML length:', el.shadowRoot.innerHTML.length);
+                }
+            });
+
+            console.log('\n💡 Instructions:');
+            console.log('1. Click "Toggle Theme" to see dynamic style updates');
+            console.log('2. Click "Update Component" multiple times and watch the console');
+            console.log('3. Notice CSS is only regenerated every 5th update (when theme changes)');
+        }, 500);
+    </script>
+
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f8fafc;
+        }
+
+        h1 {
+            color: #1e293b;
+            text-align: center;
+        }
+
+        h2 {
+            color: #475569;
+            margin-bottom: 10px;
+        }
+
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            margin: 5px;
+        }
+
+        button:hover {
+            background: #2563eb;
+        }
+    </style>
+</body>
+</html>
