@@ -5,19 +5,14 @@ import { vi } from 'vitest';
  */
 export function getTestConfig() {
   return {
-    template: (state: any) => `<div>Hello ${state.name}</div>`,
+    render: (state: any) => `<div>Hello ${state.name}</div>`,
     state: { name: 'World' },
     style: 'div { color: blue; }',
     computed: {
       greeting: (state: any) => `Hello ${state.name}`,
     },
-    refs: {
-      testRef: vi.fn(),
-    },
-    onMounted: vi.fn(),
-    onUnmounted: vi.fn(),
+    onConnected: vi.fn(),
+    onDisconnected: vi.fn(),
     onError: vi.fn(),
-    debug: true,
-    reflect: [] as string[],
   };
 }
