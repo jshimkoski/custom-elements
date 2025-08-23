@@ -36,11 +36,10 @@ interface WatchOptions {
   deep?: boolean;
 }
 
-type WatchCallback<T = any, S = any, A = any> = (
+type WatchCallback<T = any, S = any> = (
   newValue: T,
   oldValue: T,
   state?: S,
-  api?: A
 ) => void;
 
 interface WatcherState {
@@ -91,15 +90,12 @@ export interface ComponentConfig<
   ) => VNode | VNode[];
   onConnected?: (
     state: S & C & P & InferMethods<T>,
-    api: ComponentAPI<S & C & P & InferMethods<T>>,
   ) => void;
   onDisconnected?: (
     state: S & C & P & InferMethods<T>,
-    api: ComponentAPI<S & C & P & InferMethods<T>>,
   ) => void;
   onAttributeChanged?: (
     state: S & C & P & InferMethods<T>,
-    api: ComponentAPI<S & C & P & InferMethods<T>>,
     name: string,
     oldValue: string | null,
     newValue: string | null,
@@ -107,19 +103,12 @@ export interface ComponentConfig<
   onError?: (
     error: Error | null,
     state: S & C & P & InferMethods<T>,
-    api: ComponentAPI<S & C & P & InferMethods<T>>,
   ) => void;
   errorFallback?: (
     error: Error | null,
     state: S & C & P & InferMethods<T>,
   ) => string;
   [key: string]: any;
-}
-
-export interface ComponentAPI<S> {
-  state?: S & { [key: string]: any };
-  emit: (event: string, detail?: any) => void;
-  on: (event: string, handler: (detail: any) => void) => void;
 }
 
 // --- Internal registry ---
@@ -188,14 +177,24 @@ if (
 
 // --- Main component registration ---
 export function component<
-  S extends object,
+  S extends object = {},
   C extends object = {},
   P extends object = {},
   T extends object = any,
->(tag: string, config: ComponentConfig<S, C, P, T>): void {
-  registry.set(tag, config);
+>(
+  tag: string,
+  renderOrConfig: ((state: S & C & P & InferMethods<T>) => any) | ComponentConfig<S, C, P, T>,
+  config?: Partial<ComponentConfig<S, C, P, T>
+>): void {
+  let finalConfig: ComponentConfig<S, C, P, T>;
+  if (typeof renderOrConfig === "function") {
+    finalConfig = { ...config, render: renderOrConfig } as ComponentConfig<S, C, P, T>;
+  } else {
+    finalConfig = renderOrConfig;
+  }
+  registry.set(tag, finalConfig);
   if (typeof window !== "undefined" && !customElements.get(tag)) {
-    customElements.define(tag, createElementClass<S, C, P, T>(config) as CustomElementConstructor);
+    customElements.define(tag, createElementClass<S, C, P, T>(finalConfig) as CustomElementConstructor);
   }
 }
 
@@ -206,7 +205,7 @@ export function createElementClass<
   P extends object,
   T extends object = any,
 >(config: ComponentConfig<S, C, P, T>): CustomElementConstructor | { new (): object } {
-  // Validate that either render or renderAsync is provided
+  // Validate that render is provided
   if (!config.render) {
     throw new Error(
       "Component must have a render function",
@@ -218,7 +217,6 @@ export function createElementClass<
   }
   return class extends HTMLElement {
     private _state: S & C & P & InferMethods<T>;
-    private _api: ComponentAPI<S & C & P & InferMethods<T>>;
     private _listeners: Array<() => void> = [];
     private _watchers: Map<string, WatcherState> = new Map();
     /** @internal */
@@ -263,19 +261,10 @@ export function createElementClass<
         if (typeof fn === "function" && !key.startsWith("on")) {
           // Wrap the function so it receives state as the first argument
           (this._state as any)[key] = (...args: any[]) =>
-            fn(this._state, ...args);
+            fn(...args, this._state);
         }
       });
 
-      this._api = {
-        state: this._state,
-        emit: (event, detail) =>
-          this.dispatchEvent(new CustomEvent(event, { detail, bubbles: true })),
-        on: (event, handler) =>
-          this.addEventListener(event, (e) =>
-            handler((e as CustomEvent).detail),
-          ),
-      };
       this._applyProps(config);
       this._applyComputed(config);
       this._initializing = false;
@@ -290,7 +279,7 @@ export function createElementClass<
     connectedCallback() {
       this._runLogicWithinErrorBoundary(config, () => {
         if (config.onConnected && !this._mounted) {
-          config.onConnected(this._state, this._api);
+          config.onConnected(this._state);
           this._mounted = true;
         }
       });
@@ -299,7 +288,7 @@ export function createElementClass<
     disconnectedCallback() {
       this._runLogicWithinErrorBoundary(config, () => {
         if (config.onDisconnected)
-          config.onDisconnected(this._state, this._api);
+          config.onDisconnected(this._state);
         this._listeners.forEach((unsub) => unsub());
         this._listeners = [];
         this._watchers.clear();
@@ -329,7 +318,6 @@ export function createElementClass<
         if (config.onAttributeChanged) {
           config.onAttributeChanged(
             this._state,
-            this._api,
             name,
             oldValue,
             newValue,
@@ -629,7 +617,7 @@ export function createElementClass<
       } catch (error) {
         this._hasError = true;
         if (cfg.onError) {
-          cfg.onError(error as Error | null, this._state, this._api);
+          cfg.onError(error as Error | null, this._state);
         }
         if (cfg.errorFallback) {
           if (this.shadowRoot) {
@@ -795,7 +783,7 @@ export function createElementClass<
         if (options.immediate) {
           try {
             const currentValue = this._getNestedValue(key);
-            callback(currentValue, undefined, this._state, this._api);
+            callback(currentValue, undefined, this._state);
           } catch (error) {
             console.error(`Error in immediate watcher for "${key}":`, error);
           }
@@ -833,7 +821,7 @@ export function createElementClass<
       const watcher = this._watchers.get(path);
       if (watcher && !isEqual(newValue, watcher.oldValue)) {
         try {
-          watcher.callback(newValue, watcher.oldValue, this._state, this._api);
+          watcher.callback(newValue, watcher.oldValue, this._state);
           watcher.oldValue = newValue;
         } catch (error) {
           console.error(`Error in watcher for "${path}":`, error);
@@ -846,7 +834,7 @@ export function createElementClass<
           try {
             const currentValue = this._getNestedValue(watchPath);
             if (!isEqual(currentValue, watcherConfig.oldValue)) {
-              watcherConfig.callback(currentValue, watcherConfig.oldValue, this._state, this._api);
+              watcherConfig.callback(currentValue, watcherConfig.oldValue, this._state);
               watcherConfig.oldValue = currentValue;
             }
           } catch (error) {
@@ -856,15 +844,19 @@ export function createElementClass<
       }
     }
 
-
     private _applyProps(cfg: ComponentConfig<S, C, P>): void {
       try {
         if (!cfg.props) return;
+        function parseProp(val: string, type: any) {
+          if (type === Boolean) return val === "true";
+          if (type === Number) return Number(val);
+          return val;
+        }
         Object.entries(cfg.props).forEach(([key, def]) => {
           const attr = this.getAttribute(toKebab(key));
           if (attr !== null) {
             (this._state as any)[key] = escapeHTML(
-              this._parseProp(attr, def.type),
+              parseProp(attr, def.type),
             );
           } else if ('default' in def && def.default !== undefined) {
             (this._state as any)[key] = escapeHTML(def.default);
@@ -874,7 +866,7 @@ export function createElementClass<
       } catch (error) {
         this._hasError = true;
         if (cfg.onError) {
-          cfg.onError(error as Error | null, this._state, this._api);
+          cfg.onError(error as Error | null, this._state);
         }
         if (cfg.errorFallback) {
           if (this.shadowRoot) {
@@ -885,12 +877,6 @@ export function createElementClass<
           }
         }
       }
-    }
-
-    private _parseProp(val: string, type: any) {
-      if (type === Boolean) return val === "true";
-      if (type === Number) return Number(val);
-      return val;
     }
   };
 }

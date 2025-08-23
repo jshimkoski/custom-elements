@@ -14,14 +14,17 @@ import { component, html, when, each, match, eventBus } from "./lib/runtime";
 // The new runtime is completely self-contained
 // Components automatically register themselves when imported
 
-component("stateless-component", {
-  render() {
-    return html`
-      <div>
-        <p>This is a stateless component</p>
-      </div>
-    `;
-  },
+component("stateless-component", () => html`
+  <div>
+    <p>This is a stateless component!</p>
+  </div>
+`, {
+  style: `
+    div {
+      background: lightblue;
+      padding: 10px;
+    }
+  `
 });
 
 component("child-component", {
@@ -34,7 +37,7 @@ component("child-component", {
         <slot></slot>
         <p>Slot is right above me</p>
         <p>${state.message}</p>
-        <button @click="${state.handleSomething}">Click Me</button>
+        <button @click="${state.handleSomething}">Click Me (handleSomething)</button>
         <button @click="${() => (state.message = "cool")}">
           Change Message
         </button>
@@ -42,13 +45,13 @@ component("child-component", {
     `;
   },
   watch: {
-    message(newValue, oldValue, _state, api) {
+    message(newValue, oldValue, _state) {
       console.log(`Watcher called: message changed from ${oldValue} to ${newValue}`);
       eventBus.emit("messageChanged", { newValue, oldValue });
     },
   },
-  handleSomething() {
-    console.log("component did something");
+  handleSomething(event: Event, state: any) {
+    console.log("component did something", event, state);
   },
 });
 
@@ -61,8 +64,8 @@ component("my-greeting", {
     isActive: true,
     color: "red",
   },
-  onConnected(state, api) {
-    console.log("Component connected:", state, api);
+  onConnected(state) {
+    console.log("Component connected:", state);
     eventBus.on("messageChanged", (detail) => {
       console.log("Message changed event received in my-greeting", detail);
     });
@@ -190,13 +193,13 @@ component("my-greeting", {
       </div>
     `;
   },
-  onError(error, state, api) {
-    console.error("Component error:", error, state, api);
+  onError(error, state) {
+    console.error("Component error:", error, state);
   },
-  handleSomething(state: any, e: Event) {
+  handleSomething(event: Event, state: any) {
     state.name = "Updated Name";
     state.array.push("New Item");
-    console.log("component did something", state, e);
+    console.log("component did something, event, state", event, state);
   },
 });
 
