@@ -203,6 +203,7 @@ Explore the full documentation for every runtime feature:
 - [Directives & Binding](./docs/directives-and-binding.md)
 - [Slot](./docs/slot.md)
 - [Advanced Usage Patterns](./docs/advanced-usage-patterns.md)
+- [Cross-Component Communication](./docs/cross-component-communication.md)
 
 ## 🎨 Styling
 - [Style](./docs/style.md)
