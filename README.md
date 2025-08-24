@@ -178,3 +178,49 @@ git clone <repo-url>
 # Run examples
 npm run dev
 ```
+
+# 📖 Documentation Index
+
+Explore the full documentation for every runtime feature:
+
+---
+
+## 🏗️ Core Concepts
+- [Component Config](./docs/component-config.md)
+- [Component](./docs/component.md)
+- [Render](./docs/render.md)
+- [Props](./docs/props.md)
+- [State](./docs/state.md)
+- [Computed](./docs/computed.md)
+- [Watch](./docs/watch.md)
+- [Store](./docs/store.md)
+- [Event Bus](./docs/event-bus.md)
+- [Template](./docs/template.md)
+
+## 🧩 Reactivity & Patterns
+- [Directives](./docs/directives.md)
+- [Bindings](./docs/bindings.md)
+- [Directives & Binding](./docs/directives-and-binding.md)
+- [Slot](./docs/slot.md)
+- [Advanced Usage Patterns](./docs/advanced-usage-patterns.md)
+
+## 🎨 Styling
+- [Style](./docs/style.md)
+- [Style Utils](./docs/style-utils.md)
+
+## ⚡ Performance & Architecture
+- [Virtual DOM](./docs/virtual-dom.md)
+- [HMR](./docs/hmr.md)
+- [SSR](./docs/ssr.md)
+
+## 🛡️ Error Handling & Lifecycle
+- [Error](./docs/error.md)
+- [Hooks](./docs/hooks.md)
+- [Method Injection](./docs/method-injection.md)
+
+## 🧰 Utilities & Troubleshooting
+- [Troubleshooting](./docs/troubleshooting.md)
+
+---
+
+For deep dives, see each guide above or browse the source code in `src/lib/`.
