@@ -1,239 +1,120 @@
-import { component, html, css, type ComponentState } from '../../lib/runtime';
+/**
+ * TodoApp: A classic todo list example.
+ * Demonstrates state, directives, and input binding.
+ */
+import { component, html, css, each } from '../../lib/runtime';
 
 interface Todo {
   id: number;
   text: string;
-  completed: boolean;
+  done: boolean;
 }
 
-interface TodoAppState extends ComponentState {
-  todos: Todo[];
-  newTodo: string;
-  filter: 'all' | 'active' | 'completed';
-}
-
-interface TodoAppComputed {
-  filteredTodos: Todo[];
-  activeTodos: Todo[];
-  completedCount: number;
-}
-
-component<TodoAppState, TodoAppComputed>('todo-app', {
+export const TodoApp = component('todo-app', (state) => html`
+  <div class="todo-container">
+    <h2>Todo List</h2>
+    <form @submit="${state.submitForm}">
+      <input #model="input" type="text" placeholder="Add todo" />
+      <button type="submit">Add</button>
+    </form>
+    <ul>
+      ${each(state.todos, (todo) => html`
+        <li>
+          <input type="checkbox" :checked="${todo.done}" @change="${() => state.toggleTodo(state, todo.id)}" />
+          <span class="todo-text" data-done="${todo.done}">${todo.text}</span>
+          <button class="remove-btn" @click="${() => state.removeTodo(state, todo.id)}">Remove</button>
+        </li>
+      `)}
+    </ul>
+  </div>
+`, {
   state: {
-    todos: [
-      { id: 1, text: 'Learn TypeScript', completed: true },
-      { id: 2, text: 'Build awesome components', completed: false },
-      { id: 3, text: 'Ship to production', completed: false }
-    ],
-    newTodo: '',
-    filter: 'all'
+    todos: [] as Todo[],
+    input: '',
   },
-  computed: {
-    filteredTodos: (state: TodoAppState) => state.todos.filter((todo: Todo) => {
-      if (state.filter === 'active') return !todo.completed;
-      if (state.filter === 'completed') return todo.completed;
-      return true;
-    }),
-    activeTodos: (state: TodoAppState) => state.todos.filter((todo: Todo) => !todo.completed),
-    completedCount: (state: TodoAppState) => state.todos.filter((todo: Todo) => todo.completed).length
+  submitForm(event, state) {
+    event.preventDefault();
+    state.addTodo();
   },
-  template: (state, api) => html`
-    <div class="todo-app" data-todo-list-root>
-      <header>
-        <h1>📝 Todo App</h1>
-        <div>
-          ${state.newTodo}
-        </div>
-        <div>
-          <p>${state.newTodo}</p>
-        </div>
-        <div>
-          Text node 1: ${state.newTodo}
-        </div>
-        Text node 2: ${state.newTodo}
-        <span>Span: ${state.newTodo}</span>
-        <div>Div: ${state.newTodo}</div>
-        <input 
-          type="text" 
-          data-model="newTodo"
-          placeholder="What needs to be done?"
-          class="new-todo"
-          data-on-keydown="handleKeydown"
-        >
-        <textarea data-model="newTodo"></textarea>
-      </header>
-      <main>
-        <div class="filters">
-          <button
-            data-filter="all"  
-            class="${state.filter === 'all' ? 'active' : ''}"
-            data-on-click="handleAllFilter"
-          >
-            All (${state.todos.length})
-          </button>
-          <button 
-            data-filter="active"
-            class="${state.filter === 'active' ? 'active' : ''}"
-            data-on-click="handleActiveFilter"
-          >
-            Active (${state.activeTodos.length})
-          </button>
-          <button 
-            data-filter="completed"
-            class="${state.filter === 'completed' ? 'active' : ''}"
-            data-on-click="handleCompletedFilter"
-          >
-            Completed (${state.completedCount})
-          </button>
-        </div>
-        <ul class="todo-list">
-          ${state.filteredTodos.map((todo: Todo) => {
-            const idx = state.todos.findIndex(t => t.id === todo.id);
-            return html`
-              <li key="${todo.id}" class="${todo.completed ? 'completed' : ''}">
-                <input 
-                  type="checkbox"
-                  data-bind="todos[${idx}].completed"
-                >
-                <span class="text">${todo.text}</span>
-                <button 
-                  class="delete"
-                  data-todo-id="${todo.id}"
-                  data-action="delete"
-                  data-on-click="handleDelete"
-                >
-                  ×
-                </button>
-              </li>
-            `(state, api);
-          }).join('')}
-        </ul>
-      </main>
-      <footer>
-        <small>
-          ${state.activeTodos.length} items left
-        </small>
-      </footer>
-    </div>
-  `(state, api),
+  addTodo(state) {
+    if (!state.input.trim()) return;
+    state.todos = [...state.todos, { id: Date.now(), text: state.input, done: false }];
+    state.input = '';
+  },
+  toggleTodo(state, id: number) {
+    state.todos = state.todos.map(todo => todo.id === id ? { ...todo, done: !todo.done } : todo);
+  },
+  removeTodo(state, id: number) {
+    state.todos = state.todos.filter(todo => todo.id !== id);
+  },
   style: css`
-    .todo-app {
+    .todo-container {
       max-width: 400px;
       margin: 2rem auto;
-      padding: 1rem;
+      padding: 2rem;
+      background: #fff;
       border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.07);
       font-family: system-ui, sans-serif;
     }
-    header h1 {
-      margin: 0 0 1rem 0;
-      text-align: center;
-      color: #333;
+    h2 {
+      margin-bottom: 1rem;
+      font-size: 1.3rem;
+      font-weight: 600;
     }
-    .new-todo {
-      width: 100%;
-      padding: 0.75rem;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      font-size: 1rem;
-      box-sizing: border-box;
-    }
-    .filters {
+    form {
       display: flex;
       gap: 0.5rem;
-      margin: 1rem 0;
+      margin-bottom: 1rem;
     }
-    .filters button {
+    input[type="text"] {
       flex: 1;
       padding: 0.5rem;
-      border: 1px solid #ddd;
-      background: white;
+      border: 1px solid #ccc;
       border-radius: 4px;
+      font-size: 1rem;
+    }
+    button[type="submit"] {
+      background: #0078d4;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      padding: 0.6rem 1.2rem;
+      font-size: 1rem;
       cursor: pointer;
-      transition: all 0.2s;
+      transition: background 0.2s;
     }
-    .filters button.active {
-      background: #007bff;
-      color: white;
-      border-color: #007bff;
+    button[type="submit"]:hover {
+      background: #005fa3;
     }
-    .filters button:hover {
-      background: #f8f9fa;
-    }
-    .filters button.active:hover {
-      background: #0056b3;
-    }
-    .todo-list {
+    ul {
       list-style: none;
       padding: 0;
       margin: 0;
     }
-    .todo-list li {
+    li {
       display: flex;
       align-items: center;
-      gap: 0.75rem;
-      padding: 0.75rem 0;
+      gap: 0.5rem;
+      padding: 0.5rem 0;
       border-bottom: 1px solid #eee;
     }
-    .todo-list li.completed .text {
+    .todo-text[data-done="true"] {
       text-decoration: line-through;
       color: #888;
     }
-    .todo-list .text {
-      flex: 1;
-    }
-    .delete {
-      background: #dc3545;
-      color: white;
+    .remove-btn {
+      background: #e53e3e;
+      color: #fff;
       border: none;
-      border-radius: 50%;
-      width: 24px;
-      height: 24px;
+      border-radius: 4px;
+      padding: 0.3rem 0.8rem;
+      font-size: 0.95rem;
       cursor: pointer;
-      font-size: 16px;
-      line-height: 1;
+      transition: background 0.2s;
     }
-    .delete:hover {
-      background: #c82333;
+    .remove-btn:hover {
+      background: #c53030;
     }
-    footer {
-      text-align: center;
-      margin-top: 1rem;
-      color: #888;
-    }
-  `,
-  handleKeydown(e: Event, state: TodoAppState, api: any) {
-    if ('key' in e && (e as KeyboardEvent).key === 'Enter' && state.newTodo.trim()) {
-      const newId = Math.max(0, ...state.todos.map((t: Todo) => t.id)) + 1;
-      const todoText = state.newTodo.trim();
-      state.newTodo = ''; // Clear input after adding
-      state.todos.push({
-        id: newId,
-        text: todoText,
-        completed: false
-      });
-      api.emit('todo-added', { id: newId, text: todoText });
-    }
-  },
-  handleAllFilter(_e: Event, state: TodoAppState) {
-    state.filter = 'all';
-  },
-  handleActiveFilter(_e: Event, state: TodoAppState) {
-    state.filter = 'active';
-  },
-  handleCompletedFilter(_e: Event, state: TodoAppState) {
-    state.filter = 'completed';
-  },
-  handleDelete(e: Event, state: TodoAppState, api: any) {
-    const target = e.target as HTMLElement;
-    const todoId = parseInt(target.getAttribute('data-todo-id') || '0');
-    state.todos = state.todos.filter((t: Todo) => t.id !== todoId);
-    api.emit('todo-removed', { id: todoId });
-  },
-  onMounted: (state, api) => {
-    console.log('📝 Todo App mounted', state);
-    // Subscribe to global event using runtime API
-    api.onGlobal?.('todo-toggled', (data: any) => {
-      console.log('🔄 Todo toggled:', data);
-    });
-  }
+  `
 });

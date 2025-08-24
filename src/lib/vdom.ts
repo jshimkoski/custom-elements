@@ -643,7 +643,7 @@ function patchProps(
         if (typeof oldVal === "function")
           el.removeEventListener(key.slice(2).toLowerCase(), oldVal);
         el.addEventListener(key.slice(2).toLowerCase(), newVal);
-      } else if (newVal === undefined || newVal === null) {
+      } else if (newVal === undefined || newVal === null || newVal === false) {
         el.removeAttribute(key);
       } else {
         el.setAttribute(key, String(newVal));
@@ -737,7 +737,13 @@ function createElement(vnode: VNode | string, context?: any): Node {
 
   // Set attributes
   for (const key in mergedAttrs) {
-    el.setAttribute(key, String(mergedAttrs[key]));
+    const val = mergedAttrs[key];
+    if (typeof val === "boolean") {
+      if (val) el.setAttribute(key, "");
+      // If false, do not set attribute
+    } else if (val !== undefined && val !== null) {
+      el.setAttribute(key, String(val));
+    }
   }
 
   // Set props and event listeners
@@ -756,6 +762,8 @@ function createElement(vnode: VNode | string, context?: any): Node {
       el.addEventListener(key.slice(2).toLowerCase(), val);
     } else if (key.startsWith("on") && val === undefined) {
       continue; // skip undefined event handlers
+    } else if (val === undefined || val === null || val === false) {
+      el.removeAttribute(key);
     } else {
       el.setAttribute(key, String(val));
     }

@@ -5,6 +5,29 @@ The `component` function is the entry point for defining custom elements using t
 
 ---
 
+## 🏷️ Tag Naming & Normalization
+
+Custom element tags must follow web standards:
+
+- **Kebab-case required:** Tags must contain at least one dash (e.g., `my-widget`).
+- **Automatic normalization:**
+  - The runtime converts any tag to kebab-case.
+  - If you use a single word (e.g., `profile`), it is normalized to `cer-profile`.
+  - This ensures all tags are valid and avoids conflicts with native elements.
+
+**Examples:**
+```typescript
+component('profile', { ... }); // becomes 'cer-profile'
+component('userCard', { ... }); // becomes 'user-card'
+component('my-widget', { ... }); // stays 'my-widget'
+```
+
+**Tip:** Always use descriptive, kebab-case tags for clarity and standards compliance.
+
+---
+
+---
+
 ## 🛠️ Defining a Component
 - Use the `component` function to register a new custom element.
 - Provide a tag name (kebab-case) and a config object (or a render function).

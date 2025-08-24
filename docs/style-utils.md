@@ -4,6 +4,64 @@ A comprehensive guide to the style utilities in the custom elements runtime. Lea
 
 ---
 
+## 🎬 CSS Animations (`cssAnimations`)
+
+Built-in animation keyframes for common UI effects:
+
+```typescript
+import { cssAnimations } from '@jasonshimmy/custom-elements-runtime/lib/style-utils';
+
+const style = `
+  ${cssAnimations.fadeIn}
+  .fade-in {
+    animation: fadeIn 0.5s ease;
+  }
+`;
+```
+
+**Available Animations:**
+- `fadeIn`, `fadeOut`
+- `slideIn`, `slideOut`
+- `scaleIn`, `scaleOut`
+
+**Usage:**
+- Add the keyframes to your component's style.
+- Use the corresponding class in your template for animated elements.
+
+---
+
+## 🧩 CSS Utility Classes (`cssUtilities`)
+
+A set of common utility classes for layout, spacing, typography, borders, colors, and responsiveness:
+
+```typescript
+import { cssUtilities } from '@jasonshimmy/custom-elements-runtime/lib/style-utils';
+
+const style = `
+  ${cssUtilities}
+`;
+
+// Usage in your template:
+// <div class="flex items-center p-2 bg-white rounded">...</div>
+```
+
+**Categories:**
+- Display: `.flex`, `.block`, `.inline`, `.hidden`, etc.
+- Position: `.relative`, `.absolute`, `.sticky`, etc.
+- Flexbox: `.flex-col`, `.justify-center`, `.items-center`, etc.
+- Spacing: `.p-2`, `.m-4`, `.mx-auto`, etc.
+- Text: `.text-center`, `.font-bold`, `.text-lg`, etc.
+- Border: `.border`, `.rounded`, `.border-none`, etc.
+- Color: `.bg-white`, `.text-blue-600`, etc.
+- Interactive: `.cursor-pointer`, `.select-none`, etc.
+- Responsive: `.sm:block`, `.md:flex`, `.lg:hidden`, etc.
+
+**Usage:**
+- Add the utility classes to your style property.
+- Use the classes in your template for rapid layout and design.
+
+---
+
 ## 🖌️ What are Style Utils?
 
 Style utils are a set of internal tools that optimize CSS for custom elements. They ensure styles are fast, secure, deduplicated, and efficiently updated.

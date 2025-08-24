@@ -144,6 +144,25 @@ function sanitizeCSS(css: string): string {
     .replace(/expression\s*\([^)]*\)/gi, "");
 }
 
+/**
+ * CSS template literal
+ *
+ * This doesn't sanitize CSS values.
+ * Runtime does that for us.
+ * 
+ * @param strings
+ * @param values
+ * @returns
+ */
+export function css(strings: TemplateStringsArray, ...values: unknown[]): string {
+  let result = '';
+  for (let i = 0; i < strings.length; i++) {
+    result += strings[i];
+    if (i < values.length) result += values[i];
+  }
+  return result;
+}
+
 // ######################################
 // ######################################
 // ######################################
@@ -186,15 +205,29 @@ export function component<
   renderOrConfig: ((state: S & C & P & InferMethods<T>) => any) | ComponentConfig<S, C, P, T>,
   config?: Partial<ComponentConfig<S, C, P, T>
 >): void {
+  let normalizedTag = toKebab(tag);
+  if (!normalizedTag.includes("-")) {
+    normalizedTag = `cer-${normalizedTag}`;
+  }
+
   let finalConfig: ComponentConfig<S, C, P, T>;
   if (typeof renderOrConfig === "function") {
     finalConfig = { ...config, render: renderOrConfig } as ComponentConfig<S, C, P, T>;
   } else {
     finalConfig = renderOrConfig;
   }
-  registry.set(tag, finalConfig);
-  if (typeof window !== "undefined" && !customElements.get(tag)) {
-    customElements.define(tag, createElementClass<S, C, P, T>(finalConfig) as CustomElementConstructor);
+
+  // Provide a default onError handler if not defined
+  if (typeof finalConfig.onError !== "function") {
+    finalConfig.onError = (error, state) => {
+      // Lightweight, developer-friendly default
+      console.error(`[${normalizedTag}] Error:`, error, state);
+    };
+  }
+
+  registry.set(normalizedTag, finalConfig);
+  if (typeof window !== "undefined" && !customElements.get(normalizedTag)) {
+    customElements.define(normalizedTag, createElementClass<S, C, P, T>(finalConfig) as CustomElementConstructor);
   }
 }
 

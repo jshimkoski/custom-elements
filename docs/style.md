@@ -1,5 +1,7 @@
 # 🎨 Style Functionality Deep Dive
 
+---
+
 ## 🖌️ Overview
 The `style` property in the runtime lets you define CSS for your custom element. Styles can be static strings, dynamic functions based on state, or advanced configs for performance. All styles are scoped to the shadow DOM, secure, and optimized for mobile-first rendering.
 
@@ -25,6 +27,34 @@ style: (state) => `:host { color: ${state.theme}; }`
 ```typescript
 style: (state) => `:host { background: ${state.active ? 'green' : 'gray'}; }`
 ```
+
+---
+
+## 🌈 The `css` Function for Syntax Highlighting
+
+The runtime provides a `css` helper function to improve syntax highlighting for CSS-in-JS code blocks. This function is purely for developer experience—it does **not** sanitize or process your CSS. All actual CSS sanitization and security is handled by the runtime engine itself.
+
+**Usage Example:**
+```typescript
+import { component, html, css } from '@jasonshimmy/custom-elements-runtime';
+
+const style = css`
+  :host {
+    color: var(--primary);
+    padding: 1rem;
+  }
+`;
+
+component('highlighted-box', {
+  style,
+  render: () => html`<div>Styled with syntax highlighting!</div>`
+});
+```
+
+**Note:**
+- The `css` function is for editor syntax highlighting only.
+- It does **not** sanitize, validate, or transform your CSS.
+- All CSS security is built into the runtime and applied automatically.
 
 ---
 

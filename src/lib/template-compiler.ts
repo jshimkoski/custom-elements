@@ -51,7 +51,7 @@ function parseProps(
   while ((match = attrRegex.exec(str))) {
     const prefix = match[1];
     const rawName = match[2];
-    const rawVal = match[4] || match[6]; // Extract value from either quote type
+    const rawVal = (match[4] || match[6]) ?? ""; // Extract value from either quote type
 
     // Interpolation detection
     const interpMatch = rawVal.match(/^{{(\d+)}}$/);

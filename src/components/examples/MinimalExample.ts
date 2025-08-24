@@ -1,22 +1,37 @@
-import { html, css, component } from '../../lib/runtime';
+/**
+ * MinimalExample: A simple counter component using best practices.
+ * Demonstrates state, event binding, and functional API.
+ */
+import { component, html, css } from '../../lib/runtime';
 
-interface MinimalExampleState {
-  count: number;
-}
-
-component('minimal-example', {
+export const MinimalExample = component('minimal-example', (state) => html`
+  <div class="counter-container">
+    <button @click="${() => state.count++}">Count: ${state.count}</button>
+  </div>
+`, {
   state: { count: 0 },
-  template: (state: MinimalExampleState) => html`
-    <div>
-      Text Node Breaks: ${state.count}
-      <span>${state.count}</span>
-      <button data-on-click="increment">Count: ${state.count}</button>
-    </div>
-  `(state),
   style: css`
-    button { font-size: 1.5rem; padding: 0.5rem 1rem; }
-  `,
-  increment(_e: Event, state: MinimalExampleState) {
-    state.count++;
-  }
+    .counter-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 120px;
+      font-family: system-ui, sans-serif;
+    }
+    button {
+      background: #0078d4;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      padding: 0.6rem 1.2rem;
+      font-size: 1.1rem;
+      cursor: pointer;
+      margin-top: 0.5rem;
+      transition: background 0.2s;
+    }
+    button:hover {
+      background: #005fa3;
+    }
+  `
 });
