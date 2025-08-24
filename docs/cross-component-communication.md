@@ -81,6 +81,10 @@ Use native DOM events for direct communication.
   <my-child @my-event="handleEvent"></my-child>
   ```
 
+**Note:**
+- The `@event` binding only works in templates rendered by the runtime.
+- For plain HTML, always use `addEventListener`.
+
 ---
 
 ## 🚦 Best Practices
