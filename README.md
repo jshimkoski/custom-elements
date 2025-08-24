@@ -27,117 +27,145 @@ component('my-counter', {
 });
 ```
 
-### Async Templates
-
-```ts
-import { asyncComponent, html } from '@jasonshimmy/custom-elements-runtime';
-
-asyncComponent('user-profile', {
-  state: { userId: 1, user: null },
-  renderAsync: async (state) => {
-    const user = await fetch(`/api/users/${state.userId}`).then(r => r.json());
-    return html`
-      <div>
-        <h2>${user.name}</h2>
-        <p>${user.email}</p>
-      </div>
-    `;
-  },
-  loadingTemplate: () => html`<div>Loading user...</div>`,
-  errorTemplate: (error) => html`<div>Error: ${error.message}</div>`
-});
-```
-
 No config needed — TypeScript support is built-in.
-
-👉 Explore [Advanced Usage](docs/api-reference.md)
 
 ---
 
 ## ✨ Why Use It?
 
-- **Stateful or Stateless:** Flexible components with or without internal state  
-- **Reactive & Declarative:** Auto updates, attribute sync, and data binding  
-- **Async Templates:** Dynamic template loading with caching, loading states, and error handling
-- **Functional Templates:** Tagged helpers (`html`, `compile`), Promises, and styles  
-- **Refs & Computed:** Access elements or create derived state easily  
-- **Built-in Store & Events:** Global state and event bus included  
-- **SSR & Hydration:** Universal rendering with opt-in hydration  
-- **Error Handling & Focus Retention:** Smooth updates without breaking UX  
-- **Plugin System:** Hooks like `onInit`, `onRender`, `onError`  
-- **Lightweight Router:** SSR-ready with dynamic route loading and programmatic navigation  
-- **Tiny & Fast:** Tree-shakable, modular, no dependencies
+- **TypeScript-first:** Strict types and intellisense for all APIs.
+- **Functional API:** Pure functions and config objects, no classes or decorators.
+- **Zero dependencies:** No external libraries or build step.
+- **Mobile-first:** Fast, responsive UIs.
+- **Two-way binding:** Use `#model-*` for instant state sync.
+- **Simple props/state/computed:** Automatic updates, easy reactivity.
+- **Lifecycle hooks:** `onConnected`, `onDisconnected`, `onAttributeChanged`, error boundaries.
+- **Custom events:** Built-in event bus for easy communication.
+- **Scoped styles:** Secure, performant CSS with caching.
+- **SSR-friendly:** Minimal fallback for server-side rendering.
+- **HMR support:** Instant dev feedback.
+- **Easy to use:** Just call `component()` with a config and render function.
 
 ---
 
 ## ⚠️ Things to Know
 
-- Templates need a single root node (fragments allowed with keys)
-- Always use helpers (e.g.; `html`, `compile`, `css`) to sanitize templates and styles
-- One handler per event type per element  
-- User input takes priority over programmatic changes  
-- SSR hydration is opt-in (`data-hydrate`)  
-- Only documented features are officially supported  
-- Plugins must be pure and side-effect free  
-- Router requires matching templates for SSR hydration  
+- Components must use kebab-case tags (e.g., `my-widget`).
+- Each component must return a single root node from its render function.
+- Only functional patterns — avoid `this`, classes, or decorators.
+- Props are strings, numbers, or booleans (auto-converted).
+- State and computed are deeply reactive and proxied.
+- Watchers support immediate and deep options.
+- Styles are sanitized and scoped per component.
+- Error boundaries catch and display errors with fallback templates.
+- SSR disables DOM/lifecycle logic for safe server rendering.
+
+---
+
+## 🧩 Directives & Binding
+
+Directives make your templates expressive and reactive:
+
+- **when(cond, children):** Render children only if condition is true.
+- **each(list, render):** Render a block for each item in a list.
+- **match():** Chain conditional branches for complex logic.
+
+Example:
+```ts
+html`
+  ${when(isVisible, html`<div>Visible!</div>`)}
+  ${each(items, (item) => html`<li>${item}</li>`)}
+  ${match().when(a, html`A`).when(b, html`B`).otherwise(html`None`).done()}
+`
+```
+
+### Value, Event & Attribute Binding
+
+- **Two-way binding:** Use `#model` for instant state sync with inputs.
+- **Attribute binding:** Use `:attr` to bind dynamic attributes (e.g., `:disabled`).
+- **Event binding:** Use `@event` (e.g., `@click`) for event handlers.
+
+Example:
+```ts
+html`
+  <input #model="count" type="number" :disabled="isLoading" />
+  <button @click="${() => count++}">Increment</button>
+`
+```
 
 ---
 
 ## 🔧 Use Cases
 
-- Micro-frontends  
-- Progressive enhancement  
-- Design systems  
-- SSR apps  
-- Performance-critical projects  
-- Standards-based development  
-- Static site generation  
-- Plugin-extendable architectures  
+- Design systems, UI libraries
+- Dashboards, admin panels
+- E-commerce widgets
+- Interactive forms, wizards
+- Docs sites, demos
+- Reusable controls for any web app
 
 ---
 
 ## 🖥️ SSR Highlights
 
-- SEO-friendly HTML/CSS out of the box  
-- Hydrate only what you need  
-- Robust support for fragments, keyed nodes, and error handling  
-- Compatible with routing and static site generation  
+- Minimal class fallback, no DOM/lifecycle logic
+- No browser API reliance on server
+- Always valid HTML output, ready for hydration
+- Error handling and prop parsing work in SSR
 
 ---
 
 ## 🛡️ Production Ready
 
-- Strict TypeScript and modular design  
-- No dependencies  
-- Clean error handling and validation  
-- Secure: sanitizes user input  
-- Fully tested  
+- Secure by default: sanitizes HTML/CSS, blocks unsafe scripts/styles
+- Handles edge cases and errors gracefully
+- Fully tree-shakable and code-splittable
+- No global state or side effects
+- Easy to test with Vitest and Cypress
 
 ---
 
 ## ⚡ Performance Perks
 
-- DOM batching and minimal re-renders  
-- Tree-shakable exports  
-- Focus preservation and efficient DOM updates  
-- Async rendering with Promises  
-- Smart memory cleanup  
+- Ultra-fast rendering via virtual DOM diffing
+- Debounced style updates for smooth UI
+- Style caching/deduplication for minimal CSS
+- Minimal memory footprint and fast startup
+- No runtime bloat, no polyfills needed
+
+---
+
+## 🔬 Comparison: Vue, React, Svelte, Angular, Lit
+
+| Feature                | Custom Elements Runtime | Vue     | React   | Svelte  | Angular | Lit     |
+|------------------------|:----------------------:|:-------:|:-------:|:-------:|:-------:|:-------:|
+| Type Safety            | ✅ Strict TypeScript    | ✅      | ✅      | ✅      | ✅      | ✅      |
+| Functional API         | ✅ Yes                  | ⚠️ (Options/Composition) | ⚠️ (Hooks, JSX) | ✅ | ⚠️ (Classes, Decorators) | ✅ |
+| Classes/Decorators     | ❌ Never                | ⚠️      | ❌      | ❌      | ✅      | ⚠️      |
+| Dependencies           | ❌ None                 | ✅      | ✅      | ✅      | ✅      | ✅      |
+| Bundle Size            | Ultra-small             | Small   | Medium  | Small   | Large   | Small   |
+| Event Bus              | ✅ Built-in            | ⚠️ (manual) | ⚠️ (manual) | ⚠️ (manual) | ⚠️ (manual) | ⚠️ (manual) |
+| Store/State Management | ✅ Built-in store      | ✅ Vuex/Pinia | ✅ Redux/etc | ✅ Writable | ✅ NgRx/etc | ⚠️ (manual) |
+| Two-way Binding        | ✅ #model             | ✅ v-model | ⚠️ (manual) | ✅ bind: | ⚠️ (manual) | ⚠️ (manual) |
+| Directives             | ✅ when, each, match    | ✅      | ⚠️      | ✅      | ✅      | ⚠️      |
+| Attribute/Event Binding| ✅ :attr, @event        | ✅      | ✅      | ✅      | ✅      | ✅      |
+| Scoped Styles          | ✅ Auto, secure         | ✅      | ⚠️      | ✅      | ✅      | ✅      |
+| SSR Support            | ✅ Minimal fallback     | ✅      | ✅      | ✅      | ✅      | ✅      |
+| HMR                    | ✅ Yes                  | ✅      | ✅      | ✅      | ✅      | ✅      |
+| Learning Curve         | Very low                | Low     | Medium  | Low     | High    | Low     |
+| Custom Elements        | ✅ Native               | ⚠️      | ⚠️      | ⚠️      | ⚠️      | ✅      |
+| Usage                  | `component()` + config  | SFC/Options | JSX/Function | SFC/Script | NgModule | `LitElement` + template |
+
+**Legend:**
+- ✅ = Fully supported / native
+- ⚠️ = Partially supported / requires extra code
+- ❌ = Not supported
 
 ---
 
 ## 📚 Learn More
 
-- [⚙️ Advanced Use Cases](docs/advanced-use-cases.md)  
-- [🛠 API Reference](docs/api-reference.md)  
-- [⚡ Async Templates](docs/async-templates.md)  
-- [🌱 Core Concepts](docs/core-concepts.md)  
-- [🥊 Data Model vs Data Bind](docs/data-model-vs-data-bind.md)  
-- [📦 Examples](docs/examples.md)  
-- [🎛️ Form Input Bindings](docs/form-input-bindings.md)  
-- [🎯 Framework Comparison](docs/framework-comparison.md)  
-- [🔗 Framework Integration](docs/framework-integration.md)  
-- [🚦 Routing](docs/routing.md)  
-- [🌐 SSR Guide](docs/ssr.md)  
+- [API Reference](./src/lib/runtime.ts)
 
 ---
 
