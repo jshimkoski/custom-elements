@@ -1189,7 +1189,7 @@ export function renderToString(vnode: VNode): string {
   }
 
   if (vnode.tag === "#anchor") {
-    const children = Array.isArray(vnode.children) ? vnode.children : [];
+    const children = Array.isArray(vnode.children) ? vnode.children.filter(Boolean) : [];
     return children.map(renderToString).join("");
   }
 
@@ -1199,7 +1199,7 @@ export function renderToString(vnode: VNode): string {
         .join("")
     : "";
   const children = Array.isArray(vnode.children)
-    ? vnode.children.map(renderToString).join("")
-    : escapeHTML(vnode.children || "");
+    ? vnode.children.filter(Boolean).map(renderToString).join("")
+    : (typeof vnode.children === "string" ? escapeHTML(vnode.children) : vnode.children ? renderToString(vnode.children) : "");
   return `<${vnode.tag}${props}>${children}</${vnode.tag}>`;
 }
