@@ -62,6 +62,13 @@ type InferMethods<T> = {
     : never;
 };
 
+export type ComponentContext<
+  S extends object,
+  C extends object,
+  P extends object,
+  T extends object = any
+> = S & C & P & InferMethods<T>;
+
 export interface ComponentConfig<
   S extends object,
   C extends object = {},
@@ -69,7 +76,7 @@ export interface ComponentConfig<
   T extends object = any,
 > {
   state?: S;
-  computed?: { [K in keyof C]: (state: S & C) => C[K] };
+  computed?: { [K in keyof C]: (context: ComponentContext<S, C, P, T>) => C[K] };
   props?: Record<
     string,
     {
@@ -77,36 +84,34 @@ export interface ComponentConfig<
       default?: string | number | boolean;
     }
   >;
-  watch?: WatchConfig<S & C & P>;
-  style?: string | ((state: S & C) => string) | DynamicStyleConfig;
+  watch?: WatchConfig<ComponentContext<S, C, P, T>>;
+  style?: string | ((context: ComponentContext<S, C, P, T>) => string) | DynamicStyleConfig;
   styleOptimizations?: Partial<StyleOptimizations>;
-  render: (
-    state: S & C & P & InferMethods<T>
-  ) => VNode | VNode[] | Promise<VNode | VNode[]>
-  loadingTemplate?: (state: S & C & P & InferMethods<T>) => VNode | VNode[];
+  render: (context: ComponentContext<S, C, P, T>) => VNode | VNode[] | Promise<VNode | VNode[]>;
+  loadingTemplate?: (context: ComponentContext<S, C, P, T>) => VNode | VNode[];
   errorTemplate?: (
     error: Error,
-    state: S & C & P & InferMethods<T>,
+    context: ComponentContext<S, C, P, T>,
   ) => VNode | VNode[];
   onConnected?: (
-    state: S & C & P & InferMethods<T>,
+    context: ComponentContext<S, C, P, T>,
   ) => void;
   onDisconnected?: (
-    state: S & C & P & InferMethods<T>,
+    context: ComponentContext<S, C, P, T>,
   ) => void;
   onAttributeChanged?: (
-    state: S & C & P & InferMethods<T>,
+    context: ComponentContext<S, C, P, T>,
     name: string,
     oldValue: string | null,
     newValue: string | null,
   ) => void;
   onError?: (
     error: Error | null,
-    state: S & C & P & InferMethods<T>,
+    context: ComponentContext<S, C, P, T>,
   ) => void;
   errorFallback?: (
     error: Error | null,
-    state: S & C & P & InferMethods<T>,
+    context: ComponentContext<S, C, P, T>,
   ) => string;
   [key: string]: any;
 }
@@ -202,9 +207,9 @@ export function component<
   T extends object = any,
 >(
   tag: string,
-  renderOrConfig: ((state: S & C & P & InferMethods<T>) => any) | ComponentConfig<S, C, P, T>,
-  config?: Partial<ComponentConfig<S, C, P, T>
->): void {
+  renderOrConfig: ((context: ComponentContext<S, C, P, T>) => any) | ComponentConfig<S, C, P, T>,
+  config?: Partial<ComponentConfig<S, C, P, T>>
+): void {
   let normalizedTag = toKebab(tag);
   if (!normalizedTag.includes("-")) {
     normalizedTag = `cer-${normalizedTag}`;
@@ -249,7 +254,8 @@ export function createElementClass<
     return class { constructor() {} };
   }
   return class extends HTMLElement {
-    private _state: S & C & P & InferMethods<T>;
+    public context: ComponentContext<S, C, P, T>;
+
     private _listeners: Array<() => void> = [];
     private _watchers: Map<string, WatcherState> = new Map();
     /** @internal */
@@ -286,15 +292,15 @@ export function createElementClass<
         (cfg: ComponentConfig<S, C, P, T>) => this._applyStyle(cfg),
         optimizations.debounceMs,
       );
-      this._state = this._initState(config);
+      this.context = this._initContext(config);
 
       // --- Inject config methods into state ---
       Object.keys(config).forEach((key) => {
         const fn = (config as any)[key];
         if (typeof fn === "function" && !key.startsWith("on")) {
           // Wrap the function so it receives state as the first argument
-          (this._state as any)[key] = (...args: any[]) =>
-            fn(...args, this._state);
+          (this.context as any)[key] = (...args: any[]) =>
+            fn(...args, this.context);
         }
       });
 
@@ -312,7 +318,7 @@ export function createElementClass<
     connectedCallback() {
       this._runLogicWithinErrorBoundary(config, () => {
         if (config.onConnected && !this._mounted) {
-          config.onConnected(this._state);
+          config.onConnected(this.context);
           this._mounted = true;
         }
       });
@@ -321,7 +327,7 @@ export function createElementClass<
     disconnectedCallback() {
       this._runLogicWithinErrorBoundary(config, () => {
         if (config.onDisconnected)
-          config.onDisconnected(this._state);
+          config.onDisconnected(this.context);
         this._listeners.forEach((unsub) => unsub());
         this._listeners = [];
         this._watchers.clear();
@@ -350,7 +356,7 @@ export function createElementClass<
         this._applyProps(config);
         if (config.onAttributeChanged) {
           config.onAttributeChanged(
-            this._state,
+            this.context,
             name,
             oldValue,
             newValue,
@@ -367,9 +373,9 @@ export function createElementClass<
       this._runLogicWithinErrorBoundary(config, () => {
         if (!cfg.computed) return;
         Object.entries(cfg.computed).forEach(([key, fn]) => {
-          Object.defineProperty(this._state, key, {
+          Object.defineProperty(this.context, key, {
             get: () => {
-              const val = (fn as (state: S & C & P) => any)(this._state);
+              const val = (fn as (context: ComponentContext<S, C, P, T>) => any)(this.context);
               return escapeHTML(val);
             },
             enumerable: true,
@@ -387,18 +393,18 @@ export function createElementClass<
 
         // If loading, show loading template
         if (this._templateLoading && cfg.loadingTemplate) {
-          this._renderOutput(cfg.loadingTemplate(this._state));
+          this._renderOutput(cfg.loadingTemplate(this.context));
           return;
         }
 
         // If error, show error template
         if (this._templateError && cfg.errorTemplate) {
-          this._renderOutput(cfg.errorTemplate(this._templateError, this._state));
+          this._renderOutput(cfg.errorTemplate(this._templateError, this.context));
           return;
         }
 
         // Call render function
-        const outputOrPromise = cfg.render(this._state);
+        const outputOrPromise = cfg.render(this.context);
 
         if (outputOrPromise instanceof Promise) {
           this._templateLoading = true;
@@ -413,7 +419,7 @@ export function createElementClass<
               this._templateLoading = false;
               this._templateError = error;
               if (cfg.errorTemplate) {
-                const fallback = cfg.errorTemplate(error, this._state);
+                const fallback = cfg.errorTemplate(error, this.context);
                 this._renderOutput(fallback);
                 return fallback;
               }
@@ -421,7 +427,7 @@ export function createElementClass<
             });
 
           if (cfg.loadingTemplate)
-            this._renderOutput(cfg.loadingTemplate(this._state));
+            this._renderOutput(cfg.loadingTemplate(this.context));
           return;
         }
 
@@ -436,12 +442,12 @@ export function createElementClass<
       if (!this.shadowRoot) return;
 
       // Create context with state and render method for directive processing
-      const context = new Proxy(this._state, {
+      const context = new Proxy(this.context, {
         get: (target, prop) => {
           if (prop === "_requestRender") {
             return () => this._requestRender();
           }
-          if (prop === "_state") {
+          if (prop === "context") {
             return target;
           }
           // Handle nested property access for #model directives
@@ -581,7 +587,7 @@ export function createElementClass<
           // Create a hash of dependent state values for caching
           let stateHash = "";
           if (shouldCache && dependencies.length > 0) {
-            const dependentValues = dependencies.map((dep) => (this._state as Record<string, unknown>)[dep]);
+            const dependentValues = dependencies.map((dep) => (this.context as Record<string, unknown>)[dep]);
             stateHash = createStateHash(dependentValues);
 
             // Check cache first
@@ -605,7 +611,7 @@ export function createElementClass<
           // Generate style
           const rawStyle =
             typeof styleConfig.css === "function"
-              ? styleConfig.css(this._state)
+              ? styleConfig.css(this.context)
               : styleConfig.css;
 
           let processedStyle = sanitizeCSS(rawStyle);
@@ -650,13 +656,13 @@ export function createElementClass<
       } catch (error) {
         this._hasError = true;
         if (cfg.onError) {
-          cfg.onError(error as Error | null, this._state);
+          cfg.onError(error as Error | null, this.context);
         }
         if (cfg.errorFallback) {
           if (this.shadowRoot) {
             this.shadowRoot.innerHTML = cfg.errorFallback(
               error as Error | null,
-              this._state,
+              this.context,
             );
           }
         }
@@ -664,7 +670,7 @@ export function createElementClass<
     }
 
     // --- State, props, computed ---
-    private _initState(cfg: ComponentConfig<S, C, P>): S & C & P & InferMethods<T> {
+    private _initContext(cfg: ComponentConfig<S, C, P>): ComponentContext<S, C, P, T> {
       try {
         const self = this;
         function createReactive(obj: any, path = ""): any {
@@ -786,9 +792,9 @@ export function createElementClass<
           }
           return obj;
         }
-        return createReactive({ ...cfg.state }) as S & C & P & InferMethods<T>;
+        return createReactive({ ...cfg.state }) as ComponentContext<S, C, P, T>;
       } catch (error) {
-        return {} as S & C & P & InferMethods<T>;
+        return {} as ComponentContext<S, C, P, T>;
       }
     }
 
@@ -816,7 +822,7 @@ export function createElementClass<
         if (options.immediate) {
           try {
             const currentValue = this._getNestedValue(key);
-            callback(currentValue, undefined, this._state);
+            callback(currentValue, undefined, this.context);
           } catch (error) {
             console.error(`Error in immediate watcher for "${key}":`, error);
           }
@@ -827,7 +833,7 @@ export function createElementClass<
     private _getNestedValue(path: string): any {
       return path.split(".").reduce(
         (obj: any, key: string) => obj?.[key],
-        this._state as any,
+        this.context as any,
       );
     }
 
@@ -854,7 +860,7 @@ export function createElementClass<
       const watcher = this._watchers.get(path);
       if (watcher && !isEqual(newValue, watcher.oldValue)) {
         try {
-          watcher.callback(newValue, watcher.oldValue, this._state);
+          watcher.callback(newValue, watcher.oldValue, this.context);
           watcher.oldValue = newValue;
         } catch (error) {
           console.error(`Error in watcher for "${path}":`, error);
@@ -867,7 +873,7 @@ export function createElementClass<
           try {
             const currentValue = this._getNestedValue(watchPath);
             if (!isEqual(currentValue, watcherConfig.oldValue)) {
-              watcherConfig.callback(currentValue, watcherConfig.oldValue, this._state);
+              watcherConfig.callback(currentValue, watcherConfig.oldValue, this.context);
               watcherConfig.oldValue = currentValue;
             }
           } catch (error) {
@@ -888,24 +894,24 @@ export function createElementClass<
         Object.entries(cfg.props).forEach(([key, def]) => {
           const attr = this.getAttribute(toKebab(key));
           if (attr !== null) {
-            (this._state as any)[key] = escapeHTML(
+            (this.context as any)[key] = escapeHTML(
               parseProp(attr, def.type),
             );
           } else if ('default' in def && def.default !== undefined) {
-            (this._state as any)[key] = escapeHTML(def.default);
+            (this.context as any)[key] = escapeHTML(def.default);
           }
           // else: leave undefined if no default
         });
       } catch (error) {
         this._hasError = true;
         if (cfg.onError) {
-          cfg.onError(error as Error | null, this._state);
+          cfg.onError(error as Error | null, this.context);
         }
         if (cfg.errorFallback) {
           if (this.shadowRoot) {
             this.shadowRoot.innerHTML = cfg.errorFallback(
               error as Error | null,
-              this._state,
+              this.context,
             );
           }
         }
