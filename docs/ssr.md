@@ -1,0 +1,121 @@
+# 🖥️ Server-Side Rendering (SSR) Deep Dive
+
+A comprehensive guide to SSR support in the custom elements runtime. Learn how SSR works, how to use it, and best practices for building universal web components.
+
+---
+
+## 🌐 What is SSR?
+
+Server-Side Rendering (SSR) is the process of generating HTML on the server, sending it to the client, and hydrating it for interactivity. SSR improves performance, SEO, and user experience by delivering ready-to-display content.
+
+- **Purpose:** Faster initial load, better SEO, improved accessibility.
+- **Benefits:** Universal rendering, progressive enhancement, reduced time-to-interactive.
+
+---
+
+## 🏗️ SSR Architecture in the Runtime
+
+- **Functional API:** Components are defined as pure functions/configs, making them easy to render on the server.
+- **No DOM Dependency:** SSR mode avoids direct DOM APIs, using VNode trees for output.
+- **Hydration:** Client-side runtime attaches interactivity to server-rendered markup.
+- **Error Boundaries:** SSR gracefully handles errors and fallback rendering.
+
+---
+
+## ⚡ How SSR Works
+
+1. **Component registration:** Components are registered as usual.
+2. **SSR detection:** If `window` is undefined, the runtime switches to SSR mode.
+3. **VNode rendering:** The `render` function returns VNode trees, which are serialized to HTML.
+4. **No DOM/lifecycle:** In SSR, no DOM APIs or lifecycle hooks are called.
+5. **Hydration:** On the client, the runtime hydrates the markup and attaches event listeners, bindings, and styles.
+
+---
+
+## 🧩 SSR-Friendly Component Example
+
+```typescript
+import { component, html } from "runtime";
+
+component("ssr-demo", {
+  state: { message: "Hello SSR!" },
+  render: (state) => html`<div>${state.message}</div>`
+});
+```
+
+- On the server: `render` returns a VNode, which is converted to HTML.
+- On the client: The runtime hydrates the markup and enables interactivity.
+
+---
+
+## 🛠️ SSR Fallback Logic
+
+- In SSR mode, `createElementClass` returns a minimal class with no DOM or lifecycle logic.
+- Only the `render` function is used to generate output.
+- No `this` context or browser APIs are accessed.
+
+**Example:**
+```typescript
+if (typeof window === "undefined") {
+  // SSR fallback: minimal class, no DOM, no lifecycle
+  return class { constructor() {} };
+}
+```
+
+---
+
+## 🔄 Hydration Process
+
+- **Server:** Renders HTML from VNode trees
+- **Client:** Attaches event listeners, bindings, and styles
+- **No double rendering:** Hydration avoids re-rendering the initial markup
+- **Error handling:** Any hydration errors are caught by error boundaries
+
+---
+
+## 🚀 SSR Best Practices
+
+- **Avoid direct DOM manipulation:** Use VNode trees and pure functions
+- **Keep logic stateless:** SSR should not depend on browser-only APIs
+- **Use error boundaries:** Provide fallback UI for rendering errors
+- **Design for hydration:** Ensure markup matches between server and client
+
+---
+
+## 📚 Example: Universal Component
+
+```typescript
+component("universal-greeting", {
+  state: { name: "World" },
+  render: (state) => html`<h1>Hello, ${state.name}!</h1>`
+});
+```
+
+- Works in SSR and client environments
+- Hydrates seamlessly for interactivity
+
+---
+
+## ❓ FAQ
+
+**Q: How do I enable SSR?**
+A: SSR is automatic when `window` is undefined (e.g., in Node.js or serverless environments).
+
+**Q: Can I use lifecycle hooks in SSR?**
+A: No, lifecycle hooks are ignored in SSR mode. Use them only for client-side logic.
+
+**Q: How do I hydrate server-rendered markup?**
+A: The runtime automatically hydrates markup when loaded on the client.
+
+**Q: Is SSR secure?**
+A: Yes, the runtime escapes HTML and sanitizes styles to prevent XSS and injection attacks.
+
+---
+
+## 🏁 Summary
+
+SSR support in the custom elements runtime enables fast, SEO-friendly, and universal web components. By leveraging VNode trees, pure functions, and hydration, you can build components that work seamlessly on both server and client.
+
+---
+
+For more details, see the SSR fallback logic in `src/lib/runtime.ts` and explore universal component examples in the documentation.
