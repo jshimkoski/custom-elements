@@ -12,11 +12,11 @@ You can handle errors in your component config using:
 - `errorFallback`: Fallback HTML string for critical errors.
 
 ```typescript
-onError: (error, state) => {
+onError: (error, ctx) => {
   console.error('Component error:', error);
 },
-errorTemplate: (error, state) => html`<div>Error: ${error?.message}</div>`,
-errorFallback: (error, state) => `<div>Critical error: ${error?.message}</div>`,
+errorTemplate: (error, ctx) => html`<div>Error: ${error?.message}</div>`,
+errorFallback: (error, ctx) => `<div>Critical error: ${error?.message}</div>`,
 ```
 
 ---
@@ -35,15 +35,15 @@ errorFallback: (error, state) => `<div>Critical error: ${error?.message}</div>`,
 ```typescript
 component('error-demo', {
   state: { fail: false },
-  render: (state) => {
-    if (state.fail) throw new Error('Intentional failure');
-    return html`<button @click="() => state.fail = true">Fail</button>`;
+  render: (ctx) => {
+    if (ctx.fail) throw new Error('Intentional failure');
+    return html`<button @click="${() => ctx.fail = true}">Fail</button>`;
   },
-  onError: (err, state) => {
+  onError: (err, ctx) => {
     console.warn('Error caught:', err);
   },
-  errorTemplate: (err, state) => html`<div>Oops! ${err?.message}</div>`,
-  errorFallback: (err, state) => `<div>Something went wrong: ${err?.message}</div>`,
+  errorTemplate: (err, ctx) => html`<div>Oops! ${err?.message}</div>`,
+  errorFallback: (err, ctx) => `<div>Something went wrong: ${err?.message}</div>`,
 });
 ```
 

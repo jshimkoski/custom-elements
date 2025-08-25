@@ -14,7 +14,7 @@ The `style` property in the runtime lets you define CSS for your custom element.
 ```typescript
 style: `:host { color: blue; }`
 // or
-style: (state) => `:host { color: ${state.theme}; }`
+style: (ctx) => `:host { color: ${ctx.theme}; }`
 ```
 
 ---
@@ -25,7 +25,7 @@ style: (state) => `:host { color: ${state.theme}; }`
 - Use for theming, responsive design, or state-driven appearance.
 
 ```typescript
-style: (state) => `:host { background: ${state.active ? 'green' : 'gray'}; }`
+style: (ctx) => `:host { background: ${ctx.active ? 'green' : 'gray'}; }`
 ```
 
 ---
@@ -66,7 +66,7 @@ component('highlighted-box', {
 
 ```typescript
 style: {
-  css: (state) => `:host { font-size: ${state.size}px; }`,
+  css: (ctx) => `:host { font-size: ${ctx.size}px; }`,
   dependencies: ['size'],
   cache: true,
 }
@@ -102,9 +102,9 @@ styleOptimizations: {
 ```typescript
 component('styled-box', {
   state: { color: 'red', size: 24 },
-  style: (state) => `:host { color: ${state.color}; font-size: ${state.size}px; }`,
+  style: (ctx) => `:host { color: ${ctx.color}; font-size: ${ctx.size}px; }`,
   styleOptimizations: { enableMinification: true },
-  render: (state) => html`<div>Styled content</div>`,
+  render: (ctx) => html`<div>Styled content</div>`,
 });
 ```
 

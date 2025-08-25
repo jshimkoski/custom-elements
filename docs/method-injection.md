@@ -13,12 +13,12 @@ Method injection allows you to define custom functions in your component config 
 ```typescript
 component('counter-demo', {
   state: { count: 0 },
-  increment: (by, state) => { state.count += by; },
-  reset: (state) => { state.count = 0; },
-  render: (state) => html`
-    <button @click="() => state.increment(1)">+1</button>
-    <button @click="state.reset()">Reset</button>
-    <div>Count: ${state.count}</div>
+  increment: (by, ctx) => { ctx.count += by; },
+  reset: (ctx) => { ctx.count = 0; },
+  render: (ctx) => html`
+    <button @click="${() => ctx.increment(1)}">+1</button>
+    <button @click="${ctx.reset}">Reset</button>
+    <div>Count: ${ctx.count}</div>
   `,
 });
 ```
@@ -36,19 +36,19 @@ component('counter-demo', {
 ```typescript
 component('math-demo', {
   state: { value: 2 },
-  double: (state) => state.value * 2,
+  double: (ctx) => ctx.value * 2,
   computed: {
-    squared: (state) => state.double(state) ** 2,
+    squared: (ctx) => ctx.double(ctx) ** 2,
   },
   watch: {
-    value: [(newVal, oldVal, state) => {
+    value: [(newVal, oldVal, ctx) => {
       console.log('Value changed:', newVal);
-      state.double(state); // Use method in watcher
+      ctx.double(ctx); // Use method in watcher
     }],
   },
-  render: (state) => html`
-    <div>Value: ${state.value}, Squared: ${state.squared}</div>
-    <button @click="() => state.value++">Inc</button>
+  render: (ctx) => html`
+    <div>Value: ${ctx.value}, Squared: ${ctx.squared}</div>
+    <button @click="${() => ctx.value++}">Inc</button>
   `,
 });
 ```

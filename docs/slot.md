@@ -25,7 +25,7 @@ component("parent-comp", {
 
 component("child-comp", {
   props: { content: { type: String, default: "" } },
-  render: (state) => html`<div>${state.content}</div>`
+  render: (ctx) => html`<div>${ctx.content}</div>`
 });
 ```
 
@@ -38,7 +38,7 @@ Read and render child nodes passed to a custom element.
 **Example:**
 ```typescript
 component("slot-demo", {
-  render: (state) => html`<div>${state._children}</div>`
+  render: (ctx) => html`<div>${ctx._children}</div>`
 });
 // Usage:
 // <slot-demo><span>Injected!</span></slot-demo>
@@ -59,10 +59,10 @@ component("multi-slot", {
     header: { type: String, default: "" },
     footer: { type: String, default: "" }
   },
-  render: (state) => html`
-    <header>${state.header}</header>
+  render: (ctx) => html`
+    <header>${ctx.header}</header>
     <main>...</main>
-    <footer>${state.footer}</footer>
+    <footer>${ctx.footer}</footer>
   `
 });
 ```

@@ -13,19 +13,19 @@ Hooks in the runtime provide lifecycle management and event handling for your cu
 - `errorFallback`: Provides fallback HTML for critical errors.
 
 ```typescript
-onConnected: (state) => {
-  console.log('Element connected!', state);
+onConnected: (ctx) => {
+  console.log('Element connected!', ctx);
 },
-onDisconnected: (state) => {
-  console.log('Element disconnected!', state);
+onDisconnected: (ctx) => {
+  console.log('Element disconnected!', ctx);
 },
-onAttributeChanged: (state, name, oldValue, newValue) => {
+onAttributeChanged: (ctx, name, oldValue, newValue) => {
   console.log(`Attribute ${name} changed from ${oldValue} to ${newValue}`);
 },
-onError: (error, state) => {
+onError: (error, ctx) => {
   console.error('Error:', error);
 },
-errorFallback: (error, state) => `<div>Critical error: ${error?.message}</div>`,
+errorFallback: (error, ctx) => `<div>Critical error: ${error?.message}</div>`,
 ```
 
 ---
@@ -43,22 +43,22 @@ errorFallback: (error, state) => `<div>Critical error: ${error?.message}</div>`,
 component('lifecycle-demo', {
   state: { active: false },
   props: { label: { type: String, default: 'Demo' } },
-  onConnected: (state) => {
-    state.active = true;
-    console.log('Connected:', state);
+  onConnected: (ctx) => {
+    ctx.active = true;
+    console.log('Connected:', ctx);
   },
-  onDisconnected: (state) => {
-    state.active = false;
-    console.log('Disconnected:', state);
+  onDisconnected: (ctx) => {
+    ctx.active = false;
+    console.log('Disconnected:', ctx);
   },
-  onAttributeChanged: (state, name, oldValue, newValue) => {
+  onAttributeChanged: (ctx, name, oldValue, newValue) => {
     console.log(`Prop ${name} changed: ${oldValue} → ${newValue}`);
   },
-  onError: (err, state) => {
+  onError: (err, ctx) => {
     console.warn('Error caught:', err);
   },
-  errorFallback: (err, state) => `<div>Something went wrong: ${err?.message}</div>`,
-  render: (state) => html`<div>${state.label} - ${state.active ? 'Active' : 'Inactive'}</div>`,
+  errorFallback: (err, ctx) => `<div>Something went wrong: ${err?.message}</div>`,
+  render: (ctx) => html`<div>${ctx.label} - ${ctx.active ? 'Active' : 'Inactive'}</div>`,
 });
 ```
 

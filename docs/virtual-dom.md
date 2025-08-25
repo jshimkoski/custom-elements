@@ -46,7 +46,7 @@ const vnode = {
 
 ## 🔄 How vdomRenderer Works
 
-1. **Receives VNode(s) and context**
+1. **Receives VNode(s) and ctx**
 2. **Diffs** current and previous VNode trees
 3. **Patches** only the changed parts of the real DOM
 4. **Handles directives, bindings, and events**
@@ -56,7 +56,7 @@ const vnode = {
 vdomRenderer(
   shadowRoot,
   [vnode],
-  context // usually your component state
+  ctx // usually your component state
 );
 ```
 
@@ -74,7 +74,7 @@ vdomRenderer(
 ## 🛠️ Features & Integrations
 
 - **Directives:** Processes `when`, `each`, `match` for conditional and list rendering
-- **Bindings:** Handles `:attr`, `@event`, `#model-*` for reactive updates
+- **Bindings:** Handles `:attr`, `@event`, `#model` for reactive updates
 - **Error boundaries:** Supports error handling during rendering
 - **SSR-friendly:** Can generate VNode trees for server-side rendering
 
@@ -112,14 +112,14 @@ const vnode = {
     children: [item]
   }))
 };
-vdomRenderer(shadowRoot, [vnode], context);
+vdomRenderer(shadowRoot, [vnode], ctx);
 ```
 
 ---
 
 ## 🧩 Internal API Reference
 
-- **vdomRenderer(root, vnodes, context):** Main entry for rendering
+- **vdomRenderer(root, vnodes, ctx):** Main entry for rendering
 - **VNode:** Type definition for virtual nodes
 - **Diffing & patching:** Internal logic for efficient updates
 

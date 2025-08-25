@@ -38,7 +38,7 @@ Access and mutate store values directly in your component logic or templates.
 
 ```ts
 component('my-cart', {
-  render: (state) => html`
+  render: (ctx) => html`
     <div>Items: ${store.cart.length}</div>
     <button @click="${() => store.cart.push({ id: 1 })}">Add</button>
   `

@@ -12,10 +12,10 @@ Render functions can return Promises for async data or templates. The runtime ha
 ```typescript
 component("async-demo", {
   state: { userId: 1 },
-  loadingTemplate: (state) => html`<div>Loading...</div>`,
-  errorTemplate: (err, state) => html`<div>Error: ${err?.message}</div>`,
-  render: async (state) => {
-    const user = await fetchUser(state.userId);
+  loadingTemplate: (ctx) => html`<div>Loading...</div>`,
+  errorTemplate: (err, ctx) => html`<div>Error: ${err?.message}</div>`,
+  render: async (ctx) => {
+    const user = await fetchUser(ctx.userId);
     return html`<div>User: ${user.name}</div>`;
   }
 });
@@ -31,39 +31,13 @@ Components can render other custom elements, passing state and props for composi
 ```typescript
 component("parent-comp", {
   state: { name: "Alice" },
-  render: (state) => html`<child-comp name="${state.name}"></child-comp>`
+  render: (ctx) => html`<child-comp name="${ctx.name}"></child-comp>`
 });
 
 component("child-comp", {
   props: { name: { type: String, default: "" } },
-  render: (state) => html`<span>Hello, ${state.name}!</span>`
+  render: (ctx) => html`<span>Hello, ${ctx.name}!</span>`
 });
-```
-
----
-
-## 🔄 Dynamic Component Config
-
-You can update component configs at runtime for feature toggles, theming, or A/B testing.
-
-**Example:**
-```typescript
-// Update config for live components
-registry.set("my-comp", { ...newConfig });
-```
-
----
-
-## 🏷️ Custom Directives & Bindings
-
-Extend the runtime with custom directives or bindings for specialized behaviors.
-
-**Example:**
-```typescript
-// Add a custom directive
-export function myDirective(node, value, context) {
-  // Custom logic
-}
 ```
 
 ---
@@ -81,21 +55,7 @@ component("deep-watch", {
       console.log("Age changed:", newVal);
     }, { deep: true }]
   },
-  render: (state) => html`<div>Age: ${state.user.profile.age}</div>`
-});
-```
-
----
-
-## 🧩 Slot-like Patterns
-
-Simulate slots by passing content as props or using child nodes.
-
-**Example:**
-```typescript
-component("slot-demo", {
-  props: { content: { type: String, default: "" } },
-  render: (state) => html`<div>${state.content}</div>`
+  render: (ctx) => html`<div>Age: ${ctx.user.profile.age}</div>`
 });
 ```
 
@@ -108,8 +68,8 @@ Use errorTemplate and errorFallback for robust error handling in any render or l
 **Example:**
 ```typescript
 component("error-demo", {
-  errorTemplate: (err, state) => html`<div>Oops: ${err?.message}</div>`,
-  render: (state) => { throw new Error("Fail!"); }
+  errorTemplate: (err, ctx) => html`<div>Oops: ${err?.message}</div>`,
+  render: (ctx) => { throw new Error("Fail!"); }
 });
 ```
 

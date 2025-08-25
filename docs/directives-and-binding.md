@@ -49,7 +49,7 @@ html`
 Bind dynamic attributes to state or computed values using `:attr` syntax.
 ```ts
 html`
-  <input :disabled="isLoading" :value="count" />
+  <input :disabled="isLoading" />
 `
 ```
 - Any attribute can be bound: `:checked`, `:aria-label`, `:class`, etc.

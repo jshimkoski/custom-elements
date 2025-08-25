@@ -1,14 +1,14 @@
 # 🔗 Bindings Functionality Deep Dive
 
 ## 🧬 Overview
-Bindings allow you to connect your component's state, props, and events directly to the DOM. The runtime supports three core binding types: attribute binding (`:attr`), event binding (`@event`), and two-way binding (`#model-*`). These make your templates interactive, reactive, and easy to maintain.
+Bindings allow you to connect your component's state, props, and events directly to the DOM. The runtime supports three core binding types: attribute binding (`:attr`), event binding (`@event`), and two-way binding (`#model`). These make your templates interactive, reactive, and easy to maintain.
 
 ---
 
 ## 🛠️ Supported Bindings
 - `:attr` — Attribute binding
 - `@event` — Event binding
-- `#model-*` — Two-way binding for form elements
+- `#model` — Two-way binding for form elements
 
 ---
 
@@ -27,21 +27,21 @@ Bind state or props to element attributes.
 Bind event listeners to DOM events.
 
 ```html
-<button @click="() => state.count++">Increment</button>
+<button @click="${() => ctx.count++}">Increment</button>
 ```
 - Use `@eventName` to bind a handler function.
 - Handler can access and update state, props, or call injected methods.
 
 ---
 
-## 🔄 Two-Way Binding (`#model-*`)
+## 🔄 Two-Way Binding (`#model`)
 Synchronize form element values with state.
 
 ```html
-<input #model="state.email" />
+<input #model="email" />
 ```
 - Use `#model` for two-way binding on form fields.
-- Supports nested state: `#model="state.user.name"`
+- Supports nested state: `#model="user.name"`
 - Updates state when the input value changes, and vice versa.
 
 ---
@@ -50,10 +50,10 @@ Synchronize form element values with state.
 ```typescript
 component('binding-demo', {
   state: { name: '', count: 0 },
-  render: (state) => html`
-    <input #model="state.name" placeholder="Name" />
-    <button @click="() => state.count++">Clicked ${state.count} times</button>
-    <div :data-name="state.name">Hello, ${state.name}</div>
+  render: (ctx) => html`
+    <input #model="name" placeholder="Name" />
+    <button @click="${() => ctx.count++}">Clicked ${ctx.count} times</button>
+    <div :data-name="name">Hello, ${ctx.name}</div>
   `,
 });
 ```

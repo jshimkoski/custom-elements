@@ -50,7 +50,7 @@ if (
 ```typescript
 component("hmr-demo", {
   state: { count: 0 },
-  render: (state) => html`<button @click="count++">${state.count}</button>`
+  render: (ctx) => html`<button @click="${() => ctx.count++}">${ctx.count}</button>`
 });
 ```
 

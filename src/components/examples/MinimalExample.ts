@@ -1,12 +1,12 @@
 /**
  * MinimalExample: A simple counter component using best practices.
- * Demonstrates state, event binding, and functional API.
+ * Demonstrates ctx, event binding, and functional API.
  */
 import { component, html, css } from '../../lib/runtime';
 
-export const MinimalExample = component('minimal-example', (state) => html`
+export const MinimalExample = component('minimal-example', (ctx) => html`
   <div class="counter-container">
-    <button @click="${() => state.count++}">Count: ${state.count}</button>
+    <button @click="${() => ctx.count++}">Count: ${ctx.count}</button>
   </div>
 `, {
   state: { count: 0 },

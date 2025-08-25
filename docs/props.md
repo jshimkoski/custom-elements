@@ -40,13 +40,13 @@ props: {
 ---
 
 ## 🧩 Accessing Props in Component
-- Props are available in `state` inside `render`, `computed`, `watch`, and methods.
+- Props are available in `ctx` inside `render`, `computed`, `watch`, and methods.
 
 ```typescript
-render: (state) => html`
-  <h1>${state.title}</h1>
-  <p>Count: ${state.count}</p>
-  <p>Active: ${state.active ? "Yes" : "No"}</p>
+render: (ctx) => html`
+  <h1>${ctx.title}</h1>
+  <p>Count: ${ctx.count}</p>
+  <p>Active: ${ctx.active ? "Yes" : "No"}</p>
 `
 ```
 
@@ -60,11 +60,11 @@ component('demo-props', {
     age: { type: Number, default: 18 },
     subscribed: { type: Boolean, default: false },
   },
-  render: (state) => html`
+  render: (ctx) => html`
     <div>
-      <h2>Hello, ${state.name}!</h2>
-      <p>Age: ${state.age}</p>
-      <p>Subscribed: ${state.subscribed ? "✅" : "❌"}</p>
+      <h2>Hello, ${ctx.name}!</h2>
+      <p>Age: ${ctx.age}</p>
+      <p>Subscribed: ${ctx.subscribed ? "✅" : "❌"}</p>
     </div>
   `,
 });

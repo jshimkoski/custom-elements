@@ -16,7 +16,7 @@ Add a `watch` property to your component config:
 
 ```ts
 watch: {
-  count: (newVal, oldVal) => {
+  count: (newVal, oldVal, ctx) => {
     console.log('Count changed:', newVal);
   }
 }
@@ -31,7 +31,7 @@ Run the watcher callback as soon as the component is initialized:
 ```ts
 watch: {
   count: [
-    (newVal, oldVal) => console.log('Immediate:', newVal),
+    (newVal, oldVal, ctx) => console.log('Immediate:', newVal),
     { immediate: true }
   ]
 }
@@ -46,7 +46,7 @@ Track changes to nested objects or arrays:
 ```ts
 watch: {
   'user.profile': [
-    (newVal, oldVal) => console.log('Profile changed:', newVal),
+    (newVal, oldVal, ctx) => console.log('Profile changed:', newVal),
     { deep: true }
   ]
 }
@@ -60,8 +60,8 @@ You can watch props and computed values too:
 
 ```ts
 watch: {
-  label: (newVal) => console.log('Prop changed:', newVal),
-  doubled: (newVal) => console.log('Computed changed:', newVal)
+  label: (newVal, oldVal, ctx) => console.log('Prop changed:', newVal),
+  doubled: (newVal, oldVal, ctx) => console.log('Computed changed:', newVal)
 }
 ```
 
@@ -86,12 +86,12 @@ watch: {
 All watcher callbacks receive:
 - `newValue`: The updated value
 - `oldValue`: The previous value
-- `state`: The full reactive state object
+- `ctx`: The full reactive state object which includes state, props, and computed values
 
 ```ts
 watch: {
-  count: (newVal, oldVal, state) => {
-    if (newVal > 10) state.count = 0;
+  count: (newVal, oldVal, ctx) => {
+    if (newVal > 10) ctx.count = 0;
   }
 }
 ```

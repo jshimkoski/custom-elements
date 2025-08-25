@@ -11,7 +11,7 @@ The `render` function is the heart of every component in the custom elements run
 - It must return a `VNode`, an array of `VNode`, or a `Promise` resolving to either.
 
 ```typescript
-render: (state) => html`<div>Hello, ${state.name}!</div>`
+render: (ctx) => html`<div>Hello, ${ctx.name}!</div>`
 ```
 
 ---
@@ -32,12 +32,12 @@ render: (state) => html`<div>Hello, ${state.name}!</div>`
 - If the Promise rejects, the error template (if provided) will be shown.
 
 ```typescript
-render: async (state) => {
-  const data = await fetchData(state.id);
+render: async (ctx) => {
+  const data = await fetchData(ctx.id);
   return html`<div>${data.value}</div>`;
 }
-loadingTemplate: (state) => html`<div>Loading...</div>`,
-errorTemplate: (err, state) => html`<div>Error: ${err.message}</div>`,
+loadingTemplate: (ctx) => html`<div>Loading...</div>`,
+errorTemplate: (err, ctx) => html`<div>Error: ${err.message}</div>`,
 ```
 
 ---
@@ -50,11 +50,11 @@ component('user-card', {
   computed: {
     greeting: (s) => `Hello, ${s.name}!`,
   },
-  render: (state) => html`
+  render: (ctx) => html`
     <div>
-      <h2>${state.greeting}</h2>
-      <p>Age: ${state.age}</p>
-      <button @click="() => state.age++">Increase Age</button>
+      <h2>${ctx.greeting}</h2>
+      <p>Age: ${ctx.age}</p>
+      <button @click="${() => ctx.age++}">Increase Age</button>
     </div>
   `,
 });

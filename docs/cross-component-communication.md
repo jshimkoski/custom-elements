@@ -40,7 +40,7 @@ Pass data from parent to child using props and attributes.
   ```typescript
   component("user-card", {
     props: { name: { type: String }, age: { type: Number } },
-    render: (state) => html`<div>${state.name} (${state.age})</div>`
+    render: (ctx) => html`<div>${ctx.name} (${ctx.age})</div>`
   });
   ```
 
@@ -58,9 +58,9 @@ Use the built-in store for global or shared state.
 - **Access in components:**
   ```typescript
   component("theme-toggle", {
-    render: (state) => html`
-      <button @click="store.theme = store.theme === 'light' ? 'dark' : 'light'">
-        Theme: ${store.theme}
+    render: (ctx) => html`
+      <button @click="${() => store.theme = store.theme === 'light' ? 'dark' : 'light'}">
+        Theme: ${ctx.theme}
       </button>
     `
   });

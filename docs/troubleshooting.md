@@ -44,7 +44,7 @@ A guide to diagnosing and resolving common issues in the custom elements runtime
   - Use `@event` syntax in templates (e.g., `@click`).
   - Ensure event handler is a function in state/config.
 - **Two-way binding not working:**
-  - Use `#model-*` for supported input elements.
+  - Use `#model` for supported input elements.
   - Check that state property exists and is reactive.
 
 ---

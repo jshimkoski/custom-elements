@@ -15,7 +15,7 @@
 ```ts
 component('my-greeting', {
   state: { name: 'World' },
-  render: (state) => html`<h1>Hello, ${state.name}!</h1>`
+  render: (ctx) => html`<h1>Hello, ${ctx.name}!</h1>`
 });
 ```
 
@@ -37,8 +37,8 @@ Add derived values based on state (auto-updates when dependencies change).
 
 ```ts
 computed: {
-  doubled: (state) => state.count * 2,
-  greeting: (state) => `Hello, ${state.text}!`
+  doubled: (ctx) => ctx.count * 2,
+  greeting: (ctx) => `Hello, ${ctx.text}!`
 }
 ```
 
@@ -78,7 +78,7 @@ Scoped CSS for your component. Can be a string, function, or dynamic config.
 ```ts
 style: `:host { color: red; }`
 // or
-style: (state) => `:host { color: ${state.color}; }`
+style: (ctx) => `:host { color: ${ctx.color}; }`
 // or
 style: { css: '...', dependencies: ['theme'], cache: true }
 ```
@@ -100,9 +100,9 @@ styleOptimizations: { enableCaching: true, enableMinification: true, debounceMs:
 Required. Returns a VNode or array of VNodes. Supports async (Promise).
 
 ```ts
-render: (state) => html`<div>${state.label}</div>`
+render: (ctx) => html`<div>${ctx.label}</div>`
 // or async
-render: async (state) => html`<div>${await fetchLabel()}</div>`
+render: async (ctx) => html`<div>${await fetchLabel()}</div>`
 ```
 
 ---
@@ -112,8 +112,8 @@ render: async (state) => html`<div>${await fetchLabel()}</div>`
 Optional templates for loading and error states.
 
 ```ts
-loadingTemplate: (state) => html`<span>Loading...</span>`
-errorTemplate: (err, state) => html`<span>Error: ${err.message}</span>`
+loadingTemplate: (ctx) => html`<span>Loading...</span>`
+errorTemplate: (err, ctx) => html`<span>Error: ${err.message}</span>`
 ```
 
 ---
@@ -123,10 +123,10 @@ errorTemplate: (err, state) => html`<span>Error: ${err.message}</span>`
 Run logic on connect, disconnect, attribute change, or error.
 
 ```ts
-onConnected: (state) => console.log('Mounted!'),
-onDisconnected: (state) => cleanup(),
-onAttributeChanged: (state, name, oldVal, newVal) => {...},
-onError: (err, state) => reportError(err)
+onConnected: (ctx) => console.log('Mounted!'),
+onDisconnected: (ctx) => cleanup(),
+onAttributeChanged: (ctx, name, oldVal, newVal) => {...},
+onError: (err, ctx) => reportError(err)
 ```
 
 ---
@@ -136,7 +136,7 @@ onError: (err, state) => reportError(err)
 Return a fallback HTML string if an error occurs.
 
 ```ts
-errorFallback: (err, state) => `<div>Something went wrong</div>`
+errorFallback: (err, ctx) => `<div>Something went wrong</div>`
 ```
 
 ---
@@ -146,7 +146,7 @@ errorFallback: (err, state) => `<div>Something went wrong</div>`
 Add your own helper functions to the config. They are injected into state.
 
 ```ts
-reset: (state) => { state.count = 0; }
+reset: (ctx) => { ctx.count = 0; }
 ```
 
 ---
@@ -157,7 +157,7 @@ reset: (state) => { state.count = 0; }
 component('my-widget', {
   state: { count: 0 },
   computed: {
-    doubled: (state) => state.count * 2
+    doubled: (ctx) => ctx.count * 2
   },
   props: {
     label: { type: String, default: 'Add' }
@@ -165,19 +165,19 @@ component('my-widget', {
   watch: {
     count: [(n, o) => console.log(n), { immediate: true }]
   },
-  style: (state) => `:host { color: ${state.count > 5 ? 'green' : 'red'}; }`,
+  style: (ctx) => `:host { color: ${ctx.count > 5 ? 'green' : 'red'}; }`,
   styleOptimizations: { enableCaching: true },
-  render: (state) => html`
-    <button @click="${() => state.count++}">${state.label}: ${state.count}</button>
-    <div>Doubled: ${state.doubled}</div>
+  render: (ctx) => html`
+    <button @click="${() => ctx.count++}">${ctx.label}: ${ctx.count}</button>
+    <div>Doubled: ${ctx.doubled}</div>
   `,
-  loadingTemplate: (state) => html`<span>Loading...</span>`,
-  errorTemplate: (err, state) => html`<span>Error: ${err.message}</span>`,
-  onConnected: (state) => console.log('Connected!'),
-  onDisconnected: (state) => console.log('Disconnected!'),
-  onError: (err, state) => alert('Error!'),
-  errorFallback: (err, state) => `<div>Fallback error UI</div>`,
-  reset: (state) => { state.count = 0; }
+  loadingTemplate: (ctx) => html`<span>Loading...</span>`,
+  errorTemplate: (err, ctx) => html`<span>Error: ${err.message}</span>`,
+  onConnected: (ctx) => console.log('Connected!'),
+  onDisconnected: (ctx) => console.log('Disconnected!'),
+  onError: (err, ctx) => alert('Error!'),
+  errorFallback: (err, ctx) => `<div>Fallback error UI</div>`,
+  reset: (ctx) => { ctx.count = 0; }
 });
 ```
 

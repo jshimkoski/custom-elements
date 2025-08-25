@@ -1,6 +1,6 @@
 /**
  * ShoppingCart: A simple shopping cart demo.
- * Demonstrates state, computed, and quantity controls.
+ * Demonstrates ctx, computed, and quantity controls.
  */
 import { component, html, css, each } from '../../lib/runtime';
 
@@ -17,11 +17,11 @@ const initialItems: Item[] = [
   { id: 3, name: 'Orange', price: 2.0, quantity: 1 }
 ];
 
-export const ShoppingCart = component('shopping-cart', (state) => html`
+export const ShoppingCart = component('shopping-cart', (ctx) => html`
   <div class="cart-container">
     <h2>Shopping Cart</h2>
     <ul>
-      ${each(state.items, (item) => html`
+      ${each(ctx.items, (item) => html`
         <li>
           <span class="item-name">${item.name}</span>
           <span class="item-price">$${item.price.toFixed(2)}</span>
@@ -30,49 +30,49 @@ export const ShoppingCart = component('shopping-cart', (state) => html`
               class="qty-btn"
               aria-label="Decrease quantity"
               :disabled="${item.quantity <= 1}"
-              @click="${() => state.decreaseQty(state, item.id)}"
+              @click="${() => ctx.decreaseQty(ctx, item.id)}"
             >-</button>
             <span class="item-qty">${item.quantity}</span>
             <button
               class="qty-btn"
               aria-label="Increase quantity"
               :disabled="${item.quantity >= 10}"
-              @click="${() => state.increaseQty(state, item.id)}"
+              @click="${() => ctx.increaseQty(ctx, item.id)}"
             >+</button>
           </div>
-          <button class="remove-btn" @click="${() => state.removeItem(state, item.id)}">Remove</button>
+          <button class="remove-btn" @click="${() => ctx.removeItem(ctx, item.id)}">Remove</button>
         </li>
       `)}
     </ul>
-    <div class="cart-total">Total: $${state.total.toFixed(2)}</div>
-    <button class="reset-btn" @click="${state.reset}">Reset Cart</button>
+    <div class="cart-total">Total: $${ctx.total.toFixed(2)}</div>
+    <button class="reset-btn" @click="${ctx.reset}">Reset Cart</button>
   </div>
 `, {
   state: {
     items: [...initialItems],
   },
   computed: {
-    total(state) {
-      return state.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    total(ctx) {
+      return ctx.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
     }
   },
-  increaseQty(state, id: number) {
-    state.items = state.items.map(item =>
+  increaseQty(ctx, id: number) {
+    ctx.items = ctx.items.map(item =>
       item.id === id ? { ...item, quantity: item.quantity + 1 } : item
     );
   },
-  decreaseQty(state, id: number) {
-    state.items = state.items.map(item =>
+  decreaseQty(ctx, id: number) {
+    ctx.items = ctx.items.map(item =>
       item.id === id && item.quantity > 1
         ? { ...item, quantity: item.quantity - 1 }
         : item
     );
   },
-  removeItem(state, id: number) {
-    state.items = state.items.filter(item => item.id !== id);
+  removeItem(ctx, id: number) {
+    ctx.items = ctx.items.filter(item => item.id !== id);
   },
-  reset(_event, state) {
-    state.items = [...initialItems];
+  reset(_event, ctx) {
+    ctx.items = [...initialItems];
   },
   style: css`
     .cart-container {

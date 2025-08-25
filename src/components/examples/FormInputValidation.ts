@@ -1,11 +1,11 @@
 /**
  * FormInputValidation: A form with input validation and error handling.
- * Demonstrates state, validation, and error feedback.
+ * Demonstrates ctx, validation, and error feedback.
  */
 import { component, html, css, when } from '../../lib/runtime';
 
-component('form-input-validation', (state) => html`
-  <form @submit="${state.submit}">
+component('form-input-validation', (ctx) => html`
+  <form @submit="${ctx.submit}">
     <fieldset>
       <legend>Form Input Validation Demo</legend>
       <label>
@@ -20,22 +20,22 @@ component('form-input-validation', (state) => html`
         Bio:
         <textarea #model="bio" rows="3" minlength="10" required></textarea>
       </label>
-      <label>
+      <div>
         Gender:
-        <input #model="gender" type="radio" value="male" name="gender" /> Male
-        <input #model="gender" type="radio" value="female" name="gender" /> Female
-        <input #model="gender" type="radio" value="other" name="gender" /> Other
-      </label>
+        <label><input #model="gender" type="radio" value="male" name="gender" /> Male</label>
+        <label><input #model="gender" type="radio" value="female" name="gender" /> Female</label>
+        <label><input #model="gender" type="radio" value="other" name="gender" /> Other</label>
+      </div>
       <label>
         Subscribe:
         <input #model="subscribe" type="checkbox" /> Yes
       </label>
-      <label>
+      <div>
         Favorite Fruits:
-        <input #model="fruits" type="checkbox" value="apple" /> Apple
-        <input #model="fruits" type="checkbox" value="banana" /> Banana
-        <input #model="fruits" type="checkbox" value="orange" /> Orange
-      </label>
+        <label><input #model="fruits" type="checkbox" value="apple" /> Apple</label>
+        <label><input #model="fruits" type="checkbox" value="banana" /> Banana</label>
+        <label><input #model="fruits" type="checkbox" value="orange" /> Orange</label>
+      </div>
       <label>
         Country:
         <select #model="country">
@@ -45,12 +45,12 @@ component('form-input-validation', (state) => html`
           <option value="uk">United Kingdom</option>
         </select>
       </label>
-      ${when(state.error !== '', html`
-        <div class="error">${state.error}</div>
+      ${when(ctx.error !== '', html`
+        <div class="error">${ctx.error}</div>
       `)}
       <button type="submit">Submit</button>
-      ${when(state.success !== '', html`
-        <div class="success">${state.success}</div>
+      ${when(ctx.success !== '', html`
+        <div class="success">${ctx.success}</div>
       `)}
     </fieldset>
   </form>
@@ -66,52 +66,52 @@ component('form-input-validation', (state) => html`
     error: '',
     success: '',
   },
-  async submit(event, state) {
+  async submit(event, ctx) {
     event.preventDefault();
-    state.error = '';
-    state.success = '';
+    ctx.error = '';
+    ctx.success = '';
     // Email validation
-    if (!state.email.match(/^[^@\s]+@[^@\s]+\.[^@\s]+$/)) {
-      state.error = 'Please enter a valid email address.';
+    if (!ctx.email.match(/^[^@\s]+@[^@\s]+\.[^@\s]+$/)) {
+      ctx.error = 'Please enter a valid email address.';
       return;
     }
     // Username validation
-    if (!state.username || state.username.length < 3) {
-      state.error = 'Username must be at least 3 characters.';
+    if (!ctx.username || ctx.username.length < 3) {
+      ctx.error = 'Username must be at least 3 characters.';
       return;
     }
     // Bio validation
-    if (!state.bio || state.bio.length < 10) {
-      state.error = 'Bio must be at least 10 characters.';
+    if (!ctx.bio || ctx.bio.length < 10) {
+      ctx.error = 'Bio must be at least 10 characters.';
       return;
     }
     // Gender validation
-    if (!state.gender) {
-      state.error = 'Please select a gender.';
+    if (!ctx.gender) {
+      ctx.error = 'Please select a gender.';
       return;
     }
     // Country validation
-    if (!state.country) {
-      state.error = 'Please select a country.';
+    if (!ctx.country) {
+      ctx.error = 'Please select a country.';
       return;
     }
     // Fruits validation (at least one)
-    if (!Array.isArray(state.fruits) || state.fruits.length === 0) {
-      state.error = 'Please select at least one favorite fruit.';
+    if (!Array.isArray(ctx.fruits) || ctx.fruits.length === 0) {
+      ctx.error = 'Please select at least one favorite fruit.';
       return;
     }
-    state.success = 'Form submitted successfully!';
+    ctx.success = 'Form submitted successfully!';
     // Reset form fields
-    state.email = '';
-    state.username = '';
-    state.bio = '';
-    state.gender = '';
-    state.subscribe = false;
-    state.fruits = [];
-    state.country = '';
+    ctx.email = '';
+    ctx.username = '';
+    ctx.bio = '';
+    ctx.gender = '';
+    ctx.subscribe = false;
+    ctx.fruits = [];
+    ctx.country = '';
 
     await setTimeout(() => {
-      state.success = '';
+      ctx.success = '';
     }, 3000);
   },
   style: css`

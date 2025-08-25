@@ -39,7 +39,7 @@ interface WatchOptions {
 type WatchCallback<T = any, S = any> = (
   newValue: T,
   oldValue: T,
-  state?: S,
+  context?: S,
 ) => void;
 
 interface WatcherState {

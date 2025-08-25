@@ -1,6 +1,6 @@
 /**
  * TodoApp: A classic todo list example.
- * Demonstrates state, directives, and input binding.
+ * Demonstrates ctx, directives, and input binding.
  */
 import { component, html, css, each } from '../../lib/runtime';
 
@@ -10,19 +10,19 @@ interface Todo {
   done: boolean;
 }
 
-export const TodoApp = component('todo-app', (state) => html`
+export const TodoApp = component('todo-app', (ctx) => html`
   <div class="todo-container">
     <h2>Todo List</h2>
-    <form @submit="${state.submitForm}">
+    <form @submit="${ctx.submitForm}">
       <input #model="input" type="text" placeholder="Add todo" />
       <button type="submit">Add</button>
     </form>
     <ul>
-      ${each(state.todos, (todo) => html`
+      ${each(ctx.todos, (todo) => html`
         <li>
-          <input type="checkbox" :checked="${todo.done}" @change="${() => state.toggleTodo(state, todo.id)}" />
+          <input type="checkbox" :checked="${todo.done}" @change="${() => ctx.toggleTodo(ctx, todo.id)}" />
           <span class="todo-text" data-done="${todo.done}">${todo.text}</span>
-          <button class="remove-btn" @click="${() => state.removeTodo(state, todo.id)}">Remove</button>
+          <button class="remove-btn" @click="${() => ctx.removeTodo(ctx, todo.id)}">Remove</button>
         </li>
       `)}
     </ul>
@@ -32,20 +32,20 @@ export const TodoApp = component('todo-app', (state) => html`
     todos: [] as Todo[],
     input: '',
   },
-  submitForm(event, state) {
+  submitForm(event, ctx) {
     event.preventDefault();
-    state.addTodo();
+    ctx.addTodo();
   },
-  addTodo(state) {
-    if (!state.input.trim()) return;
-    state.todos = [...state.todos, { id: Date.now(), text: state.input, done: false }];
-    state.input = '';
+  addTodo(ctx) {
+    if (!ctx.input.trim()) return;
+    ctx.todos = [...ctx.todos, { id: Date.now(), text: ctx.input, done: false }];
+    ctx.input = '';
   },
-  toggleTodo(state, id: number) {
-    state.todos = state.todos.map(todo => todo.id === id ? { ...todo, done: !todo.done } : todo);
+  toggleTodo(ctx, id: number) {
+    ctx.todos = ctx.todos.map(todo => todo.id === id ? { ...todo, done: !todo.done } : todo);
   },
-  removeTodo(state, id: number) {
-    state.todos = state.todos.filter(todo => todo.id !== id);
+  removeTodo(ctx, id: number) {
+    ctx.todos = ctx.todos.filter(todo => todo.id !== id);
   },
   style: css`
     .todo-container {
@@ -98,6 +98,13 @@ export const TodoApp = component('todo-app', (state) => html`
       gap: 0.5rem;
       padding: 0.5rem 0;
       border-bottom: 1px solid #eee;
+    }
+    .todo-text {
+      flex-grow: 1;
+      text-align: left;
+    }
+    li:hover {
+      background: #f9f9f9;
     }
     .todo-text[data-done="true"] {
       text-decoration: line-through;

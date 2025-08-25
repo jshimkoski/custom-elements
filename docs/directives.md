@@ -18,8 +18,8 @@ Render content only if a condition is true.
 ```typescript
 import { when } from 'runtime';
 
-render: (state) => html`
-  ${when(state.isVisible, html`<div>Visible!</div>`)}
+render: (ctx) => html`
+  ${when(ctx.isVisible, html`<div>Visible!</div>`)}
 `
 ```
 - First argument: condition (boolean)
@@ -27,7 +27,7 @@ render: (state) => html`
 - Optional third argument: content to render if false
 
 ```typescript
-${when(state.hasError, html`<div>Error!</div>`, html`<div>All good!</div>`)}
+${when(ctx.hasError, html`<div>Error!</div>`, html`<div>All good!</div>`)}
 ```
 
 ---
@@ -38,9 +38,9 @@ Render a list of items.
 ```typescript
 import { each } from 'runtime';
 
-render: (state) => html`
+render: (ctx) => html`
   <ul>
-    ${each(state.items, (item, i) => html`<li>${i}: ${item}</li>`)}
+    ${each(ctx.items, (item, i) => html`<li>${i}: ${item}</li>`)}
   </ul>
 `
 ```
@@ -55,8 +55,8 @@ Pattern matching for multiple cases.
 ```typescript
 import { match } from 'runtime';
 
-render: (state) => html`
-  ${match(state.status, {
+render: (ctx) => html`
+  ${match(ctx.status, {
     loading: html`<div>Loading...</div>`,
     error: html`<div>Error!</div>`,
     success: html`<div>Success!</div>`,
@@ -74,12 +74,12 @@ render: (state) => html`
 ```typescript
 component('directive-demo', {
   state: { items: [1,2,3], show: true, status: 'loading' },
-  render: (state) => html`
-    ${when(state.show, html`<h2>List:</h2>`)}
+  render: (ctx) => html`
+    ${when(ctx.show, html`<h2>List:</h2>`)}
     <ul>
-      ${each(state.items, (item) => html`<li>${item}</li>`)}
+      ${each(ctx.items, (item) => html`<li>${item}</li>`)}
     </ul>
-    ${match(state.status, {
+    ${match(ctx.status, {
       loading: html`<div>Loading...</div>`,
       error: html`<div>Error!</div>`,
       success: html`<div>Done!</div>`,

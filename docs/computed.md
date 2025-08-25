@@ -12,8 +12,8 @@ Computed properties allow you to derive values from your component's state, prop
 
 ```typescript
 computed: {
-  fullName: (state) => `${state.firstName} ${state.lastName}`,
-  isAdult: (state) => state.age >= 18,
+  fullName: (ctx) => `${ctx.firstName} ${ctx.lastName}`,
+  isAdult: (ctx) => ctx.age >= 18,
 }
 ```
 
@@ -21,7 +21,7 @@ computed: {
 
 ## 🔄 Reactivity & Updates
 - Computed properties are recalculated whenever their dependencies change.
-- They are available in `state` for use in `render`, `watch`, and methods.
+- They are available in `ctx` for use in `render`, `watch`, and methods.
 - No need to manually update computed values; the runtime handles it for you.
 
 ---
@@ -30,9 +30,9 @@ computed: {
 - Use computed properties just like state or props in your render function and other config fields.
 
 ```typescript
-render: (state) => html`
-  <h1>${state.fullName}</h1>
-  <p>Adult: ${state.isAdult ? "Yes" : "No"}</p>
+render: (ctx) => html`
+  <h1>${ctx.fullName}</h1>
+  <p>Adult: ${ctx.isAdult ? "Yes" : "No"}</p>
 `
 ```
 
@@ -44,13 +44,13 @@ component('user-info', {
   state: { firstName: 'Jane', lastName: 'Doe', age: 22 },
   computed: {
     fullName: (s) => `${s.firstName} ${s.lastName}`,
-    isAdult: (s) => s.age >= 18,
+    isAdult: (ctx) => ctx.age >= 18,
   },
-  render: (state) => html`
+  render: (ctx) => html`
     <div>
-      <h2>${state.fullName}</h2>
-      <p>Age: ${state.age}</p>
-      <p>Status: ${state.isAdult ? "Adult" : "Minor"}</p>
+      <h2>${ctx.fullName}</h2>
+      <p>Age: ${ctx.age}</p>
+      <p>Status: ${ctx.isAdult ? "Adult" : "Minor"}</p>
     </div>
   `,
 });

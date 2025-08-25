@@ -39,7 +39,7 @@ import { component, html } from "runtime";
 
 component("ssr-demo", {
   state: { message: "Hello SSR!" },
-  render: (state) => html`<div>${state.message}</div>`
+  render: (ctx) => html`<div>${ctx.message}</div>`
 });
 ```
 
@@ -52,7 +52,7 @@ component("ssr-demo", {
 
 - In SSR mode, `createElementClass` returns a minimal class with no DOM or lifecycle logic.
 - Only the `render` function is used to generate output.
-- No `this` context or browser APIs are accessed.
+- No `this` ctx or browser APIs are accessed.
 
 **Example:**
 ```typescript
@@ -87,7 +87,7 @@ if (typeof window === "undefined") {
 ```typescript
 component("universal-greeting", {
   state: { name: "World" },
-  render: (state) => html`<h1>Hello, ${state.name}!</h1>`
+  render: (ctx) => html`<h1>Hello, ${ctx.name}!</h1>`
 });
 ```
 

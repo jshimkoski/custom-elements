@@ -23,7 +23,7 @@ import { html } from '@jasonshimmy/custom-elements-runtime';
 Write templates using tagged template literals:
 
 ```ts
-render: (state) => html`<h1>Hello, ${state.name}!</h1>`
+render: (ctx) => html`<h1>Hello, ${ctx.name}!</h1>`
 ```
 
 ---
@@ -48,8 +48,8 @@ Bind attributes and events directly in your template:
 
 ```ts
 html`
-  <input :value="state.count" :disabled="isLoading" />
-  <button @click="${() => state.count++}">Increment</button>
+  <input :value="count" :disabled="isLoading" />
+  <button @click="${() => ctx.count++}">Increment</button>
 `
 ```
 
@@ -73,7 +73,7 @@ Templates can include any dynamic value, including computed properties and store
 
 ```ts
 html`
-  <span>${state.doubled}</span>
+  <span>${ctx.doubled}</span>
   <span>${store.theme}</span>
 `
 ```

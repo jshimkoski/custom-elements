@@ -22,10 +22,10 @@ state: { count: 0, text: '' }
 
 ## 🏗️ Using State in Templates
 
-Access state directly in your render function:
+State can be accessed via the `ctx` passed directly in your render function:
 
 ```ts
-render: (state) => html`<span>${state.count}</span>`
+render: (ctx) => html`<span>${ctx.count}</span>`
 ```
 
 ---
@@ -35,8 +35,8 @@ render: (state) => html`<span>${state.count}</span>`
 Mutate state directly for instant reactivity:
 
 ```ts
-state.count++;
-state.text = 'Hello';
+ctx.count++;
+ctx.text = 'Hello';
 ```
 
 ---
@@ -49,8 +49,8 @@ State supports nested objects and arrays:
 state: { user: { name: '', age: 0 }, items: [] }
 
 // Update nested value
-state.user.name = 'Alice';
-state.items.push('New Item');
+ctx.user.name = 'Alice';
+ctx.items.push('New Item');
 ```
 
 ---
@@ -61,8 +61,8 @@ Use state with directives for dynamic rendering:
 
 ```ts
 html`
-  ${when(state.count > 0, html`<div>Count is positive</div>`)}
-  ${each(state.items, (item) => html`<li>${item}</li>`)}
+  ${when(ctx.count > 0, html`<div>Count is positive</div>`)}
+  ${each(ctx.items, (item) => html`<li>${item}</li>`)}
 `
 ```
 
@@ -74,7 +74,7 @@ Watchers react to state changes automatically:
 
 ```ts
 watch: {
-  count: (newVal) => console.log('Count changed:', newVal)
+  count: (newVal, oldVal) => console.log('Count changed:', newVal, oldVal)
 }
 ```
 
@@ -86,7 +86,7 @@ Computed values derive from state and update automatically:
 
 ```ts
 computed: {
-  doubled: (state) => state.count * 2
+  doubled: (ctx) => ctx.count * 2
 }
 ```
 
@@ -95,6 +95,8 @@ computed: {
 ## 💡 Tips
 
 - State is deeply reactive; all mutations trigger updates.
+- Do not unwrap `ctx` in your render function; use it directly.
+  - This preserves reactivity and ensures updates are tracked.
 - Use TypeScript for type safety and intellisense.
 - Always return a single root node from your render function.
 - State is local to each component; use `createStore` for global state.

@@ -4,6 +4,11 @@
 
 Build modern components with strict TypeScript, zero dependencies, and a clean functional API. Designed for speed, standards compliance, and productivity.
 
+## 🚧 **Active Development Notice**
+
+> ⚠️ **This package is in active development and not yet ready for production use.**
+> Features, APIs, and stability may change frequently. Please use for testing, experimentation, or contribution only.
+
 ## ✨ Why You'll Love It
 
 - ⚡ **Blazing Fast:** Minimal runtime, instant updates, zero dependencies.
@@ -29,8 +34,8 @@ npm install @jasonshimmy/custom-elements-runtime
 ```ts
 import { component, html } from '@jasonshimmy/custom-elements-runtime';
 
-component('my-counter', (state) => html`
-  <button @click="${() => state.count++}">Count: ${state.count}</button>
+component('my-counter', (ctx) => html`
+  <button @click="${() => ctx.count++}">Count: ${ctx.count}</button>
 `, { state: { count: 0 } });
 ```
 
@@ -49,18 +54,6 @@ No config needed — TypeScript support is built-in.
   <hello-world></hello-world>
   ```
 4. **Enjoy instant reactivity and type safety!**
-
----
-
-## 🛠 Local Dev
-
-```
-# Clone the repo
-git clone <repo-url>
-
-# Run examples
-npm run dev
-```
 
 # 📖 Documentation Index
 
@@ -105,6 +98,12 @@ Explore the full documentation for every runtime feature:
 ## 🧰 Utilities & Troubleshooting
 - [Troubleshooting](./docs/troubleshooting.md)
 
+## 🔗 Framework Integration
+- [🦊 Vue Integration](./docs/vue-integration.md)
+- [⚛️ React Integration](./docs/react-integration.md)
+- [🦄 Svelte Integration](./docs/svelte-integration.md)
+- [🅰️ Angular Integration](./docs/angular-integration.md)
+
 ---
 
 For deep dives, see each guide above or browse the source code in `src/lib/`.
@@ -119,3 +118,15 @@ For deep dives, see each guide above or browse the source code in `src/lib/`.
 - **Showcase your components!** Open a PR to add your project to our gallery.
 - **Questions or ideas?** [Start a discussion](https://github.com/jasonshimmy/custom-elements-runtime/discussions) or [open an issue](https://github.com/jasonshimmy/custom-elements-runtime/issues).
 - **Contribute:** We welcome PRs for docs, features, and examples.
+
+---
+
+## 🛠 Local Dev
+
+```
+# Clone the repo
+git clone <repo-url>
+
+# Run examples
+npm run dev
+```

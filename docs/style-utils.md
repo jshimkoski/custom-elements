@@ -97,7 +97,7 @@ Style utils are a set of internal tools that optimize CSS for custom elements. T
 ```typescript
 component("styled-demo", {
   state: { color: "#007aff" },
-  style: (state) => `div { color: ${state.color}; }`,
+  style: (ctx) => `div { color: ${ctx.color}; }`,
   styleOptimizations: {
     enableCaching: true,
     enableMinification: true,
@@ -105,7 +105,7 @@ component("styled-demo", {
     cacheSize: 50,
     debounceMs: 20
   },
-  render: (state) => html`<div>Styled!</div>`
+  render: (ctx) => html`<div>Styled!</div>`
 });
 ```
 
@@ -159,13 +159,13 @@ component("styled-demo", {
 component("dynamic-style", {
   state: { theme: "dark" },
   style: {
-    css: (state) => state.theme === "dark"
+    css: (ctx) => ctx.theme === "dark"
       ? "body { background: #222; color: #fff; }"
       : "body { background: #fff; color: #222; }",
     dependencies: ["theme"],
     cache: true
   },
-  render: (state) => html`<body>Theme: ${state.theme}</body>`
+  render: (ctx) => html`<body>Theme: ${ctx.theme}</body>`
 });
 ```
 

@@ -38,11 +38,11 @@ component('my-element', {
   state: { count: 0 },
   props: { label: { type: String, default: 'Click me' } },
   computed: {
-    doubled: (s) => s.count * 2,
+    doubled: (ctx) => ctx.count * 2,
   },
-  render: (state) => html`
-    <button @click="() => state.count++">
-      ${state.label}: ${state.doubled}
+  render: (ctx) => html`
+    <button @click="${() => ctx.count++}">
+      ${ctx.label}: ${ctx.doubled}
     </button>
   `,
 });
@@ -72,19 +72,19 @@ component('profile-card', {
   state: { name: 'Sam', age: 25 },
   props: { theme: { type: String, default: 'light' } },
   computed: {
-    greeting: (s) => `Hello, ${s.name}!`,
+    greeting: (ctx) => `Hello, ${ctx.name}!`,
   },
-  style: (state) => `:host { color: ${state.theme === 'dark' ? 'white' : 'black'}; }`,
-  render: (state) => html`
+  style: (ctx) => `:host { color: ${ctx.theme === 'dark' ? 'white' : 'black'}; }`,
+  render: (ctx) => html`
     <div>
-      <h2>${state.greeting}</h2>
-      <p>Age: ${state.age}</p>
+      <h2>${ctx.greeting}</h2>
+      <p>Age: ${ctx.age}</p>
     </div>
   `,
-  onConnected: (state) => {
-    console.log('Profile card connected!', state);
+  onConnected: (ctx) => {
+    console.log('Profile card connected!', ctx);
   },
-  onError: (err, state) => {
+  onError: (err, ctx) => {
     console.error('Error in profile card:', err);
   },
 });

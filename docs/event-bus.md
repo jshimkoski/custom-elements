@@ -69,13 +69,13 @@ You can remove listeners by calling the unsubscribe function returned by `.on()`
 html`<button @click="${() => eventBus.emit('notify', 'Hello!')}">Notify</button>`
 
 // In receiver component
-onConnected: (state) => {
-  state.unsub = eventBus.on('notify', (msg) => {
-    state.message = msg;
+onConnected: (ctx) => {
+  ctx.unsub = eventBus.on('notify', (msg) => {
+    ctx.message = msg;
   });
 },
-onDisconnected: (state) => {
-  state.unsub(); // Clean up
+onDisconnected: (ctx) => {
+  ctx.unsub(); // Clean up
 }
 ```
 
@@ -86,7 +86,7 @@ onDisconnected: (state) => {
 - Use event namespacing (e.g., `user:login`) for clarity.
 - Always clean up listeners on disconnect to avoid memory leaks.
 - Payload can be any type: object, string, number, etc.
-- Event bus works across all components in the same app context.
+- Event bus works across all components in the same app ctx.
 
 ---
 
