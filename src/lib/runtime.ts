@@ -1,1422 +1,921 @@
-// ============================================================================
-// Exports
-// ============================================================================
+/**
+ * runtime.ts
+ * Lightweight, strongly typed, functional custom element runtime for two-way binding, event, and prop support.
+ * Supports: state, computed, props, style, render, lifecycle hooks, #model-* and data-on-* attributes.
+ * No external dependencies. Mobile-first, secure, and developer friendly.
+ */
 
-/**
- * Represents the state object for a component.
- * Extend this interface for custom state typing.
- */
-export interface ComponentState extends Record<string, unknown> {}
-/**
- * API exposed to component templates and lifecycle handlers.
- * Includes state, event emitters, and global event bus methods.
- */
-export interface ComponentAPI<T extends ComponentState = ComponentState> {
-  /**
-   * Reactive state object. Mutate directly for reactivity.
-   */
-  readonly state: T;
-  emit(eventName: string, detail?: unknown): void;
-  onGlobal<U = any>(eventName: string, handler: (data: U) => void): () => void;
-  offGlobal<U = any>(eventName: string, handler: (data: U) => void): void;
-  emitGlobal<U = any>(eventName: string, data?: U): void;
-  render(): void;
+export { createStore } from "./store";
+export { eventBus } from "./event-bus";
+export { html } from "./template-compiler";
+export { when, each, match } from "./directives";
+
+import { vdomRenderer, type VNode } from "./vdom";
+import {
+  StyleCache,
+  createStateHash,
+  minifyCSS,
+  deduplicateCSS,
+  createDebouncer,
+  stylePerformanceMonitor,
+  type DynamicStyleConfig,
+  type StyleOptimizations,
+} from "./style-utils";
+
+// --- Types ---
+type LifecycleKeys =
+  | "onConnected"
+  | "onDisconnected"
+  | "onAttributeChanged"
+  | "onError"
+  | "errorFallback";
+
+// Watch types
+interface WatchOptions {
+  immediate?: boolean;
+  deep?: boolean;
 }
-/**
- * Configuration object for a custom element component.
- * Defines template, state, computed properties, styles, refs, and lifecycle hooks.
- * @template S - State type
- * @template C - Computed type
- */
-export interface ComponentConfig<S extends ComponentState, C extends Record<string, any> = {}> {
-  readonly template: (state: S & C, api: ComponentAPI<S & C>) => string | Promise<string> | CompiledTemplate<S & C>;
-  readonly state?: S;
-  readonly computed?: { [K in keyof C]: (state: S) => C[K] };
-  readonly style?: string | ((state: S & C) => string);
-  readonly refs?: Record<string, RefHandler<S & C>>;
-  readonly onMounted?: LifecycleHandler<S & C>;
-  readonly onUnmounted?: LifecycleHandler<S & C>;
-  readonly debug?: boolean;
-  /**
-   * Whitelist of state keys to reflect as attributes. If omitted, no keys are reflected.
-   */
-  readonly reflect?: string[];
-  hydrate?: (el: Element | ShadowRoot, state: S & C, api: ComponentAPI<S & C>) => void;
-  [handler: string]: ((...args: unknown[]) => unknown) | unknown;
-}
-/**
- * Handler for a ref element in the template.
- * @param element - The DOM element with data-ref
- * @param state - Current component state
- * @param api - Component API
- */
-export type RefHandler<T extends ComponentState> = (
-  element: Element,
-  state: T,
-  api: ComponentAPI<T>
-) => void;
-export type ComputedHandler<T extends ComponentState> = (state: T) => unknown;
-/**
- * Lifecycle handler for mounted/unmounted events.
- * @param state - Current component state
- * @param api - Component API
- */
-export type LifecycleHandler<T extends ComponentState> = (
-  state: T,
-  api: ComponentAPI<T>
+
+type WatchCallback<T = any, S = any> = (
+  newValue: T,
+  oldValue: T,
+  context?: S,
 ) => void;
 
-/**
- * Plugin interface for runtime hooks (init, render, error).
- */
-export type RuntimePlugin<S extends ComponentState, C extends Record<string, any>> = {
-  onInit?: (config: ComponentConfig<S, C>) => void;
-  onRender?: (state: S & C, api: ComponentAPI<S & C>) => void;
-  onError?: (error: Error, state: S & C, api: ComponentAPI<S & C>) => void;
-};
-export const runtimePlugins: RuntimePlugin<ComponentState, Record<string, unknown>>[] = [];
-/**
- * Registers a runtime plugin for hooks (init, render, error).
- * @param plugin - RuntimePlugin instance
- */
-export function useRuntimePlugin<S extends ComponentState, C extends Record<string, any>>(plugin: RuntimePlugin<S, C>) {
-  runtimePlugins.push(plugin as RuntimePlugin<ComponentState, Record<string, unknown>>);
+interface WatcherState {
+  callback: WatchCallback;
+  options: WatchOptions;
+  oldValue: any;
 }
 
-export { Store } from './store';
-export { eventBus } from './event-bus';
-export { renderToString, renderComponentsToString, generateHydrationScript } from './ssr';
-export type { SSRComponentConfig, SSRRenderOptions, SSRContext } from './ssr';
-export { html, compile, css, classes, styles } from './template-helpers';
-export { useDataModel } from './data-binding';
-export { compileTemplate, renderCompiledTemplate, updateCompiledTemplate } from './template-compiler';
-export { mountVNode, patchVNode, createVNodeFromElement, parseVNodeFromHTML, safeReplaceChild, getVNodeKey } from './v-dom';
-export type { VNode } from './v-dom';
+type WatchConfig<S> =
+  | {
+      [K in keyof S]?:
+        | WatchCallback<S[K]>
+        | [WatchCallback<S[K]>, WatchOptions?];
+    }
+  | Record<string, WatchCallback | [WatchCallback, WatchOptions?]>;
 
-// Router API
-export { useRouter, matchRouteSSR, resolveRouteComponent } from './router';
-export type { Route, RouterConfig, RouteState } from './router';
-
-
-// ============================================================================
-// Imports
-// ============================================================================
-
-import { reactive } from './computed-state';
-import { eventBus } from './event-bus';
-import { renderCompiledTemplate, updateCompiledTemplate } from './template-compiler';
-import { useDataModel } from './data-binding';
-import { mountVNode, patchVNode, parseVNodeFromHTML } from './v-dom';
-import { useRouter } from './router';
-import type { VNode } from './v-dom';
-import type { CompiledTemplate } from './template-compiler';
-import type { RouterConfig } from './router';
-import { css, html } from './template-helpers';
-
-
-// ============================================================================
-// Utilities
-// ============================================================================
-
-
-/**
- * Recursively sanitizes an object, removing dangerous keys and prototype pollution.
- * Handles circular references using a WeakSet.
- * @param obj - Object to sanitize
- * @param seen - WeakSet to track visited objects
- */
-export function deepSanitizeObject<T>(obj: T, seen = new WeakSet<object>()): T {
-  if (obj === null || typeof obj !== 'object') return obj;
-  if (seen.has(obj as object)) return obj;
-  seen.add(obj as object);
-  if (Array.isArray(obj)) return obj.map(item => deepSanitizeObject(item, seen)) as unknown as T;
-  // Prevent prototype pollution
-  if (Object.getPrototypeOf(obj) !== Object.prototype && Object.getPrototypeOf(obj) !== null) {
-    Object.setPrototypeOf(obj, null);
-  }
-  const dangerousKeys = ['__proto__', 'constructor', 'prototype'];
-  const sanitized: Record<string, unknown> = Object.create(null);
-  for (const key of Object.keys(obj as Record<string, unknown>)) {
-    if (dangerousKeys.includes(key)) continue;
-    sanitized[key] = deepSanitizeObject((obj as Record<string, unknown>)[key], seen);
-  }
-  return sanitized as T;
-}
-
-/**
- * Type guard to check if a value is Promise-like.
- */
-export function isPromise(val: unknown): val is Promise<unknown> {
-  return !!val && typeof (val as any).then === 'function';
-}
-
-
-// ============================================================================
-// Component Lifecycle
-// ============================================================================
-
-/**
- * Base class for runtime custom elements.
- * Handles lifecycle, rendering, controlled input sync, refs, and event binding.
- * @template S - State type
- * @template C - Computed type
- */
-
-interface ComponentRegistry {
-  [tag: string]: ComponentConfig<any, any>;
-}
-type ExtendedHTMLElement = HTMLElement & {
-  _boundHandlers?: Record<string, EventListenerOrEventListenerObject>;
-  _hasDirtyListener?: boolean;
-  _isDirty?: boolean;
-  _dataModelBound?: boolean;
-  _listItemModelListener?: EventListener;
+type InferMethods<T> = {
+  [K in keyof T as K extends LifecycleKeys ? never : K]: T[K] extends Function
+    ? T[K]
+    : never;
 };
 
-// SSR-safe ComponentElement definition
-let ComponentElement: CustomElementConstructor | { new (): object };
+export type ComponentContext<
+  S extends object,
+  C extends object,
+  P extends object,
+  T extends object = any
+> = S & C & P & InferMethods<T>;
 
-if (typeof HTMLElement !== 'undefined') {
-  ComponentElement = class<S extends ComponentState, C extends Record<string, any> = {}> extends HTMLElement {
-    /**
-     * Syncs whitelisted state properties to attributes after render.
-     * Only keys listed in config.reflect are reflected.
-     */
-    private syncStateToAttributes(): void {
-      if (!this.stateObj || !this.config?.reflect || !Array.isArray(this.config.reflect)) return;
-      const dangerousKeys = ['__proto__', 'constructor', 'prototype'];
-      this.config.reflect.forEach(key => {
-        if (dangerousKeys.includes(key)) {
-          this.removeAttribute(key);
-          return;
+export interface ComponentConfig<
+  S extends object,
+  C extends object = {},
+  P extends object = {},
+  T extends object = any,
+> {
+  state?: S;
+  computed?: { [K in keyof C]: (context: ComponentContext<S, C, P, T>) => C[K] };
+  props?: Record<
+    string,
+    {
+      type: StringConstructor | NumberConstructor | BooleanConstructor;
+      default?: string | number | boolean;
+    }
+  >;
+  watch?: WatchConfig<ComponentContext<S, C, P, T>>;
+  style?: string | ((context: ComponentContext<S, C, P, T>) => string) | DynamicStyleConfig;
+  styleOptimizations?: Partial<StyleOptimizations>;
+  render: (context: ComponentContext<S, C, P, T>) => VNode | VNode[] | Promise<VNode | VNode[]>;
+  loadingTemplate?: (context: ComponentContext<S, C, P, T>) => VNode | VNode[];
+  errorTemplate?: (
+    error: Error,
+    context: ComponentContext<S, C, P, T>,
+  ) => VNode | VNode[];
+  onConnected?: (
+    context: ComponentContext<S, C, P, T>,
+  ) => void;
+  onDisconnected?: (
+    context: ComponentContext<S, C, P, T>,
+  ) => void;
+  onAttributeChanged?: (
+    name: string,
+    oldValue: string | null,
+    newValue: string | null,
+    context: ComponentContext<S, C, P, T>,
+  ) => void;
+  onError?: (
+    error: Error | null,
+    context: ComponentContext<S, C, P, T>,
+  ) => void;
+  errorFallback?: (
+    error: Error | null,
+    context: ComponentContext<S, C, P, T>,
+  ) => string;
+  [key: string]: any;
+}
+
+// --- Internal registry ---
+const registry = new Map<string, ComponentConfig<any, any, any>>();
+
+// --- Utility functions ---
+function toKebab(str: string): string {
+  return str.replace(/([a-z])([A-Z])/g, "$1-$2").toLowerCase();
+}
+
+function escapeHTML(str: string | number | boolean): string | number | boolean {
+  if (typeof str === "string") {
+    return str.replace(
+      /[&<>"']/g,
+      (c) =>
+        ({
+          "&": "&amp;",
+          "<": "&lt;",
+          ">": "&gt;",
+          '"': "&quot;",
+          "'": "&#39;",
+        })[c]!,
+    );
+  }
+  return str;
+}
+
+function sanitizeCSS(css: string): string {
+  // Remove any url(javascript:...) and <script> tags
+  return css
+    .replace(/url\s*\(\s*['"]?javascript:[^)]*\)/gi, "")
+    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, "")
+    .replace(/expression\s*\([^)]*\)/gi, "");
+}
+
+/**
+ * CSS template literal
+ *
+ * This doesn't sanitize CSS values.
+ * Runtime does that for us.
+ * 
+ * @param strings
+ * @param values
+ * @returns
+ */
+export function css(strings: TemplateStringsArray, ...values: unknown[]): string {
+  let result = '';
+  for (let i = 0; i < strings.length; i++) {
+    result += strings[i];
+    if (i < values.length) result += values[i];
+  }
+  return result;
+}
+
+// ######################################
+// ######################################
+// ######################################
+
+// --- Hot Module Replacement (HMR) ---
+if (
+  typeof import.meta !== 'undefined' &&
+  (import.meta as any).hot &&
+  import.meta && import.meta.hot
+) {
+  import.meta.hot.accept((newModule) => {
+    // Update registry with new configs from the hot module
+    if (newModule && newModule.registry) {
+      for (const [tag, newConfig] of newModule.registry.entries()) {
+        registry.set(tag, newConfig);
+        // Update all instances to use new config
+        if (typeof document !== "undefined") {
+          document.querySelectorAll(tag).forEach((el) => {
+            if (typeof (el as any)._cfg !== "undefined") {
+              (el as any)._cfg = newConfig;
+            }
+            if (typeof (el as any)._render === "function") {
+              (el as any)._render(newConfig);
+            }
+          });
         }
-        const value = this.stateObj[key];
-        if (["string", "number", "boolean"].includes(typeof value)) {
-          if (value === undefined || value === null) {
-            this.removeAttribute(key);
-          } else {
-            this.setAttribute(key, String(value));
-          }
-        } else {
-          this.removeAttribute(key);
+      }
+    }
+  });
+}
+
+// --- Main component registration ---
+export function component<
+  S extends object = {},
+  C extends object = {},
+  P extends object = {},
+  T extends object = any,
+>(
+  tag: string,
+  renderOrConfig: ((context: ComponentContext<S, C, P, T>) => any) | ComponentConfig<S, C, P, T>,
+  config?: Partial<ComponentConfig<S, C, P, T>>
+): void {
+  let normalizedTag = toKebab(tag);
+  if (!normalizedTag.includes("-")) {
+    normalizedTag = `cer-${normalizedTag}`;
+  }
+
+  let finalConfig: ComponentConfig<S, C, P, T>;
+  if (typeof renderOrConfig === "function") {
+    finalConfig = { ...config, render: renderOrConfig } as ComponentConfig<S, C, P, T>;
+  } else {
+    finalConfig = renderOrConfig;
+  }
+
+  // Provide a default onError handler if not defined
+  if (typeof finalConfig.onError !== "function") {
+    finalConfig.onError = (error, state) => {
+      // Lightweight, developer-friendly default
+      console.error(`[${normalizedTag}] Error:`, error, state);
+    };
+  }
+
+  registry.set(normalizedTag, finalConfig);
+  if (typeof window !== "undefined" && !customElements.get(normalizedTag)) {
+    customElements.define(normalizedTag, createElementClass<S, C, P, T>(finalConfig) as CustomElementConstructor);
+  }
+}
+
+// --- Element class factory ---
+export function createElementClass<
+  S extends object,
+  C extends object,
+  P extends object,
+  T extends object = any,
+>(config: ComponentConfig<S, C, P, T>): CustomElementConstructor | { new (): object } {
+  // Validate that render is provided
+  if (!config.render) {
+    throw new Error(
+      "Component must have a render function",
+    );
+  }
+  if (typeof window === "undefined") {
+    // SSR fallback: minimal class, no DOM, no lifecycle, no "this"
+    return class { constructor() {} };
+  }
+  return class extends HTMLElement {
+    public context: ComponentContext<S, C, P, T>;
+
+    private _listeners: Array<() => void> = [];
+    private _watchers: Map<string, WatcherState> = new Map();
+    /** @internal */
+    private _renderTimeoutId: number | null = null;
+    private _mounted = false;
+    private _hasError = false;
+    private _initializing = true;
+    private _styleElement: HTMLStyleElement | null = null;
+    private _styleCache = new StyleCache(100);
+    private _lastStyleHash = "";
+    private _styleDependencies: Set<string> = new Set();
+    private _styleUpdateDebounced: ((
+      cfg: ComponentConfig<S, C, P, T>,
+    ) => void) & {
+      cancel: () => void;
+    };
+    private _cfg: ComponentConfig<S, C, P, T>;
+    private _lastRenderTime = 0;
+    private _renderCount = 0;
+    private _templateLoading = false;
+    private _templateError: Error | null = null;
+
+    constructor() {
+      super();
+      this.attachShadow({ mode: "open" });
+      this._cfg = config;
+
+      // Initialize debounced style update function
+      const optimizations = {
+        debounceMs: 16,
+        ...config.styleOptimizations,
+      };
+      this._styleUpdateDebounced = createDebouncer(
+        (cfg: ComponentConfig<S, C, P, T>) => this._applyStyle(cfg),
+        optimizations.debounceMs,
+      );
+      this.context = this._initContext(config);
+
+      // --- Inject config methods into state ---
+      Object.keys(config).forEach((key) => {
+        const fn = (config as any)[key];
+        if (typeof fn === "function" && !key.startsWith("on")) {
+          // Wrap the function so it receives state as the first argument
+          (this.context as any)[key] = (...args: any[]) =>
+            fn(...args, this.context);
+        }
+      });
+
+      this._applyProps(config);
+      this._applyComputed(config);
+      this._initializing = false;
+
+      // Initialize watchers after initialization phase is complete
+      this._initWatchers(config);
+
+      // Initial render (styles are applied within render)
+      this._render(config);
+    }
+
+    connectedCallback() {
+      this._runLogicWithinErrorBoundary(config, () => {
+        if (config.onConnected && !this._mounted) {
+          config.onConnected(this.context);
+          this._mounted = true;
         }
       });
     }
 
-    /**
-     * Allows updating the template function at runtime and triggers a re-render.
-     * @param newTemplate - New template function or string
-     */
-    public setTemplate(newTemplate: ((state: S & C, api: ComponentAPI<S & C>) => string | Promise<string> | CompiledTemplate<S & C>) | string): void {
-      // Override readonly via type assertion for runtime mutability
-      const config = this.config as any;
-      if (typeof newTemplate === 'function') {
-        config.template = newTemplate;
-      } else {
-        config.template = () => newTemplate;
-      }
-      this.render();
+    disconnectedCallback() {
+      this._runLogicWithinErrorBoundary(config, () => {
+        if (config.onDisconnected)
+          config.onDisconnected(this.context);
+        this._listeners.forEach((unsub) => unsub());
+        this._listeners = [];
+        this._watchers.clear();
+
+        // Clean up style caching
+        this._styleCache.clear();
+        this._styleDependencies.clear();
+        this._styleElement = null;
+        this._lastStyleHash = "";
+        this._styleUpdateDebounced.cancel();
+
+        // Clean up async template state
+        this._templateLoading = false;
+        this._templateError = null;
+
+        this._mounted = false;
+      });
     }
 
-    private _hasError = false;
-    private _mountedCalled = false;
-    private _unmountedCalled = false;
-    /**
-     * Tracks auto-wired config event handlers for removal
-     */
-    private _autoWiredHandlers: Record<string, EventListenerOrEventListenerObject[]> = {};
-
-    /**
-     * Override removeEventListener to support auto-wired config handler removal
-     */
-    override removeEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | EventListenerOptions): void {
-      super.removeEventListener(type, listener, options);
-      // Also remove auto-wired config handlers if present
-      if (this._autoWiredHandlers[type]) {
-        this._autoWiredHandlers[type] = this._autoWiredHandlers[type].filter(fn => {
-          if (fn === listener) {
-            super.removeEventListener(type, fn, options);
-            return false;
-          }
-          return true;
-        });
-        if (this._autoWiredHandlers[type].length === 0) delete this._autoWiredHandlers[type];
-      }
+    attributeChangedCallback(
+      name: string,
+      oldValue: string | null,
+      newValue: string | null,
+    ) {
+      this._runLogicWithinErrorBoundary(config, () => {
+        this._applyProps(config);
+        if (config.onAttributeChanged) {
+          config.onAttributeChanged(
+            name,
+            oldValue,
+            newValue,
+            this.context,
+          );
+        }
+      });
     }
 
-    /**
-     * observedAttributes automatically returns all primitive keys from static state.
-     * This enables automatic attribute observation for all primitive state properties.
-     */
     static get observedAttributes() {
-      // @ts-ignore: allow dynamic static property access
-      const state = this.stateObj || {};
-      return Object.keys(state).filter(
-        key => ['string', 'number', 'boolean'].includes(typeof state[key])
+      return config.props ? Object.keys(config.props).map(toKebab) : [];
+    }
+
+    private _applyComputed(cfg: ComponentConfig<S, C, P>) {
+      this._runLogicWithinErrorBoundary(config, () => {
+        if (!cfg.computed) return;
+        Object.entries(cfg.computed).forEach(([key, fn]) => {
+          Object.defineProperty(this.context, key, {
+            get: () => {
+              const val = (fn as (context: ComponentContext<S, C, P, T>) => any)(this.context);
+              return escapeHTML(val);
+            },
+            enumerable: true,
+          });
+        });
+      });
+    }
+
+    // --- Render ---
+    private _render(cfg: ComponentConfig<S, C, P>) {
+      this._runLogicWithinErrorBoundary(cfg, () => {
+        if (!this.shadowRoot) return;
+
+        this._styleDependencies.clear();
+
+        // If loading, show loading template
+        if (this._templateLoading && cfg.loadingTemplate) {
+          this._renderOutput(cfg.loadingTemplate(this.context));
+          return;
+        }
+
+        // If error, show error template
+        if (this._templateError && cfg.errorTemplate) {
+          this._renderOutput(cfg.errorTemplate(this._templateError, this.context));
+          return;
+        }
+
+        // Call render function
+        const outputOrPromise = cfg.render(this.context);
+
+        if (outputOrPromise instanceof Promise) {
+          this._templateLoading = true;
+          outputOrPromise
+            .then((output) => {
+              this._templateLoading = false;
+              this._templateError = null;
+              this._renderOutput(output);
+              return output;
+            })
+            .catch((error) => {
+              this._templateLoading = false;
+              this._templateError = error;
+              if (cfg.errorTemplate) {
+                const fallback = cfg.errorTemplate(error, this.context);
+                this._renderOutput(fallback);
+                return fallback;
+              }
+              throw error;
+            });
+
+          if (cfg.loadingTemplate)
+            this._renderOutput(cfg.loadingTemplate(this.context));
+          return;
+        }
+
+        // this._templateCache = outputOrPromise;
+        this._renderOutput(outputOrPromise);
+        this._applyStyle(cfg);
+      });
+    }
+
+    // --- Helper to render output ---
+    private _renderOutput(output: VNode | VNode[]) {
+      if (!this.shadowRoot) return;
+
+      // Create context with state and render method for directive processing
+      const context = new Proxy(this.context, {
+        get: (target, prop) => {
+          if (prop === "_requestRender") {
+            return () => this._requestRender();
+          }
+          if (prop === "context") {
+            return target;
+          }
+          // Handle nested property access for #model directives
+          if (typeof prop === "string" && prop.includes(".")) {
+            return prop.split(".").reduce((obj: any, key) => obj?.[key], target as any);
+          }
+          return target[prop as keyof typeof target];
+        },
+        set: (target, prop, value) => {
+          // Handle nested property assignment for #model directives
+          if (typeof prop === "string" && prop.includes(".")) {
+            const keys = prop.split(".");
+            const lastKey = keys.pop();
+            if (!lastKey) return false;
+
+            const nestedTarget = keys.reduce((obj, key) => {
+              if (!(key in obj)) {
+                (obj as any)[key] = {};
+              }
+              return (obj as any)[key];
+            }, target as any);
+
+            (nestedTarget as any)[lastKey] = value;
+            return true;
+          }
+          (target as any)[prop] = value;
+          return true;
+        },
+      });
+
+      vdomRenderer(
+        this.shadowRoot,
+        Array.isArray(output) ? output : [output],
+        context,
+      );
+
+      this._requestStyleUpdate();
+    }
+
+    _requestRender() {
+      // Debounced render request to avoid excessive re-renders
+      if (this._renderTimeoutId !== null) {
+        clearTimeout(this._renderTimeoutId);
+      }
+
+      // Prevent infinite render loops
+      const now = Date.now();
+      if (now - this._lastRenderTime < 16) {
+        // Less than 16ms since last render
+        this._renderCount++;
+        if (this._renderCount > 10) {
+          console.warn(
+            `[${this.tagName}] Potential infinite render loop detected. Skipping render.`,
+          );
+          this._renderTimeoutId = null;
+          return;
+        }
+      } else {
+        this._renderCount = 0;
+      }
+
+      this._renderTimeoutId = setTimeout(() => {
+        this._lastRenderTime = Date.now();
+        this._render(this._cfg);
+        this._renderTimeoutId = null;
+      }, 0);
+    }
+
+    // Request style-only update (more efficient than full render)
+    private _requestStyleUpdate() {
+      this._styleUpdateDebounced(this._cfg);
+    }
+
+    // --- Style ---
+    private _applyStyle(cfg: ComponentConfig<S, C, P, T>) {
+      this._runLogicWithinErrorBoundary(cfg, () => {
+        if (!this.shadowRoot) {
+          return;
+        }
+
+        const timer = stylePerformanceMonitor.startTimer("applyStyle");
+
+        try {
+          // Get or create style element
+          if (!this._styleElement) {
+            this._styleElement = this.shadowRoot.querySelector(
+              "style",
+            ) as HTMLStyleElement;
+            if (!this._styleElement) {
+              if (typeof document !== "undefined") {
+                this._styleElement = document.createElement("style");
+                this.shadowRoot.prepend(this._styleElement);
+              }
+            }
+          }
+
+          if (!cfg.style) {
+            this._styleElement.textContent = "";
+            return;
+          }
+
+          // Get style optimizations config
+          const optimizations = {
+            enableCaching: true,
+            enableMinification: false,
+            enableDeduplication: true,
+            cacheSize: 100,
+            debounceMs: 16,
+            ...cfg.styleOptimizations,
+          };
+
+          // Handle different style configurations
+          let styleConfig: DynamicStyleConfig;
+
+          if (typeof cfg.style === "string") {
+            styleConfig = {
+              css: cfg.style,
+              cache: optimizations.enableCaching,
+            };
+          } else if (typeof cfg.style === "function") {
+            styleConfig = {
+              css: cfg.style,
+              cache: optimizations.enableCaching,
+            };
+          } else {
+            styleConfig = {
+              cache: optimizations.enableCaching,
+              ...cfg.style,
+            };
+          }
+
+          // Extract dependencies and check if style needs updating
+          const dependencies = styleConfig.dependencies || [];
+          const shouldCache =
+            styleConfig.cache !== false && optimizations.enableCaching;
+
+          // Create a hash of dependent state values for caching
+          let stateHash = "";
+          if (shouldCache && dependencies.length > 0) {
+            const dependentValues = dependencies.map((dep) => (this.context as Record<string, unknown>)[dep]);
+            stateHash = createStateHash(dependentValues);
+
+            // Check cache first
+            if (
+              this._lastStyleHash === stateHash &&
+              this._styleCache.has(stateHash)
+            ) {
+              const cachedStyle = this._styleCache.get(stateHash)!;
+              if (this._styleElement.textContent !== cachedStyle) {
+                this._styleElement.textContent = cachedStyle;
+              }
+              return;
+            }
+          }
+
+          // For styles without dependencies, always generate
+          if (!shouldCache || dependencies.length === 0) {
+            stateHash = "no-deps-" + Date.now();
+          }
+
+          // Generate style
+          const rawStyle =
+            typeof styleConfig.css === "function"
+              ? styleConfig.css(this.context)
+              : styleConfig.css;
+
+          let processedStyle = sanitizeCSS(rawStyle);
+
+          // Apply optimizations
+          if (optimizations.enableMinification) {
+            processedStyle = minifyCSS(processedStyle);
+          }
+
+          if (optimizations.enableDeduplication) {
+            processedStyle = deduplicateCSS(processedStyle);
+          }
+
+          // Cache the style if enabled and has dependencies
+          if (shouldCache && dependencies.length > 0) {
+            this._styleCache.set(
+              stateHash,
+              processedStyle,
+              dependencies.map(String),
+            );
+            this._lastStyleHash = stateHash;
+          }
+
+          // Only update DOM if style actually changed
+          if (this._styleElement.textContent !== processedStyle) {
+            this._styleElement.textContent = processedStyle;
+          }
+        } finally {
+          timer();
+        }
+      });
+    }
+
+    // --- Error Boundary function ---
+    private _runLogicWithinErrorBoundary(
+      cfg: ComponentConfig<S, C, P>,
+      fn: () => void,
+    ) {
+      if (this._hasError) this._hasError = false;
+      try {
+        fn();
+      } catch (error) {
+        this._hasError = true;
+        if (cfg.onError) {
+          cfg.onError(error as Error | null, this.context);
+        }
+        if (cfg.errorFallback) {
+          if (this.shadowRoot) {
+            this.shadowRoot.innerHTML = cfg.errorFallback(
+              error as Error | null,
+              this.context,
+            );
+          }
+        }
+      }
+    }
+
+    // --- State, props, computed ---
+    private _initContext(cfg: ComponentConfig<S, C, P>): ComponentContext<S, C, P, T> {
+      try {
+        const self = this;
+        function createReactive(obj: any, path = ""): any {
+          if (Array.isArray(obj)) {
+            // Create a proxy that intercepts array mutations
+            return new Proxy(obj, {
+              get(target, prop, receiver) {
+                const value = Reflect.get(target, prop, receiver);
+
+                // Intercept array mutating methods
+                if (typeof value === "function" && typeof prop === "string") {
+                  const mutatingMethods = [
+                    "push",
+                    "pop",
+                    "shift",
+                    "unshift",
+                    "splice",
+                    "sort",
+                    "reverse",
+                  ];
+                  if (mutatingMethods.includes(prop)) {
+                    return function (...args: any[]) {
+                      const result = value.apply(target, args);
+
+                      if (!self._initializing) {
+                        const fullPath = path || "root";
+                        self._triggerWatchers(fullPath, target);
+                        self._render(cfg);
+                      }
+
+                      return result;
+                    };
+                  }
+                }
+
+                return value;
+              },
+              set(target, prop, value) {
+                target[prop as any] = value;
+                if (!self._initializing) {
+                  const fullPath = path
+                    ? `${path}.${String(prop)}`
+                    : String(prop);
+
+                  // Track style dependencies and invalidate cache
+                  self._styleDependencies.add(String(prop));
+                  self._styleCache.invalidate(String(prop));
+
+                  self._triggerWatchers(fullPath, value);
+
+                  // Check if only style dependencies changed for optimization
+                  const styleConfig = cfg.style;
+                  let onlyStyleChanged = false;
+
+                  if (
+                    styleConfig &&
+                    typeof styleConfig === "object" &&
+                    "dependencies" in styleConfig
+                  ) {
+                    const styleDeps = styleConfig.dependencies || [];
+                    onlyStyleChanged =
+                      styleDeps.includes(String(prop)) &&
+                      styleDeps.every(
+                        (dep) =>
+                          !self._styleDependencies.has(String(dep)) ||
+                          dep === prop,
+                      );
+                  }
+
+                  if (onlyStyleChanged) {
+                    self._requestStyleUpdate();
+                  } else {
+                    self._render(cfg);
+                  }
+                }
+                return true;
+              },
+              deleteProperty(target, prop) {
+                delete target[prop as any];
+                if (!self._initializing) {
+                  const fullPath = path
+                    ? `${path}.${String(prop)}`
+                    : String(prop);
+
+                  // Track style dependencies
+                  self._styleDependencies.add(String(prop));
+
+                  self._triggerWatchers(fullPath, undefined);
+                  self._render(cfg);
+                }
+                return true;
+              },
+            });
+          }
+          if (obj && typeof obj === "object") {
+            Object.keys(obj).forEach((key) => {
+              const newPath = path ? `${path}.${key}` : key;
+              obj[key] = createReactive(obj[key], newPath);
+            });
+            return new Proxy(obj, {
+              set(target, prop, value) {
+                const fullPath = path
+                  ? `${path}.${String(prop)}`
+                  : String(prop);
+                target[prop as any] = createReactive(value, fullPath);
+                if (!self._initializing) {
+                  self._triggerWatchers(
+                    fullPath,
+                    target[prop as any]
+                  );
+                  self._render(cfg);
+                }
+                return true;
+              },
+              get(target, prop, receiver) {
+                return Reflect.get(target, prop, receiver);
+              },
+            });
+          }
+          return obj;
+        }
+        return createReactive({ ...cfg.state }) as ComponentContext<S, C, P, T>;
+      } catch (error) {
+        return {} as ComponentContext<S, C, P, T>;
+      }
+    }
+
+    private _initWatchers(cfg: ComponentConfig<S, C, P>): void {
+      if (!cfg.watch) return;
+
+      for (const [key, watchConfig] of Object.entries(cfg.watch)) {
+        let callback: WatchCallback;
+        let options: WatchOptions = {};
+
+        if (Array.isArray(watchConfig)) {
+          callback = watchConfig[0];
+          options = watchConfig[1] || {};
+        } else {
+          callback = watchConfig;
+        }
+
+        this._watchers.set(key, {
+          callback,
+          options,
+          oldValue: this._getNestedValue(key),
+        });
+
+        // Execute immediately if requested
+        if (options.immediate) {
+          try {
+            const currentValue = this._getNestedValue(key);
+            callback(currentValue, undefined, this.context);
+          } catch (error) {
+            console.error(`Error in immediate watcher for "${key}":`, error);
+          }
+        }
+      }
+    }
+
+    private _getNestedValue(path: string): any {
+      return path.split(".").reduce(
+        (obj: any, key: string) => obj?.[key],
+        this.context as any,
       );
     }
 
-    /**
-     * Called when an observed attribute changes. Syncs attribute to state and triggers render.
-     */
-    attributeChangedCallback(name: string, _oldValue: string, newValue: string) {
-      if (name === '__proto__' || name === 'constructor' || name === 'prototype') return;
-      if (!this.stateObj) return;
-      // Map kebab-case to camelCase
-      const camelName = name.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
-      const stateKey = (name in this.stateObj) ? name : (camelName in this.stateObj ? camelName : null);
-      if (stateKey) {
-        const initialType = typeof (this.config?.state?.[stateKey]);
-        let value: any = newValue;
-        if (newValue === null) {
-          value = undefined;
-        } else if (initialType === 'number') {
-          if (value === undefined || value === '') {
-            value = this.config?.state?.[stateKey];
-          } else {
-            const num = Number(value);
-            value = isNaN(num) ? this.config?.state?.[stateKey] : num;
-          }
-        } else if (initialType === 'boolean') {
-          value = value === 'true';
-        }
-        value = deepSanitizeObject(value);
-        if ((this.stateObj as any)[stateKey] !== value) {
-          if (this.config?.debug) {
-            console.log('[runtime] state update:', { stateKey, value });
-          }
-          (this.stateObj as any)[stateKey] = value;
-          this.render();
-        }
-      }
-    }
+    private _triggerWatchers(path: string, newValue: any): void {
+      const isEqual = (a: any, b: any): boolean => {
+        // Simple deep equality check
+        if (a === b) return true;
+        if (typeof a !== typeof b) return false;
+        if (typeof a !== "object" || a === null || b === null) return false;
 
-    /**
-     * Force sync all controlled input values and event listeners after VDOM patching.
-     */
-    private forceSyncControlledInputs(): void {
-      if (!this.shadowRoot) return;
-      this.shadowRoot.querySelectorAll('input[data-model]').forEach(input => {
-        const modelAttr = input.getAttribute('data-model');
-        if (!modelAttr || !this.stateObj || typeof this.stateObj[modelAttr] === 'undefined') return;
-        const inputEl = input as HTMLInputElement;
-        const stateValue = String(this.stateObj[modelAttr]);
-        const isFocused = document.activeElement === inputEl;
-        // Ensure dirty flag is set on input event
-        if (!(inputEl as any)._hasDirtyListener) {
-          inputEl.addEventListener('input', () => {
-            (inputEl as any)._isDirty = true;
-          });
-          inputEl.addEventListener('blur', () => {
-            (inputEl as any)._isDirty = false;
-          });
-          (inputEl as any)._hasDirtyListener = true;
+        if (Array.isArray(a) && Array.isArray(b)) {
+          if (a.length !== b.length) return false;
+          return a.every((val, i) => isEqual(val, b[i]));
         }
-        const isDirty = Boolean((inputEl as any)._isDirty);
-        // Never set value for focused or dirty inputs—let user typing win
-        if (isFocused || isDirty) {
-          return;
-        }
-        // Only set value for unfocused and clean inputs if it differs and is not a radio or checkbox
-        if (inputEl.type !== 'radio' && inputEl.type !== 'checkbox' && inputEl.value !== stateValue) {
-          inputEl.value = stateValue;
-        }
-      });
-      // Rebind other events (e.g., data-on-click)
-      this.rebindEventListeners();
-    }
 
-    /**
-     * Sync all controlled inputs and event listeners after render
-     */
-    private syncControlledInputsAndEvents(): void {
-      if (!this.shadowRoot) return;
-      // --- Radio Groups ---
-      this.shadowRoot.querySelectorAll('input[type="radio"][data-model]').forEach((input) => {
-        const modelAttr = input.getAttribute('data-model');
-        if (!modelAttr || !this.stateObj || typeof this.stateObj[modelAttr] === 'undefined') {
-          return;
-        }
-        const inputEl = input as HTMLInputElement;
-        const stateValue = String(this.stateObj[modelAttr]);
-        inputEl.checked = inputEl.value === stateValue;
-      });
-      // --- Checkbox, Text, Number ---
-      this.shadowRoot.querySelectorAll('input[data-model]').forEach(input => {
-        const modelAttr = input.getAttribute('data-model');
-        if (!modelAttr || !this.stateObj || typeof this.stateObj[modelAttr] === 'undefined') return;
-        const inputEl = input as HTMLInputElement;
-        const stateValue = String(this.stateObj[modelAttr]);
-        if (inputEl.type === 'checkbox') {
-          const stateVal = this.stateObj[modelAttr];
-          if (Array.isArray(stateVal)) {
-            inputEl.checked = stateVal.includes(inputEl.value);
-          } else {
-            const trueValue = inputEl.getAttribute('data-true-value');
-            const falseValue = inputEl.getAttribute('data-false-value');
-            if (trueValue !== null || falseValue !== null) {
-              if (String(stateVal) === trueValue) {
-                inputEl.checked = true;
-              } else if (String(stateVal) === falseValue) {
-                inputEl.checked = false;
-              } else if (stateVal === true) {
-                inputEl.checked = true;
-              } else {
-                inputEl.checked = false;
-              }
-            } else {
-              inputEl.checked = stateVal === true || stateVal === 'true' || stateVal === 1;
-            }
-          }
-        } else if (inputEl.type === 'radio') {
-          // Do not set value for radios
-        } else {
-          inputEl.value = stateValue;
-        }
-      });
-      // --- Textarea ---
-      this.shadowRoot.querySelectorAll('textarea[data-model]').forEach(textarea => {
-        const modelAttr = textarea.getAttribute('data-model');
-        if (!modelAttr || !this.stateObj || typeof this.stateObj[modelAttr] === 'undefined') return;
-        (textarea as HTMLTextAreaElement).value = String(this.stateObj[modelAttr]);
-      });
-      // --- Select ---
-      this.shadowRoot.querySelectorAll('select[data-model]').forEach(select => {
-        const modelAttr = select.getAttribute('data-model');
-        if (!modelAttr || !this.stateObj || typeof this.stateObj[modelAttr] === 'undefined') return;
-        (select as HTMLSelectElement).value = String(this.stateObj[modelAttr]);
-      });
-    }
+        const keysA = Object.keys(a);
+        const keysB = Object.keys(b);
+        if (keysA.length !== keysB.length) return false;
 
-    /**
-     * Attach event listeners for input[data-bind] after VDOM patching
-     */
-    private attachListItemModelListeners(): void {
-      if (!this.shadowRoot) return;
-      this.shadowRoot.querySelectorAll('input[data-bind]').forEach(input => {
-        const bindExpr = input.getAttribute('data-bind');
-        if (!bindExpr) return;
-        // Remove previous listener if present
-        if ((input as any)._listItemModelListener) {
-          input.removeEventListener('input', (input as any)._listItemModelListener);
-          input.removeEventListener('change', (input as any)._listItemModelListener);
-          delete (input as any)._listItemModelListener;
-        }
-        // Array item binding: arrKey[idx].propKey
-        const arrMatch = bindExpr.match(/^([a-zA-Z0-9_]+)\[(\d+)\]\.([a-zA-Z0-9_]+)$/);
-        if (arrMatch) {
-          const [, arrKey, idxStr, propKey] = arrMatch;
-          const idx = parseInt(idxStr, 10);
-          const arr = this.stateObj[arrKey];
-          if (input instanceof HTMLInputElement && input.type === 'checkbox') {
-            input.checked = !!(Array.isArray(arr) && arr[idx] && arr[idx][propKey]);
-          }
-          const handler = (_e: Event) => {
-            if (!Array.isArray(arr) || !arr[idx]) return;
-            if (input instanceof HTMLInputElement && input.type === 'checkbox') {
-              arr[idx][propKey] = input.checked;
-            } else {
-              arr[idx][propKey] = (input as any).value;
-            }
-          };
-          input.addEventListener('input', handler);
-          input.addEventListener('change', handler);
-          (input as any)._listItemModelListener = handler;
-          return;
-        }
-        // Dot notation binding: user.name or user.amount|number|trim
-        const dotMatch = bindExpr.match(/^([a-zA-Z0-9_]+)\.([a-zA-Z0-9_]+)((?:\|[a-zA-Z0-9_]+)*)$/);
-        if (dotMatch) {
-          const [, objKey, propKey, modifierStr] = dotMatch;
-          const obj = this.stateObj[objKey];
-          const modifiers = modifierStr ? modifierStr.split('|').map(s => s.trim()).filter(Boolean) : [];
-          if (input instanceof HTMLInputElement && input.type === 'checkbox') {
-            input.checked = !!(obj && obj[propKey]);
-          } else if (input instanceof HTMLInputElement) {
-            input.value = obj ? String(obj[propKey] ?? '') : '';
-          }
-          const handler = (_e: Event) => {
-            if (!obj) return;
-            let value: unknown;
-            if (input instanceof HTMLInputElement && input.type === 'checkbox') {
-              value = input.checked;
-            } else {
-              value = (input as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement).value;
-              if (modifiers.includes('number')) value = Number(value);
-              if (modifiers.includes('trim') && typeof value === 'string') value = value.trim();
-            }
-            obj[propKey] = value;
-          };
-          input.addEventListener('input', handler);
-          input.addEventListener('change', handler);
-          (input as any)._listItemModelListener = handler;
-        }
-      });
-    }
-
-    /**
-     * Attach controlled input listeners to sync DOM value to state
-     */
-    private attachControlledInputListeners(): void {
-      const shadow = this.shadowRoot;
-      if (!shadow) return;
-      // --- Auto data-model binding ---
-      shadow.querySelectorAll('[data-model]').forEach((el) => {
-        const keyWithModifiers = el.getAttribute('data-model');
-        if (!keyWithModifiers) return;
-        // Only bind once per element
-        if ((el as any)._dataModelBound) return;
-        useDataModel(el, this.stateObj, keyWithModifiers);
-        (el as any)._dataModelBound = true;
-      });
-      // --- Post-render sync for all data-model inputs ---
-      shadow.querySelectorAll('[data-model]').forEach((el) => {
-        const [key] = el.getAttribute('data-model')?.split('|').map(s => s.trim()) ?? [];
-        if (!key || !(key in this.stateObj)) return;
-        if (el instanceof HTMLInputElement) {
-          if (el.type === 'checkbox') {
-            const stateVal = this.stateObj[key];
-            const trueValue = el.getAttribute('data-true-value');
-            const falseValue = el.getAttribute('data-false-value');
-            if (Array.isArray(stateVal)) {
-              el.checked = stateVal.includes(el.value);
-            } else if (trueValue !== null || falseValue !== null) {
-              if (String(stateVal) === trueValue) {
-                el.checked = true;
-              } else if (String(stateVal) === falseValue) {
-                el.checked = false;
-              } else if (stateVal === true) {
-                el.checked = true;
-              } else {
-                el.checked = false;
-              }
-            } else {
-              el.checked = stateVal === true || stateVal === 'true' || stateVal === 1;
-            }
-          } else if (el.type === 'radio') {
-            el.checked = el.value === String(this.stateObj[key]);
-          } else {
-            el.value = String(this.stateObj[key] ?? '');
-          }
-        } else if (el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement) {
-          el.value = String(this.stateObj[key] ?? '');
-        }
-      });
-    }
-    private config!: ComponentConfig<S, C>;
-    private stateObj!: S & C;
-    private api!: ComponentAPI<S & C>;
-    private _globalUnsubscribes: Array<() => void> = [];
-    private unsubscribes: Array<() => void> = [];
-    private lastCompiledTemplate: CompiledTemplate<S & C> | null = null;
-    private lastState: (S & C) | null = null;
-    private rafId: number | null = null;
-
-    /**
-     * Construct a new runtime component element.
-     * @param config - Component configuration
-     */
-    constructor() {
-      super();
-      // Config/state setup will be done in connectedCallback
-    }
-
-    private initializeConfig() {
-      if (this.config) return;
-      const tag = this.tagName.toLowerCase();
-      const registry: ComponentRegistry = (window as unknown as { __componentRegistry?: ComponentRegistry }).__componentRegistry || {};
-      const config = registry[tag];
-      if (!config || typeof config !== 'object') {
-        throw new Error('Invalid component config: must be an object');
-      }
-      if (!config.state || typeof config.state !== 'object') {
-        throw new Error('Invalid component config: state must be an object');
-      }
-      this.config = config;
-      // Always use the reactive proxy for state
-      const computedState = config.computed
-        ? reactive(config.state, config.computed)
-        : reactive(config.state);
-      this.stateObj = computedState as S & C;
-      // Subscribe to state changes and batch re-render
-      if (typeof (this.stateObj as any).subscribe === 'function') {
-        this.unsubscribes.push((this.stateObj as any).subscribe(() => {
-          this.scheduleRender();
-        }));
-      }
-      // Create API
-      this.api = {
-        state: this.stateObj,
-        emit: (eventName: string, detail?: unknown) => this.dispatchEvent(new CustomEvent(eventName, { detail, bubbles: true })),
-        onGlobal: <U = any>(eventName: string, handler: (data: U) => void) => {
-          const unsub = eventBus.on(eventName, handler);
-          this._globalUnsubscribes.push(unsub);
-          return unsub;
-        },
-        offGlobal: <U = any>(eventName: string, handler: (data: U) => void) => eventBus.off(eventName, handler),
-        emitGlobal: <U = any>(eventName: string, data?: U) => eventBus.emit(eventName, data),
-        render: () => this.render()
+        return keysA.every(key => isEqual(a[key], b[key]));
       };
-      Object.keys(this.config).forEach(key => {
-        if (key.startsWith('on') && key.length > 2 && typeof this.config[key] === 'function') {
-          const eventName = key.charAt(2).toLowerCase() + key.slice(3);
-          const handler: EventListener = (e: Event) => {
-            const detail = (e as CustomEvent).detail ?? e;
-            (this.config[key] as Function)(detail, this.api.state, this.api);
-          };
-          this.addEventListener(eventName, handler);
-          // Store for later removal
-          if (!this._autoWiredHandlers[eventName]) this._autoWiredHandlers[eventName] = [];
-          this._autoWiredHandlers[eventName].push(handler);
-        }
-      });
-      // Attach shadow DOM
-      this.attachShadow({ mode: 'open' });
-      // Setup style
-      if (config.style) {
-        const styleEl = document.createElement('style');
-        styleEl.textContent = typeof config.style === 'function' ? config.style(this.stateObj) : config.style;
-        this.shadowRoot!.appendChild(styleEl);
-      }
-      // SSR hydration support (selective)
-      if (typeof this.config.hydrate === 'function') {
-        const hydrateEls = this.shadowRoot?.querySelectorAll('[data-hydrate]');
-        try {
-          if (hydrateEls && hydrateEls.length > 0) {
-            hydrateEls.forEach(el => {
-              try {
-                this.config.hydrate!(el, this.stateObj, this.api);
-              } catch (err) {
-                if (typeof this.config.onError === 'function') {
-                  this.config.onError(err instanceof Error ? err : new Error(String(err)), this.api.state, this.api);
-                }
-                this._handleRenderError(err);
-              }
-            });
-          } else {
-            this.config.hydrate!(this.shadowRoot!, this.stateObj, this.api);
-          }
-        } catch (err) {
-          if (typeof this.config.onError === 'function') {
-            this.config.onError(err instanceof Error ? err : new Error(String(err)), this.api.state, this.api);
-          }
-          this._handleRenderError(err);
-        }
-      }
-      const isSSRHydration = this.hasAttribute('data-hydrated');
-      if (!isSSRHydration) {
-        this.render();
-      } else {
-        this.processRefs();
-      }
-      // Only call onMounted here if not already called
-      if (!this._mountedCalled && typeof this.config.onMounted === 'function') {
-        try {
-          const result: unknown = this.config.onMounted(this.api.state, this.api);
-          if (isPromise(result)) {
-            result.catch((err: any) => {
-              if (typeof this.config.onError === 'function') {
-                this.config.onError(err, this.api.state, this.api);
-              }
-              this._handleRenderError(err);
-            }).finally(() => {
-              this._mountedCalled = true;
-            });
-          } else {
-            this._mountedCalled = true;
-          }
-        } catch (err) {
-          if (typeof this.config.onError === 'function') {
-            this.config.onError(err, this.api.state, this.api);
-          }
-          this._handleRenderError(err);
-          this._mountedCalled = true;
-        }
-      }
-    }
 
-    connectedCallback(): void {
-      this.initializeConfig();
-      // Merge all attributes into state for initial sync
-      if (this.stateObj) {
-        for (const attr of this.getAttributeNames()) {
-          // Always map kebab-case to camelCase for state keys
-          const camelName = attr.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
-          const stateKey = camelName;
-          if (stateKey in this.stateObj) {
-            const initialType = typeof (this.config?.state?.[stateKey]);
-            let value: unknown = this.getAttribute(attr);
-            if (initialType === 'number') value = Number(value);
-            else if (initialType === 'boolean') value = value === 'true';
-            (this.stateObj as Record<string, unknown>)[stateKey] = value === null ? undefined : value;
-          }
-        }
-      }
-      // Only call onMounted if not already called
-      if (!this._mountedCalled && typeof this.config.onMounted === 'function') {
+      // Exact path watcher
+      const watcher = this._watchers.get(path);
+      if (watcher && !isEqual(newValue, watcher.oldValue)) {
         try {
-          const result: unknown = this.config.onMounted(this.api.state, this.api);
-          if (isPromise(result)) {
-            result.catch((err: unknown) => {
-              if (typeof this.config.onError === 'function') {
-                this.config.onError(err, this.api.state, this.api);
-              }
-              this._handleRenderError(err);
-            }).finally(() => {
-              this._mountedCalled = true;
-            });
-          } else {
-            this._mountedCalled = true;
-          }
-        } catch (err) {
-          if (typeof this.config.onError === 'function') {
-            this.config.onError(err, this.api.state, this.api);
-          }
-          this._handleRenderError(err);
-          this._mountedCalled = true;
+          watcher.callback(newValue, watcher.oldValue, this.context);
+          watcher.oldValue = newValue;
+        } catch (error) {
+          console.error(`Error in watcher for "${path}":`, error);
         }
       }
-      if (typeof this.render === 'function') this.render();
-    }
 
-    /**
-     * Lifecycle: called when element is removed from DOM.
-     */
-    disconnectedCallback(): void {
-      // Remove all auto-wired config event handlers
-      Object.entries(this._autoWiredHandlers).forEach(([eventName, handlers]) => {
-        handlers.forEach(handler => {
-          super.removeEventListener(eventName, handler);
-        });
-      });
-      this._autoWiredHandlers = {};
-      this.unsubscribes.forEach(fn => fn());
-      this.unsubscribes = [];
-      this._globalUnsubscribes.forEach(fn => fn());
-      this._globalUnsubscribes = [];
-      if (!this._unmountedCalled && typeof this.config.onUnmounted === 'function') {
-        try {
-          const result: unknown = this.config.onUnmounted(this.api.state, this.api);
-          if (isPromise(result)) {
-            result.catch((err: any) => {
-              if (typeof this.config.onError === 'function') {
-                this.config.onError(err, this.api.state, this.api);
-              }
-              this._handleRenderError(err);
-            }).finally(() => {
-              this._unmountedCalled = true;
-            });
-          } else {
-            this._unmountedCalled = true;
-          }
-        } catch (err) {
-          if (typeof this.config.onError === 'function') {
-            this.config.onError(err, this.api.state, this.api);
-          }
-          this._handleRenderError(err);
-          this._unmountedCalled = true;
-        }
-      }
-      // Reset flags for future re-mounts
-      this._mountedCalled = false;
-      this._unmountedCalled = false;
-    }
-
-    /**
-     * Render the component. Handles both string and compiled templates, refs, and error boundaries.
-     */
-    private render(): void {
-      // Always reset error state before each render for predictable boundaries
-      this._hasError = false;
-      // Robust controlled input sync after every render
-      this.syncControlledInputsAndEvents();
-      setTimeout(() => this.attachControlledInputListeners(), 0);
-      try {
-        // Plugin hook: onRender
-        runtimePlugins.forEach(p => {
+      // Deep watchers for parent paths
+      for (const [watchPath, watcherConfig] of this._watchers.entries()) {
+        if (watcherConfig.options.deep && path.startsWith(watchPath + ".")) {
           try {
-            p.onRender?.(this.stateObj, this.api);
-          } catch (err) {
-            this._handleRenderError(err);
-            // Do NOT re-throw, just handle and continue
-          }
-        });
-        // Error boundary for computed properties
-        if (this.config.computed) {
-          Object.values(this.config.computed).forEach(fn => {
-            try {
-              fn(this.stateObj);
-            } catch (err) {
-              this._handleRenderError(err);
-              // Do NOT re-throw, just handle and continue
+            const currentValue = this._getNestedValue(watchPath);
+            if (!isEqual(currentValue, watcherConfig.oldValue)) {
+              watcherConfig.callback(currentValue, watcherConfig.oldValue, this.context);
+              watcherConfig.oldValue = currentValue;
             }
-          });
-        }
-        const templateResultOrPromise = this.config.template(this.stateObj as S & C, this.api);
-        if (templateResultOrPromise instanceof Promise) {
-          templateResultOrPromise.then(templateResult => {
-            if (!this._hasError) {
-              this._renderTemplateResult(templateResult);
-              // Sync state to attributes after render
-              this.syncStateToAttributes();
-              // Attach list item listeners after VDOM patching
-              setTimeout(() => this.attachListItemModelListeners(), 0);
-            }
-          }).catch(error => {
-            this._handleRenderError(error);
-          });
-        } else {
-          if (!this._hasError) {
-            this._renderTemplateResult(templateResultOrPromise);
-            // Sync state to attributes after render
-            this.syncStateToAttributes();
-            // Attach list item listeners after VDOM patching
-            setTimeout(() => this.attachListItemModelListeners(), 0);
+          } catch (error) {
+            console.error(`Error in deep watcher for "${watchPath}":`, error);
           }
         }
-      } catch (error) {
-        this._handleRenderError(error);
-        // Always render fallback UI on error, do NOT re-throw
-        this.renderError(error instanceof Error ? error : new Error(String(error)));
       }
     }
 
-    /**
-     * Internal: render a template result (string or compiled template)
-     */
-    private _prevVNode: VNode | null = null;
-
-    /**
-     * Rebind event listeners for elements with data-on-* attributes in the shadow DOM
-     */
-    private rebindEventListeners(): void {
-      if (!this.shadowRoot) return;
-      const eventAttrs = ['data-on-input', 'data-on-change', 'data-on-blur', 'data-on-click'];
-      eventAttrs.forEach(attr => {
-        this.shadowRoot!.querySelectorAll(`[${attr}]`).forEach(el => {
-          const eventType = attr.replace('data-on-', '');
-          const handlerName = el.getAttribute(attr);
-          if (!handlerName || typeof this.config[handlerName] !== 'function') return;
-          // Remove previous listener if any
-          if ((el as any)._boundHandlers && (el as any)._boundHandlers[eventType]) {
-            el.removeEventListener(eventType, (el as any)._boundHandlers[eventType]);
-          }
-          // Bind new handler
-          const handler = this.config[handlerName];
-          const boundHandler = (e: Event) => handler.call(this, e, this.stateObj, this.api);
-          el.addEventListener(eventType, boundHandler);
-          if (!(el as any)._boundHandlers) (el as any)._boundHandlers = {};
-          (el as any)._boundHandlers[eventType] = boundHandler;
-        });
-      });
-      // Recurse into children for rebinding
-      Array.from(this.shadowRoot.children).forEach(child => {
-        if (child instanceof HTMLElement && typeof (child as any).rebindEventListeners === 'function') {
-          (child as any).rebindEventListeners();
-        }
-      });
-    }
-    /**
-     * Internal: render a template result (string or compiled template).
-     * Handles VDOM patching, style updates, refs, and event binding.
-     * @param templateResult - HTML string or compiled template
-     */
-    private _renderTemplateResult(templateResult: string | CompiledTemplate<S & C>): void {
-      if (this._hasError) return;
+    private _applyProps(cfg: ComponentConfig<S, C, P>): void {
       try {
-        if (typeof templateResult === 'string') {
-          // --- Sanitize HTML for XSS ---
-          function sanitizeHTML(html: string): string {
-            // Remove all on* attributes (e.g., onclick, onerror)
-            return html.replace(/<([a-zA-Z0-9]+)([^>]*)>/g, (_match, tag, attrs) => {
-              // Remove dangerous attributes
-              const safeAttrs = attrs.replace(/\s+on[a-zA-Z]+\s*=\s*(['"][^'"]*['"]|[^\s>]*)/gi, '');
-              return `<${tag}${safeAttrs}>`;
-            });
-          }
-          const sanitizedHTML = sanitizeHTML(templateResult);
-          const newVNode = parseVNodeFromHTML(sanitizedHTML);
-          function logCheckboxVNodes(vnode: VNode) {
-            vnode.children.forEach(logCheckboxVNodes);
-          }
-          logCheckboxVNodes(newVNode);
-          const shadowRoot = this.shadowRoot;
-          if (!shadowRoot) {
-            return;
-          }
-          let styleEl = shadowRoot.querySelector('style');
-          if (!styleEl) {
-            styleEl = document.createElement('style');
-            shadowRoot.appendChild(styleEl);
-          }
-          if (this.config.style) {
-            styleEl.textContent = typeof this.config.style === 'function' ? this.config.style(this.stateObj) : this.config.style;
-          } else {
-            styleEl.textContent = '';
-          }
-          // If fragment, reconcile all children
-          if (newVNode.type === '#fragment') {
-            // Use patchVNode for full parent/children reconciliation
-            const containerEl = Array.from(shadowRoot.childNodes).find(
-              node => node.nodeType === 1 && node !== styleEl
-            ) as Element | undefined;
-            if (containerEl) {
-              // Remove all non-style children from container
-              Array.from(containerEl.childNodes).forEach(node => {
-                // Keep only the <style> node, remove everything else (including text and comment nodes)
-                if (!(node.nodeType === 1 && node.nodeName === 'STYLE')) {
-                  containerEl.removeChild(node);
-                }
-              });
-              const fragmentVNode = {
-                type: '#fragment',
-                dom: containerEl,
-                children: newVNode.children,
-                props: {},
-                key: undefined
-              };
-              const prevFragmentVNode = this._prevVNode && this._prevVNode.type === '#fragment'
-                ? { ...this._prevVNode, dom: containerEl }
-                : fragmentVNode;
-              patchVNode(containerEl, prevFragmentVNode, fragmentVNode);
-            } else {
-              // If no container, mount all children
-              newVNode.children.forEach(childVNode => {
-                const dom = mountVNode(childVNode);
-                if (dom) shadowRoot.appendChild(dom);
-                childVNode.dom = dom ?? undefined;
-              });
-            }
-            // Do not assign shadowRoot to VNode.dom; fragment VNode's dom remains undefined
-          } else {
-            // Find or create persistent root node
-            let rootEl = Array.from(this.shadowRoot!.childNodes).find(
-              node => node !== styleEl && node.nodeType === 1
-            ) as Element | undefined;
-            if (rootEl) {
-              // If type or key differ, replace root node
-              if (this._prevVNode && (this._prevVNode.type !== newVNode.type || this._prevVNode.key !== newVNode.key)) {
-                const actualRootNode = mountVNode(newVNode);
-                if (actualRootNode) {
-                  if (this.shadowRoot!.contains(rootEl)) {
-                    this.shadowRoot!.replaceChild(actualRootNode, rootEl);
-                  }
-                  rootEl = actualRootNode as Element;
-                }
-              } else {
-                // Patch root node in place
-                patchVNode(rootEl, this._prevVNode!, newVNode);
-              }
-            } else {
-              // No root node, append new
-              const actualRootNode = mountVNode(newVNode);
-              rootEl = actualRootNode as Element;
-              if (rootEl) {
-                this.shadowRoot!.appendChild(rootEl);
-              }
-            }
-            newVNode.dom = rootEl;
-          }
-          this._prevVNode = newVNode;
-          this.forceSyncControlledInputs();
-          this.lastCompiledTemplate = null;
-        } else {
-          const isInitialRender = !this.shadowRoot!.firstElementChild;
-          const isSameTemplate = this.lastCompiledTemplate?.id === templateResult.id;
-          if (isInitialRender) {
-            const fragment = renderCompiledTemplate(templateResult, this.stateObj, this.api);
-            this.shadowRoot!.appendChild(fragment);
-          } else if (isSameTemplate && this.shadowRoot!.firstElementChild) {
-            const oldState = this.lastState;
-            updateCompiledTemplate(templateResult, this.shadowRoot!.firstElementChild, this.stateObj, this.api, oldState || undefined);
-          } else {
-            const fragment = renderCompiledTemplate(templateResult, this.stateObj, this.api);
-            // Always ensure <style> element is present and up-to-date
-            let styleEl = this.shadowRoot!.querySelector('style');
-            if (!styleEl) {
-              styleEl = document.createElement('style');
-              this.shadowRoot!.insertBefore(styleEl, this.shadowRoot!.firstChild);
-            }
-            if (this.config.style) {
-              styleEl.textContent = typeof this.config.style === 'function' ? this.config.style(this.stateObj) : this.config.style;
-            } else {
-              styleEl.textContent = '';
-            }
-
-            // Ensure <div data-root> is second child of shadow root
-            let rootEl = this.shadowRoot!.querySelector('[data-root]');
-            if (!rootEl) {
-              rootEl = document.createElement('div');
-              rootEl.setAttribute('data-root', '');
-              this.shadowRoot!.appendChild(rootEl);
-            }
-            // Remove all children from rootEl before patching
-            while (rootEl.firstChild) {
-              rootEl.removeChild(rootEl.firstChild);
-            }
-            // Append VDOM fragment to rootEl
-            rootEl.appendChild(fragment);
-          }
-          this.lastCompiledTemplate = templateResult;
+        if (!cfg.props) return;
+        function parseProp(val: string, type: any) {
+          if (type === Boolean) return val === "true";
+          if (type === Number) return Number(val);
+          return val;
         }
-        // Safe deep clone for lastState, ignoring circular references
-        this.lastState = safeClone(this.stateObj);
-        /**
-         * Safely deep clones an object, ignoring circular references.
-         * @param obj - Object to clone
-         */
-        function safeClone<T>(obj: T): T {
-          const seen = new WeakSet<object>();
-          function clone(val: T): T {
-            if (val === null || typeof val !== 'object') return val;
-            if (seen.has(val as object)) return val;
-            seen.add(val as object);
-            if (Array.isArray(val)) return val.map(clone) as unknown as T;
-            const out: Record<string, unknown> = {};
-            for (const key in val as Record<string, unknown>) {
-              if (Object.prototype.hasOwnProperty.call(val, key)) {
-                out[key] = clone((val as Record<string, unknown>)[key] as T);
-              }
-            }
-            return out as T;
+        Object.entries(cfg.props).forEach(([key, def]) => {
+          const attr = this.getAttribute(toKebab(key));
+          if (attr !== null) {
+            (this.context as any)[key] = escapeHTML(
+              parseProp(attr, def.type),
+            );
+          } else if ('default' in def && def.default !== undefined) {
+            (this.context as any)[key] = escapeHTML(def.default);
           }
-          return clone(obj);
-        }
-        this.updateStyle();
-        this.processRefs();
-        // Automatic event binding after refs and DOM update
-        this.bindEvents();
-        // Robust controlled input sync after every render
-        this.syncControlledInputsAndEvents();
-      } catch (error) {
-        this._handleRenderError(error);
-      }
-    }
-
-    /**
-     * Internal: handle render errors and error boundaries.
-     * Logs details and allows fallback UI.
-     * @param error - Error object
-     */
-  private _handleRenderError(error: unknown): void {
-      this._hasError = true;
-      // Improved error boundary: log details and always render fallback UI
-      if (this.config.debug) {
-        console.error(`[runtime] Render error in <${this.tagName.toLowerCase()}>:`, error);
-      }
-      runtimePlugins.forEach(p => p.onError?.(error instanceof Error ? error : new Error(String(error)), this.stateObj, this.api));
-      if ('onError' in this.config && typeof (this.config.onError) === 'function') {
-        try {
-          this.config.onError(error instanceof Error ? error : new Error(String(error)), this.api.state, this.api);
-        } catch (fallbackError) {
-          if (this.config.debug) {
-            console.error(`[runtime] Error in onError handler:`, fallbackError);
-          }
-        }
-      }
-      this.renderError(error instanceof Error ? error : new Error(String(error)));
-    }
-
-    /**
-     * Schedule a render using requestAnimationFrame, batching multiple state changes.
-     */
-    private scheduleRender(): void {
-      if (this.rafId !== undefined && this.rafId !== null) {
-        cancelAnimationFrame(this.rafId);
-      }
-      this.rafId = requestAnimationFrame(() => {
-        this.render();
-        this.rafId = null;
-      });
-    }
-
-    /**
-     * Updates the style element in the shadow root based on the current state.
-     */
-    private updateStyle(): void {
-      const styleEl = this.shadowRoot!.querySelector('style');
-      if (!styleEl || !this.config.style) return;
-
-      const css = typeof this.config.style === 'function'
-        ? this.config.style(this.api.state)
-        : this.config.style;
-      
-      styleEl.textContent = css;
-    }
-
-    /**
-     * Processes and attaches ref handlers for elements with data-ref attributes.
-     */
-    private processRefs(): void {
-      if (!this.config.refs) return;
-      // Track attached listeners per element/type
-      const listenerMap: WeakMap<Element, Set<string>> = new WeakMap();
-
-      Object.entries(this.config.refs).forEach(([refName, handler]) => {
-        const element = this.shadowRoot!.querySelector(`[data-ref="${refName}"]`);
-        if (element) {
-          // Only attach listeners once per element/type
-          if (!listenerMap.has(element)) {
-            listenerMap.set(element, new Set());
-          }
-          const attachedTypes = listenerMap.get(element)!;
-
-          // Wrap addEventListener to prevent duplicates
-          const originalAddEventListener = element.addEventListener;
-          (element as ExtendedHTMLElement).addEventListener = function(
-            type: string,
-            listener: EventListenerOrEventListenerObject,
-            options?: boolean | AddEventListenerOptions
-          ) {
-            const key = `${type}`;
-            if (attachedTypes.has(key)) return;
-            attachedTypes.add(key);
-            originalAddEventListener.call(element, type, listener, options);
-          };
-
-          // Mark as processed and call handler
-          element.setAttribute('data-refs-processed', 'true');
-          try {
-            handler(element, this.api.state, this.api);
-          } catch (err) {
-            this._handleRenderError(err);
-            // Do NOT re-throw, just handle and continue
-          }
-        }
-        // Silently skip missing refs as they may be conditionally rendered
-      });
-    }
-
-    /**
-     * Automatically bind events for elements with data-on-* attributes.
-     * Ensures events are not attached multiple times after rerender.
-     */
-    private bindEvents(): void {
-      if (!this.shadowRoot) return;
-      const walker = document.createTreeWalker(this.shadowRoot, NodeFilter.SHOW_ELEMENT);
-      let node = walker.nextNode();
-      while (node) {
-        const el = node as ExtendedHTMLElement;
-        Array.from(el.attributes).forEach(attr => {
-          if (attr.name.startsWith('data-on-')) {
-            const eventType = attr.name.slice('data-on-'.length);
-            const handlerName = attr.value;
-            // Look for handler on config, not api
-            const handler = (this.config as Record<string, unknown>)[handlerName];
-            if (typeof handler === 'function') {
-              // Remove previous handler if present
-              if (el._boundHandlers && el._boundHandlers[eventType]) {
-                el.removeEventListener(eventType, el._boundHandlers[eventType]);
-              }
-              // Bind new handler
-              const boundHandler = (e: Event) => {
-                (handler as Function).call(this.config, e, this.api.state, this.api);
-                // Immediately sync controlled inputs after handler runs
-                this.syncControlledInputsAndEvents();
-              };
-              el.addEventListener(eventType, boundHandler);
-              if (!el._boundHandlers) el._boundHandlers = {};
-              el._boundHandlers[eventType] = boundHandler;
-            } else {
-              if (this.config.debug) console.warn(`[runtime] Handler '${handlerName}' not found on config for event '${eventType}'`, el);
-            }
-          }
+          // else: leave undefined if no default
         });
-        node = walker.nextNode();
+      } catch (error) {
+        this._hasError = true;
+        if (cfg.onError) {
+          cfg.onError(error as Error | null, this.context);
+        }
+        if (cfg.errorFallback) {
+          if (this.shadowRoot) {
+            this.shadowRoot.innerHTML = cfg.errorFallback(
+              error as Error | null,
+              this.context,
+            );
+          }
+        }
       }
     }
-
-    /**
-     * Renders a fallback error UI in the shadow root.
-     * @param error - Error object
-     */
-    private renderError(error: Error): void {
-      const styleContent = this.config.style
-        ? (typeof this.config.style === 'function' ? this.config.style(this.api.state) : this.config.style)
-        : '';
-      this.shadowRoot!.innerHTML = `
-        <style>${styleContent}</style>
-        <div style="color: red; border: 1px solid red; padding: 1rem; border-radius: 4px;">
-          <h3>Error Boundary</h3>
-          <div>Error: ${error.message}</div>
-        </div>
-      `;
-    }
-  }
-} else {
-  // SSR fallback: minimal class, no DOM, no lifecycle, no "this"
-  ComponentElement = class {
-    // No-op for SSR, just a stub
-    constructor() {}
   };
-}
-
-// ============================================================================
-// PUBLIC API
-// ============================================================================
-
-/**
- * Registers a new custom element component.
- * Validates config, sets up reactive state, and defines the custom element.
- * Supports HMR and SSR hydration.
- * @template S - State type
- * @template C - Computed type
- * @param tag - Custom element tag name
- * @param config - Component configuration
- */
-export function component<S extends ComponentState, C extends Record<string, any> = {}>(tag: string, config: ComponentConfig<S, C>): void {
-  // Prevent deep object injection in config and state
-  const sanitizedConfig = deepSanitizeObject(config);
-  config = sanitizedConfig as ComponentConfig<S, C>;
-  // Do not assign to readonly state property
-  if (config.debug) {
-    console.log(`[runtime] Debugging component: ${tag}`, config);
-  }
-
-  // Validate config
-  if (!tag || !config.template) {
-    if (config && typeof config.onError === 'function') {
-      config.onError(new Error('Component requires tag and template'), config.state ?? {}, {
-        state: config.state ?? {},
-        emit: () => {},
-        onGlobal: () => () => {},
-        offGlobal: () => {},
-        emitGlobal: () => {}
-      });
-    }
-    if (config && config.debug) {
-      console.error('[runtime] Malformed config:', { tag, config });
-    }
-    return;
-  }
-
-  // Plugin System: Call all plugins' onInit in registration order
-  runtimePlugins.forEach(p => {
-    try {
-      p.onInit?.(config as any);
-    } catch (err) {
-      if (config && typeof config.onError === 'function') {
-        config.onError(err instanceof Error ? err : new Error(String(err)), config.state, {
-          state: config.state,
-          emit: () => {},
-          onGlobal: () => () => {},
-          offGlobal: () => {},
-          emitGlobal: () => {}
-        });
-      }
-      if (config && config.debug) console.error('[runtime] Plugin onInit error:', err);
-    }
-  });
-
-  // HMR support: unregister previous definition if in dev and module.hot is available
-  const isDev = typeof window !== 'undefined' && (window as any).VITE_DEV_HMR;
-  const hasHMR = typeof import.meta !== 'undefined' && (import.meta as any).hot;
-
-  if ((isDev || hasHMR) && typeof customElements !== 'undefined' && customElements.get(tag)) {
-    try {
-      document.querySelectorAll(tag).forEach(el => el.remove());
-      // @ts-ignore
-      if ((window as unknown as { customElements: { _definitions?: Record<string, unknown> } }).customElements._definitions) {
-        delete (window as unknown as { customElements: { _definitions?: Record<string, unknown> } }).customElements._definitions![tag];
-      }
-    } catch (_e) {}
-  }
-
-  if (typeof customElements !== 'undefined' && customElements.get(tag)) {
-    if (config.debug) console.warn(`[runtime] Component "${tag}" already registered`);
-    return;
-  }
-
-  // Create reactive state with computed properties
-  const state = reactive(config.state ?? ({} as S), config.computed as Record<string, (state: S) => unknown>);
-  // @ts-expect-error: Overriding readonly property for runtime assignment
-  (config as { state: S & C }).state = state;
-  (config as { _subscribe?: unknown })._subscribe = state.subscribe;
-
-  const stateObjForKeys = (config.state ?? {}) as Record<string, unknown>;
-  const primitiveKeys = Object.keys(stateObjForKeys).filter(
-    key => ['string', 'number', 'boolean'].includes(typeof stateObjForKeys[key])
-  );
-
-  class RuntimeComponent extends ComponentElement {
-      static get observedAttributes() {
-        return primitiveKeys;
-      }
-      constructor() {
-        super();
-      }
-    }
-    // Type assertion for CustomElementConstructor
-    const ComponentClass = RuntimeComponent as unknown as CustomElementConstructor;
-
-    if (typeof customElements !== 'undefined' && !customElements.get(tag)) {
-      // Store config in a global registry for lookup in connectedCallback
-    (window as unknown as { __componentRegistry?: ComponentRegistry }).__componentRegistry = (window as unknown as { __componentRegistry?: ComponentRegistry }).__componentRegistry || {};
-    (window as unknown as { __componentRegistry?: ComponentRegistry }).__componentRegistry![tag] = config;
-      customElements.define(tag, ComponentClass);
-    }
-
-    // Accept HMR updates if available
-    if (
-      hasHMR &&
-      typeof import.meta !== 'undefined' &&
-      import.meta.hot &&
-      typeof import.meta.hot.accept === 'function' &&
-      typeof customElements !== 'undefined'
-    ) {
-      import.meta.hot.accept(() => {
-        if (!customElements.get(tag)) {
-          customElements.define(tag, ComponentClass);
-        }
-      });
-    }
-}
-
-/**
- * RouterLink component state
- */
-export interface RouterLinkState extends ComponentState {
-  to: string;
-  tag: string;
-  replace: boolean;
-  exact: boolean;
-  activeClass: string;
-  exactActiveClass: string;
-  ariaCurrentValue: string;
-  disabled: boolean;
-  external: boolean;
-  style: string;
-}
-
-/**
- * Singleton router instance for global access.
- * 
- * Define here to prevent circular dependency
- * issue with component.
- */
-export function initRouter(config: RouterConfig) {
-  const router = useRouter(config);
-  component('router-view', {
-    template: async () => {
-      if (!router) return '<div>Router not initialized.</div>';
-      const current = router.getCurrent() as import('./router').RouteState;
-      const { path } = current;
-      const match = router.matchRoute(path);
-      if (!match.route) return '<div>Not found</div>';
-      if (match.route.load) {
-        await match.route.load();
-      }
-      return `<${match.route.component}></${match.route.component}>`;
-    },
-    onMounted(_state, api) {
-      // Subscribe to router state and re-render on change
-      if (router && typeof router.subscribe === 'function') {
-        router.subscribe(() => {
-          api.render();
-        });
-      }
-    }
-  });
-  component<RouterLinkState>('router-link', {
-    state: {
-      to: '',
-      tag: 'a',
-      replace: false,
-      exact: false,
-      activeClass: 'active',
-      exactActiveClass: 'exact-active',
-      ariaCurrentValue: 'page',
-      disabled: false,
-      external: false,
-      style: css`
-        [aria-disabled="true"] {
-          pointer-events: none;
-          opacity: 0.5;
-        }
-      `,
-    },
-    computed: {
-      current() {
-        return router.getCurrent();
-      },
-      isExactActive(state: RouterLinkState) {
-        const current = state.current as { path: string };
-        return current.path === state.to;
-      },
-      isActive(state: RouterLinkState) {
-        const current = state.current as { path?: string } | undefined;
-        return state.exact
-          ? state.isExactActive
-          : current && typeof current.path === 'string'
-            ? current.path.startsWith(state.to)
-            : false;
-      },
-      className(state: RouterLinkState) {
-        return state.isExactActive
-          ? state.exactActiveClass
-          : state.isActive
-          ? state.activeClass
-          : '';
-      },
-      ariaCurrent(state: RouterLinkState) {
-        return state.isExactActive ? `aria-current="${state.ariaCurrentValue}"` : '';
-      },
-      isButton(state: RouterLinkState) {
-        return state.tag === 'button';
-      },
-      disabledAttr(state: RouterLinkState) {
-        return state.disabled
-          ? state.isButton
-            ? 'disabled aria-disabled="true" tabindex="-1"'
-            : 'aria-disabled="true" tabindex="-1"'
-          : '';
-      },
-      externalAttr(state: RouterLinkState) {
-        return state.external && (state.tag === 'a' || !state.tag)
-          ? 'target="_blank" rel="noopener noreferrer"'
-          : '';
-      },
-    },
-    reflect: [ 'to', 'tag', 'replace', 'exact', 'activeClass', 'exactActiveClass', 'ariaCurrentValue', 'disabled', 'external', 'style' ],
-    style: (state: RouterLinkState) => state.style,
-    template: (state) => html`
-      ${state.isButton ? html`
-        <button
-          part="button"
-          class="${state.className}"
-          ${state.ariaCurrent}
-          ${state.disabledAttr}
-          ${state.externalAttr}
-          data-on-click="navigate"
-        ><slot></slot></button>
-      `(state) : html`
-        <a
-          part="link"
-          href="${state.to}"
-          class="${state.className}"
-          ${state.ariaCurrent}
-          ${state.disabledAttr}
-          ${state.externalAttr}
-          data-on-click="navigate"
-        ><slot></slot></a>
-      `(state)}
-    `(state),
-    navigate: (e: MouseEvent, state: RouterLinkState) => {
-      if (state.disabled) {
-        e.preventDefault();
-        return;
-      }
-      // If external, let browser handle navigation
-      if (state.external && (state.tag === 'a' || !state.tag)) {
-        return;
-      }
-      e.preventDefault();
-      if (state.replace) {
-        router.replace(state.to);
-      } else {
-        router.push(state.to);
-      }
-    }
-  });
-  return router;
 }

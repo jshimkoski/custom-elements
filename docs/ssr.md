@@ -1,124 +1,121 @@
-# 🌐 SSR Guide
+# 🖥️ Server-Side Rendering (SSR) Deep Dive
 
-## SSR Support
+A comprehensive guide to SSR support in the custom elements runtime. Learn how SSR works, how to use it, and best practices for building universal web components.
 
-- Use `renderToString`, `renderComponentsToString`, and `generateHydrationScript` for server-side rendering and hydration.
-- Hydration is opt-in via `data-hydrate` in your component config. Without it, the whole shadow root hydrates.
-- Ensure SSR templates match client templates for smooth hydration.
+---
 
-## Complete SSR Example with Hydration
+## 🌐 What is SSR?
+
+Server-Side Rendering (SSR) is the process of generating HTML on the server, sending it to the client, and hydrating it for interactivity. SSR improves performance, SEO, and user experience by delivering ready-to-display content.
+
+- **Purpose:** Faster initial load, better SEO, improved accessibility.
+- **Benefits:** Universal rendering, progressive enhancement, reduced time-to-interactive.
+
+---
+
+## 🏗️ SSR Architecture in the Runtime
+
+- **Functional API:** Components are defined as pure functions/configs, making them easy to render on the server.
+- **No DOM Dependency:** SSR mode avoids direct DOM APIs, using VNode trees for output.
+- **Hydration:** Client-side runtime attaches interactivity to server-rendered markup.
+- **Error Boundaries:** SSR gracefully handles errors and fallback rendering.
+
+---
+
+## ⚡ How SSR Works
+
+1. **Component registration:** Components are registered as usual.
+2. **SSR detection:** If `window` is undefined, the runtime switches to SSR mode.
+3. **VNode rendering:** The `render` function returns VNode trees, which are serialized to HTML.
+4. **No DOM/lifecycle:** In SSR, no DOM APIs or lifecycle hooks are called.
+5. **Hydration:** On the client, the runtime hydrates the markup and attaches event listeners, bindings, and styles.
+
+---
+
+## 🧩 SSR-Friendly Component Example
 
 ```typescript
-import {
-  renderToString,
-  renderComponentsToString,
-  generateHydrationScript,
-  compile,
-  css,
-  type SSRComponentConfig,
-  matchRouteSSR
-} from '@jasonshimmy/custom-elements-runtime';
+import { component, html } from "runtime";
 
-// User Card Component
-const userCardConfig: SSRComponentConfig<{ name: string; email: string; avatar: string; isOnline: boolean }> = {
-  state: {
-    name: 'John Doe',
-    email: 'john@example.com',
-    avatar: 'https://via.placeholder.com/80x80',
-    isOnline: true
-  },
-  template: ({ name, email, avatar, isOnline }) => compile`
-    <div class="user-card">
-      <img src="${avatar}" alt="${name}" class="avatar" />
-      <div class="info">
-        <h3>${name}</h3>
-        <p>${email}</p>
-        <span class="status ${isOnline ? 'online' : 'offline'}">
-          ${isOnline ? 'Online' : 'Offline'}
-        </span>
-      </div>
-    </div>
-  `({ name, email, avatar, isOnline }),
-  style: css`
-    .user-card { display: flex; align-items: center; padding: 1rem; border: 1px solid #e0e0e0; border-radius: 8px; background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-    .avatar { width: 60px; height: 60px; border-radius: 50%; margin-right: 1rem; }
-    .info h3 { margin: 0 0 1rem 0; color: #333; }
-    .info p { margin: 0 0 0.5rem 0; color: #666; font-size: 0.9rem; }
-    .status { padding: 0.25rem 0.5rem; border-radius: 12px; font-size: 0.8rem; font-weight: bold; }
-    .status.online { background: #d4edda; color: #155724; }
-    .status.offline { background: #f8d7da; color: #721c24; }
-  `
-};
-
-// Dashboard Component
-const dashboardConfig: SSRComponentConfig<{ title: string; widgets: Array<{ id: number; name: string; value: number }> }> = {
-  state: {
-    title: 'Analytics Dashboard',
-    widgets: [
-      { id: 1, name: 'Users', value: 1234 },
-      { id: 2, name: 'Revenue', value: 56789 },
-      { id: 3, name: 'Orders', value: 432 }
-    ]
-  },
-  template: ({ title, widgets }) => compile`
-    <div class="dashboard">
-      <h1>${title}</h1>
-      <div class="widgets">
-        ${widgets.map(widget => `
-          <div class="widget">
-            <h3>${widget.name}</h3>
-            <div class="value">${widget.value.toLocaleString()}</div>
-          </div>
-        `).join('')}
-      </div>
-      <div class="summary">
-        Total: ${widgets.reduce((sum, w) => sum + w.value, 0).toLocaleString()}
-      </div>
-    </div>
-  `({ title, widgets }),
-  style: css`
-    .dashboard { padding: 2rem; font-family: system-ui, sans-serif; }
-    .widgets { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin: 2rem 0; }
-    .widget { padding: 1.5rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 8px; text-align: center; }
-    .widget h3 { margin: 0 0 1rem 0; font-size: 1rem; opacity: 0.9; }
-    .value { font-size: 2rem; font-weight: bold; }
-    .summary { text-align: center; font-size: 1.2rem; font-weight: bold; color: #333; }
-  `
-};
-
-// Render components to HTML string
-const { html, context } = renderComponentsToString([userCardConfig, dashboardConfig], {
-  includeStyles: false,
-  prettyPrint: true
+component("ssr-demo", {
+  state: { message: "Hello SSR!" },
+  render: (ctx) => html`<div>${ctx.message}</div>`
 });
+```
 
-// Generate hydration script for client
-const hydrationScript = generateHydrationScript(context);
+- On the server: `render` returns a VNode, which is converted to HTML.
+- On the client: The runtime hydrates the markup and enables interactivity.
 
-// Full HTML page
-const fullPage = `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>SSR Demo</title>
-  <style>
-    body { margin: 0; padding: 2rem; background: #f5f5f5; font-family: system-ui, sans-serif; }
-  </style>
-</head>
-<body>
-  <h1>Server-Side Rendered Components</h1>
-  ${html}
-  <!-- Hydration script for client-side takeover -->
-  ${hydrationScript}
-  <script type="module" src="/main.js"></script>
-</body>
-</html>
-`;
+---
 
-// Example server handler (Express, Fastify, etc.)
-export function handleSSR(req: any, res: any) {
-  res.setHeader('Content-Type', 'text/html');
-  res.send(fullPage);
+## 🛠️ SSR Fallback Logic
+
+- In SSR mode, `createElementClass` returns a minimal class with no DOM or lifecycle logic.
+- Only the `render` function is used to generate output.
+- No `this` ctx or browser APIs are accessed.
+
+**Example:**
+```typescript
+if (typeof window === "undefined") {
+  // SSR fallback: minimal class, no DOM, no lifecycle
+  return class { constructor() {} };
 }
+```
+
+---
+
+## 🔄 Hydration Process
+
+- **Server:** Renders HTML from VNode trees
+- **Client:** Attaches event listeners, bindings, and styles
+- **No double rendering:** Hydration avoids re-rendering the initial markup
+- **Error handling:** Any hydration errors are caught by error boundaries
+
+---
+
+## 🚀 SSR Best Practices
+
+- **Avoid direct DOM manipulation:** Use VNode trees and pure functions
+- **Keep logic stateless:** SSR should not depend on browser-only APIs
+- **Use error boundaries:** Provide fallback UI for rendering errors
+- **Design for hydration:** Ensure markup matches between server and client
+
+---
+
+## 📚 Example: Universal Component
+
+```typescript
+component("universal-greeting", {
+  state: { name: "World" },
+  render: (ctx) => html`<h1>Hello, ${ctx.name}!</h1>`
+});
+```
+
+- Works in SSR and client environments
+- Hydrates seamlessly for interactivity
+
+---
+
+## ❓ FAQ
+
+**Q: How do I enable SSR?**
+A: SSR is automatic when `window` is undefined (e.g., in Node.js or serverless environments).
+
+**Q: Can I use lifecycle hooks in SSR?**
+A: No, lifecycle hooks are ignored in SSR mode. Use them only for client-side logic.
+
+**Q: How do I hydrate server-rendered markup?**
+A: The runtime automatically hydrates markup when loaded on the client.
+
+**Q: Is SSR secure?**
+A: Yes, the runtime escapes HTML and sanitizes styles to prevent XSS and injection attacks.
+
+---
+
+## 🏁 Summary
+
+SSR support in the custom elements runtime enables fast, SEO-friendly, and universal web components. By leveraging VNode trees, pure functions, and hydration, you can build components that work seamlessly on both server and client.
+
+---
+
+For more details, see the SSR fallback logic in `src/lib/runtime.ts` and explore universal component examples in the documentation.

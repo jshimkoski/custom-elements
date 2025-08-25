@@ -4,6 +4,21 @@
 
 Build modern components with strict TypeScript, zero dependencies, and a clean functional API. Designed for speed, standards compliance, and productivity.
 
+## 🚧 **Active Development Notice**
+
+> ⚠️ **This package is in active development and not yet ready for production use.**
+> Features, APIs, and stability may change frequently. Please use for testing, experimentation, or contribution only.
+
+## ✨ Why You'll Love It
+
+- ⚡ **Blazing Fast:** Minimal runtime, instant updates, zero dependencies.
+- 🧑‍💻 **TypeScript First:** Strict types, intellisense, and safety everywhere.
+- 🧩 **Functional API:** No classes, no boilerplate—just pure functions.
+- 🛠️ **SSR & HMR Ready:** Universal rendering and instant hot reloads.
+- 🎨 **Style Utilities:** Scoped CSS, dynamic styles, and theming built-in.
+- 🔌 **Extensible:** Directives, event bus, store, and more for advanced use cases.
+- 🏆 **Developer Friendly:** Clean docs, examples, and a welcoming community.
+
 ---
 
 ## 🚀 Quick Start
@@ -19,103 +34,90 @@ npm install @jasonshimmy/custom-elements-runtime
 ```ts
 import { component, html } from '@jasonshimmy/custom-elements-runtime';
 
-component('my-counter', {
-  state: { count: 0 },
-  template: ({ count }) => html`
-    <button data-on-click="increment">Count: ${count}</button>
-  `({ count }),
-  increment(event, state) { state.count++; }
-});
+component('my-counter', (ctx) => html`
+  <button @click="${() => ctx.count++}">Count: ${ctx.count}</button>
+`, { state: { count: 0 } });
 ```
 
 No config needed — TypeScript support is built-in.
 
-👉 Explore [Advanced Usage](docs/api-reference.md)
+## ⏱️ Getting Started in 60 Seconds
+
+1. **Install:** `npm install @jasonshimmy/custom-elements-runtime`
+2. **Create a Component:**
+  ```ts
+  import { component, html } from '@jasonshimmy/custom-elements-runtime';
+  component('hello-world', () => html`<h1>Hello, World!</h1>`);
+  ```
+3. **Use in HTML:**
+  ```html
+  <hello-world></hello-world>
+  ```
+4. **Enjoy instant reactivity and type safety!**
+
+# 📖 Documentation Index
+
+Explore the full documentation for every runtime feature:
 
 ---
 
-## ✨ Why Use It?
+## 🏗️ Core Concepts
+- [Component Config](./docs/component-config.md)
+- [Component](./docs/component.md)
+- [Render](./docs/render.md)
+- [Props](./docs/props.md)
+- [State](./docs/state.md)
+- [Computed](./docs/computed.md)
+- [Watch](./docs/watch.md)
+- [Store](./docs/store.md)
+- [Event Bus](./docs/event-bus.md)
+- [Template](./docs/template.md)
 
-- **Stateful or Stateless:** Flexible components with or without internal state  
-- **Reactive & Declarative:** Auto updates, attribute sync, and data binding  
-- **Functional Templates:** Tagged helpers (`html`, `compile`), Promises, and styles  
-- **Refs & Computed:** Access elements or create derived state easily  
-- **Built-in Store & Events:** Global state and event bus included  
-- **SSR & Hydration:** Universal rendering with opt-in hydration  
-- **Error Handling & Focus Retention:** Smooth updates without breaking UX  
-- **Plugin System:** Hooks like `onInit`, `onRender`, `onError`  
-- **Lightweight Router:** SSR-ready with `<router-view>` and programmatic navigation  
-- **Tiny & Fast:** Tree-shakable, modular, no dependencies  
+## 🧩 Reactivity & Patterns
+- [Directives](./docs/directives.md)
+- [Bindings](./docs/bindings.md)
+- [Directives & Binding](./docs/directives-and-binding.md)
+- [Slot](./docs/slot.md)
+- [Advanced Usage Patterns](./docs/advanced-usage-patterns.md)
+- [Cross-Component Communication](./docs/cross-component-communication.md)
 
----
+## 🎨 Styling
+- [Style](./docs/style.md)
+- [Style Utils](./docs/style-utils.md)
 
-## ⚠️ Things to Know
+## ⚡ Performance & Architecture
+- [Virtual DOM](./docs/virtual-dom.md)
+- [HMR](./docs/hmr.md)
+- [SSR](./docs/ssr.md)
 
-- Templates need a single root node (fragments allowed with keys)
-- Always use helpers (e.g.; `html`, `compile`, `css`) to sanitize templates and styles
-- One handler per event type per element  
-- User input takes priority over programmatic changes  
-- SSR hydration is opt-in (`data-hydrate`)  
-- Only documented features are officially supported  
-- Plugins must be pure and side-effect free  
-- Router requires matching templates for SSR hydration  
+## 🛡️ Error Handling & Lifecycle
+- [Error](./docs/error.md)
+- [Hooks](./docs/hooks.md)
+- [Method Injection](./docs/method-injection.md)
 
----
+## 🧰 Utilities & Troubleshooting
+- [Troubleshooting](./docs/troubleshooting.md)
 
-## 🔧 Use Cases
-
-- Micro-frontends  
-- Progressive enhancement  
-- Design systems  
-- SSR apps  
-- Performance-critical projects  
-- Standards-based development  
-- Static site generation  
-- Plugin-extendable architectures  
-
----
-
-## 🖥️ SSR Highlights
-
-- SEO-friendly HTML/CSS out of the box  
-- Hydrate only what you need  
-- Robust support for fragments, keyed nodes, and error handling  
-- Compatible with routing and static site generation  
+## 🔗 Framework Integration
+- [Vue Integration](./docs/vue-integration.md)
+- [React Integration](./docs/react-integration.md)
+- [Svelte Integration](./docs/svelte-integration.md)
+- [Angular Integration](./docs/angular-integration.md)
 
 ---
 
-## 🛡️ Production Ready
+For deep dives, see each guide above or browse the source code in `src/lib/`.
 
-- Strict TypeScript and modular design  
-- No dependencies  
-- Clean error handling and validation  
-- Secure: sanitizes user input  
-- Fully tested  
+## 🧑‍🔬 Real-World Examples
+- [Form Input & Validation](./src/components/examples/FormInputValidation.ts)
+- [Minimal Example](./src/components/examples/MinimalExample.ts)
+- [Shopping Cart](./src/components/examples/ShoppingCart.ts)
+- [Todo App](./src/components/examples/TodoApp.ts)
 
----
-
-## ⚡ Performance Perks
-
-- DOM batching and minimal re-renders  
-- Tree-shakable exports  
-- Focus preservation and efficient DOM updates  
-- Async rendering with Promises  
-- Smart memory cleanup  
-
----
-
-## 📚 Learn More
-
-- [⚙️ Advanced Use Cases](docs/advanced-use-cases.md)  
-- [🛠 API Reference](docs/api-reference.md)  
-- [🌱 Core Concepts](docs/core-concepts.md)  
-- [🥊 Data Model vs Data Bind](docs/data-model-vs-data-bind.md)  
-- [📦 Examples](docs/examples.md)  
-- [🎛️ Form Input Bindings](docs/form-input-bindings.md)  
-- [🎯 Framework Comparison](docs/framework-comparison.md)  
-- [🔗 Framework Integration](docs/framework-integration.md)  
-- [🚦 Routing](docs/routing.md)  
-- [🌐 SSR Guide](docs/ssr.md)  
+## 🌟 Showcase & Community
+- **Showcase your components!** Open a PR to add your project to our gallery.
+- **Questions or ideas?** [Start a discussion](https://github.com/jasonshimmy/custom-elements-runtime/discussions) or [open an issue](https://github.com/jasonshimmy/custom-elements-runtime/issues).
+- **Contribute:** We welcome PRs for docs, features, and examples.
 
 ---
 

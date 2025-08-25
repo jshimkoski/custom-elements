@@ -5,7 +5,7 @@
  */
 
 
-import { Store } from './store';
+import { createStore, type Store } from './store';
 
 export interface Route {
   path: string;
@@ -78,7 +78,7 @@ export function useRouter(config: RouterConfig) {
   const { routes, base = '' } = config;
   let getLocation: () => { path: string; query: Record<string, string> };
   let initial: { path: string; query: Record<string, string> };
-  let store: ReturnType<typeof Store>;
+  let store: Store<RouteState>;
   let update: () => void;
   let push: (path: string) => void;
   let replace: (path: string) => void;
@@ -93,7 +93,7 @@ export function useRouter(config: RouterConfig) {
     };
     initial = getLocation();
     const match = matchRoute(routes, initial.path);
-    store = Store<RouteState>({
+    store = createStore<RouteState>({
       path: initial.path,
       params: match.params,
       query: initial.query
@@ -121,7 +121,7 @@ export function useRouter(config: RouterConfig) {
     getLocation = () => ({ path: '/', query: {} });
     initial = getLocation();
     const match = matchRoute(routes, initial.path);
-    store = Store<RouteState>({
+    store = createStore<RouteState>({
       path: initial.path,
       params: match.params,
       query: initial.query
@@ -139,7 +139,7 @@ export function useRouter(config: RouterConfig) {
     back,
     subscribe: store.subscribe,
     matchRoute: (path: string) => matchRoute(routes, path),
-    getCurrent: () => store.getState(),
+    getCurrent: (): RouteState => store.getState(),
     resolveRouteComponent
   };
 }
@@ -147,4 +147,166 @@ export function useRouter(config: RouterConfig) {
 // SSR/static site support: match route for a given path
 export function matchRouteSSR(routes: Route[], path: string) {
   return matchRoute(routes, path);
+}
+
+/**
+ * Singleton router instance for global access.
+ * 
+ * Define here to prevent circular dependency
+ * issue with component.
+ */
+import { component, html, css, match } from './runtime';
+export function initRouter(config: RouterConfig) {
+  const router = useRouter(config);
+  component('router-view', {
+    render: async () => {
+      if (!router) return html`<div>Router not initialized.</div>`;
+      const current = router.getCurrent() as import('./router').RouteState;
+      const { path } = current;
+      const match = router.matchRoute(path);
+      if (!match.route) return html`<div>Not found</div>`;
+      if (match.route.load) {
+        await match.route.load();
+      }
+      return html`<${match.route.component}></${match.route.component}>`;
+    },
+    onConnected(context) {
+      // Subscribe to router state and re-render on change
+      if (router && typeof router.subscribe === 'function') {
+        router.subscribe(() => {
+          if (typeof context.render === 'function') context.render();
+        });
+      }
+    }
+  });
+
+  interface RouterLinkProps {
+    to: string;
+    tag: string;
+    replace: boolean;
+    exact: boolean;
+    activeClass: string;
+    exactActiveClass: string;
+    ariaCurrentValue: string;
+    disabled: boolean;
+    external: boolean;
+    styles: string;
+  }
+
+  interface RouterLinkComputed {
+    current: RouteState;
+    isExactActive: boolean;
+    isActive: boolean;
+    className: string;
+    ariaCurrent: string;
+    isButton: boolean;
+    disabledAttr: string;
+    externalAttr: string;
+  }
+
+  component<{}, RouterLinkComputed, RouterLinkProps>('router-link', {
+    state: {},
+    props: {
+      to: { type: String, default: '' },
+      tag: { type: String, default: 'a' },
+      replace: { type: Boolean, default: false },
+      exact: { type: Boolean, default: false },
+      activeClass: { type: String, default: 'active' },
+      exactActiveClass: { type: String, default: 'exact-active' },
+      ariaCurrentValue: { type: String, default: 'page' },
+      disabled: { type: Boolean, default: false },
+      external: { type: Boolean, default: false },
+      style: { type: String, default: css`
+        [aria-disabled="true"] {
+          pointer-events: none;
+          opacity: 0.5;
+        }
+      ` },
+    },
+    computed: {
+      current(_context) {
+        return router.getCurrent();
+      },
+      isExactActive(context) {
+        const current = context.current as { path: string };
+        return current.path === context.to;
+      },
+      isActive(context) {
+        const current = context.current as { path?: string } | undefined;
+        return context.exact
+          ? context.isExactActive
+          : current && typeof current.path === 'string'
+            ? current.path.startsWith(context.to)
+            : false;
+      },
+      className(context) {
+        return context.isExactActive
+          ? context.exactActiveClass
+          : context.isActive
+          ? context.activeClass
+          : '';
+      },
+      ariaCurrent(context) {
+        return context.isExactActive ? `aria-current="${context.ariaCurrentValue}"` : '';
+      },
+      isButton(context) {
+        return context.tag === 'button';
+      },
+      disabledAttr(context) {
+        return context.disabled
+          ? context.isButton
+            ? 'disabled aria-disabled="true" tabindex="-1"'
+            : 'aria-disabled="true" tabindex="-1"'
+          : '';
+      },
+      externalAttr(context) {
+        return context.external && (context.tag === 'a' || !context.tag)
+          ? 'target="_blank" rel="noopener noreferrer"'
+          : '';
+      },
+    },
+    style: (context) => context.style,
+    render: (context) => html`
+      ${match()
+        .when(context.isButton, html`
+          <button
+            part="button"
+            class="${context.className}"
+            ${context.ariaCurrent}
+            ${context.disabledAttr}
+            ${context.externalAttr}
+            data-on-click="navigate"
+          ><slot></slot></button>
+        `)
+        .otherwise(html`
+          <a
+            part="link"
+            href="${context.to}"
+            class="${context.className}"
+            ${context.ariaCurrent}
+            ${context.disabledAttr}
+            ${context.externalAttr}
+            data-on-click="navigate"
+          ><slot></slot></a>
+        `)
+        .done()}
+    `,
+    navigate: (e: MouseEvent, context: RouterLinkProps & RouterLinkComputed) => {
+      if (context.disabled) {
+        e.preventDefault();
+        return;
+      }
+      // If external, let browser handle navigation
+      if (context.external && (context.tag === 'a' || !context.tag)) {
+        return;
+      }
+      e.preventDefault();
+      if (context.replace) {
+        router.replace(context.to);
+      } else {
+        router.push(context.to);
+      }
+    }
+  });
+  return router;
 }
