@@ -99,10 +99,10 @@ Explore the full documentation for every runtime feature:
 - [Troubleshooting](./docs/troubleshooting.md)
 
 ## 🔗 Framework Integration
-- [🦊 Vue Integration](./docs/vue-integration.md)
-- [⚛️ React Integration](./docs/react-integration.md)
-- [🦄 Svelte Integration](./docs/svelte-integration.md)
-- [🅰️ Angular Integration](./docs/angular-integration.md)
+- [Vue Integration](./docs/vue-integration.md)
+- [React Integration](./docs/react-integration.md)
+- [Svelte Integration](./docs/svelte-integration.md)
+- [Angular Integration](./docs/angular-integration.md)
 
 ---
 
