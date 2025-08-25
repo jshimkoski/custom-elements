@@ -179,7 +179,7 @@ describe('component config options', () => {
     let called = false;
     component('test-attr', {
       props: { foo: { type: String } },
-      onAttributeChanged: (_state, name, oldValue, newValue) => {
+      onAttributeChanged: (name, oldValue, newValue, _ctx) => {
         if (name === 'foo' && oldValue === null && newValue === 'bar') called = true;
       },
       render: () => html`<div>Attr</div>`
@@ -317,8 +317,8 @@ describe('component config options', () => {
     document.body.appendChild(el);
     await wait();
     // Override method
-    const state = (el.shadowRoot?.host as any)._state;
-    if (state) state.doSomething = () => 'override';
+    const ctx = (el.shadowRoot?.host as any).context;
+    if (ctx) ctx.doSomething = () => 'override';
     el.setAttribute('val', '2');
     await wait();
     expect(el.shadowRoot?.textContent).toBe('override');
@@ -335,8 +335,8 @@ describe('component config options', () => {
     await wait();
     expect(el.shadowRoot?.textContent).toBe('0');
     // Simulate state change
-    const state = (el.shadowRoot?.host as any)._state;
-    if (state) state.count = 5;
+    const ctx = (el.shadowRoot?.host as any).context;
+    if (ctx) ctx.count = 5;
     await wait();
     expect(el.shadowRoot?.textContent).toBe('5');
     document.body.removeChild(el);

@@ -19,7 +19,7 @@ onConnected: (ctx) => {
 onDisconnected: (ctx) => {
   console.log('Element disconnected!', ctx);
 },
-onAttributeChanged: (ctx, name, oldValue, newValue) => {
+onAttributeChanged: (name, oldValue, newValue, ctx) => {
   console.log(`Attribute ${name} changed from ${oldValue} to ${newValue}`);
 },
 onError: (error, ctx) => {
@@ -51,7 +51,7 @@ component('lifecycle-demo', {
     ctx.active = false;
     console.log('Disconnected:', ctx);
   },
-  onAttributeChanged: (ctx, name, oldValue, newValue) => {
+  onAttributeChanged: (name, oldValue, newValue, ctx) => {
     console.log(`Prop ${name} changed: ${oldValue} → ${newValue}`);
   },
   onError: (err, ctx) => {

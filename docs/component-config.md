@@ -125,7 +125,7 @@ Run logic on connect, disconnect, attribute change, or error.
 ```ts
 onConnected: (ctx) => console.log('Mounted!'),
 onDisconnected: (ctx) => cleanup(),
-onAttributeChanged: (ctx, name, oldVal, newVal) => {...},
+onAttributeChanged: (name, oldVal, newVal, ctx) => {...},
 onError: (err, ctx) => reportError(err)
 ```
 

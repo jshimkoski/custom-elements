@@ -100,10 +100,10 @@ export interface ComponentConfig<
     context: ComponentContext<S, C, P, T>,
   ) => void;
   onAttributeChanged?: (
-    context: ComponentContext<S, C, P, T>,
     name: string,
     oldValue: string | null,
     newValue: string | null,
+    context: ComponentContext<S, C, P, T>,
   ) => void;
   onError?: (
     error: Error | null,
@@ -356,10 +356,10 @@ export function createElementClass<
         this._applyProps(config);
         if (config.onAttributeChanged) {
           config.onAttributeChanged(
-            this.context,
             name,
             oldValue,
             newValue,
+            this.context,
           );
         }
       });
