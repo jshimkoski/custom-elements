@@ -291,7 +291,7 @@ export function initRouter(config: RouterConfig) {
         `)
         .done()}
     `,
-    navigate: (e: MouseEvent, context) => {
+    navigate: (e: MouseEvent, context: RouterLinkProps & RouterLinkComputed) => {
       if (context.disabled) {
         e.preventDefault();
         return;

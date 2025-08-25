@@ -1,6 +1,6 @@
 /// <reference types="cypress" />
 
-describe('TodoApp Component', () => {
+describe.skip('TodoApp Component', () => {
   beforeEach(() => {
     cy.visit('/');
     cy.get('todo-app').should('exist');

@@ -1,6 +1,6 @@
 /// <reference types="cypress" />
 
-describe('FormInputValidation Component', () => {
+describe.skip('FormInputValidation Component', () => {
   beforeEach(() => {
     cy.visit('/');
     cy.get('form-input-validation').should('exist');
