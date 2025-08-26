@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v0.0.14] - 2025-08-26
+
+- fix: update link to style-utils.ts in JIT CSS documentation (77c34ef)
+- docs: reorder and number steps in JIT CSS explanation for clarity (1a67bb6)
+
+
 ## [v0.0.13] - 2025-08-26
 
 - docs: reorder and number steps in JIT CSS explanation for clarity (1a67bb6)
