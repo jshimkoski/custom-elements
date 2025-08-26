@@ -12,44 +12,28 @@ Build modern components with strict TypeScript, zero dependencies, and a clean f
 ## ✨ Why You'll Love It
 
 - ⚡ **Blazing Fast:** Minimal runtime, instant updates, zero dependencies.
-- 🎨 **JIT CSS:** On-demand, utility-first styling directly in your HTML.
+- 🎨 **JIT CSS:** On-demand, utility-first styling directly in your HTML at runtime.
+- 💪 **No Build Necessary:** Instant development feedback, no bundling required.
 - 🧑‍💻 **TypeScript First:** Strict types, intellisense, and safety everywhere.
 - 🧩 **Functional API:** No classes, no boilerplate—just pure functions.
 - 🛠️ **SSR & HMR Ready:** Universal rendering and instant hot reloads.
 - 🔌 **Extensible:** Directives, event bus, store, and more for advanced use cases.
 - 🏆 **Developer Friendly:** Clean docs, examples, and a welcoming community.
 
-## 🚀 Quick Start
-
-### Install
-
-```
-npm install @jasonshimmy/custom-elements-runtime
-```
-
-### Example Usage
-
-```ts
-import { component, html } from '@jasonshimmy/custom-elements-runtime';
-
-component('my-counter', (ctx) => html`
-  <button @click="${() => ctx.count++}">Count: ${ctx.count}</button>
-`, { state: { count: 0 } });
-```
-
-No config needed — TypeScript support is built-in.
-
 ## ⏱️ Getting Started in 60 Seconds
 
 1. **Install:** `npm install @jasonshimmy/custom-elements-runtime`
 2. **Create a Component:**
   ```ts
-  import { component, html } from '@jasonshimmy/custom-elements-runtime';
-  component('hello-world', () => html`<h1>Hello, World!</h1>`);
+import { component, html } from '@jasonshimmy/custom-elements-runtime';
+
+component('my-counter', (ctx) => html`
+  <button @click="${() => ctx.count++}">Count: ${ctx.count}</button>
+`, { state: { count: 0 } });
   ```
 3. **Use in HTML:**
   ```html
-  <hello-world></hello-world>
+  <my-counter></my-counter>
   ```
 4. **Enjoy instant reactivity and type safety!**
 
