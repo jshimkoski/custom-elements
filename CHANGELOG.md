@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v0.0.12] - 2025-08-26
+
+- docs: refine README for clarity and consistency in usage instructions (1a2f2f6)
+- chore: Bump version to 0.0.11-beta.0 and update documentation (89c6be6)
+
+
 ## [v0.0.11] - 2025-08-26
 
 - chore: Bump version to 0.0.11-beta.0 and update documentation (89c6be6)
