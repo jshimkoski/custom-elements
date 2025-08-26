@@ -51,7 +51,6 @@ component('my-element', {
 - `computed`: Derived reactive values.
 - `watch`: Watchers for state/props/computed changes.
 - `style`: Static or dynamic CSS (string or function).
-- `styleOptimizations`: Performance tuning for styles.
 - `render`: Required function to generate UI.
 - `loadingTemplate`: Shown during async render.
 - `errorTemplate`: Shown on render error.

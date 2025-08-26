@@ -25,8 +25,6 @@ A guide to diagnosing and resolving common issues in the custom elements runtime
 - **Styles not applied:**
   - Confirm your `style` config is a string, function, or valid object.
   - Check for missing dependencies in dynamic styles.
-- **Style flicker or delay:**
-  - Adjust `debounceMs` in `styleOptimizations` for smoother updates.
 - **Unsafe CSS warning:**
   - Avoid `url(javascript:...)`, `<script>`, or `expression()` in styles.
 

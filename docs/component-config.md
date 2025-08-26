@@ -59,22 +59,12 @@ watch: {
 
 ## 🎨 Style
 
-Scoped CSS for your component. Can be a string, function, or dynamic config.
+Scoped CSS for your component. Can be a string or a function.
 
 ```ts
 style: `:host { color: red; }`
 // or
 style: (ctx) => `:host { color: ${ctx.color}; }`
-// or
-style: { css: '...', dependencies: ['theme'], cache: true }
-```
-
-## ⚡ styleOptimizations
-
-Fine-tune style caching, minification, deduplication, debounce, etc.
-
-```ts
-styleOptimizations: { enableCaching: true, enableMinification: true, debounceMs: 32 }
 ```
 
 ## 🖼️ Render
@@ -138,7 +128,6 @@ component('my-widget', {
     count: [(n, o) => console.log(n), { immediate: true }]
   },
   style: (ctx) => `:host { color: ${ctx.count > 5 ? 'green' : 'red'}; }`,
-  styleOptimizations: { enableCaching: true },
   render: (ctx) => html`
     <button @click="${() => ctx.count++}">${ctx.label}: ${ctx.count}</button>
     <div>Doubled: ${ctx.doubled}</div>
