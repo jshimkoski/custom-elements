@@ -4,10 +4,11 @@ Custom Elements Runtime provides a high-performance, zero-dependency JIT CSS eng
 
 ## 🏗️ How JIT CSS Works
 
-- **Base Reset:** Applies a minimal Shadow DOM reset for consistent rendering.
-- **JIT CSS:** Extracts all class names from your HTML, parses utilities, variants, and arbitrary values, and generates scoped CSS rules on demand.
-- **Minification:** Strips whitespace and comments for fast, small payloads.
-- **Memoization & Throttling:** Caches CSS output for repeated HTML inputs and throttles regeneration for performance.
+1. **Base Reset:** Applies a minimal Shadow DOM reset for consistent rendering.
+2. **Merges User-defined Styles:** Merges in user-defined styles from the component config.
+3. **JIT CSS:** Extracts all class names from your HTML, parses utilities, variants, and arbitrary values, and generates scoped CSS rules on demand.
+4. **Minification:** Optionally, strips whitespace and comments for fast, small payloads.
+5. **Memoization & Throttling:** Caches CSS output for repeated HTML inputs and throttles regeneration for performance.
 
 ## 🧩 Built-in Utilities
 
