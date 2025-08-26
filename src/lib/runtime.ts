@@ -13,7 +13,8 @@ export { when, each, match } from "./directives";
 import { vdomRenderer, type VNode } from "./vdom";
 import {
   minifyCSS,
-  baseReset,
+  getBaseResetSheet,
+  sanitizeCSS,
   jitCSS
 } from "./style-utils";
 
@@ -133,14 +134,6 @@ function escapeHTML(str: string | number | boolean): string | number | boolean {
     );
   }
   return str;
-}
-
-function sanitizeCSS(css: string): string {
-  // Remove any url(javascript:...) and <script> tags
-  return css
-    .replace(/url\s*\(\s*['"]?javascript:[^)]*\)/gi, "")
-    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, "")
-    .replace(/expression\s*\([^)]*\)/gi, "");
 }
 
 /**
@@ -499,6 +492,7 @@ export function createElementClass<
 
         if (!cfg.style && (!jitCss || jitCss.trim() === "")) {
           this._styleSheet = null;
+          this.shadowRoot.adoptedStyleSheets = [getBaseResetSheet()];
           return;
         }
 
@@ -509,15 +503,18 @@ export function createElementClass<
           else if (typeof cfg.style === "function") userStyle = cfg.style(this.context);
         }
 
-        let finalStyle = sanitizeCSS(`${baseReset}\n${userStyle}\n${jitCss}\n`);
+        let finalStyle = sanitizeCSS(`${userStyle}\n${jitCss}\n`);
         finalStyle = minifyCSS(finalStyle);
 
         // Use adoptedStyleSheets
         if (!this._styleSheet) {
           this._styleSheet = new CSSStyleSheet();
         }
-        this._styleSheet.replaceSync(finalStyle);
-        this.shadowRoot.adoptedStyleSheets = [this._styleSheet];
+        if (this._styleSheet.cssRules.length === 0 || this._styleSheet.toString() !== finalStyle) {
+          this._styleSheet.replaceSync(finalStyle);
+        }
+        // Adopt both baseReset and component stylesheet
+        this.shadowRoot.adoptedStyleSheets = [getBaseResetSheet(), this._styleSheet];
       });
     }
 

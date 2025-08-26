@@ -15,6 +15,25 @@ export function minifyCSS(css: string): string {
     .trim();
 }
 
+// --- Shared baseReset stylesheet ---
+let baseResetSheet: CSSStyleSheet | null = null;
+export function getBaseResetSheet(): CSSStyleSheet {
+  if (!baseResetSheet) {
+    baseResetSheet = new CSSStyleSheet();
+    baseResetSheet.replaceSync(minifyCSS(baseReset));
+  }
+  return baseResetSheet;
+}
+
+export function sanitizeCSS(css: string): string {
+  // Remove any url(javascript:...) and <script> tags
+  return css
+    .replace(/url\s*\(\s*['"]?javascript:[^)]*\)/gi, "")
+    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, "")
+    .replace(/expression\s*\([^)]*\)/gi, "");
+}
+
+
 /**
  * Minimal Shadow DOM reset
  */
