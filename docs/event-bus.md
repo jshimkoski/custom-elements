@@ -2,21 +2,15 @@
 
 > How to use the built-in event bus for decoupled communication between components
 
----
-
 ## 📖 Overview
 
 The event bus is a lightweight publish/subscribe system for sending and receiving custom events across components. It helps you keep your code modular and reactive without tight coupling.
-
----
 
 ## 🚀 Importing
 
 ```ts
 import { eventBus } from '@jasonshimmy/custom-elements-runtime';
 ```
-
----
 
 ## 📬 Sending Events
 
@@ -26,8 +20,6 @@ Use `eventBus.emit(eventName, payload?)` to broadcast an event.
 // Send a custom event with optional data
 eventBus.emit('cart:add', { id: 123, qty: 2 });
 ```
-
----
 
 ## 📥 Listening for Events
 
@@ -42,8 +34,6 @@ const unsubscribe = eventBus.on('cart:add', (data) => {
 unsubscribe();
 ```
 
----
-
 ## 🔄 One-time Listeners
 
 Use `eventBus.once(eventName, handler)` to listen for an event only once.
@@ -54,13 +44,9 @@ eventBus.once('user:login', (user) => {
 });
 ```
 
----
-
 ## 🧹 Removing Listeners
 
 You can remove listeners by calling the unsubscribe function returned by `.on()` or `.once()`.
-
----
 
 ## 🧩 Example: Component Communication
 
@@ -79,15 +65,11 @@ onDisconnected: (ctx) => {
 }
 ```
 
----
-
 ## 💡 Tips
 
 - Use event namespacing (e.g., `user:login`) for clarity.
 - Always clean up listeners on disconnect to avoid memory leaks.
 - Payload can be any type: object, string, number, etc.
 - Event bus works across all components in the same app ctx.
-
----
 
 For more, see the [API Reference](../src/lib/event-bus.ts) and [examples](../src/components/examples/).

@@ -20,9 +20,8 @@ Use Custom Elements Runtime components in Svelte apps:
    - Listen for events with `on:eventname`.
 
 ## Notes
+
 - Svelte recognizes custom elements automatically.
 - For two-way binding, use `bind:this` and custom events.
 - Works with Svelte 3.x and above.
-
----
 Mix and match with Svelte power! 🌈

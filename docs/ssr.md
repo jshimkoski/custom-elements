@@ -2,16 +2,12 @@
 
 A comprehensive guide to SSR support in the custom elements runtime. Learn how SSR works, how to use it, and best practices for building universal web components.
 
----
-
 ## 🌐 What is SSR?
 
 Server-Side Rendering (SSR) is the process of generating HTML on the server, sending it to the client, and hydrating it for interactivity. SSR improves performance, SEO, and user experience by delivering ready-to-display content.
 
 - **Purpose:** Faster initial load, better SEO, improved accessibility.
 - **Benefits:** Universal rendering, progressive enhancement, reduced time-to-interactive.
-
----
 
 ## 🏗️ SSR Architecture in the Runtime
 
@@ -20,8 +16,6 @@ Server-Side Rendering (SSR) is the process of generating HTML on the server, sen
 - **Hydration:** Client-side runtime attaches interactivity to server-rendered markup.
 - **Error Boundaries:** SSR gracefully handles errors and fallback rendering.
 
----
-
 ## ⚡ How SSR Works
 
 1. **Component registration:** Components are registered as usual.
@@ -29,8 +23,6 @@ Server-Side Rendering (SSR) is the process of generating HTML on the server, sen
 3. **VNode rendering:** The `render` function returns VNode trees, which are serialized to HTML.
 4. **No DOM/lifecycle:** In SSR, no DOM APIs or lifecycle hooks are called.
 5. **Hydration:** On the client, the runtime hydrates the markup and attaches event listeners, bindings, and styles.
-
----
 
 ## 🧩 SSR-Friendly Component Example
 
@@ -46,8 +38,6 @@ component("ssr-demo", {
 - On the server: `render` returns a VNode, which is converted to HTML.
 - On the client: The runtime hydrates the markup and enables interactivity.
 
----
-
 ## 🛠️ SSR Fallback Logic
 
 - In SSR mode, `createElementClass` returns a minimal class with no DOM or lifecycle logic.
@@ -62,8 +52,6 @@ if (typeof window === "undefined") {
 }
 ```
 
----
-
 ## 🔄 Hydration Process
 
 - **Server:** Renders HTML from VNode trees
@@ -71,16 +59,12 @@ if (typeof window === "undefined") {
 - **No double rendering:** Hydration avoids re-rendering the initial markup
 - **Error handling:** Any hydration errors are caught by error boundaries
 
----
-
 ## 🚀 SSR Best Practices
 
 - **Avoid direct DOM manipulation:** Use VNode trees and pure functions
 - **Keep logic stateless:** SSR should not depend on browser-only APIs
 - **Use error boundaries:** Provide fallback UI for rendering errors
 - **Design for hydration:** Ensure markup matches between server and client
-
----
 
 ## 📚 Example: Universal Component
 
@@ -93,8 +77,6 @@ component("universal-greeting", {
 
 - Works in SSR and client environments
 - Hydrates seamlessly for interactivity
-
----
 
 ## ❓ FAQ
 
@@ -110,12 +92,8 @@ A: The runtime automatically hydrates markup when loaded on the client.
 **Q: Is SSR secure?**
 A: Yes, the runtime escapes HTML and sanitizes styles to prevent XSS and injection attacks.
 
----
-
 ## 🏁 Summary
 
 SSR support in the custom elements runtime enables fast, SEO-friendly, and universal web components. By leveraging VNode trees, pure functions, and hydration, you can build components that work seamlessly on both server and client.
-
----
 
 For more details, see the SSR fallback logic in `src/lib/runtime.ts` and explore universal component examples in the documentation.

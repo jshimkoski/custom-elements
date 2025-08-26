@@ -23,9 +23,8 @@ Integrate Custom Elements Runtime components with Vue easily:
 
 
 ## Notes
+
 - Vue treats custom elements as native tags. No extra config needed.
 - For two-way binding with `v-model`, your custom element must emit the expected events (e.g., `input` or `update:modelValue`). The runtime does not emit these by default; you may need to wire them manually.
 - Works with Vue 2.x and 3.x.
-
----
 Enjoy seamless interoperability! 🚀

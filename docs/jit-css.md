@@ -2,16 +2,12 @@
 
 Custom Elements Runtime provides a high-performance, zero-dependency JIT CSS engine for custom elements. It enables utility-first, variant-rich, and arbitrary-value styling directly from your HTML templates.
 
----
-
 ## 🏗️ How JIT CSS Works
 
 - **Base Reset:** Applies a minimal Shadow DOM reset for consistent rendering.
 - **JIT CSS:** Extracts all class names from your HTML, parses utilities, variants, and arbitrary values, and generates scoped CSS rules on demand.
 - **Minification:** Strips whitespace and comments for fast, small payloads.
 - **Memoization & Throttling:** Caches CSS output for repeated HTML inputs and throttles regeneration for performance.
-
----
 
 ## 🧩 Built-in Utilities
 
@@ -39,8 +35,6 @@ Custom Elements Runtime provides a high-performance, zero-dependency JIT CSS eng
 
 **Colors:** `bg-gray-100`, `text-blue-500`, `border-red-500`, `shadow-blue-500`, etc. (full palette, semantic, and arbitrary)
 
----
-
 ## 🧑‍💻 Variants
 
 **State:** `hover:`, `focus:`, `active:`, `disabled:`, `visited:`, `checked:`, `first:`, `last:`, `odd:`, `even:`, `before:`, `after:`, `focus-within:`, `focus-visible:`
@@ -64,8 +58,6 @@ Custom Elements Runtime provides a high-performance, zero-dependency JIT CSS eng
 <div class="p-2 md:p-4 lg:p-8">Responsive Padding</div>
 <div class="dark:bg-gray-900">Dark Mode</div>
 ```
-
----
 
 ## 🚀 Arbitrary Values: The Power Feature
 
@@ -94,8 +86,6 @@ Arbitrary values let you use any valid CSS value, not just those in the built-in
 <button class="hover:bg-[#09f] focus:[box-shadow:0_0_0_2px_#09f]"></button>
 <div class="md:p-[2rem] dark:bg-[#222]"></div>
 ```
-
----
 
 ## 🎨 Color Palettes & Usage
 
@@ -164,8 +154,6 @@ JIT CSS provides a rich set of built-in color palettes, all accessible via utili
 
 **Tip:** You can use any palette with `bg-`, `text-`, `border-`, `shadow-`, `outline-`, `caret`, `accent`, and arbitrary value syntax for full flexibility.
 
----
-
 ## 📚 Tips & Best Practices
 
 - Use arbitrary values for advanced design and rapid prototyping.
@@ -175,8 +163,6 @@ JIT CSS provides a rich set of built-in color palettes, all accessible via utili
 - All utilities are mobile-first and responsive.
 - Extend the utility map or property map for custom needs.
 
----
-
 ## 🔍 Reference
 
 - `minifyCSS(css: string): string`
@@ -184,7 +170,5 @@ JIT CSS provides a rich set of built-in color palettes, all accessible via utili
 - `jitCSS(html: string): string`
 - Utility classes: see `utilityMap` in `style-utils.ts`
 - Variants: see `selectorVariants` and `mediaVariants`
-
----
 
 For full details, see the source in [`src/lib/style-utils.ts`](src/lib/style-utils.ts).

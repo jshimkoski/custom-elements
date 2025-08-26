@@ -19,8 +19,6 @@ Build modern components with strict TypeScript, zero dependencies, and a clean f
 - 🔌 **Extensible:** Directives, event bus, store, and more for advanced use cases.
 - 🏆 **Developer Friendly:** Clean docs, examples, and a welcoming community.
 
----
-
 ## 🚀 Quick Start
 
 ### Install
@@ -58,8 +56,6 @@ No config needed — TypeScript support is built-in.
 # 📖 Documentation Index
 
 Explore the full documentation for every runtime feature:
-
----
 
 ## 🏗️ Core Concepts
 - [Component Config](./docs/component-config.md)
@@ -104,8 +100,6 @@ Explore the full documentation for every runtime feature:
 - [Svelte Integration](./docs/svelte-integration.md)
 - [Angular Integration](./docs/angular-integration.md)
 
----
-
 For deep dives, see each guide above or browse the source code in `src/lib/`.
 
 ## 🧑‍🔬 Real-World Examples
@@ -118,8 +112,6 @@ For deep dives, see each guide above or browse the source code in `src/lib/`.
 - **Showcase your components!** Open a PR to add your project to our gallery.
 - **Questions or ideas?** [Start a discussion](https://github.com/jasonshimmy/custom-elements-runtime/discussions) or [open an issue](https://github.com/jasonshimmy/custom-elements-runtime/issues).
 - **Contribute:** We welcome PRs for docs, features, and examples.
-
----
 
 ## 🛠 Local Dev
 

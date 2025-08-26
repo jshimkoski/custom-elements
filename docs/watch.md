@@ -1,14 +1,10 @@
 # 👀 Watch Guide
 
-> How to use watchers for reactive state, prop, and computed value tracking
-
----
+> How to use watchers for reactive state and prop value tracking
 
 ## 📖 Overview
 
-Watchers let you react to changes in state, props, or computed values. They support immediate execution, deep watching, and work with nested properties.
-
----
+Watchers let you react to changes in state or props. They support immediate execution, deep watching, and work with nested properties.
 
 ## 🚀 Basic Usage
 
@@ -21,8 +17,6 @@ watch: {
   }
 }
 ```
-
----
 
 ## ⏩ Immediate Execution
 
@@ -37,11 +31,9 @@ watch: {
 }
 ```
 
----
-
 ## 🧬 Deep Watching
 
-Track changes to nested objects or arrays:
+Deep watchers are triggered for any nested property change under the watched path.
 
 ```ts
 watch: {
@@ -51,21 +43,6 @@ watch: {
   ]
 }
 ```
-
----
-
-## 🏷️ Watching Props & Computed
-
-You can watch props and computed values too:
-
-```ts
-watch: {
-  label: (newVal, oldVal, ctx) => console.log('Prop changed:', newVal),
-  doubled: (newVal, oldVal, ctx) => console.log('Computed changed:', newVal)
-}
-```
-
----
 
 ## 🧩 Multiple Watchers
 
@@ -78,8 +55,6 @@ watch: {
   theme: (t) => {...}
 }
 ```
-
----
 
 ## 🔄 Callback Signature
 
@@ -96,16 +71,12 @@ watch: {
 }
 ```
 
----
-
 ## 💡 Tips
 
 - Use `{ immediate: true }` for initialization logic.
 - Use `{ deep: true }` for nested objects/arrays.
 - Watchers are cleaned up automatically on disconnect.
-- Works with state, props, and computed values.
+- Works with state and props.
 - Callback errors are caught and logged.
-
----
 
 For more, see the [API Reference](../src/lib/runtime.ts) and [examples](../src/components/examples/).

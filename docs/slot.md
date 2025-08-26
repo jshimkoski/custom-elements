@@ -2,16 +2,12 @@
 
 A guide to slot functionality in the custom elements runtime. Learn how to use native <slot> elements, as well as slot-like patterns with props and child nodes, for flexible UIs.
 
----
-
 ## 🏷️ What are Slots?
 
 Slots allow you to pass custom content from a parent to a child component, enabling composition and reuse. The runtime fully supports native `<slot>` elements for content projection, as well as slot-like patterns using props and child nodes.
 
 - **Purpose:** Flexible content injection and composition
 - **Benefits:** Reusable layouts, dynamic content, separation of concerns
-
----
 
 ## 🧩 Slot-like Patterns with Props
 
@@ -29,8 +25,6 @@ component("child-comp", {
 });
 ```
 
----
-
 ## 🧬 Slot-like Patterns with Child Nodes
 
 Read and render child nodes passed to a custom element.
@@ -45,8 +39,6 @@ component("slot-demo", {
 ```
 
 - Use a helper to extract and render child nodes if needed.
-
----
 
 ## 🔄 Multiple Slots
 
@@ -66,8 +58,6 @@ component("multi-slot", {
   `
 });
 ```
-
----
 
 ## 🪄 Using Native <slot> Elements
 
@@ -99,8 +89,6 @@ component("native-slot-demo", {
 - Named slots (`slot="header"`) receive content with matching slot attributes.
 - Slot content is projected into the Shadow DOM automatically.
 
----
-
 ## 🛠️ Best Practices
 
 - Use native `<slot>` elements for true content projection and composition
@@ -108,8 +96,6 @@ component("native-slot-demo", {
 - Use child nodes for complex or nested content
 - Sanitize and escape HTML to prevent XSS
 - Document expected slot usage in your component API
-
----
 
 ## ❓ FAQ
 
@@ -125,12 +111,8 @@ A: Use multiple props or a structured object for different content regions.
 **Q: Is slot content reactive?**
 A: Props are reactive; child nodes are static unless managed by the parent.
 
----
-
 ## 🏁 Summary
 
 Slot functionality in the runtime enables flexible, composable UIs. Use native `<slot>` elements for true content projection, and props or child nodes for additional patterns.
-
----
 
 For more details, see advanced usage examples and the source code in `src/lib/runtime.ts`.

@@ -2,8 +2,6 @@
 
 A guide to advanced patterns for building powerful, maintainable custom elements with the runtime. Learn how to leverage async templates, nested components, dynamic config, and more.
 
----
-
 ## ⏳ Async Templates
 
 Render functions can return Promises for async data or templates. The runtime handles loading and error states automatically.
@@ -20,8 +18,6 @@ component("async-demo", {
   }
 });
 ```
-
----
 
 ## 🧩 Nested Components
 
@@ -40,8 +36,6 @@ component("child-comp", {
 });
 ```
 
----
-
 ## 🧬 Deep State & Watchers
 
 Watch deeply nested state for complex reactivity.
@@ -59,8 +53,6 @@ component("deep-watch", {
 });
 ```
 
----
-
 ## 🛠️ Error Boundaries Everywhere
 
 Use errorTemplate and errorFallback for robust error handling in any render or lifecycle logic.
@@ -73,16 +65,12 @@ component("error-demo", {
 });
 ```
 
----
-
 ## 🚀 Performance Patterns
 
 - Use style dependencies for efficient style updates
 - Debounce expensive renders
 - Minimize deep state mutations
 - Use keys for list rendering
-
----
 
 ## ❓ FAQ
 
@@ -95,12 +83,8 @@ A: Use props and state; parent can set attributes on child elements.
 **Q: Can I extend the runtime with custom logic?**
 A: Yes, add custom directives, bindings, or utility functions as needed.
 
----
-
 ## 🏁 Summary
 
 Advanced patterns unlock the full power of the runtime for scalable, maintainable, and feature-rich custom elements. Experiment with async templates, nested components, deep state, and more for robust UIs.
-
----
 
 For more details, see examples in the documentation and source code in `src/lib/runtime.ts`.

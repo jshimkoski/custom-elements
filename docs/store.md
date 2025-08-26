@@ -2,21 +2,15 @@
 
 > How to use the built-in `createStore` for global, reactive state management
 
----
-
 ## 📖 Overview
 
 `createStore` lets you create a reactive, shared state object for your app. It's lightweight, type-safe, and works seamlessly with components and directives.
-
----
 
 ## 🚀 Importing
 
 ```ts
 import { createStore } from '@jasonshimmy/custom-elements-runtime';
 ```
-
----
 
 ## 🏗️ Creating a Store
 
@@ -29,8 +23,6 @@ const store = createStore({
   cart: []
 });
 ```
-
----
 
 ## 📦 Using Store in Components
 
@@ -45,8 +37,6 @@ component('my-cart', {
 });
 ```
 
----
-
 ## 👀 Reactivity
 
 Store values are deeply reactive. Changes automatically update all components using the store.
@@ -54,8 +44,6 @@ Store values are deeply reactive. Changes automatically update all components us
 ```ts
 store.theme = 'dark'; // All components using store.theme will update
 ```
-
----
 
 ## 🔍 Watching Store Changes
 
@@ -71,8 +59,6 @@ component('my-theme', {
   render: () => html`<span>Current theme: ${store.theme}</span>`
 });
 ```
-
----
 
 ## 🧩 Sharing Store Across Components
 
@@ -90,15 +76,11 @@ component('my-counter', {
 });
 ```
 
----
-
 ## 💡 Tips
 
 - Use a single store for global state, or multiple stores for modular state.
 - Store is deeply reactive; array/object mutations are tracked.
 - Works with all directives and templates.
 - TypeScript infers types from your initial state.
-
----
 
 For more, see the [API Reference](../src/lib/store.ts) and [examples](../src/components/examples/).

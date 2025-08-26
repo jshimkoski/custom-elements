@@ -2,13 +2,9 @@
 
 > How to configure components with the Custom Elements Runtime
 
----
-
 ## 📖 Overview
 
 `ComponentConfig` is a strongly typed object that defines your component's state, props, computed values, styles, rendering logic, lifecycle hooks, and more. All options are optional except `render`.
-
----
 
 ## 🧩 Basic Example
 
@@ -19,8 +15,6 @@ component('my-greeting', {
 });
 ```
 
----
-
 ## 📦 State
 
 Define reactive local state for your component.
@@ -28,8 +22,6 @@ Define reactive local state for your component.
 ```ts
 state: { count: 0, text: '' }
 ```
-
----
 
 ## 🧮 Computed
 
@@ -41,8 +33,6 @@ computed: {
   greeting: (ctx) => `Hello, ${ctx.text}!`
 }
 ```
-
----
 
 ## 🏷️ Props
 
@@ -56,8 +46,6 @@ props: {
 }
 ```
 
----
-
 ## 👀 Watch
 
 React to changes in state, computed, or props. Supports immediate and deep options.
@@ -68,8 +56,6 @@ watch: {
   'user.name': (newVal, oldVal) => alert(`Name changed to ${newVal}`)
 }
 ```
-
----
 
 ## 🎨 Style
 
@@ -83,8 +69,6 @@ style: (ctx) => `:host { color: ${ctx.color}; }`
 style: { css: '...', dependencies: ['theme'], cache: true }
 ```
 
----
-
 ## ⚡ styleOptimizations
 
 Fine-tune style caching, minification, deduplication, debounce, etc.
@@ -92,8 +76,6 @@ Fine-tune style caching, minification, deduplication, debounce, etc.
 ```ts
 styleOptimizations: { enableCaching: true, enableMinification: true, debounceMs: 32 }
 ```
-
----
 
 ## 🖼️ Render
 
@@ -105,8 +87,6 @@ render: (ctx) => html`<div>${ctx.label}</div>`
 render: async (ctx) => html`<div>${await fetchLabel()}</div>`
 ```
 
----
-
 ## ⏳ loadingTemplate & errorTemplate
 
 Optional templates for loading and error states.
@@ -115,8 +95,6 @@ Optional templates for loading and error states.
 loadingTemplate: (ctx) => html`<span>Loading...</span>`
 errorTemplate: (err, ctx) => html`<span>Error: ${err.message}</span>`
 ```
-
----
 
 ## 🔄 Lifecycle Hooks
 
@@ -129,8 +107,6 @@ onAttributeChanged: (name, oldVal, newVal, ctx) => {...},
 onError: (err, ctx) => reportError(err)
 ```
 
----
-
 ## 🛑 errorFallback
 
 Return a fallback HTML string if an error occurs.
@@ -139,8 +115,6 @@ Return a fallback HTML string if an error occurs.
 errorFallback: (err, ctx) => `<div>Something went wrong</div>`
 ```
 
----
-
 ## 🛠️ Custom Methods
 
 Add your own helper functions to the config. They are injected into state.
@@ -148,8 +122,6 @@ Add your own helper functions to the config. They are injected into state.
 ```ts
 reset: (ctx) => { ctx.count = 0; }
 ```
-
----
 
 ## 🏁 Full Example
 
@@ -181,8 +153,6 @@ component('my-widget', {
 });
 ```
 
----
-
 ## 💡 Tips
 
 - Only `render` is required; all other options are optional.
@@ -190,7 +160,5 @@ component('my-widget', {
 - Use kebab-case for component tags.
 - Always return a single root node from `render`.
 - Use TypeScript for best experience and type safety.
-
----
 
 For more, see the [API Reference](../src/lib/runtime.ts) and [examples](../src/components/examples/).

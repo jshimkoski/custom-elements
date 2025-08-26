@@ -31,9 +31,9 @@ Integrate Custom Elements Runtime components in Angular projects:
 
 
 ## Notes
+
 - Angular requires `CUSTOM_ELEMENTS_SCHEMA` for custom elements.
 - For two-way binding with `[(ngModel)]`, your custom element must emit the expected events (e.g., `input`). The runtime does not emit these by default; you may need to wire them manually.
 - Works with Angular 9+.
 
----
 Angular + Custom Elements = 🚀

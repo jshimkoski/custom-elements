@@ -2,8 +2,6 @@
 
 A guide to diagnosing and resolving common issues in the custom elements runtime. Find solutions for rendering, state, style, events, and more—with friendly tips and best practices.
 
----
-
 ## 🚦 Rendering Issues
 
 - **Blank output:**
@@ -13,8 +11,6 @@ A guide to diagnosing and resolving common issues in the custom elements runtime
   - Confirm your async function returns a VNode, not just data.
   - Use `loadingTemplate` and `errorTemplate` for feedback.
 
----
-
 ## 🧬 State & Props Problems
 
 - **State not updating:**
@@ -23,8 +19,6 @@ A guide to diagnosing and resolving common issues in the custom elements runtime
 - **Props not received:**
   - Check attribute spelling and casing (use kebab-case in HTML).
   - Ensure `props` config matches expected types.
-
----
 
 ## 🎨 Style Issues
 
@@ -36,8 +30,6 @@ A guide to diagnosing and resolving common issues in the custom elements runtime
 - **Unsafe CSS warning:**
   - Avoid `url(javascript:...)`, `<script>`, or `expression()` in styles.
 
----
-
 ## 🔗 Event & Binding Problems
 
 - **Events not firing:**
@@ -46,8 +38,6 @@ A guide to diagnosing and resolving common issues in the custom elements runtime
 - **Two-way binding not working:**
   - Use `#model` for supported input elements.
   - Check that state property exists and is reactive.
-
----
 
 ## 🧩 Lifecycle & Watchers
 
@@ -58,8 +48,6 @@ A guide to diagnosing and resolving common issues in the custom elements runtime
   - Use correct path for nested state (e.g., `user.profile.age`).
   - Set `{ deep: true }` for deep watchers.
 
----
-
 ## 🧱 Template & Directives
 
 - **Directives not working:**
@@ -67,8 +55,6 @@ A guide to diagnosing and resolving common issues in the custom elements runtime
   - Ensure directive syntax matches documentation.
 - **Template errors:**
   - Use error boundaries (`errorTemplate`, `errorFallback`) for robust handling.
-
----
 
 ## 🔥 HMR & SSR
 
@@ -79,16 +65,12 @@ A guide to diagnosing and resolving common issues in the custom elements runtime
   - Avoid browser-only APIs in SSR mode.
   - Use pure functions for render and style.
 
----
-
 ## 🧪 Debugging Tips
 
 - Use browser dev tools to inspect shadow DOM and state.
 - Add `console.log` in render, hooks, and watchers for insight.
 - Use error boundaries to catch and display runtime errors.
 - Test with minimal configs to isolate issues.
-
----
 
 ## ❓ FAQ
 
@@ -104,12 +86,8 @@ A: Use `@event` syntax and ensure handler is a function.
 **Q: How do I debug async templates?**
 A: Use `loadingTemplate` and `errorTemplate` for feedback; log errors in async code.
 
----
-
 ## 🏁 Summary
 
 Troubleshooting is easier with clear configs, error boundaries, and dev tools. Use this guide to quickly resolve issues and build robust custom elements.
-
----
 
 For more help, see the documentation for each feature and inspect the source code in `src/lib/runtime.ts`.

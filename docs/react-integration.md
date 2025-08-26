@@ -23,10 +23,9 @@ Use Custom Elements Runtime components in React projects:
 
 
 ## Notes
+
 - React supports custom elements natively.
 - For custom events, use refs and `addEventListener` as React does not natively map custom events to props.
 - For two-way binding, use refs and event handlers.
 - Works with React 16.8+.
-
----
 Build modern UIs with zero config! ✨

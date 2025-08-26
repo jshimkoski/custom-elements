@@ -2,8 +2,6 @@
 
 A comprehensive guide to Hot Module Replacement (HMR) in the custom elements runtime. Learn how HMR works, how to use it, and best practices for fast, iterative development.
 
----
-
 ## 🔥 What is HMR?
 
 Hot Module Replacement (HMR) allows you to update modules in a running application without a full reload. This enables instant feedback, preserves state, and speeds up development.
@@ -11,16 +9,12 @@ Hot Module Replacement (HMR) allows you to update modules in a running applicati
 - **Purpose:** Fast, stateful updates during development
 - **Benefits:** No page reloads, preserves component state, instant UI feedback
 
----
-
 ## 🏗️ HMR Architecture in the Runtime
 
 - **Registry:** All component configs are stored in an internal registry
 - **HMR Detection:** Checks for `import.meta.hot` to enable HMR logic
 - **Config Updates:** On module update, new configs are merged into the registry
 - **Instance Refresh:** All live component instances are updated with the new config and re-rendered
-
----
 
 ## ⚡ How HMR Works
 
@@ -43,8 +37,6 @@ if (
 }
 ```
 
----
-
 ## 🧩 HMR-Friendly Component Example
 
 ```typescript
@@ -58,16 +50,12 @@ component("hmr-demo", {
 - HMR updates the config and all live instances instantly
 - State is preserved—no page reload required
 
----
-
 ## 🚀 HMR Best Practices
 
 - **Keep state outside config:** State is preserved across HMR updates
 - **Avoid side effects in config:** Only pure logic should be in component configs
 - **Use error boundaries:** Catch and display errors during HMR updates
 - **Test with multiple instances:** Ensure all live elements update correctly
-
----
 
 ## 🛠️ Internal HMR Logic
 
@@ -78,8 +66,6 @@ component("hmr-demo", {
   - Internal `_cfg` and `_render` are called for each instance
 - **Error handling:**
   - Errors during HMR are caught and displayed using error boundaries
-
----
 
 ## ❓ FAQ
 
@@ -95,12 +81,8 @@ A: Errors are caught and displayed using error boundaries; the app remains stabl
 **Q: Can I use HMR with all features?**
 A: Yes, HMR works with state, props, computed, style, render, and more.
 
----
-
 ## 🏁 Summary
 
 HMR in the custom elements runtime enables fast, stateful, and reliable development. By updating configs and live instances instantly, you get immediate feedback and a smooth developer experience.
-
----
 
 For more details, see the HMR logic in `src/lib/runtime.ts` and try editing components in development mode to see HMR in action.

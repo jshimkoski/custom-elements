@@ -2,21 +2,15 @@
 
 > How to use the `html` template function for expressive, reactive UIs
 
----
-
 ## 📖 Overview
 
 The `html` template function lets you write declarative, type-safe templates for your components. It supports directives, bindings, and dynamic content with full reactivity.
-
----
 
 ## 🚀 Importing
 
 ```ts
 import { html } from '@jasonshimmy/custom-elements-runtime';
 ```
-
----
 
 ## 🏗️ Basic Usage
 
@@ -25,8 +19,6 @@ Write templates using tagged template literals:
 ```ts
 render: (ctx) => html`<h1>Hello, ${ctx.name}!</h1>`
 ```
-
----
 
 ## 🧩 Embedding Directives
 
@@ -40,8 +32,6 @@ html`
 `
 ```
 
----
-
 ## 🏷️ Attribute & Event Binding
 
 Bind attributes and events directly in your template:
@@ -53,8 +43,6 @@ html`
 `
 ```
 
----
-
 ## 🔗 Two-way Binding
 
 Sync input values with state using `#model`:
@@ -64,8 +52,6 @@ html`
   <input #model="count" type="number" />
 `
 ```
-
----
 
 ## 🧬 Dynamic Content
 
@@ -77,8 +63,6 @@ html`
   <span>${store.theme}</span>
 `
 ```
-
----
 
 ## 🧩 Nesting & Composition
 
@@ -94,15 +78,11 @@ html`
 `
 ```
 
----
-
 ## 💡 Tips
 
 - Always return a single root node from your render function.
 - Use directives and bindings for maximum reactivity.
 - TypeScript infers types for template variables.
 - Works seamlessly with state, props, computed, store, and event bus.
-
----
 
 For more, see the [API Reference](../src/lib/template-compiler.ts) and [examples](../src/components/examples/).
