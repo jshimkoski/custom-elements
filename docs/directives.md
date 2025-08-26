@@ -54,18 +54,14 @@ Pattern matching for multiple cases.
 import { match } from 'runtime';
 
 render: (ctx) => html`
-  ${match(ctx.status, {
-    loading: html`<div>Loading...</div>`,
-    error: html`<div>Error!</div>`,
-    success: html`<div>Success!</div>`,
-    _: html`<div>Unknown status</div>`, // fallback
-  })}
+  ${match()
+    .when(ctx.status === 'loading', html`<div>Loading...</div>`)
+    .when(ctx.status === 'error', html`<div>Error!</div>`)
+    .when(ctx.status === 'success', html`<div>Success!</div>`)
+    .otherwise(true, html`<div>Unknown status</div>`)
+    .done()}
 `
 ```
-
-- First argument: value to match
-- Second argument: object mapping cases to content
-- Use `_` for fallback/default case
 
 ## 🧪 Example: All Directives Together
 
@@ -77,12 +73,12 @@ component('directive-demo', {
     <ul>
       ${each(ctx.items, (item) => html`<li>${item}</li>`)}
     </ul>
-    ${match(ctx.status, {
-      loading: html`<div>Loading...</div>`,
-      error: html`<div>Error!</div>`,
-      success: html`<div>Done!</div>`,
-      _: html`<div>Unknown</div>`,
-    })}
+    ${match()
+      .when(ctx.status === 'loading', html`<div>Loading...</div>`)
+      .when(ctx.status === 'error', html`<div>Error!</div>`)
+      .when(ctx.status === 'success', html`<div>Success!</div>`)
+      .otherwise(true, html`<div>Unknown status</div>`)
+      .done()}
   `,
 });
 ```

@@ -8,7 +8,7 @@ describe('MinimalExample Component', () => {
 
   it('renders the minimal example with correct content', () => {
     cy.get('minimal-example').should('exist').shadow().within(() => {
-      cy.get('div').should('have.class', 'counter-container');
+      cy.get('div').should('have.class', 'flex flex-col items-center justify-center min-h-[120px]');
       cy.get('button').should('exist').should('contain', 'Count: 0');
     });
   });
