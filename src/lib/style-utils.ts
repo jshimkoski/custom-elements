@@ -252,16 +252,18 @@ const utilityMap: CSSMap = {
   border: "border-width:1px;",
   "rounded-none": "border-radius:0;",
   "rounded-xs": "border-radius:0.125rem;",
+  "rounded": "border-radius:0.25rem;",
   "rounded-sm": "border-radius:0.25rem;",
   "rounded-md": "border-radius:0.375rem;",
   "rounded-lg": "border-radius:0.5rem;",
   "rounded-full": "border-radius:9999px;",
-    /* Ring (box-shadow for focus) */
-    "ring-0": "box-shadow:none;",
-    "ring-1": "box-shadow:0 0 0 1px rgba(59,130,246,0.5);",
-    "ring-2": "box-shadow:0 0 0 2px rgba(59,130,246,0.5);",
-    "ring-4": "box-shadow:0 0 0 4px rgba(59,130,246,0.5);",
-    "ring-8": "box-shadow:0 0 0 8px rgba(59,130,246,0.5);",
+
+  /* Ring (box-shadow for focus) */
+  "ring-0": "box-shadow:none;",
+  "ring-1": "box-shadow:0 0 0 1px rgba(59,130,246,0.5);",
+  "ring-2": "box-shadow:0 0 0 2px rgba(59,130,246,0.5);",
+  "ring-4": "box-shadow:0 0 0 4px rgba(59,130,246,0.5);",
+  "ring-8": "box-shadow:0 0 0 8px rgba(59,130,246,0.5);",
 
   /* Shadow and effects */
   "shadow-none": "box-shadow:0 0 #0000;",
@@ -283,6 +285,16 @@ const utilityMap: CSSMap = {
   "invisible": "visibility:hidden;",
 
   /* Flex Grow/Shrink/Basis */
+  "items-center": "align-items:center;",
+  "items-start": "align-items:flex-start;",
+  "items-end": "align-items:flex-end;",
+  "items-baseline": "align-items:baseline;",
+  "items-stretch": "align-items:stretch;",
+  "justify-center": "justify-content:center;",
+  "justify-start": "justify-content:flex-start;",
+  "justify-end": "justify-content:flex-end;",
+  "flex-col": "flex-direction:column;",
+  "flex-row": "flex-direction:row;",
   "grow": "flex-grow:1;",
   "shrink": "flex-shrink:1;",
   "grow-0": "flex-grow:0;",
