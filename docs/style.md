@@ -5,6 +5,8 @@
 ## 🖌️ Overview
 The `style` property in the runtime lets you define CSS for your custom element. Styles can be static strings, dynamic functions based on state, or advanced configs for performance. All styles are scoped to the shadow DOM, secure, and optimized for mobile-first rendering.
 
+A [JIT CSS](./jit-css.md) engine is also included that generates only the necessary CSS based on your HTML content. It is simple, expressive, and ensures minimal styles are applied.
+
 ---
 
 ## 🛠️ Defining Styles
@@ -58,40 +60,6 @@ component('highlighted-box', {
 
 ---
 
-## 🧩 Advanced: DynamicStyleConfig
-- Use an object for fine-grained control:
-  - `css`: CSS string or function
-  - `dependencies`: Array of state keys to watch for style updates
-  - `cache`: Enable/disable style caching
-
-```typescript
-style: {
-  css: (ctx) => `:host { font-size: ${ctx.size}px; }`,
-  dependencies: ['size'],
-  cache: true,
-}
-```
-
----
-
-## 🚀 Style Optimizations
-- Use `styleOptimizations` for performance tuning:
-  - `enableCaching`: Cache styles by dependency hash
-  - `enableMinification`: Minify CSS
-  - `enableDeduplication`: Remove duplicate rules
-  - `cacheSize`: Max cache entries
-  - `debounceMs`: Debounce style updates
-
-```typescript
-styleOptimizations: {
-  enableCaching: true,
-  enableMinification: true,
-  cacheSize: 50,
-}
-```
-
----
-
 ## 🛡️ Security
 - All styles are sanitized: no `javascript:` URLs, no `<script>` tags, no CSS expressions.
 - Styles are injected into the shadow DOM for isolation.
@@ -103,7 +71,7 @@ styleOptimizations: {
 component('styled-box', {
   state: { color: 'red', size: 24 },
   style: (ctx) => `:host { color: ${ctx.color}; font-size: ${ctx.size}px; }`,
-  styleOptimizations: { enableMinification: true },
+  minifyCSS: true,
   render: (ctx) => html`<div>Styled content</div>`,
 });
 ```
@@ -113,15 +81,11 @@ component('styled-box', {
 ## 🧠 How Styles Work Internally
 - Styles are injected as a `<style>` tag in the shadow DOM.
 - Dynamic styles are recalculated and updated efficiently.
-- Caching and deduplication reduce DOM updates and memory usage.
-- Dependencies trigger style updates only when needed.
 
 ---
 
 ## 📝 Tips & Best Practices
 - Prefer dynamic styles for interactive components.
-- Use dependencies for efficient updates.
-- Minify and deduplicate for production.
 - Avoid global selectors; use `:host` for scoping.
 - Keep styles mobile-first and responsive.
 
@@ -136,3 +100,5 @@ component('styled-box', {
 
 ## 🏁 Summary
 The `style` property provides secure, efficient, and flexible styling for your custom elements. Use static, dynamic, or advanced configs to create beautiful, performant, and maintainable components.
+
+See [JIT CSS](./jit-css.md) to learn about how to generate only the necessary CSS based on your HTML content.

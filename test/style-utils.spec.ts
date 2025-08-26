@@ -1,144 +1,80 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import {
-  StyleCache,
-  minifyCSS,
-  createStateHash,
-  deduplicateCSS,
-  createDebouncer,
-  extractCSSVariables,
-  scopeCSS,
-  cssAnimations,
-  cssUtilities,
-  StylePerformanceMonitor,
-} from '../src/lib/style-utils';
+import { describe, it, expect } from 'vitest';
+import { minifyCSS, baseReset, jitCSS } from '../src/lib/style-utils';
 
-describe('StyleCache', () => {
-  let cache: StyleCache;
-  beforeEach(() => {
-    cache = new StyleCache(2);
-  });
-
-  it('should set and get cache entries', () => {
-    cache.set('a', 'cssA');
-    expect(cache.get('a')).toBe('cssA');
-  });
-
-  it('should evict oldest when maxSize exceeded', () => {
-    cache.set('a', 'cssA');
-    cache.set('b', 'cssB');
-    cache.set('c', 'cssC');
-    expect(cache.get('a')).toBeNull();
-    expect(cache.get('b')).toBe('cssB');
-    expect(cache.get('c')).toBe('cssC');
-  });
-
-  it('should invalidate by dependency', () => {
-    cache.set('a', 'cssA', ['dep1']);
-    cache.set('b', 'cssB', ['dep2']);
-    cache.invalidate('dep1');
-    expect(cache.get('a')).toBeNull();
-    expect(cache.get('b')).toBe('cssB');
-  });
-
-  it('should clear cache', () => {
-    cache.set('a', 'cssA');
-    cache.clear();
-    expect(cache.get('a')).toBeNull();
-  });
-
-  it('should report stats', () => {
-    cache.set('a', 'cssA');
-    const stats = cache.getStats();
-    expect(stats.size).toBe(1);
-    expect(stats.maxSize).toBe(2);
-  });
-});
-
+// --- minifyCSS ---
 describe('minifyCSS', () => {
-  it('should minify CSS', () => {
-    const css = 'div { color: red;  } /* comment */';
-    expect(minifyCSS(css)).toBe('div{color:red}');
+  it('removes whitespace and comments', () => {
+    const css = `/* comment */\n  body { color: red; }\n  /* another */`;
+    expect(minifyCSS(css)).toBe('body{color:red}');
+  });
+
+  it('handles empty input', () => {
+    expect(minifyCSS('')).toBe('');
   });
 });
 
-describe('createStateHash', () => {
-  it('should create hash from values', () => {
-    expect(createStateHash([1, 'a', true])).toContain('1');
-    expect(createStateHash([{ x: 1 }])).toContain('x');
+// --- baseReset ---
+describe('baseReset', () => {
+  it('contains :host and box-sizing', () => {
+    expect(baseReset).toContain(':host');
+    expect(baseReset).toContain('box-sizing');
   });
 });
 
-describe('deduplicateCSS', () => {
-  it('should deduplicate CSS rules', () => {
-    const css = 'div{color:red;}div{color:red;}span{color:blue;}';
-    expect(deduplicateCSS(css)).toContain('span{color:blue;');
-    expect(deduplicateCSS(css).match(/div{color:red;}/g)?.length).toBe(1);
+// --- jitCSS ---
+describe('jitCSS', () => {
+  it('generates CSS for utility classes', () => {
+    const html = '<div class="p-4 text-xl font-bold"></div>';
+    const css = jitCSS(html);
+    expect(css).toContain('.p-4');
+    expect(css).toContain('padding:calc(0.25rem * 4);');
+    expect(css).toContain('.text-xl');
+    expect(css).toContain('font-size:1.25rem;');
   });
-});
 
-describe('createDebouncer', () => {
-  it('should debounce function calls', async () => {
-    const fn = vi.fn();
-    const debounced = createDebouncer(fn, 10);
-    debounced();
-    debounced();
-    await new Promise(r => setTimeout(r, 20));
-    expect(fn).toHaveBeenCalledTimes(1);
-    debounced.cancel();
+  it('supports variants', () => {
+    const html = '<button class="hover:bg-blue-500 focus:ring-2"></button>';
+    const css = jitCSS(html);
+    expect(css).toContain('.hover\\:bg-blue-500:hover');
+    expect(css).toContain('.focus\\:ring-2:focus');
   });
-});
 
-describe('extractCSSVariables', () => {
-  it('should extract CSS variables', () => {
-    const css = ':root { --main: red; --secondary: blue; }';
-    const vars = extractCSSVariables(css);
-    expect(vars.main).toBe('red');
-    expect(vars.secondary).toBe('blue');
+  it('supports responsive variants', () => {
+    const html = '<div class="md:p-2 lg:p-4"></div>';
+    const css = jitCSS(html);
+    expect(css).toContain('@media (min-width:768px)');
+    expect(css).toContain('.md\\:p-2');
+    expect(css).toContain('@media (min-width:1024px)');
+    expect(css).toContain('.lg\\:p-4');
   });
-});
 
-describe('scopeCSS', () => {
-  it('should prefix selectors with scope', () => {
-    const css = 'div { color: red; }';
-    const scoped = scopeCSS(css, '.scoped');
-    expect(scoped).toContain('.scoped div');
+  it('supports arbitrary values', () => {
+    const html = '<div class="z-[22] shadow-[0_2px_8px_rgba(0,0,0,0.15)]"></div>';
+    const css = jitCSS(html);
+    expect(css).toBe('.z-\\[22\\]{z-index:22;}.shadow-\\[0_2px_8px_rgba\\(0\\,0\\,0\\,0\\.15\\)\\]{box-shadow:0 2px 8px rgba(0,0,0,0.15);}');
   });
-});
 
-describe('cssAnimations', () => {
-  it('should contain keyframes', () => {
-    expect(cssAnimations.fadeIn).toContain('@keyframes fadeIn');
-    expect(cssAnimations.fadeOut).toContain('@keyframes fadeOut');
+  it('supports duration and delay with ms', () => {
+    const html = '<div class="duration-[500ms] delay-[300ms]"></div>';
+    const css = jitCSS(html);
+    expect(css).toContain('transition-duration:500ms;');
+    expect(css).toContain('transition-delay:300ms;');
   });
-});
 
-describe('cssUtilities', () => {
-  it('should contain utility classes', () => {
-    expect(cssUtilities).toContain('.flex');
-    expect(cssUtilities).toContain('.text-center');
+  it('supports min-w and font-weight arbitrary values', () => {
+    const html = '<div class="min-w-[320px] font-weight-[700]"></div>';
+    const css = jitCSS(html);
+    expect(css).toContain('min-width:320px;');
+    expect(css).toContain('font-weight:700;');
   });
-});
 
-describe('StylePerformanceMonitor', () => {
-  it.skip('should record and report metrics', async () => {
-    const monitor = new StylePerformanceMonitor();
-    const stop = monitor.startTimer('op');
-    await new Promise(r => setTimeout(r, 5));
-    stop();
-    const stats = monitor.getStats();
-    // Expect stats.op to be an object with count, average, min, max
-    expect(stats && typeof stats.op === 'object').toBe(true);
-    expect(stats?.op.count).toBeGreaterThan(0);
-    expect(stats?.op.average).toBeGreaterThan(0);
-    expect(stats?.op.min).toBeGreaterThan(0);
-    expect(stats?.op.max).toBeGreaterThan(0);
-    monitor.reset('op');
-    const resetStats = monitor.getStats();
-    // After reset, op may be undefined or have count 0
-    if (resetStats && resetStats.op) {
-      expect(resetStats.op.count).toBe(0);
-    } else {
-      expect(resetStats?.op).toBeUndefined();
-    }
+  it('ignores unsupported classes', () => {
+    const html = '<div class="foo-bar"></div>';
+    const css = jitCSS(html);
+    expect(css).not.toContain('.foo-bar');
+  });
+
+  it('handles empty html', () => {
+    expect(jitCSS('')).toBe('');
   });
 });

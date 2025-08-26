@@ -12,10 +12,10 @@ Build modern components with strict TypeScript, zero dependencies, and a clean f
 ## ✨ Why You'll Love It
 
 - ⚡ **Blazing Fast:** Minimal runtime, instant updates, zero dependencies.
+- 🎨 **JIT CSS:** On-demand, utility-first styling directly in your HTML.
 - 🧑‍💻 **TypeScript First:** Strict types, intellisense, and safety everywhere.
 - 🧩 **Functional API:** No classes, no boilerplate—just pure functions.
 - 🛠️ **SSR & HMR Ready:** Universal rendering and instant hot reloads.
-- 🎨 **Style Utilities:** Scoped CSS, dynamic styles, and theming built-in.
 - 🔌 **Extensible:** Directives, event bus, store, and more for advanced use cases.
 - 🏆 **Developer Friendly:** Clean docs, examples, and a welcoming community.
 
@@ -83,7 +83,7 @@ Explore the full documentation for every runtime feature:
 
 ## 🎨 Styling
 - [Style](./docs/style.md)
-- [Style Utils](./docs/style-utils.md)
+- [Deep Dive: JIT CSS](./docs/jit-css.md)
 
 ## ⚡ Performance & Architecture
 - [Virtual DOM](./docs/virtual-dom.md)

@@ -12,14 +12,9 @@ export { when, each, match } from "./directives";
 
 import { vdomRenderer, type VNode } from "./vdom";
 import {
-  StyleCache,
-  createStateHash,
   minifyCSS,
-  deduplicateCSS,
-  createDebouncer,
-  stylePerformanceMonitor,
-  type DynamicStyleConfig,
-  type StyleOptimizations,
+  baseReset,
+  jitCSS
 } from "./style-utils";
 
 // --- Types ---
@@ -85,8 +80,8 @@ export interface ComponentConfig<
     }
   >;
   watch?: WatchConfig<ComponentContext<S, C, P, T>>;
-  style?: string | ((context: ComponentContext<S, C, P, T>) => string) | DynamicStyleConfig;
-  styleOptimizations?: Partial<StyleOptimizations>;
+  style?: string | ((context: ComponentContext<S, C, P, T>) => string);
+  minifyCSS?: boolean;
   render: (context: ComponentContext<S, C, P, T>) => VNode | VNode[] | Promise<VNode | VNode[]>;
   loadingTemplate?: (context: ComponentContext<S, C, P, T>) => VNode | VNode[];
   errorTemplate?: (
@@ -263,15 +258,11 @@ export function createElementClass<
     private _mounted = false;
     private _hasError = false;
     private _initializing = true;
-    private _styleElement: HTMLStyleElement | null = null;
-    private _styleCache = new StyleCache(100);
-    private _lastStyleHash = "";
-    private _styleDependencies: Set<string> = new Set();
-    private _styleUpdateDebounced: ((
-      cfg: ComponentConfig<S, C, P, T>,
-    ) => void) & {
-      cancel: () => void;
-    };
+
+    private _styleSheet: CSSStyleSheet | null = null;
+
+    private _lastHtmlStringForJitCSS = "";
+
     private _cfg: ComponentConfig<S, C, P, T>;
     private _lastRenderTime = 0;
     private _renderCount = 0;
@@ -283,15 +274,6 @@ export function createElementClass<
       this.attachShadow({ mode: "open" });
       this._cfg = config;
 
-      // Initialize debounced style update function
-      const optimizations = {
-        debounceMs: 16,
-        ...config.styleOptimizations,
-      };
-      this._styleUpdateDebounced = createDebouncer(
-        (cfg: ComponentConfig<S, C, P, T>) => this._applyStyle(cfg),
-        optimizations.debounceMs,
-      );
       this.context = this._initContext(config);
 
       // --- Inject config methods into state ---
@@ -331,13 +313,6 @@ export function createElementClass<
         this._listeners.forEach((unsub) => unsub());
         this._listeners = [];
         this._watchers.clear();
-
-        // Clean up style caching
-        this._styleCache.clear();
-        this._styleDependencies.clear();
-        this._styleElement = null;
-        this._lastStyleHash = "";
-        this._styleUpdateDebounced.cancel();
 
         // Clean up async template state
         this._templateLoading = false;
@@ -388,8 +363,6 @@ export function createElementClass<
     private _render(cfg: ComponentConfig<S, C, P>) {
       this._runLogicWithinErrorBoundary(cfg, () => {
         if (!this.shadowRoot) return;
-
-        this._styleDependencies.clear();
 
         // If loading, show loading template
         if (this._templateLoading && cfg.loadingTemplate) {
@@ -484,7 +457,8 @@ export function createElementClass<
         context,
       );
 
-      this._requestStyleUpdate();
+      // Extract rendered HTML for JIT CSS
+      this._lastHtmlStringForJitCSS = this.shadowRoot.innerHTML;
     }
 
     _requestRender() {
@@ -516,132 +490,35 @@ export function createElementClass<
       }, 0);
     }
 
-    // Request style-only update (more efficient than full render)
-    private _requestStyleUpdate() {
-      this._styleUpdateDebounced(this._cfg);
-    }
-
     // --- Style ---
     private _applyStyle(cfg: ComponentConfig<S, C, P, T>) {
       this._runLogicWithinErrorBoundary(cfg, () => {
-        if (!this.shadowRoot) {
+        if (!this.shadowRoot) return;
+
+        // Generate JIT CSS from latest HTML
+        const jitCss = jitCSS(this._lastHtmlStringForJitCSS);
+
+        if (!cfg.style && (!jitCss || jitCss.trim() === "")) {
+          this._styleSheet = null;
           return;
         }
 
-        const timer = stylePerformanceMonitor.startTimer("applyStyle");
-
-        try {
-          // Get or create style element
-          if (!this._styleElement) {
-            this._styleElement = this.shadowRoot.querySelector(
-              "style",
-            ) as HTMLStyleElement;
-            if (!this._styleElement) {
-              if (typeof document !== "undefined") {
-                this._styleElement = document.createElement("style");
-                this.shadowRoot.prepend(this._styleElement);
-              }
-            }
-          }
-
-          if (!cfg.style) {
-            this._styleElement.textContent = "";
-            return;
-          }
-
-          // Get style optimizations config
-          const optimizations = {
-            enableCaching: true,
-            enableMinification: false,
-            enableDeduplication: true,
-            cacheSize: 100,
-            debounceMs: 16,
-            ...cfg.styleOptimizations,
-          };
-
-          // Handle different style configurations
-          let styleConfig: DynamicStyleConfig;
-
-          if (typeof cfg.style === "string") {
-            styleConfig = {
-              css: cfg.style,
-              cache: optimizations.enableCaching,
-            };
-          } else if (typeof cfg.style === "function") {
-            styleConfig = {
-              css: cfg.style,
-              cache: optimizations.enableCaching,
-            };
-          } else {
-            styleConfig = {
-              cache: optimizations.enableCaching,
-              ...cfg.style,
-            };
-          }
-
-          // Extract dependencies and check if style needs updating
-          const dependencies = styleConfig.dependencies || [];
-          const shouldCache =
-            styleConfig.cache !== false && optimizations.enableCaching;
-
-          // Create a hash of dependent state values for caching
-          let stateHash = "";
-          if (shouldCache && dependencies.length > 0) {
-            const dependentValues = dependencies.map((dep) => (this.context as Record<string, unknown>)[dep]);
-            stateHash = createStateHash(dependentValues);
-
-            // Check cache first
-            if (
-              this._lastStyleHash === stateHash &&
-              this._styleCache.has(stateHash)
-            ) {
-              const cachedStyle = this._styleCache.get(stateHash)!;
-              if (this._styleElement.textContent !== cachedStyle) {
-                this._styleElement.textContent = cachedStyle;
-              }
-              return;
-            }
-          }
-
-          // For styles without dependencies, always generate
-          if (!shouldCache || dependencies.length === 0) {
-            stateHash = "no-deps-" + Date.now();
-          }
-
-          // Generate style
-          const rawStyle =
-            typeof styleConfig.css === "function"
-              ? styleConfig.css(this.context)
-              : styleConfig.css;
-
-          let processedStyle = sanitizeCSS(rawStyle);
-
-          // Apply optimizations
-          if (optimizations.enableMinification) {
-            processedStyle = minifyCSS(processedStyle);
-          }
-
-          if (optimizations.enableDeduplication) {
-            processedStyle = deduplicateCSS(processedStyle);
-          }
-
-          // Cache the style if enabled and has dependencies
-          if (shouldCache && dependencies.length > 0) {
-            this._styleCache.set(
-              stateHash,
-              processedStyle,
-              dependencies.map(String),
-            );
-            this._lastStyleHash = stateHash;
-          }
-
-          // Only update DOM if style actually changed
-          if (this._styleElement.textContent !== processedStyle) {
-            this._styleElement.textContent = processedStyle;
-          }
-        } finally {
-          timer();
+        // Compose final style: baseReset + jitCss + user style
+        let userStyle = "";
+        if (cfg.style) {
+          if (typeof cfg.style === "string") userStyle = cfg.style;
+          else if (typeof cfg.style === "function") userStyle = cfg.style(this.context);
         }
+
+        let finalStyle = sanitizeCSS(`${baseReset}\n${userStyle}\n${jitCss}\n`);
+        if (cfg.minifyCSS) finalStyle = minifyCSS(finalStyle);
+
+        // Use adoptedStyleSheets
+        if (!this._styleSheet) {
+          this._styleSheet = new CSSStyleSheet();
+        }
+        this._styleSheet.replaceSync(finalStyle);
+        this.shadowRoot.adoptedStyleSheets = [this._styleSheet];
       });
     }
 
@@ -714,37 +591,8 @@ export function createElementClass<
                   const fullPath = path
                     ? `${path}.${String(prop)}`
                     : String(prop);
-
-                  // Track style dependencies and invalidate cache
-                  self._styleDependencies.add(String(prop));
-                  self._styleCache.invalidate(String(prop));
-
                   self._triggerWatchers(fullPath, value);
-
-                  // Check if only style dependencies changed for optimization
-                  const styleConfig = cfg.style;
-                  let onlyStyleChanged = false;
-
-                  if (
-                    styleConfig &&
-                    typeof styleConfig === "object" &&
-                    "dependencies" in styleConfig
-                  ) {
-                    const styleDeps = styleConfig.dependencies || [];
-                    onlyStyleChanged =
-                      styleDeps.includes(String(prop)) &&
-                      styleDeps.every(
-                        (dep) =>
-                          !self._styleDependencies.has(String(dep)) ||
-                          dep === prop,
-                      );
-                  }
-
-                  if (onlyStyleChanged) {
-                    self._requestStyleUpdate();
-                  } else {
-                    self._render(cfg);
-                  }
+                  self._render(cfg);
                 }
                 return true;
               },
@@ -754,10 +602,6 @@ export function createElementClass<
                   const fullPath = path
                     ? `${path}.${String(prop)}`
                     : String(prop);
-
-                  // Track style dependencies
-                  self._styleDependencies.add(String(prop));
-
                   self._triggerWatchers(fullPath, undefined);
                   self._render(cfg);
                 }

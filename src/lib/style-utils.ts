@@ -1,117 +1,4 @@
 /**
- * Style utilities for component style management, caching, and optimization
- */
-
-export interface StyleCacheEntry {
-  css: string;
-  timestamp: number;
-  dependencies: string[];
-}
-
-export interface DynamicStyleConfig {
-  css: string | ((state: any) => string);
-  dependencies?: string[];
-  cache?: boolean;
-  media?: string;
-  priority?: number;
-}
-
-export interface StyleOptimizations {
-  enableCaching: boolean;
-  enableMinification: boolean;
-  enableDeduplication: boolean;
-  cacheSize: number;
-  debounceMs: number;
-}
-
-/**
- * Advanced style cache with LRU eviction and dependency tracking
- */
-export class StyleCache {
-  private cache = new Map<string, StyleCacheEntry>();
-  private maxSize: number;
-  private accessOrder = new Map<string, number>();
-  private accessCounter = 0;
-
-  constructor(maxSize = 100) {
-    this.maxSize = maxSize;
-  }
-
-  set(key: string, css: string, dependencies: string[] = []): void {
-    // Evict oldest entries if cache is full
-    if (this.cache.size >= this.maxSize) {
-      this.evictOldest();
-    }
-
-    this.cache.set(key, {
-      css,
-      timestamp: Date.now(),
-      dependencies,
-    });
-    this.accessOrder.set(key, ++this.accessCounter);
-  }
-
-  get(key: string): string | null {
-    const entry = this.cache.get(key);
-    if (entry) {
-      this.accessOrder.set(key, ++this.accessCounter);
-      return entry.css;
-    }
-    return null;
-  }
-
-  has(key: string): boolean {
-    return this.cache.has(key);
-  }
-
-  invalidate(dependency: string): void {
-    const keysToDelete: string[] = [];
-
-    for (const [key, entry] of this.cache) {
-      if (entry.dependencies.includes(dependency)) {
-        keysToDelete.push(key);
-      }
-    }
-
-    keysToDelete.forEach(key => {
-      this.cache.delete(key);
-      this.accessOrder.delete(key);
-    });
-  }
-
-  clear(): void {
-    this.cache.clear();
-    this.accessOrder.clear();
-    this.accessCounter = 0;
-  }
-
-  private evictOldest(): void {
-    let oldestKey = '';
-    let oldestAccess = Infinity;
-
-    for (const [key, access] of this.accessOrder) {
-      if (access < oldestAccess) {
-        oldestAccess = access;
-        oldestKey = key;
-      }
-    }
-
-    if (oldestKey) {
-      this.cache.delete(oldestKey);
-      this.accessOrder.delete(oldestKey);
-    }
-  }
-
-  getStats() {
-    return {
-      size: this.cache.size,
-      maxSize: this.maxSize,
-      hitRate: this.accessCounter > 0 ? (this.cache.size / this.accessCounter) : 0,
-    };
-  }
-}
-
-/**
  * CSS minification utility (basic)
  */
 export function minifyCSS(css: string): string {
@@ -129,568 +16,665 @@ export function minifyCSS(css: string): string {
 }
 
 /**
- * Create a stable hash from state values for caching
+ * Minimal Shadow DOM reset
  */
-export function createStateHash(values: any[]): string {
-  try {
-    return JSON.stringify(values, (_key, value) => {
-      // Handle circular references and functions
-      if (typeof value === 'function') {
-        return value.toString();
-      }
-      if (typeof value === 'object' && value !== null) {
-        // Simple circular reference detection
-        if (value.__hashed) return '[Circular]';
-        value.__hashed = true;
-        const result = { ...value };
-        delete result.__hashed;
-        return result;
-      }
-      return value;
-    });
-  } catch {
-    // Fallback for complex objects
-    return values.map(v => String(v)).join('|');
+export const baseReset = `
+  :host {
+    box-sizing:border-box;
+    line-height:1.5;
+    font-family:ui-sans-serif,system-ui,sans-serif;
+    -webkit-text-size-adjust:100%;
+    text-size-adjust:100%;
   }
-}
-
-/**
- * CSS deduplication utility
- */
-export function deduplicateCSS(css: string): string {
-  const rules = css.split('}').filter(rule => rule.trim());
-  const seen = new Set<string>();
-  const deduplicated: string[] = [];
-
-  for (const rule of rules) {
-    const normalized = rule.trim().replace(/\s+/g, ' ');
-    if (normalized && !seen.has(normalized)) {
-      seen.add(normalized);
-      deduplicated.push(rule + '}');
-    }
+  *,::before,::after {
+    box-sizing:inherit;
+    margin:0;
+    padding:0;
+    border:0 solid currentColor;
   }
-
-  return deduplicated.join('').replace(/}$/, '');
-}
+`;
 
 /**
- * Debounced function utility for style updates
+ * JIT CSS implementation
  */
-export function createDebouncer<T extends (...args: any[]) => any>(
-  fn: T,
-  delay: number
-): T & { cancel: () => void } {
-  let timeoutId: number | null = null;
 
-  const debounced = ((...args: Parameters<T>) => {
-    if (timeoutId !== null) {
-      clearTimeout(timeoutId);
-    }
+type CSSMap = Record<string, string>;
+type SelectorVariantMap = Record<string, (selector: string, body: string) => string>;
+type MediaVariantMap = Record<string, string>;
 
-    timeoutId = setTimeout(() => {
-      fn(...args);
-      timeoutId = null;
-    }, delay);
-  }) as T & { cancel: () => void };
-
-  debounced.cancel = () => {
-    if (timeoutId !== null) {
-      clearTimeout(timeoutId);
-      timeoutId = null;
-    }
-  };
-
-  return debounced;
-}
-
-/**
- * Extract CSS custom properties (CSS variables) from a style string
- */
-export function extractCSSVariables(css: string): Record<string, string> {
-  const variables: Record<string, string> = {};
-  const regex = /--([\w-]+):\s*([^;]+)/g;
-  let match;
-
-  while ((match = regex.exec(css)) !== null) {
-    variables[match[1]] = match[2].trim();
-  }
-
-  return variables;
-}
-
-/**
- * Generate scoped CSS by prefixing selectors
- */
-export function scopeCSS(css: string, scope: string): string {
-  // Simple CSS selector scoping
-  return css.replace(
-    /([^{}]+){/g,
-    (match, selector) => {
-      // Skip keyframes and other @ rules
-      if (selector.trim().startsWith('@')) {
-        return match;
-      }
-
-      // Scope each selector
-      const scopedSelectors = selector
-        .split(',')
-        .map((sel: string) => {
-          const trimmed = sel.trim();
-          if (trimmed.startsWith(':host')) {
-            return trimmed.replace(':host', scope);
-          }
-          return `${scope} ${trimmed}`;
-        })
-        .join(', ');
-
-      return `${scopedSelectors} {`;
-    }
-  );
-}
-
-/**
- * CSS animation and transition utilities
- */
-export const cssAnimations = {
-  fadeIn: `
-    @keyframes fadeIn {
-      from { opacity: 0; }
-      to { opacity: 1; }
-    }
-  `,
-  fadeOut: `
-    @keyframes fadeOut {
-      from { opacity: 1; }
-      to { opacity: 0; }
-    }
-  `,
-  slideIn: `
-    @keyframes slideIn {
-      from { transform: translateX(-100%); }
-      to { transform: translateX(0); }
-    }
-  `,
-  slideOut: `
-    @keyframes slideOut {
-      from { transform: translateX(0); }
-      to { transform: translateX(100%); }
-    }
-  `,
-  scaleIn: `
-    @keyframes scaleIn {
-      from { transform: scale(0.8); opacity: 0; }
-      to { transform: scale(1); opacity: 1; }
-    }
-  `,
-  scaleOut: `
-    @keyframes scaleOut {
-      from { transform: scale(1); opacity: 1; }
-      to { transform: scale(0.8); opacity: 0; }
-    }
-  `,
+const colors: Record<string, Record<string, string>> = {
+  gray: {
+    50:  "var(--color-gray-50, #f9fafb)",
+    100: "var(--color-gray-100, #f3f4f6)",
+    200: "var(--color-gray-200, #e5e7eb)",
+    300: "var(--color-gray-300, #d1d5db)",
+    400: "var(--color-gray-400, #9ca3af)",
+    500: "var(--color-gray-500, #6b7280)",
+    600: "var(--color-gray-600, #4b5563)",
+    700: "var(--color-gray-700, #374151)",
+    800: "var(--color-gray-800, #1f2937)",
+    900: "var(--color-gray-900, #111827)",
+  },
+  slate: {
+    50:  "var(--color-slate-50, #f8fafc)",
+    100: "var(--color-slate-100, #f1f5f9)",
+    200: "var(--color-slate-200, #e2e8f0)",
+    300: "var(--color-slate-300, #cbd5e1)",
+    400: "var(--color-slate-400, #94a3b8)",
+    500: "var(--color-slate-500, #64748b)",
+    600: "var(--color-slate-600, #475569)",
+    700: "var(--color-slate-700, #334155)",
+    800: "var(--color-slate-800, #1e293b)",
+    900: "var(--color-slate-900, #0f172a)",
+  },
+  zinc: {
+    50:  "var(--color-zinc-50, #fafafa)",
+    100: "var(--color-zinc-100, #f4f4f5)",
+    200: "var(--color-zinc-200, #e4e4e7)",
+    300: "var(--color-zinc-300, #d4d4d8)",
+    400: "var(--color-zinc-400, #a1a1aa)",
+    500: "var(--color-zinc-500, #71717a)",
+    600: "var(--color-zinc-600, #52525b)",
+    700: "var(--color-zinc-700, #3f3f46)",
+    800: "var(--color-zinc-800, #27272a)",
+    900: "var(--color-zinc-900, #18181b)",
+  },
+  red: {
+    50:  "var(--color-red-50, #fef2f2)",
+    100: "var(--color-red-100, #fee2e2)",
+    200: "var(--color-red-200, #fecaca)",
+    300: "var(--color-red-300, #fca5a5)",
+    400: "var(--color-red-400, #f87171)",
+    500: "var(--color-red-500, #ef4444)",
+    600: "var(--color-red-600, #dc2626)",
+    700: "var(--color-red-700, #b91c1c)",
+    800: "var(--color-red-800, #991b1b)",
+    900: "var(--color-red-900, #7f1d1d)",
+  },
+  blue: {
+    50:  "var(--color-blue-50, #eff6ff)",
+    100: "var(--color-blue-100, #dbeafe)",
+    200: "var(--color-blue-200, #bfdbfe)",
+    300: "var(--color-blue-300, #93c5fd)",
+    400: "var(--color-blue-400, #60a5fa)",
+    500: "var(--color-blue-500, #3b82f6)",
+    600: "var(--color-blue-600, #2563eb)",
+    700: "var(--color-blue-700, #1d4ed8)",
+    800: "var(--color-blue-800, #1e40af)",
+    900: "var(--color-blue-900, #1e3a8a)",
+  },
+  green: {
+    50:  "var(--color-green-50, #f0fdf4)",
+    100: "var(--color-green-100, #dcfce7)",
+    200: "var(--color-green-200, #bbf7d0)",
+    300: "var(--color-green-300, #86efac)",
+    400: "var(--color-green-400, #4ade80)",
+    500: "var(--color-green-500, #22c55e)",
+    600: "var(--color-green-600, #16a34a)",
+    700: "var(--color-green-700, #15803d)",
+    800: "var(--color-green-800, #166534)",
+    900: "var(--color-green-900, #14532d)",
+  },
+  amber: {
+    50:  "var(--color-amber-50, #fffbeb)",
+    100: "var(--color-amber-100, #fef3c7)",
+    200: "var(--color-amber-200, #fde68a)",
+    300: "var(--color-amber-300, #fcd34d)",
+    400: "var(--color-amber-400, #fbbf24)",
+    500: "var(--color-amber-500, #f59e0b)",
+    600: "var(--color-amber-600, #d97706)",
+    700: "var(--color-amber-700, #b45309)",
+    800: "var(--color-amber-800, #92400e)",
+    900: "var(--color-amber-900, #78350f)",
+  },
+  indigo: {
+    50:  "var(--color-indigo-50, #eef2ff)",
+    100: "var(--color-indigo-100, #e0e7ff)",
+    200: "var(--color-indigo-200, #c7d2fe)",
+    300: "var(--color-indigo-300, #a5b4fc)",
+    400: "var(--color-indigo-400, #818cf8)",
+    500: "var(--color-indigo-500, #6366f1)",
+    600: "var(--color-indigo-600, #4f46e5)",
+    700: "var(--color-indigo-700, #4338ca)",
+    800: "var(--color-indigo-800, #3730a3)",
+    900: "var(--color-indigo-900, #312e81)",
+  },
+  emerald: {
+    50:  "var(--color-emerald-50, #ecfdf5)",
+    100: "var(--color-emerald-100, #d1fae5)",
+    200: "var(--color-emerald-200, #a7f3d0)",
+    300: "var(--color-emerald-300, #6ee7b7)",
+    400: "var(--color-emerald-400, #34d399)",
+    500: "var(--color-emerald-500, #10b981)",
+    600: "var(--color-emerald-600, #059669)",
+    700: "var(--color-emerald-700, #047857)",
+    800: "var(--color-emerald-800, #065f46)",
+    900: "var(--color-emerald-900, #064e3b)",
+  },
+  rose: {
+    50:  "var(--color-rose-50, #fff1f2)",
+    100: "var(--color-rose-100, #ffe4e6)",
+    200: "var(--color-rose-200, #fecdd3)",
+    300: "var(--color-rose-300, #fda4af)",
+    400: "var(--color-rose-400, #fb7185)",
+    500: "var(--color-rose-500, #f43f5e)",
+    600: "var(--color-rose-600, #e11d48)",
+    700: "var(--color-rose-700, #be123c)",
+    800: "var(--color-rose-800, #9f1239)",
+    900: "var(--color-rose-900, #881337)",
+  },
+  white: { DEFAULT: "var(--color-white, #ffffff)" },
+  black: { DEFAULT: "var(--color-black, #000000)" }
 };
 
-/**
- * CSS Reset
- */
-export const cssReset = `
-/* CSS Reset */
-  *,
-  *::before,
-  *::after {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-    border: 0;
-    background: none;
-    font: inherit;
-    vertical-align: baseline;
-  }
-  html {
-    line-height: 1.5;
-    -webkit-text-size-adjust: 100%;
-    -moz-tab-size: 4;
-    tab-size: 4;
-    font-family: ui-sans-serif, system-ui, sans-serif;
-    color: #111827;
-    background: #fff;
-  }
-  body {
-    min-height: 100vh;
-    text-rendering: optimizeLegibility;
-    font-size: 1rem;
-    font-weight: 400;
-    line-height: 1.5;
-    background: #fff;
-  }
-  ul, ol { list-style: none; }
-  button, input, select, textarea {
-    background: none;
-    border: none;
-    outline: none;
-    font: inherit;
-    color: inherit;
-  }
-  a { text-decoration: none; color: inherit; }
-`;
+const utilityMap: CSSMap = {
+  /* Display */
+  block: "display:block;",
+  inline: "display:inline;",
+  "inline-block": "display:inline-block;",
+  flex: "display:flex;",
+  "inline-flex": "display:inline-flex;",
+  grid: "display:grid;",
+  hidden: "display:none;",
 
-/**
- * Common CSS utility classes (Tailwind CSS 4 inspired, with custom properties)
- * Includes a CSS reset and scalable spacing utilities.
- */
-export const cssUtilities = `
-  /* CSS Custom Properties for Spacing  */
-  :root {
-    --space-0: 0rem;
-    --space-1: 0.25rem;
-    --space-2: 0.5rem;
-    --space-3: 0.75rem;
-    --space-4: 1rem;
-    --space-5: 1.25rem;
-    --space-6: 1.5rem;
-    --space-7: 1.75rem;
-    --space-8: 2rem;
-    --space-9: 2.25rem;
-    --space-10: 2.5rem;
-    --space-11: 2.75rem;
-    --space-12: 3rem;
-  }
+  /* Accessibility */
+  "sr-only": "position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border-width:0;",
+  "not-sr-only": "position:static;width:auto;height:auto;padding:0;margin:0;overflow:visible;clip:auto;white-space:normal;",
 
-  /* Spacing utilities (up to 12) */
-  .p-0 { padding: var(--space-0); }
-  .p-1 { padding: var(--space-1); }
-  .p-2 { padding: var(--space-2); }
-  .p-3 { padding: var(--space-3); }
-  .p-4 { padding: var(--space-4); }
-  .p-5 { padding: var(--space-5); }
-  .p-6 { padding: var(--space-6); }
-  .p-7 { padding: var(--space-7); }
-  .p-8 { padding: var(--space-8); }
-  .p-9 { padding: var(--space-9); }
-  .p-10 { padding: var(--space-10); }
-  .p-11 { padding: var(--space-11); }
-  .p-12 { padding: var(--space-12); }
+  /* Grid Layout */
+  "grid-cols-1": "grid-template-columns:repeat(1,minmax(0,1fr));",
+  "grid-cols-2": "grid-template-columns:repeat(2,minmax(0,1fr));",
+  "grid-cols-3": "grid-template-columns:repeat(3,minmax(0,1fr));",
+  "grid-cols-4": "grid-template-columns:repeat(4,minmax(0,1fr));",
+  "grid-cols-5": "grid-template-columns:repeat(5,minmax(0,1fr));",
+  "grid-cols-6": "grid-template-columns:repeat(6,minmax(0,1fr));",
+  "grid-cols-12": "grid-template-columns:repeat(12,minmax(0,1fr));",
+  "grid-rows-1": "grid-template-rows:repeat(1,minmax(0,1fr));",
+  "grid-rows-2": "grid-template-rows:repeat(2,minmax(0,1fr));",
+  "grid-rows-3": "grid-template-rows:repeat(3,minmax(0,1fr));",
+  "grid-rows-4": "grid-template-rows:repeat(4,minmax(0,1fr));",
+  "grid-rows-6": "grid-template-rows:repeat(6,minmax(0,1fr));",
+  "grid-rows-12": "grid-template-rows:repeat(12,minmax(0,1fr));",
 
-  .pt-0 { padding-top: var(--space-0); }
-  .pt-1 { padding-top: var(--space-1); }
-  .pt-2 { padding-top: var(--space-2); }
-  .pt-3 { padding-top: var(--space-3); }
-  .pt-4 { padding-top: var(--space-4); }
-  .pt-5 { padding-top: var(--space-5); }
-  .pt-6 { padding-top: var(--space-6); }
-  .pt-7 { padding-top: var(--space-7); }
-  .pt-8 { padding-top: var(--space-8); }
-  .pt-9 { padding-top: var(--space-9); }
-  .pt-10 { padding-top: var(--space-10); }
-  .pt-11 { padding-top: var(--space-11); }
-  .pt-12 { padding-top: var(--space-12); }
+  /* Grid Placement */
+  "col-span-1": "grid-column:span 1 / span 1;",
+  "col-span-2": "grid-column:span 2 / span 2;",
+  "col-span-3": "grid-column:span 3 / span 3;",
+  "col-span-4": "grid-column:span 4 / span 4;",
+  "col-span-5": "grid-column:span 5 / span 5;",
+  "col-span-6": "grid-column:span 6 / span 6;",
+  "col-span-12": "grid-column:span 12 / span 12;",
+  "row-span-1": "grid-row:span 1 / span 1;",
+  "row-span-2": "grid-row:span 2 / span 2;",
+  "row-span-3": "grid-row:span 3 / span 3;",
+  "row-span-4": "grid-row:span 4 / span 4;",
+  "row-span-6": "grid-row:span 6 / span 6;",
+  "row-span-12": "grid-row:span 12 / span 12;",
 
-  .pb-0 { padding-bottom: var(--space-0); }
-  .pb-1 { padding-bottom: var(--space-1); }
-  .pb-2 { padding-bottom: var(--space-2); }
-  .pb-3 { padding-bottom: var(--space-3); }
-  .pb-4 { padding-bottom: var(--space-4); }
-  .pb-5 { padding-bottom: var(--space-5); }
-  .pb-6 { padding-bottom: var(--space-6); }
-  .pb-7 { padding-bottom: var(--space-7); }
-  .pb-8 { padding-bottom: var(--space-8); }
-  .pb-9 { padding-bottom: var(--space-9); }
-  .pb-10 { padding-bottom: var(--space-10); }
-  .pb-11 { padding-bottom: var(--space-11); }
-  .pb-12 { padding-bottom: var(--space-12); }
+  /* Positioning */
+  absolute: "position:absolute;",
+  relative: "position:relative;",
+  fixed: "position:fixed;",
+  sticky: "position:sticky;",
 
-  .pl-0 { padding-left: var(--space-0); }
-  .pl-1 { padding-left: var(--space-1); }
-  .pl-2 { padding-left: var(--space-2); }
-  .pl-3 { padding-left: var(--space-3); }
-  .pl-4 { padding-left: var(--space-4); }
-  .pl-5 { padding-left: var(--space-5); }
-  .pl-6 { padding-left: var(--space-6); }
-  .pl-7 { padding-left: var(--space-7); }
-  .pl-8 { padding-left: var(--space-8); }
-  .pl-9 { padding-left: var(--space-9); }
-  .pl-10 { padding-left: var(--space-10); }
-  .pl-11 { padding-left: var(--space-11); }
-  .pl-12 { padding-left: var(--space-12); }
+  /* Typography */
+  "font-bold": "font-weight:700;",
+  "font-semibold": "font-weight:600;",
+  "font-medium": "font-weight:500;",
+  "font-light": "font-weight:300;",
+  underline: "text-decoration-line:underline;",
+  overline: "text-decoration-line:overline;",
+  "line-through": "text-decoration-line:line-through;",
+  "no-underline": "text-decoration-line:none;",
+  italic: "font-style:italic;",
+  "not-italic": "font-style:normal;",
+  uppercase: "text-transform:uppercase;",
+  lowercase: "text-transform:lowercase;",
+  capitalize: "text-transform:capitalize;",
+  "normal-case": "text-transform:none;",
+  "text-left": "text-align:left;",
+  "text-center": "text-align:center;",
+  "text-right": "text-align:right;",
+  "text-xs": "font-size:0.75rem;line-height:calc(1 / 0.75)",
+  "text-sm": "font-size:0.875rem;line-height:calc(1.25 / 0.875)",
+  "text-base": "font-size:1rem;line-height:calc(1.5 / 1)",
+  "text-lg": "font-size:1.125rem;line-height:calc(1.75 / 1.125)",
+  "text-xl": "font-size:1.25rem;line-height:calc(1.75 / 1.25)",
+  "text-2xl": "font-size:1.5rem;line-height:calc(2 / 1.5)",
+  "text-3xl": "font-size:1.875rem;line-height:calc(2.25 / 1.875)",
+  "text-4xl": "font-size:2.25rem;line-height:calc(2.5 / 2.25)",
+  "text-5xl": "font-size:3rem;line-height:1",
+  "text-6xl": "font-size:3.75rem;line-height:1",
+  "text-7xl": "font-size:4.5rem;line-height:1",
+  "text-8xl": "font-size:6rem;line-height:1",
 
-  .pr-0 { padding-right: var(--space-0); }
-  .pr-1 { padding-right: var(--space-1); }
-  .pr-2 { padding-right: var(--space-2); }
-  .pr-3 { padding-right: var(--space-3); }
-  .pr-4 { padding-right: var(--space-4); }
-  .pr-5 { padding-right: var(--space-5); }
-  .pr-6 { padding-right: var(--space-6); }
-  .pr-7 { padding-right: var(--space-7); }
-  .pr-8 { padding-right: var(--space-8); }
-  .pr-9 { padding-right: var(--space-9); }
-  .pr-10 { padding-right: var(--space-10); }
-  .pr-11 { padding-right: var(--space-11); }
-  .pr-12 { padding-right: var(--space-12); }
+  /* Borders */
+  border: "border-width:1px;",
+  "rounded-none": "border-radius:0;",
+  "rounded-xs": "border-radius:0.125rem;",
+  "rounded-sm": "border-radius:0.25rem;",
+  "rounded-md": "border-radius:0.375rem;",
+  "rounded-lg": "border-radius:0.5rem;",
+  "rounded-full": "border-radius:9999px;",
+    /* Ring (box-shadow for focus) */
+    "ring-0": "box-shadow:none;",
+    "ring-1": "box-shadow:0 0 0 1px rgba(59,130,246,0.5);",
+    "ring-2": "box-shadow:0 0 0 2px rgba(59,130,246,0.5);",
+    "ring-4": "box-shadow:0 0 0 4px rgba(59,130,246,0.5);",
+    "ring-8": "box-shadow:0 0 0 8px rgba(59,130,246,0.5);",
 
-  .m-0 { margin: var(--space-0); }
-  .m-1 { margin: var(--space-1); }
-  .m-2 { margin: var(--space-2); }
-  .m-3 { margin: var(--space-3); }
-  .m-4 { margin: var(--space-4); }
-  .m-5 { margin: var(--space-5); }
-  .m-6 { margin: var(--space-6); }
-  .m-7 { margin: var(--space-7); }
-  .m-8 { margin: var(--space-8); }
-  .m-9 { margin: var(--space-9); }
-  .m-10 { margin: var(--space-10); }
-  .m-11 { margin: var(--space-11); }
-  .m-12 { margin: var(--space-12); }
+  /* Shadow and effects */
+  "shadow-none": "box-shadow:0 0 #0000;",
+  "shadow-xs": "box-shadow:0 1px 2px 0 rgb(0 0 0 / 0.05);",
+  "shadow-sm": "box-shadow:0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);",
+  "shadow-md": "box-shadow:0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);",
+  "shadow-lg": "box-shadow:0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);",
+  "shadow-xl": "box-shadow:0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);",
+  "shadow-2xl": "box-shadow:0 25px 50px -12px rgb(0 0 0 / 0.25);",
 
-  .mt-0 { margin-top: var(--space-0); }
-  .mt-1 { margin-top: var(--space-1); }
-  .mt-2 { margin-top: var(--space-2); }
-  .mt-3 { margin-top: var(--space-3); }
-  .mt-4 { margin-top: var(--space-4); }
-  .mt-5 { margin-top: var(--space-5); }
-  .mt-6 { margin-top: var(--space-6); }
-  .mt-7 { margin-top: var(--space-7); }
-  .mt-8 { margin-top: var(--space-8); }
-  .mt-9 { margin-top: var(--space-9); }
-  .mt-10 { margin-top: var(--space-10); }
-  .mt-11 { margin-top: var(--space-11); }
-  .mt-12 { margin-top: var(--space-12); }
+  /* Transitions */
+  transition: "transition-property:all;transition-duration:150ms;transition-timing-function:cubic-bezier(0.4,0,0.2,1);",
 
-  .mb-0 { margin-bottom: var(--space-0); }
-  .mb-1 { margin-bottom: var(--space-1); }
-  .mb-2 { margin-bottom: var(--space-2); }
-  .mb-3 { margin-bottom: var(--space-3); }
-  .mb-4 { margin-bottom: var(--space-4); }
-  .mb-5 { margin-bottom: var(--space-5); }
-  .mb-6 { margin-bottom: var(--space-6); }
-  .mb-7 { margin-bottom: var(--space-7); }
-  .mb-8 { margin-bottom: var(--space-8); }
-  .mb-9 { margin-bottom: var(--space-9); }
-  .mb-10 { margin-bottom: var(--space-10); }
-  .mb-11 { margin-bottom: var(--space-11); }
-  .mb-12 { margin-bottom: var(--space-12); }
+  /* Text Overflow & Whitespace */
+  truncate: "overflow:hidden;text-overflow:ellipsis;white-space:nowrap;",
 
-  .ml-0 { margin-left: var(--space-0); }
-  .ml-1 { margin-left: var(--space-1); }
-  .ml-2 { margin-left: var(--space-2); }
-  .ml-3 { margin-left: var(--space-3); }
-  .ml-4 { margin-left: var(--space-4); }
-  .ml-5 { margin-left: var(--space-5); }
-  .ml-6 { margin-left: var(--space-6); }
-  .ml-7 { margin-left: var(--space-7); }
-  .ml-8 { margin-left: var(--space-8); }
-  .ml-9 { margin-left: var(--space-9); }
-  .ml-10 { margin-left: var(--space-10); }
-  .ml-11 { margin-left: var(--space-11); }
-  .ml-12 { margin-left: var(--space-12); }
+  /* Visibility */
+  "visible": "visibility:visible;",
+  "invisible": "visibility:hidden;",
 
-  .mr-0 { margin-right: var(--space-0); }
-  .mr-1 { margin-right: var(--space-1); }
-  .mr-2 { margin-right: var(--space-2); }
-  .mr-3 { margin-right: var(--space-3); }
-  .mr-4 { margin-right: var(--space-4); }
-  .mr-5 { margin-right: var(--space-5); }
-  .mr-6 { margin-right: var(--space-6); }
-  .mr-7 { margin-right: var(--space-7); }
-  .mr-8 { margin-right: var(--space-8); }
-  .mr-9 { margin-right: var(--space-9); }
-  .mr-10 { margin-right: var(--space-10); }
-  .mr-11 { margin-right: var(--space-11); }
-  .mr-12 { margin-right: var(--space-12); }
+  /* Flex Grow/Shrink/Basis */
+  "grow": "flex-grow:1;",
+  "shrink": "flex-shrink:1;",
+  "grow-0": "flex-grow:0;",
+  "shrink-0": "flex-shrink:0;",
 
-  .my-auto { margin-block: auto; }
-  .mx-auto { margin-inline: auto; }
+  /* Font Family */
+  "font-sans": "font-family:ui-sans-serif,system-ui,sans-serif;",
+  "font-serif": "font-family:ui-serif,Georgia,serif;",
+  "font-mono": "font-family:ui-monospace,SFMono-Regular,monospace;",
 
-  /* Display utilities */
-  .block { display: block; }
-  .inline { display: inline; }
-  .inline-block { display: inline-block; }
-  .flex { display: flex; }
-  .inline-flex { display: inline-flex; }
-  .grid { display: grid; }
-  .hidden { display: none; }
+  /* Line Clamp (for webkit) */
+  "line-clamp-1": "display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;",
+  "line-clamp-2": "display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;",
+  "line-clamp-3": "display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;",
+  "line-clamp-4": "display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;",
 
-  /* Flexbox utilities */
-  .flex-row { flex-direction: row; }
-  .flex-col { flex-direction: column; }
-  .items-center { align-items: center; }
-  .items-start { align-items: flex-start; }
-  .items-end { align-items: flex-end; }
-  .justify-center { justify-content: center; }
-  .justify-between { justify-content: space-between; }
-  .justify-start { justify-content: flex-start; }
-  .justify-end { justify-content: flex-end; }
-  .gap-1 { gap: var(--space-1); }
-  .gap-2 { gap: var(--space-2); }
-  .gap-3 { gap: var(--space-3); }
-  .gap-4 { gap: var(--space-4); }
-  .gap-5 { gap: var(--space-5); }
-  .gap-6 { gap: var(--space-6); }
-  .gap-7 { gap: var(--space-7); }
-  .gap-8 { gap: var(--space-8); }
-  .gap-9 { gap: var(--space-9); }
-  .gap-10 { gap: var(--space-10); }
-  .gap-11 { gap: var(--space-11); }
-  .gap-12 { gap: var(--space-12); }
+  /* Transition Delay/Property */
+  "transition-colors": "transition-property:color,background-color,border-color,text-decoration-color,fill,stroke;",
+  "transition-opacity": "transition-property:opacity;",
+  "transition-transform": "transition-property:transform;",
+};
 
-  /* Sizing utilities */
-  .w-full { width: 100%; }
-  .h-full { height: 100%; }
-  .min-h-screen { min-height: 100vh; }
-  .max-w-xs { max-width: 20rem; }
-  .max-w-sm { max-width: 24rem; }
-  .max-w-md { max-width: 28rem; }
-  .max-w-lg { max-width: 32rem; }
-  .max-w-xl { max-width: 36rem; }
+const spacing = '0.25rem';
 
-  /* Typography utilities */
-  .text-xs { font-size: 0.75rem; }
-  .text-sm { font-size: 0.875rem; }
-  .text-base { font-size: 1rem; }
-  .text-lg { font-size: 1.125rem; }
-  .text-xl { font-size: 1.25rem; }
-  .font-bold { font-weight: 700; }
-  .font-semibold { font-weight: 600; }
-  .font-normal { font-weight: 400; }
-  .font-light { font-weight: 300; }
-  .text-center { text-align: center; }
-  .text-left { text-align: left; }
-  .text-right { text-align: right; }
+const spacingProps: Record<string, string[]> = {
+  m: ["margin"],
+  mx: ["margin-inline"],
+  my: ["margin-block"],
+  mt: ["margin-top"],
+  mr: ["margin-right"],
+  mb: ["margin-bottom"],
+  ml: ["margin-left"],
+  p: ["padding"],
+  px: ["padding-inline"],
+  py: ["padding-block"],
+  pt: ["padding-top"],
+  pr: ["padding-right"],
+  pb: ["padding-bottom"],
+  pl: ["padding-left"],
+  inset: ["inset"],
+  "inset-x": ["inset-inline"],
+  "inset-y": ["inset-block"],
+  top: ["top"],
+  bottom: ["bottom"],
+  left: ["left"],
+  right: ["right"],
+  gap: ["gap"],
+  "gap-x": ["column-gap"],
+  "gap-y": ["row-gap"]
+};
 
-  /* Border utilities */
-  .border { border: 1px solid #e5e7eb; }
-  .border-0 { border: none; }
-  .rounded { border-radius: 0.25rem; }
-  .rounded-md { border-radius: 0.375rem; }
-  .rounded-lg { border-radius: 0.5rem; }
-  .rounded-full { border-radius: 9999px; }
+const selectorVariants: SelectorVariantMap = {
+  // State variants
+  before: (sel, body) => `${sel}::before{${body}}`,
+  after: (sel, body) => `${sel}::after{${body}}`,
+  hover: (sel, body) => `${sel}:hover{${body}}`,
+  focus: (sel, body) => `${sel}:focus{${body}}`,
+  active: (sel, body) => `${sel}:active{${body}}`,
+  disabled: (sel, body) => `${sel}:disabled{${body}}`,
+  visited: (sel, body) => `${sel}:visited{${body}}`,
+  checked: (sel, body) => `${sel}:checked{${body}}`,
+  first: (sel, body) => `${sel}:first-child{${body}}`,
+  last: (sel, body) => `${sel}:last-child{${body}}`,
+  odd: (sel, body) => `${sel}:nth-child(odd){${body}}`,
+  even: (sel, body) => `${sel}:nth-child(even){${body}}`,
+  "focus-within": (sel, body) => `${sel}:focus-within{${body}}`,
+  "focus-visible": (sel, body) => `${sel}:focus-visible{${body}}`,
 
-  /* Color utilities */
-  .bg-white { background-color: #fff; }
-  .bg-gray-50 { background-color: #f9fafb; }
-  .bg-gray-100 { background-color: #f3f4f6; }
-  .bg-gray-200 { background-color: #e5e7eb; }
-  .bg-blue-500 { background-color: #3b82f6; }
-  .bg-red-500 { background-color: #ef4444; }
-  .text-black { color: #000; }
-  .text-gray-600 { color: #4b5563; }
-  .text-blue-600 { color: #2563eb; }
-  .text-red-600 { color: #dc2626; }
+  // Group variants
+  "group-hover": (sel, body) => `.group:hover ${sel}{${body}}`,
+  "group-focus": (sel, body) => `.group:focus ${sel}{${body}}`,
+  "group-active": (sel, body) => `.group:active ${sel}{${body}}`,
+  "group-disabled": (sel, body) => `.group:disabled ${sel}{${body}}`,
 
-  /* Interactive utilities */
-  .cursor-pointer { cursor: pointer; }
-  .cursor-default { cursor: default; }
-  .pointer-events-none { pointer-events: none; }
-  .select-none { user-select: none; }
+  // Peer variants
+  "peer-hover": (sel, body) => `.peer:hover ~ ${sel}{${body}}`,
+  "peer-focus": (sel, body) => `.peer:focus ~ ${sel}{${body}}`,
+  "peer-checked": (sel, body) => `.peer:checked ~ ${sel}{${body}}`,
+  "peer-disabled": (sel, body) => `.peer:disabled ~ ${sel}{${body}}`,
+};
 
-  /* Shadow utilities */
-  .shadow { box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05); }
-  .shadow-md { box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
-  .shadow-lg { box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
+const mediaVariants: MediaVariantMap = {
+  // Responsive
+  "sm": "(min-width:640px)",
+  "md": "(min-width:768px)",
+  "lg": "(min-width:1024px)",
+  "xl": "(min-width:1280px)",
+  "2xl": "(min-width:1536px)",
 
-  /* Responsive utilities (mobile-first) */
-  @media (min-width: 640px) {
-    .sm\\:block { display: block; }
-    .sm\\:hidden { display: none; }
-    .sm\\:flex { display: flex; }
-    .sm\\:grid { display: grid; }
-    .sm\\:w-full { width: 100%; }
-  }
-  @media (min-width: 768px) {
-    .md\\:block { display: block; }
-    .md\\:hidden { display: none; }
-    .md\\:flex { display: flex; }
-    .md\\:grid { display: grid; }
-    .md\\:w-full { width: 100%; }
-  }
-  @media (min-width: 1024px) {
-    .lg\\:block { display: block; }
-    .lg\\:hidden { display: none; }
-    .lg\\:flex { display: flex; }
-    .lg\\:grid { display: grid; }
-    .lg\\:w-full { width: 100%; }
-  }
-  @media (min-width: 1280px) {
-    .xl\\:block { display: block; }
-    .xl\\:hidden { display: none; }
-    .xl\\:flex { display: flex; }
-    .xl\\:grid { display: grid; }
-    .xl\\:w-full { width: 100%; }
-  }
-  @media (min-width: 1536px) {
-    .2xl\\:block { display: block; }
-    .2xl\\:hidden { display: none; }
-    .2xl\\:flex { display: flex; }
-    .2xl\\:grid { display: grid; }
-    .2xl\\:w-full { width: 100%; }
-  }
-`;
+  // Dark mode (now plain string)
+  "dark": "(prefers-color-scheme: dark)"
+};
 
-/**
- * Performance monitoring for style operations
- */
-export class StylePerformanceMonitor {
-  private metrics = new Map<string, number[]>();
+const responsiveOrder = ["sm", "md", "lg", "xl", "2xl"];
 
-  startTimer(operation: string): () => number {
-    const start = performance.now();
+function parseSpacing(className: string): string | null {
+  const negative = className.startsWith("-");
+  const raw = negative ? className.slice(1) : className;
+  const parts = raw.split("-");
 
-    return () => {
-      const duration = performance.now() - start;
-      this.recordMetric(operation, duration);
-      return duration;
-    };
-  }
+  if (parts.length < 2) return null;
 
-  private recordMetric(operation: string, duration: number): void {
-    if (!this.metrics.has(operation)) {
-      this.metrics.set(operation, []);
-    }
+  const key = parts.slice(0, -1).join("-");
+  const numStr = parts[parts.length - 1];
+  const num = parseFloat(numStr);
 
-    const times = this.metrics.get(operation)!;
-    times.push(duration);
+  if (Number.isNaN(num) || !spacingProps[key]) return null;
 
-    // Keep only last 100 measurements
-    if (times.length > 100) {
-      times.shift();
-    }
-  }
-
-  getStats(operation?: string) {
-    if (operation) {
-      const times = this.metrics.get(operation) || [];
-      if (times.length === 0) return null;
-
-      return {
-        operation,
-        count: times.length,
-        average: times.reduce((a, b) => a + b, 0) / times.length,
-        min: Math.min(...times),
-        max: Math.max(...times),
-      };
-    }
-
-    const stats: Record<string, any> = {};
-    for (const [op, times] of this.metrics) {
-      if (times.length > 0) {
-        stats[op] = {
-          count: times.length,
-          average: times.reduce((a, b) => a + b, 0) / times.length,
-          min: Math.min(...times),
-          max: Math.max(...times),
-        };
-      }
-    }
-    return stats;
-  }
-
-  reset(operation?: string): void {
-    if (operation) {
-      this.metrics.delete(operation);
-    } else {
-      this.metrics.clear();
-    }
-  }
+  const sign = negative ? "-" : "";
+  return spacingProps[key]
+    .map(prop => `${prop}:calc(${sign}${spacing} * ${num});`)
+    .join("");
 }
 
-// Default performance monitor instance
-export const stylePerformanceMonitor = new StylePerformanceMonitor();
+function hexToRgb(hex: string): string {
+  const clean = hex.replace("#", "");
+  const bigint = parseInt(clean, 16);
+  const r = (bigint >> 16) & 255;
+  const g = (bigint >> 8) & 255;
+  const b = bigint & 255;
+  return `${r} ${g} ${b}`;
+}
+
+function parseColorClass(className: string): string | null {
+  // Match bg-red-500, text-gray-200, border-blue-600, etc.
+  const match = /^(bg|text|border|shadow|outline|caret|accent)-([a-z]+)-?(\d{2,3}|DEFAULT)?$/.exec(className);
+  if (!match) return null;
+
+  const [, type, colorName, shade = "DEFAULT"] = match;
+  const colorValue = colors[colorName]?.[shade];
+  if (!colorValue) return null;
+
+  const propMap: Record<string, string> = {
+    bg: "background-color",
+    text: "color",
+    border: "border-color",
+    shadow: "box-shadow",
+    outline: "outline-color",
+    caret: "caret-color",
+    accent: "accent-color",
+  };
+
+  return `${propMap[type]}:${colorValue};`;
+}
+
+function parseOpacityModifier(className: string): { base: string; opacity?: number } {
+  const [base, opacityStr] = className.split("/");
+  if (!opacityStr) return { base };
+
+  const opacity = parseInt(opacityStr, 10);
+  if (isNaN(opacity) || opacity < 0 || opacity > 100) return { base };
+
+  return { base, opacity: opacity / 100 };
+}
+
+function parseColorWithOpacity(className: string): string | null {
+  const { base, opacity } = parseOpacityModifier(className);
+
+  // Try palette first
+  const paletteRule = parseColorClass(base); // e.g., "background-color:#ef4444;"
+  if (paletteRule) {
+    if (opacity !== undefined) {
+      const match = /#([0-9a-f]{6})/i.exec(paletteRule);
+      if (match) {
+        const rgb = hexToRgb(match[0]);
+        return paletteRule.replace(/#([0-9a-f]{6})/i, `rgb(${rgb} / ${opacity})`);
+      }
+    }
+    return paletteRule;
+  }
+
+  // Try arbitrary color: [bg:#ff0000]/50
+  const arbitraryRule = parseArbitrary(base);
+  if (arbitraryRule && opacity !== undefined) {
+    const match = /#([0-9a-f]{6})/i.exec(arbitraryRule);
+    if (match) {
+      const rgb = hexToRgb(match[0]);
+      return arbitraryRule.replace(/#([0-9a-f]{6})/i, `rgb(${rgb} / ${opacity})`);
+    }
+  }
+
+  return arbitraryRule;
+}
+
+/**
+ * Arbitrary value parser — supports:
+ * - prop-[value]
+ */
+function parseArbitrary(className: string): string | null {
+  // prop-[value] syntax
+  const bracketStart = className.indexOf("-[");
+  const bracketEnd = className.endsWith("]");
+  if (bracketStart > 0 && bracketEnd) {
+    const prop = className.slice(0, bracketStart);
+    let value = className.slice(bracketStart + 2, -1);
+
+    // Convert underscores to spaces for valid CSS
+    value = value.replace(/_/g, " ");
+
+    // Map common abbreviations to CSS properties
+    const propMap: Record<string, string> = {
+      bg: "background-color",
+      text: "color",
+      p: "padding",
+      px: "padding-inline",
+      py: "padding-block",
+      m: "margin",
+      mx: "margin-inline",
+      my: "margin-block",
+      w: "width",
+      h: "height",
+      "min-w": "min-width",
+      "max-w": "max-width",
+      "min-h": "min-height",
+      "max-h": "max-height",
+      "border-t": "border-top",
+      "border-b": "border-bottom",
+      "border-l": "border-left",
+      "border-r": "border-right",
+      "border-x": "border-inline",
+      "border-y": "border-block",
+      shadow: "box-shadow",
+      "duration": "transition-duration",
+      "list": "list-style",
+      "break": "word-break",
+      "flex": "flex-direction",
+      "items": "align-items",
+      "justify": "justify-content",
+      "whitespace": "white-space",
+      "select": "user-select",
+      "content": "align-content",
+      "self": "align-self",
+      "basis": "flex-basis",
+      "tracking": "letter-spacing",
+      "scroll": "scroll-behavior",
+      "delay": "transition-delay",
+      "weight": "font-weight",
+      "leading": "line-height",
+      z: "z-index"
+    };
+
+    const cssProp = propMap[prop] ?? prop.replace(/_/g, "-");
+    if (cssProp && value) return `${cssProp}:${value};`;
+  }
+
+  return null;
+}
+
+function escapeClassName(name: string): string {
+  // Escape only selector-relevant characters, not brackets
+  return name.replace(/([!"#$%&'()*+,./:;<=>?@[\\\]^`{|}~])/g, '\\$1');
+}
+
+function extractClassesFromHTML(html: string): string[] {
+  const classAttrRegex = /class\s*=\s*["']([^"']+)["']/g;
+  const classList: string[] = [];
+  let match: RegExpExecArray | null;
+
+  while ((match = classAttrRegex.exec(html))) {
+    // Split on spaces not inside brackets
+    let buffer = '';
+    let inBracket = false;
+    for (const char of match[1]) {
+      if (char === '[') inBracket = true;
+      if (char === ']') inBracket = false;
+      if (char === ' ' && !inBracket) {
+        if (buffer) classList.push(buffer);
+        buffer = '';
+      } else buffer += char;
+    }
+    if (buffer) classList.push(buffer);
+  }
+  return classList.filter(Boolean);
+}
+
+/**
+ * JIT CSS generation with throttling and memoization.
+ * Only regenerates CSS if HTML changes and enough time has passed.
+ * Caches results for repeated HTML inputs.
+ */
+const jitCssCache = new Map<string, { css: string; timestamp: number }>();
+const JIT_CSS_THROTTLE_MS = 16; // 60fps
+
+export function jitCSS(html: string): string {
+  const now = Date.now();
+  const cached = jitCssCache.get(html);
+
+  // Use cached CSS if within throttle window
+  if (cached && now - cached.timestamp < JIT_CSS_THROTTLE_MS) return cached.css;
+
+  // ...existing JIT CSS logic...
+  const classes = extractClassesFromHTML(html);
+  const seen = new Set(classes);
+
+  const bucket1: string[] = [];
+  const bucket2: string[] = [];
+  const bucket3: string[] = [];
+  const bucket4: string[] = [];
+  const ruleCache: Record<string, string | null> = {};
+
+  function generateRuleCached(cls: string, stripDark = false): string | null {
+    const cacheKey = (stripDark ? "dark|" : "") + cls;
+    if (cacheKey in ruleCache) return ruleCache[cacheKey];
+    const result = generateRule(cls, stripDark);
+    ruleCache[cacheKey] = result;
+    return result;
+  }
+
+  function classify(before: string[]): number {
+    const hasResponsive = before.some(t => responsiveOrder.includes(t));
+    const hasDark = before.includes("dark");
+    if (before.length === 0) return 1;
+    if (!hasResponsive && !hasDark) return 2;
+    if (hasResponsive && !hasDark) return 3;
+    return 4;
+  }
+
+  function generateRule(cls: string, stripDark = false): string | null {
+    const parts = cls.split(":");
+    const basePart = parts.find(
+      p => utilityMap[p] || parseSpacing(p) || parseColorWithOpacity(p) || parseArbitrary(p)
+    );
+    if (!basePart) return null;
+
+    const baseRule =
+      utilityMap[basePart] ??
+      parseSpacing(basePart) ??
+      parseColorWithOpacity(basePart) ??
+      parseArbitrary(basePart);
+
+    if (!baseRule) return null;
+
+    let selector = `.${escapeClassName(cls)}`;
+    let body = baseRule;
+
+    const baseIndex = parts.indexOf(basePart);
+    let before = baseIndex >= 0 ? parts.slice(0, baseIndex) : [];
+
+    if (stripDark) before = before.filter(t => t !== "dark");
+
+    const responsiveTokens = before.filter(t => responsiveOrder.includes(t));
+    const lastResponsive = responsiveTokens.length
+      ? responsiveTokens[responsiveTokens.length - 1]
+      : null;
+
+    for (const token of before) {
+      if (responsiveOrder.includes(token)) continue;
+      const variantFn = selectorVariants[token];
+      if (typeof variantFn === "function") {
+        selector = variantFn(selector, body).replace(/\{.*$/, "");
+      }
+    }
+
+    let rule = `${selector}{${body}}`;
+
+    if (stripDark && lastResponsive) {
+      const responsiveQuery = mediaVariants[lastResponsive] as string;
+      rule = `@media (prefers-color-scheme: dark) and ${responsiveQuery}{${rule}}`;
+    } else if (stripDark) {
+      rule = `@media (prefers-color-scheme: dark){${rule}}`;
+    } else if (lastResponsive) {
+      const responsiveQuery = mediaVariants[lastResponsive] as string;
+      rule = `@media ${responsiveQuery}{${rule}}`;
+    }
+
+    return rule;
+  }
+
+  for (const cls of seen) {
+    const parts = cls.split(":");
+    const basePart = parts.find(
+      p => utilityMap[p] || parseSpacing(p) || parseColorWithOpacity(p) || parseArbitrary(p)
+    );
+    if (!basePart) continue;
+    const baseIndex = parts.indexOf(basePart);
+    const before = baseIndex >= 0 ? parts.slice(0, baseIndex) : [];
+    const bucketNum = classify(before);
+
+    if (bucketNum === 4) {
+      const rule = generateRuleCached(cls, true);
+      if (rule) bucket4.push(rule);
+    } else {
+      const rule = generateRuleCached(cls);
+      if (rule) {
+        if (bucketNum === 1) bucket1.push(rule);
+        else if (bucketNum === 2) bucket2.push(rule);
+        else if (bucketNum === 3) bucket3.push(rule);
+      }
+    }
+  }
+
+  const css = [...bucket1, ...bucket2, ...bucket3, ...bucket4].join("");
+  jitCssCache.set(html, { css, timestamp: now });
+  return css;
+}
