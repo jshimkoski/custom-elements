@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v0.0.15] - 2025-08-26
+
+- fix: correct link to style-utils.ts in JIT CSS documentation (c6adcc7)
+- fix: update link to style-utils.ts in JIT CSS documentation (77c34ef)
+
+
 ## [v0.0.14] - 2025-08-26
 
 - fix: update link to style-utils.ts in JIT CSS documentation (77c34ef)
