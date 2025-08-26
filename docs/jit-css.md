@@ -172,4 +172,4 @@ JIT CSS provides a rich set of built-in color palettes, all accessible via utili
 - Utility classes: see `utilityMap` in `style-utils.ts`
 - Variants: see `selectorVariants` and `mediaVariants`
 
-For full details, see the source in [`src/lib/style-utils.ts`](src/lib/style-utils.ts).
+For full details, see the source in [`../src/lib/style-utils.ts`](src/lib/style-utils.ts).
