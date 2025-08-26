@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v0.0.13] - 2025-08-26
+
+- docs: reorder and number steps in JIT CSS explanation for clarity (1a67bb6)
+- docs: refine README for clarity and consistency in usage instructions (1a2f2f6)
+
+
 ## [v0.0.12] - 2025-08-26
 
 - docs: refine README for clarity and consistency in usage instructions (1a2f2f6)
