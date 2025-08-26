@@ -1,6 +1,11 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v0.0.10-beta.2] - 2025-08-26
+
+- refactor(tests): update runtime config tests to improve clarity and remove unsupported assertions (f078f59)
+
+
 
 ## [v0.0.10-beta.1] - 2025-08-26
 
