@@ -19,18 +19,128 @@ export function minifyCSS(css: string): string {
  * Minimal Shadow DOM reset
  */
 export const baseReset = `
-  :host {
-    box-sizing:border-box;
-    line-height:1.5;
-    font-family:ui-sans-serif,system-ui,sans-serif;
-    -webkit-text-size-adjust:100%;
-    text-size-adjust:100%;
+  :host, *, ::before, ::after {
+    box-sizing: border-box;
+    border-width: 0;
+    border-style: solid;
+    border-color: currentColor;
   }
-  *,::before,::after {
-    box-sizing:inherit;
-    margin:0;
-    padding:0;
-    border:0 solid currentColor;
+  :host {
+    font-size: 16px;
+    line-height: 1.5;
+    font-family: ui-sans-serif, system-ui, sans-serif;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    color: inherit;
+    background-color: transparent;
+  }
+  *, ::before, ::after {
+    -webkit-tap-highlight-color: transparent;
+    margin: 0;
+    padding: 0;
+    font: inherit;
+    vertical-align: baseline;
+    background: transparent;
+    color: inherit;
+  }
+  button, input, optgroup, select, textarea {
+    font: inherit;
+    color: inherit;
+    background: transparent;
+    border: none;
+    outline: none;
+    margin: 0;
+    padding: 0;
+  }
+  textarea {
+    resize: vertical;
+  }
+  progress {
+    vertical-align: baseline;
+  }
+  button, textarea {
+    overflow: visible;
+  }
+  input[type="search"]::-webkit-search-decoration,
+  input[type="search"]::-webkit-search-cancel-button,
+  input[type="search"]::-webkit-search-results-button,
+  input[type="search"]::-webkit-search-results-decoration {
+    -webkit-appearance: none;
+  }
+  img, svg, video, canvas, audio, iframe, embed, object {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    vertical-align: middle;
+  }
+  select {
+    text-transform: none;
+  }
+  optgroup {
+    font-weight: bold;
+  }
+  fieldset {
+    border: none;
+  }
+  svg {
+    fill: currentColor;
+    stroke: none;
+  }
+  a {
+    color: inherit;
+    text-decoration: inherit;
+  }
+  a, button {
+    cursor: pointer;
+  }
+  input[type="file"] {
+    border: 0;
+  }
+  button, [type="button"], [type="reset"], [type="submit"] {
+    appearance: button;
+    background-color: transparent;
+    background-image: none;
+  }
+  [type='button'], [type='reset'], [type='submit'] {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  ::-webkit-input-placeholder { color: inherit; opacity: 0.5; }
+  ::placeholder { color: inherit; opacity: 0.5; }
+  *:focus {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+  }
+  ol, ul {
+    list-style: none;
+  }
+  table {
+    border-collapse: collapse;
+    border-spacing: 0;
+  }
+  strong {
+    font-weight: bolder;
+  }
+  sub, sup {
+    font-size: 0.75em;
+    line-height: 0;
+    position: relative;
+    vertical-align: baseline;
+  }
+  sub {
+    bottom: -0.25em;
+  }
+  sup {
+    top: -0.5em;
+  }
+  [disabled] {
+    cursor: not-allowed;
+  }
+  [hidden] {
+    display: none;
+  }
+  [aria-disabled="true"] {
+    cursor: not-allowed;
   }
 `;
 

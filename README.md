@@ -20,17 +20,19 @@ Build modern components with strict TypeScript, zero dependencies, and a clean f
 - 🔌 **Extensible:** Directives, event bus, store, and more for advanced use cases.
 - 🏆 **Developer Friendly:** Clean docs, examples, and a welcoming community.
 
-## ⏱️ Getting Started in 60 Seconds
+## ⏱️ Getting Started
 
 1. **Install:** `npm install @jasonshimmy/custom-elements-runtime`
 2. **Create a Component:**
-  ```ts
+```ts
 import { component, html } from '@jasonshimmy/custom-elements-runtime';
 
 component('my-counter', (ctx) => html`
-  <button @click="${() => ctx.count++}">Count: ${ctx.count}</button>
+  <button
+    @click="${() => ctx.count++}"
+  >Count: ${ctx.count}</button>
 `, { state: { count: 0 } });
-  ```
+```
 3. **Use in HTML:**
   ```html
   <my-counter></my-counter>

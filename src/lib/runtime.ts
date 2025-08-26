@@ -81,7 +81,6 @@ export interface ComponentConfig<
   >;
   watch?: WatchConfig<ComponentContext<S, C, P, T>>;
   style?: string | ((context: ComponentContext<S, C, P, T>) => string);
-  minifyCSS?: boolean;
   render: (context: ComponentContext<S, C, P, T>) => VNode | VNode[] | Promise<VNode | VNode[]>;
   loadingTemplate?: (context: ComponentContext<S, C, P, T>) => VNode | VNode[];
   errorTemplate?: (
@@ -511,7 +510,7 @@ export function createElementClass<
         }
 
         let finalStyle = sanitizeCSS(`${baseReset}\n${userStyle}\n${jitCss}\n`);
-        if (cfg.minifyCSS) finalStyle = minifyCSS(finalStyle);
+        finalStyle = minifyCSS(finalStyle);
 
         // Use adoptedStyleSheets
         if (!this._styleSheet) {

@@ -2,7 +2,7 @@
 
 ## 🖌️ Overview
 
-The `style` property in the runtime lets you define CSS for your custom element. Styles can be static strings, dynamic functions based on state, or advanced configs for performance. All styles are scoped to the shadow DOM, secure, and optimized for mobile-first rendering.
+The `style` property in the runtime lets you define CSS for your custom element. Styles can be static strings or dynamic functions based on state. All styles are scoped to the shadow DOM, secure, and optimized for mobile-first rendering.
 
 A [JIT CSS](./jit-css.md) engine is also included that generates only the necessary CSS based on your HTML content. It is simple, expressive, and ensures minimal styles are applied.
 
@@ -63,7 +63,6 @@ component('highlighted-box', {
 component('styled-box', {
   state: { color: 'red', size: 24 },
   style: (ctx) => `:host { color: ${ctx.color}; font-size: ${ctx.size}px; }`,
-  minifyCSS: true,
   render: (ctx) => html`<div>Styled content</div>`,
 });
 ```
@@ -87,6 +86,6 @@ component('styled-box', {
 
 ## 🏁 Summary
 
-The `style` property provides secure, efficient, and flexible styling for your custom elements. Use static, dynamic, or advanced configs to create beautiful, performant, and maintainable components.
+The `style` property provides secure, efficient, and flexible styling for your custom elements. Use static or dynamic styles to create beautiful, performant, and maintainable components.
 
 See [JIT CSS](./jit-css.md) to learn about how to generate only the necessary CSS based on your HTML content.
