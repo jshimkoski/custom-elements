@@ -1,6 +1,15 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v0.0.16] - 2025-08-26
+
+- fix: fix broken minimum example cypress test docs: fix docs for directives (6119047)
+- fix: make base reset used across all component instances fix: move style related functions to style utils (0d12974)
+- docs: update README and style documentation for clarity and consistency feat: enhance MinimalExample component styling and remove minifyCSS option style: add comprehensive base reset styles for improved consistency across elements (fb36db4)
+- refactor: enhance MinimalExample component styling and update utilityMap with new flex and alignment utilities (c5e7add)
+- fix: correct link to style-utils.ts in JIT CSS documentation (c6adcc7)
+
+
 ## [v0.0.15] - 2025-08-26
 
 - fix: correct link to style-utils.ts in JIT CSS documentation (c6adcc7)
