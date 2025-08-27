@@ -28,13 +28,15 @@ Custom Elements Runtime provides a high-performance, zero-dependency JIT CSS eng
 
 **Visibility:** `visible`, `invisible`
 
-**Flex:** `grow`, `shrink`, `grow-0`, `shrink-0`, `basis-[value]`, `items-[value]`, `justify-[value]`, `self-[value]`
+**Flex:** `grow`, `shrink`, `grow-0`, `shrink-0`, `flex-col`, `flex-row`, `basis-[value]`, `items-[value]`, `justify-[value]`, `self-[value]`
 
 **Font Family:** `font-sans`, `font-serif`, `font-mono`
 
 **Spacing:** `p-4`, `m-2`, `mx-auto`, `gap-2`, `gap-x-2`, `gap-y-2`, etc. (all axis and negative values supported)
 
 **Colors:** `bg-gray-100`, `text-blue-500`, `border-red-500`, `shadow-blue-500`, etc. (full palette, semantic, and arbitrary)
+
+For a complete list, see the `utilityMap` in [`src/lib/style-utils.ts`](../src/lib/style-utils.ts).
 
 ## 🧑‍💻 Variants
 
