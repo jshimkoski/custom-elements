@@ -76,7 +76,7 @@ A guide to diagnosing and resolving common issues in the custom elements runtime
 A: Check registration, tag name, and that `render` returns a valid VNode.
 
 **Q: Why are my styles missing?**
-A: Confirm style config and dependencies; check for unsafe CSS.
+A: Confirm style config; check for unsafe CSS.
 
 **Q: Why aren't events firing?**
 A: Use `@event` syntax and ensure handler is a function.

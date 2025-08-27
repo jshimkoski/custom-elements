@@ -67,7 +67,6 @@ component("error-demo", {
 
 ## 🚀 Performance Patterns
 
-- Use style dependencies for efficient style updates
 - Debounce expensive renders
 - Minimize deep state mutations
 - Use keys for list rendering

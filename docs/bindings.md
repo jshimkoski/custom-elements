@@ -9,6 +9,7 @@ Bindings allow you to connect your component's state, props, and events directly
 - `:attr` — Attribute binding
 - `@event` — Event binding
 - `#model` — Two-way binding for form elements
+- `ref` — Ref binding
 
 ## 🏷️ Attribute Binding (`:attr`)
 
@@ -40,6 +41,35 @@ Synchronize form element values with state.
 - Use `#model` for two-way binding on form fields.
 - Supports nested state: `#model="user.name"`
 - Updates state when the input value changes, and vice versa.
+
+## 🪝 Ref Binding (`ref`)
+
+Add `ref="refName"` to any element in your template.
+
+```typescript
+html`
+  <input ref="usernameInput" type="text" />
+  <button ref="submitBtn">Submit</button>
+`
+```
+
+### Accessing Refs
+
+Refs are attached to the `refs` object on your component context. You can access them in lifecycle hooks or event handlers:
+
+```typescript
+onConnected(ctx) {
+  // Focus the input when the component mounts
+  ctx.refs.usernameInput?.focus();
+}
+```
+
+### Best Practices
+
+- Use descriptive, camelCase names for refs.
+- Access refs only after the element is rendered (e.g., in `onConnected`).
+- Avoid manipulating the DOM directly unless necessary; prefer declarative updates.
+
 
 ## 🧩 Example: All Bindings Together
 

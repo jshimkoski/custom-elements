@@ -10,7 +10,7 @@ component('form-input-validation', (ctx) => html`
       <legend>Form Input Validation Demo</legend>
       <label>
         Email:
-        <input #model="email" type="email" required />
+        <input #model="email" ref="emailInput" type="email" required />
       </label>
       <label>
         Username:
@@ -65,6 +65,10 @@ component('form-input-validation', (ctx) => html`
     country: '',
     error: '',
     success: '',
+  },
+  async onConnected(ctx) {
+    console.log("Verifying refs", ctx.refs);
+    ctx.refs.emailInput?.focus();
   },
   async submit(event, ctx) {
     event.preventDefault();

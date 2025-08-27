@@ -98,7 +98,6 @@ component('directive-demo', {
 
 ## 📚 Learn More
 
-- [Binding Guide](./directives-and-binding.md)
 - [Render Guide](./render.md)
 - [Component Guide](./component.md)
 

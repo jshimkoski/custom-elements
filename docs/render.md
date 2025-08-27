@@ -87,7 +87,6 @@ component('user-card', {
 
 - [Component Config Guide](./component-config.md)
 - [Template Guide](./template.md)
-- [Directives & Binding Guide](./directives-and-binding.md)
 - [State Guide](./state.md)
 
 ## 🏁 Summary

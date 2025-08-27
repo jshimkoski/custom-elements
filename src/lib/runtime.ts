@@ -58,12 +58,16 @@ type InferMethods<T> = {
     : never;
 };
 
+interface Refs {
+  refs: Record<string, HTMLElement | undefined>;
+}
+
 export type ComponentContext<
   S extends object,
   C extends object,
   P extends object,
   T extends object = any
-> = S & C & P & InferMethods<T>;
+> = S & C & P & InferMethods<T> & Refs;
 
 export interface ComponentConfig<
   S extends object,
@@ -242,7 +246,7 @@ export function createElementClass<
   }
   return class extends HTMLElement {
     public context: ComponentContext<S, C, P, T>;
-
+    private _refs: Refs["refs"] = {};
     private _listeners: Array<() => void> = [];
     private _watchers: Map<string, WatcherState> = new Map();
     /** @internal */
@@ -266,7 +270,15 @@ export function createElementClass<
       this.attachShadow({ mode: "open" });
       this._cfg = config;
 
-      this.context = this._initContext(config);
+      const reactiveContext = this._initContext(config);
+      // Inject refs into context (non-enumerable to avoid proxy traps)
+      Object.defineProperty(reactiveContext, "refs", {
+        value: this._refs,
+        writable: false,
+        enumerable: false, // Hide from iteration to avoid proxy traps
+        configurable: false,
+      });
+      this.context = reactiveContext;
 
       // --- Inject config methods into state ---
       Object.keys(config).forEach((key) => {
@@ -447,6 +459,7 @@ export function createElementClass<
         this.shadowRoot,
         Array.isArray(output) ? output : [output],
         context,
+        this._refs
       );
 
       // Extract rendered HTML for JIT CSS

@@ -12,9 +12,12 @@ export interface VNode {
     props?: any;
     attrs?: Record<string, any>;
     directives?: Record<string, { value: string; modifiers: string[] }>;
+    ref?: string;
   };
   children?: VNode[] | string;
 }
+
+export type VDomRefs = Record<string, HTMLElement | undefined>;
 
 export interface AnchorBlockVNode extends VNode {
   tag: "#anchor";
@@ -674,7 +677,11 @@ function patchProps(
   }
 }
 
-function createElement(vnode: VNode | string, context?: any): Node {
+function createElement(
+  vnode: VNode | string,
+  context?: any,
+  refs?: VDomRefs
+): Node {
   // String VNode → plain text node (no key)
   if (typeof vnode === "string") {
     return document.createTextNode(vnode);
@@ -776,10 +783,16 @@ function createElement(vnode: VNode | string, context?: any): Node {
     el.addEventListener(eventType, listener as EventListener);
   }
 
+  // Assign ref if present (support both props.ref and props.props.ref)
+  const refKey = vnode.props?.ref ?? (vnode.props?.props && vnode.props.props.ref);
+  if (typeof vnode !== "string" && refKey && refs) {
+    refs[refKey] = el as HTMLElement;
+  }
+
   // Append children
   if (Array.isArray(vnode.children)) {
     for (const child of vnode.children) {
-      el.appendChild(createElement(child, context));
+      el.appendChild(createElement(child, context, refs));
     }
   } else if (typeof vnode.children === "string") {
     el.textContent = vnode.children;
@@ -796,6 +809,7 @@ function patchChildren(
   oldChildren: VNode[] | string | undefined,
   newChildren: VNode[] | string | undefined,
   context?: any,
+  refs?: VDomRefs
 ) {
   if (typeof newChildren === "string") {
     if (parent.textContent !== newChildren) parent.textContent = newChildren;
@@ -989,6 +1003,7 @@ function patchChildren(
         oldVNode,
         newVNode,
         context,
+        refs
       );
       usedNodes.add(node);
       if (node !== nextSibling && parent.contains(node)) {
@@ -996,7 +1011,7 @@ function patchChildren(
         parent.insertBefore(node, nextSibling);
       }
     } else {
-      node = createElement(newVNode, context);
+      node = createElement(newVNode, context, refs);
       if (nextSibling && !parent.contains(nextSibling)) nextSibling = null;
       parent.insertBefore(node, nextSibling);
       usedNodes.add(node);
@@ -1008,6 +1023,14 @@ function patchChildren(
   // Remove unused nodes
   for (const node of oldNodes) {
     if (!usedNodes.has(node) && parent.contains(node)) {
+      // Clean up ref if present
+      if (node instanceof HTMLElement && refs) {
+        for (const refKey in refs) {
+          if (refs[refKey] === node) {
+            delete refs[refKey];
+          }
+        }
+      }
       parent.removeChild(node);
     }
   }
@@ -1021,7 +1044,12 @@ function patch(
   oldVNode: VNode | string | null,
   newVNode: VNode | string | null,
   context?: any,
+  refs?: VDomRefs
 ): Node {
+  if (oldVNode && typeof oldVNode !== "string" && oldVNode.props?.ref && refs) {
+    delete refs[oldVNode.props.ref]; // Clean up old ref
+  }
+
   if (oldVNode === newVNode) return dom;
 
   if (typeof newVNode === "string") {
@@ -1069,7 +1097,10 @@ function patch(
   }
 
   if (!oldVNode || typeof oldVNode === "string") {
-    const newEl = createElement(newVNode, context);
+    const newEl = createElement(newVNode, context, refs);
+    if (typeof newVNode !== "string" && newVNode.props?.ref && refs) {
+      refs[newVNode.props.ref] = newEl as HTMLElement; // Assign new ref
+    }
     dom.parentNode?.replaceChild(newEl, dom);
     return newEl;
   }
@@ -1105,11 +1136,17 @@ function patch(
   ) {
     const el = dom as HTMLElement;
     patchProps(el, oldVNode.props || {}, newVNode.props || {}, context);
-    patchChildren(el, oldVNode.children, newVNode.children, context);
+    patchChildren(el, oldVNode.children, newVNode.children, context, refs); // <-- Pass refs
+    if (typeof newVNode !== "string" && newVNode.props?.ref && refs) {
+      refs[newVNode.props.ref] = el; // Assign ref
+    }
     return el;
   }
 
-  const newEl = createElement(newVNode, context);
+  const newEl = createElement(newVNode, context, refs);
+  if (typeof newVNode !== "string" && newVNode.props?.ref && refs) {
+    refs[newVNode.props.ref] = newEl as HTMLElement;
+  }
   dom.parentNode?.replaceChild(newEl, dom);
   return newEl;
 }
@@ -1122,6 +1159,7 @@ export function vdomRenderer(
   root: ShadowRoot,
   vnodeOrArray: VNode | VNode[],
   context?: any,
+  refs?: VDomRefs
 ) {
   const wrap = (v: VNode): VNode =>
     v.key == null ? { ...v, key: "__root__" } : v;
@@ -1146,13 +1184,13 @@ export function vdomRenderer(
       prevVNode.tag === newVNode.tag &&
       prevVNode.key === newVNode.key
     ) {
-      newDom = patch(prevDom, prevVNode, newVNode, context);
+      newDom = patch(prevDom, prevVNode, newVNode, context, refs);
     } else {
-      newDom = createElement(newVNode, context);
+      newDom = createElement(newVNode, context, refs);
       root.replaceChild(newDom, prevDom);
     }
   } else {
-    newDom = createElement(newVNode, context);
+    newDom = createElement(newVNode, context, refs);
     if (root.firstChild) root.replaceChild(newDom, root.firstChild);
     else root.appendChild(newDom);
   }
@@ -1162,6 +1200,14 @@ export function vdomRenderer(
   for (let i = 0; i < root.childNodes.length; i++) {
     const node = root.childNodes[i];
     if (node !== newDom && node.nodeName !== "STYLE") {
+      // Clean up ref if present
+      if (node instanceof HTMLElement && refs) {
+        for (const refKey in refs) {
+          if (refs[refKey] === node) {
+            delete refs[refKey];
+          }
+        }
+      }
       nodesToRemove.push(node);
     }
   }

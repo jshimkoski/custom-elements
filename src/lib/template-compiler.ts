@@ -115,6 +115,8 @@ function parseProps(
         value: finalValue,
         modifiers: finalModifiers,
       };
+    } else if (rawName === "ref") {
+      props.ref = value;
     } else {
       attrs[rawName] = value;
     }
