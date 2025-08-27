@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v0.1.0] - 2025-08-27
+
+- feat: add ref binding support and update documentation docs: clean up docs (019eb7a)
+- docs: update component and troubleshooting guides to remove styleOptimizations references (6c1b90b)
+
+
 ## [v0.0.17] - 2025-08-26
 
 - docs: update component and troubleshooting guides to remove styleOptimizations references (6c1b90b)
