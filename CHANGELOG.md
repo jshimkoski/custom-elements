@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v0.1.1] - 2025-08-27
+
+- docs: update Flex section to include missing flex-col and flex-row utilities (9a969b0)
+- feat: add ref binding support and update documentation docs: clean up docs (019eb7a)
+
+
 ## [v0.1.0] - 2025-08-27
 
 - feat: add ref binding support and update documentation docs: clean up docs (019eb7a)
