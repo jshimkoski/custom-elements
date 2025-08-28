@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v0.1.2] - 2025-08-28
+
+- docs: Updated error handling documentation to clarify default `onError` handler. (67adbc1)
+- docs: update Flex section to include missing flex-col and flex-row utilities (9a969b0)
+
+
 ## [v0.1.1] - 2025-08-27
 
 - docs: update Flex section to include missing flex-col and flex-row utilities (9a969b0)
