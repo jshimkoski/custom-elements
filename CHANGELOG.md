@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v0.1.3] - 2025-08-28
+
+- refactor: refactored the lib directory and how the package is published. docs: added router documentation feat: added router to module export (87902f5)
+- docs: Updated error handling documentation to clarify default `onError` handler. (67adbc1)
+
+
 ## [v0.1.2] - 2025-08-28
 
 - docs: Updated error handling documentation to clarify default `onError` handler. (67adbc1)
