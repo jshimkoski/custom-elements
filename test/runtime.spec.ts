@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import { component } from '../src/lib/runtime';
-import { html } from '../src/lib/template-compiler';
+import { component } from '../src/lib/runtime/component';
+import { html } from '../src/lib/runtime/template-compiler';
 
 // Helper to mount a custom element and return instance
 function mount(tag: string, config: any, props: Record<string, any> = {}) {

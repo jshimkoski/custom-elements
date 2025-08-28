@@ -4,40 +4,38 @@
  * Features: keyed diffing, incremental patching, focus/caret preservation, event delegation, SSR-friendly, no dependencies.
  */
 
-export interface VNode {
-  tag: string;
-  key?: string;
-  props?: {
-    key?: string;
-    props?: any;
-    attrs?: Record<string, any>;
-    directives?: Record<string, { value: string; modifiers: string[] }>;
-    ref?: string;
-  };
-  children?: VNode[] | string;
-}
+import type { VNode, VDomRefs, AnchorBlockVNode } from "./types";
+import { escapeHTML } from "./helpers";
 
-export type VDomRefs = Record<string, HTMLElement | undefined>;
-
-export interface AnchorBlockVNode extends VNode {
-  tag: "#anchor";
-  key: string;
-  children: VNode[];
-  _startNode?: Comment;
-  _endNode?: Comment;
+/**
+ * Recursively clean up refs for all descendants of a node
+ */
+export function cleanupRefs(node: Node, refs?: VDomRefs) {
+  if (!refs) return;
+  if (node instanceof HTMLElement) {
+    for (const refKey in refs) {
+      if (refs[refKey] === node) {
+        delete refs[refKey];
+      }
+    }
+    // Clean up child nodes
+    for (const child of Array.from(node.childNodes)) {
+      cleanupRefs(child, refs);
+    }
+  }
 }
 
 /**
  * Get nested property value from object using dot notation
  */
-function getNestedValue(obj: any, path: string): any {
+export function getNestedValue(obj: any, path: string): any {
   return path.split(".").reduce((current, key) => current?.[key], obj);
 }
 
 /**
  * Set nested property value in object using dot notation
  */
-function setNestedValue(obj: any, path: string, value: any): void {
+export function setNestedValue(obj: any, path: string, value: any): void {
   const keys = path.split(".");
   const lastKey = keys.pop();
 
@@ -47,6 +45,7 @@ function setNestedValue(obj: any, path: string, value: any): void {
     if (!(key in current)) {
       current[key] = {};
     }
+
     return current[key];
   }, obj);
 
@@ -56,7 +55,7 @@ function setNestedValue(obj: any, path: string, value: any): void {
 /**
  * Process #model directive for two-way data binding
  */
-function processModelDirective(
+export function processModelDirective(
   value: string,
   modifiers: string[],
   props: Record<string, any>,
@@ -329,7 +328,7 @@ function processModelDirective(
 /**
  * Process #bind directive for attribute/property binding
  */
-function processBindDirective(
+export function processBindDirective(
   value: string,
   props: Record<string, any>,
   attrs: Record<string, any>,
@@ -356,7 +355,7 @@ function processBindDirective(
 /**
  * Process #show directive for conditional display
  */
-function processShowDirective(
+export function processShowDirective(
   value: string,
   attrs: Record<string, any>,
   context?: any,
@@ -389,7 +388,7 @@ function processShowDirective(
 /**
  * Process #class directive for conditional CSS classes
  */
-function processClassDirective(
+export function processClassDirective(
   value: string,
   attrs: Record<string, any>,
   context?: any,
@@ -420,7 +419,7 @@ function processClassDirective(
   }
 }
 
-function processStyleDirective(
+export function processStyleDirective(
   value: any,
   attrs: Record<string, any>,
   context?: any,
@@ -492,7 +491,7 @@ function processStyleDirective(
 /**
  * Process directives and return merged props, attrs, and event listeners
  */
-function processDirectives(
+export function processDirectives(
   directives: Record<string, { value: any; modifiers: string[] }>,
   context?: any,
   el?: HTMLElement,
@@ -540,7 +539,7 @@ function processDirectives(
   return { props, attrs, listeners };
 }
 
-function assignKeysDeep(
+export function assignKeysDeep(
   nodeOrNodes: VNode | VNode[],
   baseKey: string,
 ): VNode | VNode[] {
@@ -600,7 +599,7 @@ function assignKeysDeep(
  * Patch props on an element.
  * Only update changed props, remove old, add new.
  */
-function patchProps(
+export function patchProps(
   el: HTMLElement,
   oldProps: Record<string, any>,
   newProps: Record<string, any>,
@@ -677,7 +676,7 @@ function patchProps(
   }
 }
 
-function createElement(
+export function createElement(
   vnode: VNode | string,
   context?: any,
   refs?: VDomRefs
@@ -804,7 +803,7 @@ function createElement(
 /**
  * Patch children using keys for node matching.
  */
-function patchChildren(
+export function patchChildren(
   parent: HTMLElement,
   oldChildren: VNode[] | string | undefined,
   newChildren: VNode[] | string | undefined,
@@ -1023,14 +1022,7 @@ function patchChildren(
   // Remove unused nodes
   for (const node of oldNodes) {
     if (!usedNodes.has(node) && parent.contains(node)) {
-      // Clean up ref if present
-      if (node instanceof HTMLElement && refs) {
-        for (const refKey in refs) {
-          if (refs[refKey] === node) {
-            delete refs[refKey];
-          }
-        }
-      }
+      cleanupRefs(node, refs);
       parent.removeChild(node);
     }
   }
@@ -1039,7 +1031,7 @@ function patchChildren(
 /**
  * Patch a node using keys for node matching.
  */
-function patch(
+export function patch(
   dom: Node,
   oldVNode: VNode | string | null,
   newVNode: VNode | string | null,
@@ -1047,7 +1039,7 @@ function patch(
   refs?: VDomRefs
 ): Node {
   if (oldVNode && typeof oldVNode !== "string" && oldVNode.props?.ref && refs) {
-    delete refs[oldVNode.props.ref]; // Clean up old ref
+    cleanupRefs(dom, refs); // Clean up old ref and descendants
   }
 
   if (oldVNode === newVNode) return dom;
@@ -1091,12 +1083,14 @@ function patch(
   }
 
   if (!newVNode) {
+    cleanupRefs(dom, refs);
     const placeholder = document.createComment("removed");
     dom.parentNode?.replaceChild(placeholder, dom);
     return placeholder;
   }
 
   if (!oldVNode || typeof oldVNode === "string") {
+    cleanupRefs(dom, refs);
     const newEl = createElement(newVNode, context, refs);
     if (typeof newVNode !== "string" && newVNode.props?.ref && refs) {
       refs[newVNode.props.ref] = newEl as HTMLElement; // Assign new ref
@@ -1143,6 +1137,7 @@ function patch(
     return el;
   }
 
+  cleanupRefs(dom, refs);
   const newEl = createElement(newVNode, context, refs);
   if (typeof newVNode !== "string" && newVNode.props?.ref && refs) {
     refs[newVNode.props.ref] = newEl as HTMLElement;
@@ -1161,11 +1156,22 @@ export function vdomRenderer(
   context?: any,
   refs?: VDomRefs
 ) {
-  const wrap = (v: VNode): VNode =>
-    v.key == null ? { ...v, key: "__root__" } : v;
-  let newVNode = Array.isArray(vnodeOrArray)
-    ? { tag: "div", key: "__root__", children: vnodeOrArray }
-    : wrap(vnodeOrArray);
+  let newVNode: VNode;
+  if (Array.isArray(vnodeOrArray)) {
+    if (vnodeOrArray.length === 1) {
+      newVNode = vnodeOrArray[0];
+      if (newVNode && typeof newVNode === "object" && newVNode.key == null) {
+        newVNode = { ...newVNode, key: "__root__" };
+      }
+    } else {
+      newVNode = { tag: "div", key: "__root__", children: vnodeOrArray };
+    }
+  } else {
+    newVNode = vnodeOrArray;
+    if (newVNode && typeof newVNode === "object" && newVNode.key == null) {
+      newVNode = { ...newVNode, key: "__root__" };
+    }
+  }
 
   newVNode = assignKeysDeep(newVNode, String(newVNode.key ?? "root")) as VNode;
 
@@ -1200,14 +1206,7 @@ export function vdomRenderer(
   for (let i = 0; i < root.childNodes.length; i++) {
     const node = root.childNodes[i];
     if (node !== newDom && node.nodeName !== "STYLE") {
-      // Clean up ref if present
-      if (node instanceof HTMLElement && refs) {
-        for (const refKey in refs) {
-          if (refs[refKey] === node) {
-            delete refs[refKey];
-          }
-        }
-      }
+      cleanupRefs(node, refs);
       nodesToRemove.push(node);
     }
   }
@@ -1218,28 +1217,11 @@ export function vdomRenderer(
   (root as any)._prevDom = newDom;
 }
 
-/**
- * SSR-friendly: serialize VNode to HTML string.
- */
-function escapeHTML(str: string): string {
-  return str.replace(
-    /[&<>"']/g,
-    (c) =>
-      ({
-        "&": "&amp;",
-        "<": "&lt;",
-        ">": "&gt;",
-        '"': "&quot;",
-        "'": "&#39;",
-      })[c]!,
-  );
-}
-
 export function renderToString(vnode: VNode): string {
-  if (typeof vnode === "string") return escapeHTML(vnode);
+  if (typeof vnode === "string") return escapeHTML(vnode) as string;
 
   if (vnode.tag === "#text") {
-    return typeof vnode.children === "string" ? escapeHTML(vnode.children) : "";
+    return typeof vnode.children === "string" ? escapeHTML(vnode.children) as string : "";
   }
 
   if (vnode.tag === "#anchor") {
@@ -1247,13 +1229,26 @@ export function renderToString(vnode: VNode): string {
     return children.map(renderToString).join("");
   }
 
-  const props = vnode.props
-    ? Object.entries(vnode.props)
-        .map(([k, v]) => ` ${k}="${escapeHTML(String(v))}"`)
-        .join("")
-    : "";
+  // Collect attributes from props.attrs
+  let attrsString = "";
+  if (vnode.props && vnode.props.attrs) {
+    attrsString = Object.entries(vnode.props.attrs)
+      .map(([k, v]) => ` ${k}="${escapeHTML(String(v))}"`)
+      .join("");
+  }
+
+  // Collect other props (excluding attrs, directives, ref, key)
+  let propsString = "";
+  if (vnode.props) {
+    propsString = Object.entries(vnode.props)
+      .filter(([k]) => k !== "attrs" && k !== "directives" && k !== "ref" && k !== "key")
+      .map(([k, v]) => ` ${k}="${escapeHTML(String(v))}"`)
+      .join("");
+  }
+
   const children = Array.isArray(vnode.children)
     ? vnode.children.filter(Boolean).map(renderToString).join("")
     : (typeof vnode.children === "string" ? escapeHTML(vnode.children) : vnode.children ? renderToString(vnode.children) : "");
-  return `<${vnode.tag}${props}>${children}</${vnode.tag}>`;
+
+  return `<${vnode.tag}${attrsString}${propsString}>${children}</${vnode.tag}>`;
 }

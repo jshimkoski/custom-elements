@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { when, each, match } from '../src/lib/directives';
-import type { VNode } from '../src/lib/vdom';
+import type { VNode } from '../src/lib/runtime/types';
 
 function getChildren(v: VNode | VNode[]) {
   if (Array.isArray(v)) return v;

@@ -80,4 +80,4 @@ watch: {
 - Works with state and props.
 - Callback errors are caught and logged.
 
-For more, see the [API Reference](../src/lib/runtime.ts) and [examples](../src/components/examples/).
+For more, see the [API Reference](../src/lib/index.ts) and [examples](../src/components/examples/).

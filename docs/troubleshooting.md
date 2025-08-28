@@ -88,4 +88,4 @@ A: Use `loadingTemplate` and `errorTemplate` for feedback; log errors in async c
 
 Troubleshooting is easier with clear configs, error boundaries, and dev tools. Use this guide to quickly resolve issues and build robust custom elements.
 
-For more help, see the documentation for each feature and inspect the source code in `src/lib/runtime.ts`.
+For more help, see the documentation for each feature and inspect the source code in `src/lib/index.ts`.

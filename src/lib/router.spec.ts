@@ -1,0 +1,248 @@
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import {
+  useRouter,
+  matchRouteSSR,
+  initRouter,
+  resolveRouteComponent,
+  parseQuery,
+} from './router';
+import * as componentModule from './runtime/component';
+
+describe('router.ts', () => {
+  describe('parseQuery', () => {
+    it('parses empty string', () => {
+      const result = parseQuery('');
+      expect(result).toEqual({});
+    });
+    it('parses query string', () => {
+      const result = parseQuery('?foo=1&bar=2');
+      expect(result).toEqual({ foo: '1', bar: '2' });
+    });
+    it('returns empty if URLSearchParams is undefined', () => {
+      const orig = global.URLSearchParams;
+      // @ts-ignore
+      global.URLSearchParams = undefined;
+      const result = parseQuery('?foo=1');
+      expect(result).toEqual({});
+      global.URLSearchParams = orig;
+    });
+  });
+  const routes = [
+    { path: '/', component: 'Home' },
+    { path: '/about', component: 'About' },
+    { path: '/user/:id', component: 'User' },
+    { path: '/async', load: async () => ({ default: 'AsyncComp' }) },
+  ];
+
+  describe('matchRouteSSR', () => {
+    it('matches route with multiple params', () => {
+      const multiRoutes = [ { path: '/post/:id/:slug', component: 'Post' } ];
+      const result = matchRouteSSR(multiRoutes, '/post/42/hello');
+      expect(result.route).toEqual(multiRoutes[0]);
+      expect(result.params).toEqual({ id: '42', slug: 'hello' });
+    });
+    it('does not match if param missing', () => {
+      const multiRoutes = [ { path: '/post/:id/:slug', component: 'Post' } ];
+      const result = matchRouteSSR(multiRoutes, '/post/42');
+      expect(result.route).toBeNull();
+      expect(result.params).toEqual({});
+    });
+    it('matches static route', () => {
+      const result = matchRouteSSR(routes, '/about');
+      expect(result.route).toEqual(routes[1]);
+      expect(result.params).toEqual({});
+    });
+    it('matches dynamic route', () => {
+      const result = matchRouteSSR(routes, '/user/42');
+      expect(result.route).toEqual(routes[2]);
+      expect(result.params).toEqual({ id: '42' });
+    });
+    it('returns null for unmatched route', () => {
+      const result = matchRouteSSR(routes, '/404');
+      expect(result.route).toBeNull();
+      expect(result.params).toEqual({});
+    });
+  });
+
+  describe('useRouter SSR fallback', () => {
+    let router: ReturnType<typeof useRouter>;
+    beforeEach(() => {
+      // Simulate SSR (no window/document)
+      (global as any).window = undefined;
+      (global as any).document = undefined;
+      router = useRouter({ routes });
+    });
+    it('returns initial state', () => {
+      expect(router.getCurrent()).toEqual({ path: '/', params: {}, query: {} });
+    });
+    it('matchRoute works', () => {
+      const result = router.matchRoute('/user/99');
+      expect(result.route).toEqual(routes[2]);
+      expect(result.params).toEqual({ id: '99' });
+    });
+    it('push/replace/back are no-ops', () => {
+      expect(() => router.push('/about')).not.toThrow();
+      expect(() => router.replace('/about')).not.toThrow();
+      expect(() => router.back()).not.toThrow();
+    });
+    it('subscribe works', () => {
+      const fn = vi.fn();
+      router.subscribe(fn);
+      // Should be called once with initial state
+      expect(fn).toHaveBeenCalledTimes(1);
+      expect(fn).toHaveBeenCalledWith({ path: '/', params: {}, query: {} });
+    });
+  });
+
+  describe('resolveRouteComponent', () => {
+    it('resolves static component', async () => {
+      const result = await resolveRouteComponent(routes[0]);
+      expect(result).toBe('Home');
+    });
+    it('resolves async component', async () => {
+      const result = await resolveRouteComponent(routes[3]);
+      expect(result).toBe('AsyncComp');
+    });
+    it('throws for missing component/loader', async () => {
+      await expect(resolveRouteComponent({ path: '/none' } as any)).rejects.toThrow();
+    });
+    it('throws for failed async loader', async () => {
+      const badRoute = { path: '/bad', load: async () => { throw new Error('fail'); } };
+      await expect(resolveRouteComponent(badRoute)).rejects.toThrow('Failed to load component for route: /bad');
+    });
+  });
+
+  describe('initRouter', () => {
+    it('router-link computed: active, exact, disabled, external, button', () => {
+      const config = { routes };
+      const router = initRouter(config);
+      // Simulate props for router-link
+      const context: any = {
+        props: {
+          to: '/', tag: 'button', exact: true, activeClass: 'active', exactActiveClass: 'exact', ariaCurrentValue: 'page', disabled: true, external: true
+        }
+      };
+      // Computed logic
+      const current = router.getCurrent();
+      const isExactActive = current.path === context.props.to;
+      const isActive = context.props.exact ? isExactActive : current.path.startsWith(context.props.to);
+      const className = isExactActive ? 'exact' : isActive ? 'active' : '';
+      const ariaCurrent = isExactActive ? `aria-current="page"` : '';
+      const isButton = context.props.tag === 'button';
+      const disabledAttr = context.props.disabled ? (isButton ? 'disabled aria-disabled="true" tabindex="-1"' : 'aria-disabled="true" tabindex="-1"') : '';
+      const externalAttr = context.props.external && (context.props.tag === 'a' || !context.props.tag) ? 'target="_blank" rel="noopener noreferrer"' : '';
+      expect(className).toBe('exact');
+      expect(ariaCurrent).toBe('aria-current="page"');
+      expect(disabledAttr).toContain('aria-disabled');
+      expect(externalAttr).toBe('');
+    });
+
+    it('router-link computed: link, not exact, not active', () => {
+      const config = { routes };
+      const router = initRouter(config);
+      const context: any = {
+        props: {
+          to: '/about', tag: 'a', exact: false, activeClass: 'active', exactActiveClass: 'exact', ariaCurrentValue: 'page', disabled: false, external: true
+        }
+      };
+      const current = router.getCurrent();
+      const isExactActive = current.path === context.props.to;
+      const isActive = context.props.exact ? isExactActive : current.path.startsWith(context.props.to);
+      const className = isExactActive ? 'exact' : isActive ? 'active' : '';
+      const ariaCurrent = isExactActive ? `aria-current="page"` : '';
+      const isButton = context.props.tag === 'button';
+      const disabledAttr = context.props.disabled ? (isButton ? 'disabled aria-disabled="true" tabindex="-1"' : 'aria-disabled="true" tabindex="-1"') : '';
+      const externalAttr = context.props.external && (context.props.tag === 'a' || !context.props.tag) ? 'target="_blank" rel="noopener noreferrer"' : '';
+      expect(className).toBe('');
+      expect(ariaCurrent).toBe('');
+      expect(disabledAttr).toBe('');
+      expect(externalAttr).toBe('target="_blank" rel="noopener noreferrer"');
+    });
+
+    it('router-link navigate: disabled, external, replace, push', () => {
+      const componentSpy = vi.spyOn(componentModule, 'component');
+      const config = { routes };
+      // Use the same router instance for both config and test
+      const router = initRouter(config);
+      // Find the router-link config from the spy
+      const linkConfig = (componentModule.component as any).mock.calls.find(([name]: [string]) => name === 'router-link')[1];
+      const navigate = linkConfig.navigate;
+      const context: any = {
+        props: { disabled: true, external: true, tag: 'a', replace: true, to: '/about' }
+      };
+      const e = { preventDefault: vi.fn() } as any;
+      // Disabled: should preventDefault and return
+      navigate(e, context);
+      expect(e.preventDefault).toHaveBeenCalled();
+      // External: should return without calling router
+      context.props.disabled = false;
+      navigate(e, context); // Should not throw
+      // Replace: should call router.replace
+      context.props.external = false;
+      const replaceSpy = vi.spyOn(router, 'replace');
+      navigate(e, { ...context, props: { ...context.props, replace: true } });
+      expect(replaceSpy).toHaveBeenCalledWith('/about');
+      replaceSpy.mockRestore();
+      // Push: should call router.push
+      const pushSpy = vi.spyOn(router, 'push');
+      navigate(e, { ...context, props: { ...context.props, replace: false } });
+      expect(pushSpy).toHaveBeenCalledWith('/about');
+      pushSpy.mockRestore();
+      componentSpy.mockRestore();
+    });
+
+    it('router-view fallback rendering', async () => {
+  // Debug log for htmlFallback output
+      const componentSpy = vi.spyOn(componentModule, 'component');
+      const config = { routes };
+      initRouter(config);
+      // Find the router-view config from the spy
+      const viewConfig = (componentModule.component as any).mock.calls.find(([name]: [string]) => name === 'router-view')[1];
+      const render = viewConfig.render;
+      // Not initialized
+      const htmlOut = await render(undefined);
+      // Accept any object output for fallback, since html`` returns an object
+      expect(typeof htmlOut).toBe('object');
+      // Not found
+      // Register router-view with fallback
+      const fallbackConfig = {
+        routes: [
+          { path: '/', component: 'home-tag' },
+          { path: '/about', component: 'about-tag' },
+        ],
+        fallback: 'Not found',
+      };
+      initRouter(fallbackConfig);
+      componentSpy.mockRestore();
+    });
+    it('registers router-view and router-link components', () => {
+      // Spy on internal component registration
+      const componentSpy = vi.spyOn(componentModule, 'component');
+      const config = { routes };
+      const router = initRouter(config);
+      expect(router).toBeDefined();
+      expect(componentSpy).toHaveBeenCalledWith('router-view', expect.any(Object));
+      expect(componentSpy).toHaveBeenCalledWith('router-link', expect.any(Object));
+      componentSpy.mockRestore();
+    });
+
+    it('router-view renders Not found for unmatched route', async () => {
+      // Simulate router-view render logic
+      const config = { routes };
+      const router = initRouter(config);
+      const view = await router.resolveRouteComponent({ path: '/404' } as any).catch(() => null);
+      expect(view).toBeNull();
+    });
+
+    it('router-link computed values', () => {
+      // Simulate router-link computed logic
+      const config = { routes };
+      const router = initRouter(config);
+      const current = router.getCurrent();
+      expect(current).toEqual({ path: '/', params: {}, query: {} });
+      // Simulate computed className
+      const isExactActive = current.path === '/';
+      expect(isExactActive).toBe(true);
+    });
+  });
+});

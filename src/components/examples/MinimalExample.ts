@@ -2,7 +2,7 @@
  * MinimalExample: A simple counter component using best practices.
  * Demonstrates ctx, event binding, and functional API.
  */
-import { component, html, css } from '../../lib/runtime';
+import { component, html, css } from '../../lib';
 
 export const MinimalExample = component('minimal-example', (ctx) => html`
   <div class="flex flex-col items-center justify-center min-h-[120px]">

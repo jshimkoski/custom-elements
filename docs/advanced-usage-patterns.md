@@ -86,4 +86,4 @@ A: Yes, add custom directives, bindings, or utility functions as needed.
 
 Advanced patterns unlock the full power of the runtime for scalable, maintainable, and feature-rich custom elements. Experiment with async templates, nested components, deep state, and more for robust UIs.
 
-For more details, see examples in the documentation and source code in `src/lib/runtime.ts`.
+For more details, see examples in the documentation and source code in `src/lib/index.ts`.

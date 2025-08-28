@@ -2,7 +2,7 @@
  * ShoppingCart: A simple shopping cart demo.
  * Demonstrates ctx, computed, and quantity controls.
  */
-import { component, html, css, each } from '../../lib/runtime';
+import { component, html, css, each } from '../../lib';
 
 interface Item {
   id: number;

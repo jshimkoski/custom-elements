@@ -1,11 +1,15 @@
 /**
  * Lightweight, scalable router for Custom Elements Runtime
  * - Functional API, zero dependencies, SSR/static site compatible
- * - Integrates with Store and runtime.ts
+ * - Integrates with createStore and lib/index.ts
  */
 
-
+import type { ComponentContext } from './runtime/types';
 import { createStore, type Store } from './store';
+import { component } from './runtime/component';
+import { html } from './runtime/template-compiler';
+import { css } from './runtime/style';
+import { match } from './directives';
 
 export interface Route {
   path: string;
@@ -25,13 +29,13 @@ export interface RouteState {
 }
 
 
-const parseQuery = (search: string): Record<string, string> => {
+export const parseQuery = (search: string): Record<string, string> => {
   if (!search) return {};
   if (typeof URLSearchParams === 'undefined') return {};
   return Object.fromEntries(new URLSearchParams(search));
 };
 
-const matchRoute = (routes: Route[], path: string): { route: Route | null; params: Record<string, string> } => {
+export const matchRoute = (routes: Route[], path: string): { route: Route | null; params: Record<string, string> } => {
   for (const route of routes) {
     const paramNames: string[] = [];
     const regexPath = route.path.replace(/:[^/]+/g, (m) => {
@@ -155,26 +159,35 @@ export function matchRouteSSR(routes: Route[], path: string) {
  * Define here to prevent circular dependency
  * issue with component.
  */
-import { component, html, css, match } from './runtime';
+
 export function initRouter(config: RouterConfig) {
   const router = useRouter(config);
   component('router-view', {
-    render: async () => {
+    async render() {
       if (!router) return html`<div>Router not initialized.</div>`;
-      const current = router.getCurrent() as import('./router').RouteState;
+      const current = router.getCurrent();
       const { path } = current;
       const match = router.matchRoute(path);
       if (!match.route) return html`<div>Not found</div>`;
+      let componentTag = match.route.component;
       if (match.route.load) {
-        await match.route.load();
+        const loaded = await match.route.load();
+        // Only support string tag names for runtime
+        if (typeof loaded.default === 'string') {
+          componentTag = loaded.default;
+        }
       }
-      return html`<${match.route.component}></${match.route.component}>`;
+      if (typeof componentTag === 'string') {
+        return html`<${componentTag}></${componentTag}>`;
+      }
+      return html`<div>Invalid route component</div>`;
     },
-    onConnected(context) {
-      // Subscribe to router state and re-render on change
+    onConnected(ctx) {
       if (router && typeof router.subscribe === 'function') {
         router.subscribe(() => {
-          if (typeof context.render === 'function') context.render();
+          if (typeof ctx.requestRender === 'function') {
+            ctx.requestRender();
+          }
         });
       }
     }
@@ -190,7 +203,7 @@ export function initRouter(config: RouterConfig) {
     ariaCurrentValue: string;
     disabled: boolean;
     external: boolean;
-    styles: string;
+    style: string;
   }
 
   interface RouterLinkComputed {
@@ -223,88 +236,80 @@ export function initRouter(config: RouterConfig) {
         }
       ` },
     },
-    computed: {
-      current(_context) {
-        return router.getCurrent();
-      },
-      isExactActive(context) {
-        const current = context.current as { path: string };
-        return current.path === context.to;
-      },
-      isActive(context) {
-        const current = context.current as { path?: string } | undefined;
-        return context.exact
-          ? context.isExactActive
-          : current && typeof current.path === 'string'
-            ? current.path.startsWith(context.to)
-            : false;
-      },
-      className(context) {
-        return context.isExactActive
-          ? context.exactActiveClass
-          : context.isActive
-          ? context.activeClass
-          : '';
-      },
-      ariaCurrent(context) {
-        return context.isExactActive ? `aria-current="${context.ariaCurrentValue}"` : '';
-      },
-      isButton(context) {
-        return context.tag === 'button';
-      },
-      disabledAttr(context) {
-        return context.disabled
-          ? context.isButton
-            ? 'disabled aria-disabled="true" tabindex="-1"'
-            : 'aria-disabled="true" tabindex="-1"'
-          : '';
-      },
-      externalAttr(context) {
-        return context.external && (context.tag === 'a' || !context.tag)
-          ? 'target="_blank" rel="noopener noreferrer"'
-          : '';
-      },
+    style: (context) => context.props.style,
+    render: (context) => {
+      // Recalculate computed values in render
+      const current = router.getCurrent();
+      const to = context.props.to;
+      const exact = context.props.exact;
+      const exactActiveClass = context.props.exactActiveClass;
+      const activeClass = context.props.activeClass;
+      const ariaCurrentValue = context.props.ariaCurrentValue;
+      const tag = context.props.tag;
+      const disabled = context.props.disabled;
+      const external = context.props.external;
+      // Computed
+      const isExactActive = current.path === to;
+      const isActive = exact
+        ? isExactActive
+        : current && typeof current.path === 'string'
+          ? current.path.startsWith(to)
+          : false;
+      const className = isExactActive
+        ? exactActiveClass
+        : isActive
+        ? activeClass
+        : '';
+      const ariaCurrent = isExactActive ? `aria-current="${ariaCurrentValue}"` : '';
+      const isButton = tag === 'button';
+      const disabledAttr = disabled
+        ? isButton
+          ? 'disabled aria-disabled="true" tabindex="-1"'
+          : 'aria-disabled="true" tabindex="-1"'
+        : '';
+      const externalAttr = external && (tag === 'a' || !tag)
+        ? 'target="_blank" rel="noopener noreferrer"'
+        : '';
+      return html`
+        ${match()
+          .when(isButton, html`
+            <button
+              part="button"
+              class="${className}"
+              ${ariaCurrent}
+              ${disabledAttr}
+              ${externalAttr}
+              data-on-click="navigate"
+            ><slot></slot></button>
+          `)
+          .otherwise(html`
+            <a
+              part="link"
+              href="${to}"
+              class="${className}"
+              ${ariaCurrent}
+              ${disabledAttr}
+              ${externalAttr}
+              data-on-click="navigate"
+            ><slot></slot></a>
+          `)
+          .done()}
+      `;
     },
-    style: (context) => context.style,
-    render: (context) => html`
-      ${match()
-        .when(context.isButton, html`
-          <button
-            part="button"
-            class="${context.className}"
-            ${context.ariaCurrent}
-            ${context.disabledAttr}
-            ${context.externalAttr}
-            data-on-click="navigate"
-          ><slot></slot></button>
-        `)
-        .otherwise(html`
-          <a
-            part="link"
-            href="${context.to}"
-            class="${context.className}"
-            ${context.ariaCurrent}
-            ${context.disabledAttr}
-            ${context.externalAttr}
-            data-on-click="navigate"
-          ><slot></slot></a>
-        `)
-        .done()}
-    `,
-    navigate: (e: MouseEvent, context: RouterLinkProps & RouterLinkComputed) => {
-      if (context.disabled) {
+    navigate: (e: MouseEvent, context: ComponentContext<{}, RouterLinkComputed, RouterLinkProps, any>) => {
+      const { disabled, external, tag, replace, to } = context.props;
+      if (disabled) {
         e.preventDefault();
         return;
       }
-      // If external, let browser handle navigation
-      if (context.external && (context.tag === 'a' || !context.tag)) {
+      if (external && (tag === 'a' || !tag)) {
         return;
       }
       e.preventDefault();
-      if (context.replace) {
-        router.replace(context.to);
+      if (replace) {
+        router.replace(to);
       } else {
-        router.push(context.to);
+        router.push(to);
       }
     }
   });

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { component, type ComponentConfig } from '../src/lib/runtime';
-import { html } from '../src/lib/template-compiler';
+import type { ComponentConfig } from '../src/lib/runtime/types';
+import { component } from '../src/lib/runtime/component';
+import { html } from '../src/lib/runtime/template-compiler';
 
 // Edge case: missing config
 it('should throw error for missing config', () => {

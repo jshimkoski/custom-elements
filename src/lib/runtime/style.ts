@@ -1,4 +1,23 @@
 /**
+ * CSS template literal
+ *
+ * This doesn't sanitize CSS values.
+ * Runtime does that for us.
+ * 
+ * @param strings
+ * @param values
+ * @returns
+ */
+export function css(strings: TemplateStringsArray, ...values: unknown[]): string {
+  let result = '';
+  for (let i = 0; i < strings.length; i++) {
+    result += strings[i];
+    if (i < values.length) result += values[i];
+  }
+  return result;
+}
+
+/**
  * CSS minification utility (basic)
  */
 export function minifyCSS(css: string): string {
@@ -37,7 +56,7 @@ export function sanitizeCSS(css: string): string {
 /**
  * Minimal Shadow DOM reset
  */
-export const baseReset = `
+export const baseReset = css`
   :host, *, ::before, ::after {
     all: isolate;
     box-sizing: border-box;
@@ -105,7 +124,7 @@ type CSSMap = Record<string, string>;
 type SelectorVariantMap = Record<string, (selector: string, body: string) => string>;
 type MediaVariantMap = Record<string, string>;
 
-const colors: Record<string, Record<string, string>> = {
+export const colors: Record<string, Record<string, string>> = {
   gray: {
     50:  "var(--color-gray-50, #f9fafb)",
     100: "var(--color-gray-100, #f3f4f6)",
@@ -242,7 +261,7 @@ const colors: Record<string, Record<string, string>> = {
   black: { DEFAULT: "var(--color-black, #000000)" }
 };
 
-const utilityMap: CSSMap = {
+export const utilityMap: CSSMap = {
   /* Display */
   block: "display:block;",
   inline: "display:inline;",
@@ -436,9 +455,9 @@ const utilityMap: CSSMap = {
   "transition-transform": "transition-property:transform;",
 };
 
-const spacing = "var(--spacing, 0.25rem)";
+export const spacing = "var(--spacing, 0.25rem)";
 
-const spacingProps: Record<string, string[]> = {
+export const spacingProps: Record<string, string[]> = {
   m: ["margin"],
   mx: ["margin-inline"],
   my: ["margin-block"],
@@ -471,7 +490,7 @@ const spacingProps: Record<string, string[]> = {
   "gap-y": ["row-gap"]
 };
 
-const selectorVariants: SelectorVariantMap = {
+export const selectorVariants: SelectorVariantMap = {
   // State variants
   before: (sel, body) => `${sel}::before{${body}}`,
   after: (sel, body) => `${sel}::after{${body}}`,
@@ -501,7 +520,7 @@ const selectorVariants: SelectorVariantMap = {
   "peer-disabled": (sel, body) => `.peer:disabled ~ ${sel}{${body}}`,
 };
 
-const mediaVariants: MediaVariantMap = {
+export const mediaVariants: MediaVariantMap = {
   // Responsive
   "sm": "(min-width:640px)",
   "md": "(min-width:768px)",
@@ -513,9 +532,9 @@ const mediaVariants: MediaVariantMap = {
   "dark": "(prefers-color-scheme: dark)"
 };
 
-const responsiveOrder = ["sm", "md", "lg", "xl", "2xl"];
+export const responsiveOrder = ["sm", "md", "lg", "xl", "2xl"];
 
-function parseSpacing(className: string): string | null {
+export function parseSpacing(className: string): string | null {
   const negative = className.startsWith("-");
   const raw = negative ? className.slice(1) : className;
   const parts = raw.split("-");
@@ -534,7 +553,7 @@ function parseSpacing(className: string): string | null {
     .join("");
 }
 
-function hexToRgb(hex: string): string {
+export function hexToRgb(hex: string): string {
   const clean = hex.replace("#", "");
   const bigint = parseInt(clean, 16);
   const r = (bigint >> 16) & 255;
@@ -543,7 +562,7 @@ function hexToRgb(hex: string): string {
   return `${r} ${g} ${b}`;
 }
 
-function parseColorClass(className: string): string | null {
+export function parseColorClass(className: string): string | null {
   // Match bg-red-500, text-gray-200, border-blue-600, etc.
   const match = /^(bg|text|border|shadow|outline|caret|accent)-([a-z]+)-?(\d{2,3}|DEFAULT)?$/.exec(className);
   if (!match) return null;
@@ -565,7 +584,7 @@ function parseColorClass(className: string): string | null {
   return `${propMap[type]}:${colorValue};`;
 }
 
-function parseOpacityModifier(className: string): { base: string; opacity?: number } {
+export function parseOpacityModifier(className: string): { base: string; opacity?: number } {
   const [base, opacityStr] = className.split("/");
   if (!opacityStr) return { base };
 
@@ -575,7 +594,7 @@ function parseOpacityModifier(className: string): { base: string; opacity?: numb
   return { base, opacity: opacity / 100 };
 }
 
-function parseColorWithOpacity(className: string): string | null {
+export function parseColorWithOpacity(className: string): string | null {
   const { base, opacity } = parseOpacityModifier(className);
 
   // Try palette first
@@ -608,7 +627,7 @@ function parseColorWithOpacity(className: string): string | null {
  * Arbitrary value parser — supports:
  * - prop-[value]
  */
-function parseArbitrary(className: string): string | null {
+export function parseArbitrary(className: string): string | null {
   // prop-[value] syntax
   const bracketStart = className.indexOf("-[");
   const bracketEnd = className.endsWith("]");
@@ -668,12 +687,12 @@ function parseArbitrary(className: string): string | null {
   return null;
 }
 
-function escapeClassName(name: string): string {
+export function escapeClassName(name: string): string {
   // Escape only selector-relevant characters, not brackets
   return name.replace(/([!"#$%&'()*+,./:;<=>?@[\\\]^`{|}~])/g, '\\$1');
 }
 
-function extractClassesFromHTML(html: string): string[] {
+export function extractClassesFromHTML(html: string): string[] {
   const classAttrRegex = /class\s*=\s*["']([^"']+)["']/g;
   const classList: string[] = [];
   let match: RegExpExecArray | null;
@@ -700,8 +719,8 @@ function extractClassesFromHTML(html: string): string[] {
  * Only regenerates CSS if HTML changes and enough time has passed.
  * Caches results for repeated HTML inputs.
  */
-const jitCssCache = new Map<string, { css: string; timestamp: number }>();
-const JIT_CSS_THROTTLE_MS = 16; // 60fps
+export const jitCssCache = new Map<string, { css: string; timestamp: number }>();
+export const JIT_CSS_THROTTLE_MS = 16; // 60fps
 
 export function jitCSS(html: string): string {
   const now = Date.now();

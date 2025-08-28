@@ -9,7 +9,6 @@ export type EventHandler<T = any> = (data: T) => void;
  */
 type EventMap = { [eventName: string]: Set<EventHandler> };
 
-
 /**
  * GlobalEventBus provides a singleton event bus for cross-component communication.
  * Uses Set for handler storage to optimize add/remove operations and prevent duplicates.
@@ -194,7 +193,6 @@ export class GlobalEventBus extends EventTarget {
     this.eventCounters.clear();
   }
 }
-
 
 /**
  * Singleton instance of the global event bus

@@ -96,4 +96,4 @@ A: Yes, the runtime escapes HTML and sanitizes styles to prevent XSS and injecti
 
 SSR support in the custom elements runtime enables fast, SEO-friendly, and universal web components. By leveraging VNode trees, pure functions, and hydration, you can build components that work seamlessly on both server and client.
 
-For more details, see the SSR fallback logic in `src/lib/runtime.ts` and explore universal component examples in the documentation.
+For more details, see the SSR fallback logic in `src/lib/index.ts` and explore universal component examples in the documentation.

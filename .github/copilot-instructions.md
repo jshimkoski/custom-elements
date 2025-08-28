@@ -39,7 +39,7 @@ You are an expert in TypeScript, JavaScript, HTML, CSS. Your task is to produce 
 
 ## UI and Styling
 
-- Generate Custom Elements using our runtime.ts for components and styling.
+- Generate Custom Elements using our lib/index.ts for components and styling.
 - Implement responsive design; use a mobile-first approach.
 
 ## Performance Optimization

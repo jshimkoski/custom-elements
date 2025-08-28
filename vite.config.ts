@@ -4,7 +4,7 @@ import { resolve } from 'path';
 export default defineConfig({
   build: {
     lib: {
-      entry: resolve(__dirname, 'src/lib/runtime.ts'),
+      entry: resolve(__dirname, 'src/lib/index.ts'),
       name: 'CustomElementsRuntime',
       fileName: (format) => `custom-elements-runtime.${format}.js`,
       formats: ['es', 'cjs', 'umd'],

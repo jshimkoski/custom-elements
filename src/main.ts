@@ -1,5 +1,5 @@
 import './style.css';
-import { component, html, when, each, match, eventBus } from "./lib/runtime";
+import { component, html, when, each, match, eventBus } from "./lib";
 
 // Import example components so they register themselves
 import './components/examples/MinimalExample';

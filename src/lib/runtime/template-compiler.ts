@@ -1,4 +1,4 @@
-import type { VNode } from "./vdom";
+import type { VNode } from "./types";
 
 export function h(
   tag: string,
@@ -11,7 +11,7 @@ export function h(
   return { tag, key: finalKey, props, children };
 }
 
-function isAnchorBlock(v: any): boolean {
+export function isAnchorBlock(v: any): boolean {
   return (
     !!v &&
     typeof v === "object" &&
@@ -19,17 +19,17 @@ function isAnchorBlock(v: any): boolean {
   );
 }
 
-function isElementVNode(v: any): v is VNode {
+export function isElementVNode(v: any): v is VNode {
   return (
     typeof v === "object" && v !== null && "tag" in v && !isAnchorBlock(v) // exclude anchor blocks from being treated as normal elements
   );
 }
 
-function ensureKey(v: VNode, k: string): VNode {
+export function ensureKey(v: VNode, k: string): VNode {
   return v.key != null ? v : { ...v, key: k };
 }
 
-function parseProps(
+export function parseProps(
   str: string,
   values: unknown[] = [],
   context: Record<string, any> = {}
@@ -133,7 +133,7 @@ function parseProps(
  *  - Pass AnchorBlocks through (and deep-normalize their children's keys) so the renderer can mount/patch them surgically.
  *  - Do not rewrap interpolated VNodes (preserve their keys); only fill in missing keys.
  */
-function htmlImpl(
+export function htmlImpl(
   strings: TemplateStringsArray,
   values: unknown[],
   context?: Record<string, any>,

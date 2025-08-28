@@ -39,19 +39,18 @@
   },
   "main": "dist/custom-elements-runtime.cjs.js",
   "module": "dist/custom-elements-runtime.es.js",
-  "types": "dist/runtime.d.ts",
+  "types": "dist/index.d.ts",
   "files": [
     "dist",
-    "dist/runtime.d.ts"
+    "dist/index.d.ts"
   ],
   "exports": {
     ".": {
-      "types": "./dist/runtime.d.ts",
+      "types": "./dist/index.d.ts",
       "import": "./dist/custom-elements-runtime.es.js",
       "require": "./dist/custom-elements-runtime.cjs.js",
       "default": "./dist/custom-elements-runtime.umd.js"
-    },
-    "./runtime.d.ts": "./dist/runtime.d.ts"
+    }
   },
   "publishConfig": {
     "access": "public"

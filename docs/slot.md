@@ -115,4 +115,4 @@ A: Props are reactive; child nodes are static unless managed by the parent.
 
 Slot functionality in the runtime enables flexible, composable UIs. Use native `<slot>` elements for true content projection, and props or child nodes for additional patterns.
 
-For more details, see advanced usage examples and the source code in `src/lib/runtime.ts`.
+For more details, see advanced usage examples and the source code in `src/lib/index.ts`.

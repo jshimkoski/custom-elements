@@ -1,4 +1,4 @@
-import type { VNode } from "./vdom";
+import type { VNode } from "./runtime/types";
 
 /* --- When --- */
 export function when(cond: boolean, children: VNode | VNode[]): VNode {

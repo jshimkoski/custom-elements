@@ -150,4 +150,4 @@ component('my-widget', {
 - Always return a single root node from `render`.
 - Use TypeScript for best experience and type safety.
 
-For more, see the [API Reference](../src/lib/runtime.ts) and [examples](../src/components/examples/).
+For more, see the [API Reference](../src/lib/index.ts) and [examples](../src/components/examples/).

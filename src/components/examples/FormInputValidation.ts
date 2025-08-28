@@ -2,7 +2,7 @@
  * FormInputValidation: A form with input validation and error handling.
  * Demonstrates ctx, validation, and error feedback.
  */
-import { component, html, css, when } from '../../lib/runtime';
+import { component, html, when } from '../../lib';
 
 component('form-input-validation', (ctx) => html`
   <form
@@ -72,14 +72,14 @@ component('form-input-validation', (ctx) => html`
         </select>
       </label>
       ${when(ctx.error !== '', html`
-        <div class="text-sm text-red-600 dark:text-red-400">${ctx.error}</div>
+        <div class="mb-6 text-sm text-red-600 dark:text-red-400">${ctx.error}</div>
       `)}
       <button
         type="submit"
-        class="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:bg-blue-700"
+        class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:bg-blue-700"
       >Submit</button>
       ${when(ctx.success !== '', html`
-        <div class="text-sm text-green-600 dark:text-green-400">${ctx.success}</div>
+        <div class="mt-4 text-sm text-green-600 dark:text-green-400">${ctx.success}</div>
       `)}
     </fieldset>
   </form>

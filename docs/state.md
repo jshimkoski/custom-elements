@@ -83,4 +83,4 @@ computed: {
 - Always return a single root node from your render function.
 - State is local to each component; use `createStore` for global state.
 
-For more, see the [API Reference](../src/lib/runtime.ts) and [examples](../src/components/examples/).
+For more, see the [API Reference](../src/lib/index.ts) and [examples](../src/components/examples/).

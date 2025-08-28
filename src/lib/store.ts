@@ -1,15 +1,3 @@
-
-// Usage example
-// import { Store } from './lib/store';
-
-// export const globalState = Store({ theme: 'light', count: 0 });
-
-// // In a component
-// globalState.subscribe((state) => {
-//   console.log('Global changed:', state.count);
-// });
-
-// src/lib/store.ts
 type Listener<T> = (state: T) => void;
 
 export interface Store<T extends object> {
@@ -25,6 +13,7 @@ export function createStore<T extends object>(initial: T) {
       return true;
     }
   });
+
   const listeners: Listener<T>[] = [];
 
   function subscribe(listener: Listener<T>) {

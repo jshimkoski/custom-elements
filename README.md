@@ -52,6 +52,7 @@ Explore the full documentation for every runtime feature:
 - [Computed](./docs/computed.md)
 - [Watch](./docs/watch.md)
 - [Store](./docs/store.md)
+- [Router](./docs/router.md)
 - [Event Bus](./docs/event-bus.md)
 - [Template](./docs/template.md)
 

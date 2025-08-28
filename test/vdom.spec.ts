@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { vdomRenderer, renderToString } from '../src/lib/vdom';
+import { vdomRenderer, renderToString } from '../src/lib/runtime/vdom';
+import type { VNode } from '../src/lib/runtime/types';
 
-function vnode(tag: any, children: any, key: any, props: any): { tag: any; children: any; key: any; props: any } {
+function vnode(tag: any, children: any, key: any, props: any): VNode {
   return { tag, children, key, props };
 }
 
@@ -189,5 +190,66 @@ describe('vdom', () => {
     expect(htmlStr).toContain('id="foo"');
     expect(htmlStr).toContain('title="bar &amp; baz"');
     expect(htmlStr).toContain('X');
+  });
+});
+
+describe('vdomRenderer edge cases', () => {
+  it('removes extra nodes except style', () => {
+    const host = document.createElement('div');
+    const shadowRoot = host.attachShadow({ mode: 'open' });
+    // Add extra nodes
+    shadowRoot.appendChild(document.createElement('div'));
+    shadowRoot.appendChild(document.createElement('span'));
+    const style = document.createElement('style');
+    shadowRoot.appendChild(style);
+
+    const vnode: VNode = { tag: 'div', children: 'Test' };
+    vdomRenderer(shadowRoot, vnode, {}, {});
+    // Only the rendered node and style should remain
+    expect(shadowRoot.querySelector('style')).not.toBeNull();
+    expect(shadowRoot.childNodes.length).toBe(2);
+  });
+
+  it('tracks previous VNode and DOM node', () => {
+    const host = document.createElement('div');
+    const shadowRoot = host.attachShadow({ mode: 'open' });
+    const vnode: VNode = { tag: 'div', children: 'First' };
+    vdomRenderer(shadowRoot, vnode, {}, {});
+    // Should set _prevVNode and _prevDom
+    expect((shadowRoot as any)._prevVNode).toBeTruthy();
+    expect((shadowRoot as any)._prevDom).toBeTruthy();
+  });
+
+  it('handles null refs cleanup', () => {
+    const host = document.createElement('div');
+    const shadowRoot = host.attachShadow({ mode: 'open' });
+    const refs: any = {};
+    // First render with ref and key
+    vdomRenderer(shadowRoot, { tag: 'div', key: 'old', props: { ref: 'myRef' } }, {}, refs);
+    expect(refs.myRef).toBeInstanceOf(HTMLElement);
+    // Second render with a different key/tag, should replace and clean up
+    vdomRenderer(shadowRoot, { tag: 'span', key: 'new', children: 'X' }, {}, refs);
+    expect(shadowRoot.querySelector('div')).toBeNull();
+    expect(shadowRoot.querySelector('span')).not.toBeNull();
+  });
+});
+
+describe('renderToString edge cases', () => {
+  it('renders empty children', () => {
+    const vnode: VNode = { tag: 'div' };
+    expect(renderToString(vnode)).toBe('<div></div>');
+  });
+
+  it('renders deeply nested VNodes', () => {
+    const vnode: VNode = {
+      tag: 'section',
+      children: [
+        { tag: 'header', children: 'Title' },
+        { tag: 'main', children: [
+          { tag: 'article', children: 'Content' }
+        ]}
+      ]
+    };
+    expect(renderToString(vnode)).toBe('<section><header>Title</header><main><article>Content</article></main></section>');
   });
 });
