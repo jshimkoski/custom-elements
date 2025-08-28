@@ -39,128 +39,62 @@ export function sanitizeCSS(css: string): string {
  */
 export const baseReset = `
   :host, *, ::before, ::after {
+    all: isolate;
     box-sizing: border-box;
-    border-width: 0;
-    border-style: solid;
-    border-color: currentColor;
+    border: 0 solid currentColor;
+    margin: 0;
+    padding: 0;
+    font: inherit;
+    vertical-align: baseline;
+    background: transparent;
+    color: inherit;
+    -webkit-tap-highlight-color: transparent;
   }
   :host {
-    font-size: 16px;
-    line-height: 1.5;
-    font-family: ui-sans-serif, system-ui, sans-serif;
+    display: contents;
+    font: 16px/1.5 ui-sans-serif, system-ui, sans-serif;
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
-    color: inherit;
-    background-color: transparent;
   }
-  *, ::before, ::after {
-    -webkit-tap-highlight-color: transparent;
-    margin: 0;
-    padding: 0;
-    font: inherit;
-    vertical-align: baseline;
+  button, input, select, textarea {
     background: transparent;
-    color: inherit;
-  }
-  button, input, optgroup, select, textarea {
-    font: inherit;
-    color: inherit;
-    background: transparent;
-    border: none;
     outline: none;
-    margin: 0;
-    padding: 0;
   }
-  textarea {
-    resize: vertical;
-  }
-  progress {
-    vertical-align: baseline;
-  }
-  button, textarea {
-    overflow: visible;
-  }
-  input[type="search"]::-webkit-search-decoration,
-  input[type="search"]::-webkit-search-cancel-button,
-  input[type="search"]::-webkit-search-results-button,
-  input[type="search"]::-webkit-search-results-decoration {
-    -webkit-appearance: none;
-  }
+  textarea { resize: vertical }
+  progress { vertical-align: baseline }
+  button, textarea { overflow: visible }
   img, svg, video, canvas, audio, iframe, embed, object {
     display: block;
     max-width: 100%;
     height: auto;
-    vertical-align: middle;
   }
-  select {
-    text-transform: none;
-  }
-  optgroup {
-    font-weight: bold;
-  }
-  fieldset {
-    border: none;
-  }
-  svg {
-    fill: currentColor;
-    stroke: none;
-  }
-  a {
-    color: inherit;
-    text-decoration: inherit;
-  }
-  a, button {
+  svg { fill: currentColor; stroke: none }
+  a { text-decoration: inherit; cursor: pointer }
+  button, [type=button], [type=reset], [type=submit] {
     cursor: pointer;
-  }
-  input[type="file"] {
-    border: 0;
-  }
-  button, [type="button"], [type="reset"], [type="submit"] {
     appearance: button;
-    background-color: transparent;
-    background-image: none;
-  }
-  [type='button'], [type='reset'], [type='submit'] {
+    background: none;
     -webkit-user-select: none;
     user-select: none;
   }
-  ::-webkit-input-placeholder { color: inherit; opacity: 0.5; }
-  ::placeholder { color: inherit; opacity: 0.5; }
+  ::-webkit-input-placeholder, ::placeholder {
+    color: inherit; opacity: .5;
+  }
   *:focus {
-    outline: 2px solid #3b82f6;
+    outline: 2px solid var(--color-blue-500, #3b82f6);
     outline-offset: 2px;
   }
-  ol, ul {
-    list-style: none;
-  }
-  table {
-    border-collapse: collapse;
-    border-spacing: 0;
-  }
-  strong {
-    font-weight: bolder;
-  }
+  ol, ul { list-style: none }
+  table { border-collapse: collapse }
   sub, sup {
-    font-size: 0.75em;
+    font-size: .75em;
     line-height: 0;
     position: relative;
-    vertical-align: baseline;
   }
-  sub {
-    bottom: -0.25em;
-  }
-  sup {
-    top: -0.5em;
-  }
-  [disabled] {
-    cursor: not-allowed;
-  }
-  [hidden] {
-    display: none;
-  }
-  [aria-disabled="true"] {
-    cursor: not-allowed;
-  }
+  sub { bottom: -.25em }
+  sup { top: -.5em }
+  [disabled], [aria-disabled=true] { cursor: not-allowed }
+  [hidden] { display: none }
 `;
 
 /**
@@ -183,6 +117,18 @@ const colors: Record<string, Record<string, string>> = {
     700: "var(--color-gray-700, #374151)",
     800: "var(--color-gray-800, #1f2937)",
     900: "var(--color-gray-900, #111827)",
+  },
+  neutral: {
+    50:  "var(--color-neutral-50, #fafafa)",
+    100: "var(--color-neutral-100, #f5f5f5)",
+    200: "var(--color-neutral-200, #e5e5e5)",
+    300: "var(--color-neutral-300, #d4d4d4)",
+    400: "var(--color-neutral-400, #a3a3a3)",
+    500: "var(--color-neutral-500, #737373)",
+    600: "var(--color-neutral-600, #525252)",
+    700: "var(--color-neutral-700, #404040)",
+    800: "var(--color-neutral-800, #262626)",
+    900: "var(--color-neutral-900, #171717)",
   },
   slate: {
     50:  "var(--color-slate-50, #f8fafc)",
@@ -306,6 +252,29 @@ const utilityMap: CSSMap = {
   grid: "display:grid;",
   hidden: "display:none;",
 
+  /* Sizing & Spacing */
+  "w-full": "width:100%;",
+  "w-screen": "width:100dvw;",
+  "h-full": "height:100%;",
+  "h-screen": "height:100dvw;",
+  "max-w-full": "max-width:100%;",
+  "max-h-full": "max-height:100%;",
+  "min-w-0": "min-width:0;",
+  "min-h-0": "min-height:0;",
+  "m-auto": "margin:auto;",
+  "mx-auto": "margin-inline:auto;",
+  "my-auto": "margin-block:auto;",
+
+  /* Overflow */
+  "overflow-auto": "overflow:auto;",
+  "overflow-hidden": "overflow:hidden;",
+  "overflow-visible": "overflow:visible;",
+  "overflow-scroll": "overflow:scroll;",
+
+  /* Pointer Events */
+  "pointer-events-none": "pointer-events:none;",
+  "pointer-events-auto": "pointer-events:auto;",
+
   /* Accessibility */
   "sr-only": "position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border-width:0;",
   "not-sr-only": "position:static;width:auto;height:auto;padding:0;margin:0;overflow:visible;clip:auto;white-space:normal;",
@@ -421,7 +390,28 @@ const utilityMap: CSSMap = {
   "items-stretch": "align-items:stretch;",
   "justify-center": "justify-content:center;",
   "justify-start": "justify-content:flex-start;",
+  "justify-between": "justify-content:space-between;",
+  "justify-around": "justify-content:space-around;",
+  "justify-evenly": "justify-content:space-evenly;",
   "justify-end": "justify-content:flex-end;",
+  "flex-wrap": "flex-wrap:wrap;",
+  "flex-nowrap": "flex-wrap:nowrap;",
+  "flex-wrap-reverse": "flex-wrap:wrap-reverse;",
+  "content-center": "align-content:center;",
+  "content-start": "align-content:flex-start;",
+  "content-end": "align-content:flex-end;",
+  "content-between": "align-content:space-between;",
+  "content-around": "align-content:space-around;",
+  "content-stretch": "align-content:stretch;",
+  "self-auto": "align-self:auto;",
+  "self-start": "align-self:flex-start;",
+  "self-end": "align-self:flex-end;",
+  "self-center": "align-self:center;",
+  "self-stretch": "align-self:stretch;",
+  "flex-1": "flex:1 1 0%;",
+  "flex-auto": "flex:1 1 auto;",
+  "flex-initial": "flex:0 1 auto;",
+  "flex-none": "flex:0 0 auto;",
   "flex-col": "flex-direction:column;",
   "flex-row": "flex-direction:row;",
   "grow": "flex-grow:1;",
@@ -446,7 +436,7 @@ const utilityMap: CSSMap = {
   "transition-transform": "transition-property:transform;",
 };
 
-const spacing = '0.25rem';
+const spacing = "var(--spacing, 0.25rem)";
 
 const spacingProps: Record<string, string[]> = {
   m: ["margin"],
@@ -466,6 +456,12 @@ const spacingProps: Record<string, string[]> = {
   inset: ["inset"],
   "inset-x": ["inset-inline"],
   "inset-y": ["inset-block"],
+  h: ["height"],
+  w: ["width"],
+  "min-h": ["min-height"],
+  "min-w": ["min-width"],
+  "max-h": ["max-height"],
+  "max-w": ["max-width"],
   top: ["top"],
   bottom: ["bottom"],
   left: ["left"],

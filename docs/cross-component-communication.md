@@ -25,11 +25,9 @@ The built-in event bus enables decoupled communication between components.
 
 ## 🧩 Props & Attribute Passing
 
-Pass data from parent to child using props and attributes.
+Pass data from parent to child using props and attributes (string, number, boolean). For function props (event handlers), set them as properties on the element instance (not as attributes).
 
-**Please note:** Props can only be of type string, number, or boolean.
-
-- **Example:**
+- **Primitive props example:**
   ```html
   <user-card name="Alice" age="30"></user-card>
   ```
@@ -38,6 +36,16 @@ Pass data from parent to child using props and attributes.
     props: { name: { type: String }, age: { type: Number } },
     render: (ctx) => html`<div>${ctx.name} (${ctx.age})</div>`
   });
+  ```
+
+- **Function prop (event handler) example:**
+  ```typescript
+  // In parent code
+  const el = document.createElement('user-card');
+  el.onCustomEvent = (detail, ctx) => {
+    // handle event
+  };
+  document.body.appendChild(el);
   ```
 
 ## 🏪 Shared Store
@@ -54,7 +62,7 @@ Use the built-in store for global or shared state.
   component("theme-toggle", {
     render: (ctx) => html`
       <button @click="${() => store.theme = store.theme === 'light' ? 'dark' : 'light'}">
-        Theme: ${ctx.theme}
+        Theme: ${store.theme}
       </button>
     `
   });
@@ -64,25 +72,31 @@ Use the built-in store for global or shared state.
 
 Use native DOM events for direct communication.
 
-- **Dispatch custom events:**
+- **Dispatch custom events (from within runtime component):**
   ```typescript
-  this.dispatchEvent(new CustomEvent("my-event", { detail: { foo: "bar" } }));
+  // Use context.emit for custom events
+  ctx.emit('my-event', { foo: 'bar' });
   ```
-- **Listen in parent:**
-  ```html
-  <my-child @my-event="handleEvent"></my-child>
-  ```
+- **Listen in parent (frameworks):**
+  - Vue: `<my-child @my-event="handleEvent" />`
+  - Angular: `<my-child (my-event)="handleEvent($event)" ></my-child>`
+  - Svelte: `<my-child on:my-event={handleEvent} />`
+  - React: Use ref and `addEventListener`
+    ```jsx
+    el.addEventListener('my-event', e => { /* ... */ });
+    ```
 
 **Note:**
-- The `@event` binding only works in templates rendered by the runtime.
+- The `@event` binding only works in templates rendered by the runtime or supported frameworks.
 - For plain HTML, always use `addEventListener`.
 
 ## 🚦 Best Practices
 
 - Prefer event bus for decoupled, app-wide communication
-- Use props for parent-to-child data
+- Use props for parent-to-child data (primitive types via attributes, function props via property assignment)
 - Use store for shared/global state
 - Use DOM events for direct parent-child or sibling communication
+- Always set function props (event handlers) as properties, not attributes
 - Clean up listeners to avoid memory leaks
 
 ## ❓ FAQ

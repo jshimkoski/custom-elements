@@ -1,40 +1,72 @@
 # 🎨 Deep Dive: JIT CSS
 
-Custom Elements Runtime provides a high-performance, zero-dependency JIT CSS engine for custom elements. It enables utility-first, variant-rich, and arbitrary-value styling directly from your HTML templates.
+Custom Elements Runtime provides a high-performance, zero-dependency JIT CSS engine for custom elements. It enables utility-first, variant-rich, and arbitrary-value styling directly from your Shadow DOM.
 
 ## 🏗️ How JIT CSS Works
 
-1. **Base Reset:** Applies a minimal Shadow DOM reset for consistent rendering.
+1. **Base Reset:** Applies a minimal Shadow DOM reset for consistent rendering. This is shared across all components to save space.
 2. **Merges User-defined Styles:** Merges in user-defined styles from the component config.
-3. **JIT CSS:** Extracts all class names from your HTML, parses utilities, variants, and arbitrary values, and generates scoped CSS rules on demand.
-4. **Minification:** Optionally, strips whitespace and comments for fast, small payloads.
+3. **JIT CSS:** Extracts all class names from the Shadow DOM, parses utilities, variants, and arbitrary values, and generates scoped CSS rules on demand.
+4. **Minification:** Strips whitespace and comments for fast, small payloads.
 5. **Memoization & Throttling:** Caches CSS output for repeated HTML inputs and throttles regeneration for performance.
 
 ## 🧩 Built-in Utilities
 
-**Layout:** `block`, `inline`, `inline-block`, `flex`, `inline-flex`, `grid`, `hidden`
 
-**Grid:** `grid-cols-1` to `grid-cols-12`, `grid-rows-1` to `grid-rows-12`, `col-span-*`, `row-span-*`
+**Layout:**
+`block`, `inline`, `inline-block`, `flex`, `inline-flex`, `grid`, `hidden`
 
-**Position:** `absolute`, `relative`, `fixed`, `sticky`
+**Sizing & Spacing:**
+`w-full`, `w-screen`, `h-full`, `h-screen`, `max-w-full`, `max-h-full`, `min-w-0`, `min-h-0`, `m-auto`, `mx-auto`, `my-auto`,
+`p-4`, `m-2`, `mx-auto`, `gap-2`, `gap-x-2`, `gap-y-2`, etc. (all axis and negative values supported)
 
-**Typography:** `font-bold`, `font-semibold`, `font-medium`, `font-light`, `italic`, `underline`, `uppercase`, `text-left`, `text-center`, `text-right`, `text-xs` to `text-8xl`, `truncate`, `line-clamp-*`
+**Accessibility:**
+`sr-only`, `not-sr-only`
 
-**Borders & Radius:** `border`, `rounded-none`, `rounded-xs`, `rounded-sm`, `rounded-md`, `rounded-lg`, `rounded-full`
+**Grid:**
+`grid-cols-1` to `grid-cols-12`, `grid-rows-1` to `grid-rows-12`, `col-span-*`, `row-span-*`
 
-**Shadow & Effects:** `shadow-none`, `shadow-xs`, `shadow-sm`, `shadow-md`, `shadow-lg`, `shadow-xl`, `shadow-2xl`
+**Grid Placement:**
+`col-span-1` to `col-span-12`, `row-span-1` to `row-span-12`
 
-**Transitions:** `transition`, `transition-colors`, `transition-opacity`, `transition-transform`, `duration-[value]`, `delay-[value]`
+**Position:**
+`absolute`, `relative`, `fixed`, `sticky`
 
-**Visibility:** `visible`, `invisible`
+**Typography:**
+`font-bold`, `font-semibold`, `font-medium`, `font-light`, `underline`, `overline`, `line-through`, `no-underline`, `italic`, `not-italic`, `uppercase`, `lowercase`, `capitalize`, `normal-case`, `text-left`, `text-center`, `text-right`, `text-xs` to `text-8xl`, `truncate`, `line-clamp-1` to `line-clamp-4`
 
-**Flex:** `grow`, `shrink`, `grow-0`, `shrink-0`, `flex-col`, `flex-row`, `basis-[value]`, `items-[value]`, `justify-[value]`, `self-[value]`
+**Borders & Radius:**
+`border`, `rounded-none`, `rounded-xs`, `rounded` (alias `rounded-md`), `rounded-sm`, `rounded-md`, `rounded-lg`, `rounded-full`
 
-**Font Family:** `font-sans`, `font-serif`, `font-mono`
+**Ring (Focus):**
+`ring-0`, `ring-1`, `ring-2`, `ring-4`, `ring-8`
 
-**Spacing:** `p-4`, `m-2`, `mx-auto`, `gap-2`, `gap-x-2`, `gap-y-2`, etc. (all axis and negative values supported)
+**Shadow & Effects:**
+`shadow-none`, `shadow-xs`, `shadow-sm`, `shadow-md`, `shadow-lg`, `shadow-xl`, `shadow-2xl`
 
-**Colors:** `bg-gray-100`, `text-blue-500`, `border-red-500`, `shadow-blue-500`, etc. (full palette, semantic, and arbitrary)
+**Transitions:**
+`transition`, `transition-colors`, `transition-opacity`, `transition-transform`
+
+**Text Overflow & Whitespace:**
+`truncate`
+
+**Visibility:**
+`visible`, `invisible`
+
+**Flex:**
+`items-center`, `items-start`, `items-end`, `items-baseline`, `items-stretch`, `justify-center`, `justify-start`, `justify-between`, `justify-around`, `justify-evenly`, `justify-end`, `flex-wrap`, `flex-nowrap`, `flex-wrap-reverse`, `content-center`, `content-start`, `content-end`, `content-between`, `content-around`, `content-stretch`, `self-auto`, `self-start`, `self-end`, `self-center`, `self-stretch`, `flex-1`, `flex-auto`, `flex-initial`, `flex-none`, `flex-col`, `flex-row`, `grow`, `shrink`, `grow-0`, `shrink-0`, `basis-[value]`
+
+**Font Family:**
+`font-sans`, `font-serif`, `font-mono`
+
+**Line Clamp:**
+`line-clamp-1`, `line-clamp-2`, `line-clamp-3`, `line-clamp-4`
+
+**Transition Delay/Property:**
+`transition-colors`, `transition-opacity`, `transition-transform`
+
+**Colors:**
+`bg-gray-100`, `text-blue-500`, `border-red-500`, `shadow-blue-500`, etc. (full palette, semantic, and arbitrary)
 
 For a complete list, see the `utilityMap` in [`src/lib/style-utils.ts`](../src/lib/style-utils.ts).
 
@@ -97,6 +129,7 @@ JIT CSS provides a rich set of built-in color palettes, all accessible via utili
 **Available Palettes:**
 
 - `gray` (50-900)
+- `neutral` (50-900)
 - `slate` (50-900)
 - `zinc` (50-900)
 - `red` (50-900)
@@ -109,11 +142,16 @@ JIT CSS provides a rich set of built-in color palettes, all accessible via utili
 - `white` (DEFAULT)
 - `black` (DEFAULT)
 
+**Opacity Modifiers:**
+
+`bg-blue-500/50`, `text-red-500/80`, etc. (any palette color supports `/[0-100]` for opacity)
+
 **Usage Examples:**
 
 ```html
 <!-- Background colors -->
 <div class="bg-gray-100"></div>
+<div class="bg-neutral-100"></div>
 <div class="bg-slate-700"></div>
 <div class="bg-zinc-900"></div>
 <div class="bg-red-500"></div>

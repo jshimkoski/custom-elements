@@ -5,40 +5,66 @@
 import { component, html, css, when } from '../../lib/runtime';
 
 component('form-input-validation', (ctx) => html`
-  <form @submit="${ctx.submit}">
+  <form
+    class="max-w-128 mx-auto p-8 rounded-lg shadow bg-white dark:bg-black text-black dark:text-white shadow-lg border border-neutral-100 dark:border-neutral-900"
+    @submit="${ctx.submit}"
+  >
     <fieldset>
-      <legend>Form Input Validation Demo</legend>
-      <label>
-        Email:
-        <input #model="email" ref="emailInput" type="email" required />
+      <legend class="text-2xl mb-8">Form Input Validation Demo</legend>
+      <label class="flex flex-col items-start gap-2 w-full mb-6">
+        <span class="font-semibold">Email:</span>
+        <input
+          #model="email"
+          ref="emailInput"
+          type="email"
+          required
+          class="w-full px-2 py-1 rounded border border-neutral-300 dark:border-neutral-800 hover:bg-neutral-50 focus:bg-white dark:hover:bg-neutral-900 dark:focus:bg-black"
+        />
       </label>
-      <label>
-        Username:
-        <input #model="username" type="text" minlength="3" required />
+      <label class="flex flex-col items-start gap-2 w-full mb-6">
+        <span class="font-semibold">Username:</span>
+        <input
+          #model="username"
+          type="text"
+          minlength="3"
+          required
+          class="w-full px-2 py-1 rounded border border-neutral-300 dark:border-neutral-800 hover:bg-neutral-50 focus:bg-white dark:hover:bg-neutral-900 dark:focus:bg-black"
+        />
       </label>
-      <label>
-        Bio:
-        <textarea #model="bio" rows="3" minlength="10" required></textarea>
+      <label class="flex flex-col items-start gap-2 w-full mb-6">
+        <span class="font-semibold">Bio:</span>
+        <textarea
+          #model="bio"
+          rows="3"
+          minlength="10"
+          required
+          class="w-full px-2 py-1 rounded border border-neutral-300 dark:border-neutral-800 hover:bg-neutral-50 focus:bg-white dark:hover:bg-neutral-900 dark:focus:bg-black"
+        ></textarea>
       </label>
-      <div>
-        Gender:
+      <div class="flex flex-col items-start gap-2 w-full mb-6">
+        <span class="font-semibold">Gender:</span>
         <label><input #model="gender" type="radio" value="male" name="gender" /> Male</label>
         <label><input #model="gender" type="radio" value="female" name="gender" /> Female</label>
         <label><input #model="gender" type="radio" value="other" name="gender" /> Other</label>
       </div>
-      <label>
-        Subscribe:
-        <input #model="subscribe" type="checkbox" /> Yes
+      <label class="flex flex-col items-start gap-2 w-full mb-6">
+        <span class="font-semibold">Subscribe:</span>
+        <div>
+          <input #model="subscribe" type="checkbox" /> Yes
+        </div>
       </label>
-      <div>
-        Favorite Fruits:
+      <div class="flex flex-col items-start gap-2 w-full mb-6">
+        <span class="font-semibold">Favorite Fruits:</span>
         <label><input #model="fruits" type="checkbox" value="apple" /> Apple</label>
         <label><input #model="fruits" type="checkbox" value="banana" /> Banana</label>
         <label><input #model="fruits" type="checkbox" value="orange" /> Orange</label>
       </div>
-      <label>
-        Country:
-        <select #model="country">
+      <label class="flex flex-col items-start gap-2 w-full mb-6">
+        <span class="font-semibold">Country:</span>
+        <select
+          #model="country"
+          class="w-full px-2 py-1 rounded border border-neutral-300 dark:border-neutral-800 hover:bg-neutral-50 focus:bg-white dark:hover:bg-neutral-900 dark:focus:bg-black"
+        >
           <option value="">Select...</option>
           <option value="us">United States</option>
           <option value="ca">Canada</option>
@@ -46,11 +72,14 @@ component('form-input-validation', (ctx) => html`
         </select>
       </label>
       ${when(ctx.error !== '', html`
-        <div class="error">${ctx.error}</div>
+        <div class="text-sm text-red-600 dark:text-red-400">${ctx.error}</div>
       `)}
-      <button type="submit">Submit</button>
+      <button
+        type="submit"
+        class="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:bg-blue-700"
+      >Submit</button>
       ${when(ctx.success !== '', html`
-        <div class="success">${ctx.success}</div>
+        <div class="text-sm text-green-600 dark:text-green-400">${ctx.success}</div>
       `)}
     </fieldset>
   </form>
@@ -118,69 +147,4 @@ component('form-input-validation', (ctx) => html`
       ctx.success = '';
     }, 3000);
   },
-  style: css`
-    form {
-      max-width: 400px;
-      margin: 2rem auto;
-      padding: 2rem;
-      background: #fff;
-      border-radius: 8px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.07);
-      font-family: system-ui, sans-serif;
-    }
-    fieldset {
-      border: none;
-      padding: 0;
-      margin: 0 0 1rem 0;
-    }
-    legend {
-      font-size: 1.2rem;
-      font-weight: 600;
-      margin-bottom: 1rem;
-    }
-    label {
-      display: block;
-      margin-bottom: 1rem;
-      font-weight: 500;
-    }
-    input, textarea, select {
-      display: block;
-      width: 100%;
-      padding: 0.5rem;
-      margin-top: 0.25rem;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      font-size: 1rem;
-      box-sizing: border-box;
-    }
-    input[type="checkbox"], input[type="radio"] {
-      display: inline-block;
-      width: auto;
-      margin-right: 0.5rem;
-    }
-    button[type="submit"] {
-      background: #0078d4;
-      color: #fff;
-      border: none;
-      border-radius: 4px;
-      padding: 0.6rem 1.2rem;
-      font-size: 1rem;
-      cursor: pointer;
-      margin-top: 1rem;
-      transition: background 0.2s;
-    }
-    button[type="submit"]:hover {
-      background: #005fa3;
-    }
-    .error {
-      color: red;
-      font-size: 0.9em;
-      margin-top: 0.5rem;
-    }
-    .success {
-      color: green;
-      font-size: 0.9em;
-      margin-top: 0.5rem;
-    }
-  `
 });

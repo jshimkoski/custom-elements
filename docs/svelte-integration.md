@@ -16,12 +16,22 @@ Use Custom Elements Runtime components in Svelte apps:
    ```
 
 3. **Props and events:**
-   - Pass props as attributes.
-   - Listen for events with `on:eventname`.
+    - Pass props as attributes (kebab-case).
+    - Listen for custom events with `on:eventname` (kebab-case).
+    - For function props (event handlers), set them as properties on the element instance using `bind:this`:
+      ```svelte
+      <my-counter bind:this={counterEl} />
+      <script>
+         let counterEl;
+         counterEl.onCustomEvent = (detail, ctx) => {
+            // handle event
+         };
+      </script>
+      ```
 
 ## Notes
 
 - Svelte recognizes custom elements automatically.
-- For two-way binding, use `bind:this` and custom events.
+- For two-way binding, use `bind:this` and custom events. Use `context.emit` in your component to emit events.
 - Works with Svelte 3.x and above.
 Mix and match with Svelte power! 🌈

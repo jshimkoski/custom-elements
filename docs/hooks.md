@@ -65,6 +65,7 @@ component('lifecycle-demo', {
 - Hooks are called at the appropriate lifecycle stage by the runtime.
 - All hooks receive the full reactive state (including props and computed).
 - Errors in hooks are caught and handled via `onError` and `errorFallback`.
+- Hooks are injected only if defined in the config.
 - Hooks do not block rendering; they run asynchronously when possible.
 
 ## 📝 Tips & Best Practices

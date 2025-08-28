@@ -80,7 +80,7 @@ export interface ComponentConfig<
   props?: Record<
     string,
     {
-      type: StringConstructor | NumberConstructor | BooleanConstructor;
+      type: StringConstructor | NumberConstructor | BooleanConstructor | FunctionConstructor;
       default?: string | number | boolean;
     }
   >;
@@ -271,27 +271,79 @@ export function createElementClass<
       this._cfg = config;
 
       const reactiveContext = this._initContext(config);
+
       // Inject refs into context (non-enumerable to avoid proxy traps)
       Object.defineProperty(reactiveContext, "refs", {
         value: this._refs,
         writable: false,
-        enumerable: false, // Hide from iteration to avoid proxy traps
+        enumerable: false,
         configurable: false,
       });
+
+      // --- Apply props BEFORE wiring listeners and emit ---
       this.context = reactiveContext;
+      this._applyProps(config);
+
+      // Inject emit helper for custom events
+      Object.defineProperty(this.context, "emit", {
+        value: (eventName: string, detail?: any, options?: CustomEventInit) => {
+          this.dispatchEvent(
+            new CustomEvent(eventName, {
+              detail,
+              bubbles: true,
+              composed: true,
+              ...(options || {})
+            })
+          );
+          // Always check for handler on element property, context, and config
+          const handlerName = `on${eventName.charAt(0).toUpperCase()}${eventName.slice(1)}`;
+          // 1. Handler set as property on the element
+          const propHandler = typeof (this as any)[handlerName] === "function"
+            ? (this as any)[handlerName]
+            : undefined;
+          // 2. Handler set in context (from props)
+          const contextHandler = typeof (this.context as any)[handlerName] === "function"
+            ? (this.context as any)[handlerName]
+            : undefined;
+          // 3. Handler set in config
+          const configHandler = typeof (config as any)[handlerName] === "function"
+            ? (config as any)[handlerName]
+            : undefined;
+          if (propHandler) propHandler(detail, this.context);
+          if (contextHandler && contextHandler !== propHandler) contextHandler(detail, this.context);
+          if (configHandler && configHandler !== propHandler && configHandler !== contextHandler)
+            configHandler(detail, this.context);
+        },
+        writable: false,
+        enumerable: false,
+        configurable: false,
+      });
 
       // --- Inject config methods into state ---
       Object.keys(config).forEach((key) => {
         const fn = (config as any)[key];
         if (typeof fn === "function" && !key.startsWith("on")) {
-          // Wrap the function so it receives state as the first argument
           (this.context as any)[key] = (...args: any[]) =>
             fn(...args, this.context);
         }
+        // Listen for custom events
+        else if (key.startsWith("on") && key.length > 2 && key[2] === key[2].toUpperCase()) {
+          const eventName = key.slice(2, 3).toLowerCase() + key.slice(3);
+          this.addEventListener(eventName, (e: Event) => {
+            // Always check for handler on element property first
+            const fn =
+              typeof (this as any)[key] === "function"
+                ? (this as any)[key]
+                : (this.context as any)[key];
+            if (typeof fn === "function") {
+              fn((e as CustomEvent).detail, this.context);
+            }
+          });
+        }
       });
 
-      this._applyProps(config);
       this._applyComputed(config);
+
       this._initializing = false;
 
       // Initialize watchers after initialization phase is complete
@@ -745,15 +797,20 @@ export function createElementClass<
           return val;
         }
         Object.entries(cfg.props).forEach(([key, def]) => {
-          const attr = this.getAttribute(toKebab(key));
-          if (attr !== null) {
-            (this.context as any)[key] = escapeHTML(
-              parseProp(attr, def.type),
-            );
-          } else if ('default' in def && def.default !== undefined) {
-            (this.context as any)[key] = escapeHTML(def.default);
+          // Check for function prop on the element instance first
+          if (def.type === Function && typeof (this as any)[key] === "function") {
+            (this.context as any)[key] = (this as any)[key];
+          } else {
+            const attr = this.getAttribute(toKebab(key));
+            if (attr !== null) {
+              (this.context as any)[key] = escapeHTML(
+                parseProp(attr, def.type),
+              );
+            } else if ('default' in def && def.default !== undefined) {
+              (this.context as any)[key] = escapeHTML(def.default);
+            }
+            // else: leave undefined if no default
           }
-          // else: leave undefined if no default
         });
       } catch (error) {
         this._hasError = true;
@@ -770,5 +827,5 @@ export function createElementClass<
         }
       }
     }
-  };
+  }
 }

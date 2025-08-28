@@ -75,6 +75,7 @@ watch: {
 
 - Use `{ immediate: true }` for initialization logic.
 - Use `{ deep: true }` for nested objects/arrays.
+- Deep watching only occurs if the watcher's deep option is set.
 - Watchers are cleaned up automatically on disconnect.
 - Works with state and props.
 - Callback errors are caught and logged.

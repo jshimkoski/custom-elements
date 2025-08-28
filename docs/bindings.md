@@ -77,9 +77,12 @@ onConnected(ctx) {
 component('binding-demo', {
   state: { name: '', count: 0 },
   render: (ctx) => html`
-    <input #model="name" placeholder="Name" />
-    <button @click="${() => ctx.count++}">Clicked ${ctx.count} times</button>
-    <div :data-name="name">Hello, ${ctx.name}</div>
+    <div>
+      <input #model="name" ref="nameInput" placeholder="Name" />
+      <button @click="${() => ctx.count++}">Clicked ${ctx.count} times</button>
+      <div :data-name="name">Hello, ${ctx.name}</div>
+      <button @click="${() => ctx.refs.nameInput?.focus()}">Focus Name Input</button>
+    </div>
   `,
 });
 ```
@@ -96,6 +99,7 @@ component('binding-demo', {
 - Use `:attr` for dynamic attributes (e.g., `:disabled`, `:class`).
 - Use `@event` for all user interactions.
 - Use `#model` for forms and user input.
+- Use `ref` to access DOM elements when necessary.
 - Prefer simple, declarative bindings for maintainability.
 - Avoid side effects in event handlers unless necessary.
 

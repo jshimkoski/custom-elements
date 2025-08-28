@@ -69,7 +69,7 @@ component('styled-box', {
 
 ## 🧠 How Styles Work Internally
 
-- Styles are injected as a `<style>` tag in the shadow DOM.
+- The runtime uses Adopted Style Sheets for performance.
 - Dynamic styles are recalculated and updated efficiently.
 
 ## 📝 Tips & Best Practices

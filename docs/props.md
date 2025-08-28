@@ -1,97 +1,53 @@
-# 🎯 Props Functionality Deep Dive
+# 🎯 Props Deep Dive
 
-## 📦 Overview
+Props are the primary way to pass data from parent to child custom elements. This guide explains how to use props with the runtime, including types, best practices, and edge cases.
 
-Props allow you to pass data from HTML attributes into your custom element components. They are strongly typed, support default values, and are automatically reactive. Props are merged into the component's state and available in render, computed, and methods.
+## 🏷️ Supported Prop Types
 
-## 🛠️ Defining Props
+- **Primitive types:** string, number, boolean (set via attributes, kebab-case)
+- **Function props (event handlers):** must be set as properties on the element instance, not as attributes
 
-- Props are defined in the `props` field of your `ComponentConfig`.
-- Each prop must specify a `type` (String, Number, or Boolean).
-- You can provide a `default` value.
+## 🚀 Usage
 
-```typescript
-props: {
-  title: { type: String, default: "Hello" },
-  count: { type: Number, default: 0 },
-  active: { type: Boolean, default: false },
-}
-```
+### 🔤 Primitive Props
 
-## 🏷️ Using Props in HTML
-
-- Props are set via attributes on your custom element, using kebab-case.
-- Boolean props: use `active="true"` or omit for default.
-- Number props: use `count="42"`.
-- String props: use `title="Welcome"`.
+Use kebab-case attributes to pass primitive props:
 
 ```html
-<my-element title="Welcome" count="42" active="true"></my-element>
+<user-card name="Alice" age="30"></user-card>
 ```
 
-## 🔄 Reactivity & Updates
-
-- Props are reactive: changing an attribute updates the prop and triggers a re-render.
-- The runtime automatically parses and escapes values for security.
-- Default values are used if the attribute is missing.
-
-## 🧩 Accessing Props in Component
-
-- Props are available in `ctx` inside `render`, `computed`, `watch`, and methods.
-
 ```typescript
-render: (ctx) => html`
-  <h1>${ctx.title}</h1>
-  <p>Count: ${ctx.count}</p>
-  <p>Active: ${ctx.active ? "Yes" : "No"}</p>
-`
-```
-
-## 🧪 Example: Full Props Usage
-
-```typescript
-component('demo-props', {
-  props: {
-    name: { type: String, default: "World" },
-    age: { type: Number, default: 18 },
-    subscribed: { type: Boolean, default: false },
-  },
-  render: (ctx) => html`
-    <div>
-      <h2>Hello, ${ctx.name}!</h2>
-      <p>Age: ${ctx.age}</p>
-      <p>Subscribed: ${ctx.subscribed ? "✅" : "❌"}</p>
-    </div>
-  `,
+component("user-card", {
+  props: { name: { type: String }, age: { type: Number } },
+  render: (ctx) => html`<div>${ctx.name} (${ctx.age})</div>`
 });
 ```
 
-## 🧠 How Props Work Internally
+### 🛠️ Function Props (Event Handlers)
 
-- Props are parsed from attributes using kebab-case mapping.
-- Types are enforced: String, Number, Boolean.
-- Values are escaped for security.
-- Props are merged into the reactive state object.
-- Changing an attribute triggers `attributeChangedCallback`, updating state and re-rendering.
+Set function props as properties on the element instance (not as attributes):
 
-## 🛡️ Error Handling
+```typescript
+const el = document.createElement('user-card');
+el.onCustomEvent = (detail, ctx) => {
+  // handle event
+};
+document.body.appendChild(el);
+```
 
-- If a prop value is invalid, it falls back to the default (if provided).
-- Errors in prop parsing trigger `onError` and/or `errorFallback` if defined.
+## 🌟 Best Practices
 
-## 📝 Tips & Best Practices
+- Use kebab-case for attribute names
+- Only use attributes for string, number, boolean props
+- Always set function props as properties, not attributes
+- For custom events, use `context.emit` in your component and listen using framework-native event binding or `addEventListener`
 
-- Always specify types for props for strong typing and security.
-- Use defaults to ensure predictable behavior.
-- Use kebab-case for attribute names in HTML.
-- Avoid complex objects as props; use primitives for best performance.
+## ⚠️ Edge Cases
 
-## 📚 Learn More
-
-- [Component Config Guide](./component-config.md)
-- [Render Guide](./render.md)
-- [State Guide](./state.md)
+- If you set a function prop as an attribute, it will be a string, not a function
+- For two-way binding, emit the expected event from your component using `context.emit`
 
 ## 🏁 Summary
 
-Props provide a secure, reactive, and strongly typed way to pass data into your components. They integrate seamlessly with state, computed, and render, making your custom elements flexible and robust.
+Props are simple and powerful in the runtime. Use attributes for primitives, properties for functions, and follow best practices for robust, maintainable components.

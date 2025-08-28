@@ -51,6 +51,7 @@ component('error-demo', {
 - The shadow DOM is updated with the error template or fallback HTML.
 - Errors in watchers, computed, or props also trigger error handling.
 - Error handling is per-instance; other components remain unaffected.
+- Runtime provides a default `onError` handler if not specified.
 
 ## 📝 Tips & Best Practices
 

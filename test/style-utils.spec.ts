@@ -27,7 +27,7 @@ describe('jitCSS', () => {
     const html = '<div class="p-4 text-xl font-bold"></div>';
     const css = jitCSS(html);
     expect(css).toContain('.p-4');
-    expect(css).toContain('padding:calc(0.25rem * 4);');
+    expect(css).toContain('padding:calc(var(--spacing, 0.25rem) * 4);');
     expect(css).toContain('.text-xl');
     expect(css).toContain('font-size:1.25rem;');
   });
