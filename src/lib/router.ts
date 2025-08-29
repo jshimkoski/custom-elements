@@ -11,15 +11,56 @@ import { html } from './runtime/template-compiler';
 import { css } from './runtime/style';
 import { match } from './directives';
 
+export interface RouteComponent {
+  // Can be any renderable type — adjust as needed for your framework
+  new (...args: any[]): any; // class components
+  // OR functional components
+  (...args: any[]): any;
+}
+
+export interface RouteState {
+  path: string;
+  params: Record<string, string>;
+  query: Record<string, string>;
+}
+
+export type GuardResult = boolean | string | Promise<boolean | string>;
+
 export interface Route {
   path: string;
+
+  /**
+   * Statically available component (already imported)
+   */
   component?: string;
+
+  /**
+   * Lazy loader that resolves to something renderable
+   */
   load?: () => Promise<{ default: string | HTMLElement | Function }>;
+
+
+  /**
+   * Runs before matching — return false to cancel,
+   * or a string to redirect
+   */
+  beforeEnter?: (to: RouteState, from: RouteState) => GuardResult;
+
+  /**
+   * Runs right before navigation commits — can cancel or redirect
+   */
+  onEnter?: (to: RouteState, from: RouteState) => GuardResult;
+
+  /**
+   * Runs after navigation completes — cannot cancel
+   */
+  afterEnter?: (to: RouteState, from: RouteState) => void;
 }
 
 export interface RouterConfig {
   routes: Route[];
   base?: string;
+  initialUrl?: string; // For SSR: explicitly pass the URL
 }
 
 export interface RouteState {
@@ -79,22 +120,116 @@ export async function resolveRouteComponent(route: Route): Promise<any> {
 }
 
 export function useRouter(config: RouterConfig) {
-  const { routes, base = '' } = config;
+  const { routes, base = '', initialUrl } = config;
+
   let getLocation: () => { path: string; query: Record<string, string> };
   let initial: { path: string; query: Record<string, string> };
   let store: Store<RouteState>;
-  let update: () => void;
-  let push: (path: string) => void;
-  let replace: (path: string) => void;
+  let update: (replace?: boolean) => Promise<void>;
+  let push: (path: string) => Promise<void>;
+  let replaceFn: (path: string) => Promise<void>;
   let back: () => void;
 
+  // Run matching route guards/hooks
+  const runBeforeEnter = async (to: RouteState, from: RouteState) => {
+    const matched = routes.find(r => matchRoute([r], to.path).route !== null);
+    if (matched?.beforeEnter) {
+      try {
+        const result = await matched.beforeEnter(to, from);
+        if (typeof result === 'string') {
+          // Redirect
+          await navigate(result, true);
+          return false;
+        }
+        return result !== false;
+      } catch (err) {
+        console.error('beforeEnter error', err);
+        return false;
+      }
+    }
+    return true;
+  };
+
+  const runOnEnter = async (to: RouteState, from: RouteState) => {
+    const matched = routes.find(r => matchRoute([r], to.path).route !== null);
+    if (matched?.onEnter) {
+      try {
+        const result = await matched.onEnter(to, from);
+        if (typeof result === 'string') {
+          await navigate(result, true);
+          return false;
+        }
+        return result !== false;
+      } catch (err) {
+        console.error('onEnter error', err);
+        return false;
+      }
+    }
+    return true;
+  };
+
+  const runAfterEnter = (to: RouteState, from: RouteState) => {
+    const matched = routes.find(r => matchRoute([r], to.path).route !== null);
+    if (matched?.afterEnter) {
+      try {
+        matched.afterEnter(to, from);
+      } catch (err) {
+        console.error('afterEnter error', err);
+      }
+    }
+  };
+
+  const navigate = async (path: string, replace = false) => {
+    try {
+      const loc = {
+        path: path.replace(base, '') || '/',
+        query: {}
+      };
+      const match = matchRoute(routes, loc.path);
+      if (!match) throw new Error(`No route found for ${loc.path}`);
+
+      const from = store.getState();
+      const to: RouteState = {
+        path: loc.path,
+        params: match.params,
+        query: loc.query
+      };
+
+      // beforeEnter guard
+      const allowedBefore = await runBeforeEnter(to, from);
+      if (!allowedBefore) return;
+
+      // onEnter guard (right before commit)
+      const allowedOn = await runOnEnter(to, from);
+      if (!allowedOn) return;
+
+      if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+        if (replace) {
+          window.history.replaceState({}, '', base + path);
+        } else {
+          window.history.pushState({}, '', base + path);
+        }
+      }
+
+      store.setState(to);
+
+      // afterEnter hook (post commit)
+      runAfterEnter(to, from);
+
+    } catch (err) {
+      console.error('Navigation error:', err);
+    }
+  };
+
   if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+    // Browser mode
     getLocation = () => {
       const url = new URL(window.location.href);
       const path = url.pathname.replace(base, '') || '/';
       const query = parseQuery(url.search);
       return { path, query };
     };
+
     initial = getLocation();
     const match = matchRoute(routes, initial.path);
     store = createStore<RouteState>({
@@ -102,27 +237,27 @@ export function useRouter(config: RouterConfig) {
       params: match.params,
       query: initial.query
     });
-    update = () => {
+
+    update = async (replace = false) => {
       const loc = getLocation();
-      const match = matchRoute(routes, loc.path);
-      const s = store.getState() as RouteState;
-      s.path = loc.path;
-      s.params = match.params;
-      s.query = loc.query;
+      await navigate(loc.path, replace);
     };
-    window.addEventListener('popstate', update);
-    push = (path: string) => {
-      window.history.pushState({}, '', base + path);
-      update();
-    };
-    replace = (path: string) => {
-      window.history.replaceState({}, '', base + path);
-      update();
-    };
+
+    window.addEventListener('popstate', () => update(true));
+
+    push = (path: string) => navigate(path, false);
+    replaceFn = (path: string) => navigate(path, true);
     back = () => window.history.back();
+
   } else {
-    // SSR fallback: minimal API
-    getLocation = () => ({ path: '/', query: {} });
+    // SSR mode
+    getLocation = () => {
+      const url = new URL(initialUrl || '/', 'http://localhost');
+      const path = url.pathname.replace(base, '') || '/';
+      const query = parseQuery(url.search);
+      return { path, query };
+    };
+
     initial = getLocation();
     const match = matchRoute(routes, initial.path);
     store = createStore<RouteState>({
@@ -130,16 +265,17 @@ export function useRouter(config: RouterConfig) {
       params: match.params,
       query: initial.query
     });
-    update = () => {};
-    push = () => {};
-    replace = () => {};
+
+    update = async () => {};
+    push = async () => {};
+    replaceFn = async () => {};
     back = () => {};
   }
 
   return {
     store,
     push,
-    replace,
+    replace: replaceFn,
     back,
     subscribe: store.subscribe,
     matchRoute: (path: string) => matchRoute(routes, path),
@@ -147,6 +283,7 @@ export function useRouter(config: RouterConfig) {
     resolveRouteComponent
   };
 }
+
 
 // SSR/static site support: match route for a given path
 export function matchRouteSSR(routes: Route[], path: string) {

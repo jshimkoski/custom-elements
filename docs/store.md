@@ -4,7 +4,7 @@
 
 ## 📖 Overview
 
-`createStore` lets you create a reactive, shared state object for your app. It's lightweight, type-safe, and works seamlessly with components and directives.
+`createStore` creates a lightweight, type-safe, reactive state store for your app. It works with any component or directive.
 
 ## 🚀 Importing
 
@@ -26,37 +26,37 @@ const store = createStore({
 
 ## 📦 Using Store in Components
 
-Access and mutate store values directly in your component logic or templates.
+Use the store in your component logic or templates. Access state via `getState()`, update with `setState()`.
 
 ```ts
-component('my-cart', {
-  render: (ctx) => html`
-    <div>Items: ${store.cart.length}</div>
-    <button @click="${() => store.cart.push({ id: 1 })}">Add</button>
+const store = createStore({ count: 0 });
+
+component('my-counter', {
+  render: () => html`
+    <button @click="${() => store.setState(prev => ({ count: prev.count + 1 }))}">${store.getState().count}</button>
   `
 });
 ```
 
 ## 👀 Reactivity
 
-Store values are deeply reactive. Changes automatically update all components using the store.
+Store is shallowly reactive. Use `subscribe(listener)` to react to state changes.
 
 ```ts
-store.theme = 'dark'; // All components using store.theme will update
+store.subscribe(state => {
+  console.log('State changed:', state);
+});
+
+store.setState({ theme: 'dark' });
 ```
 
 ## 🔍 Watching Store Changes
 
-You can use watchers in your component config to react to store changes.
+You can subscribe to store changes and update your UI or logic.
 
 ```ts
-component('my-theme', {
-  watch: {
-    'theme': (newVal) => {
-      console.log('Theme changed:', newVal);
-    }
-  },
-  render: () => html`<span>Current theme: ${store.theme}</span>`
+store.subscribe(state => {
+  // React to state changes
 });
 ```
 
@@ -65,22 +65,24 @@ component('my-theme', {
 Import and use the same store instance in any component or module.
 
 ```ts
-// store.js
+// store.ts
 export const store = createStore({ count: 0 });
 
 // my-counter.ts
-import { store } from './store.js';
+import { store } from './store';
 
 component('my-counter', {
-  render: () => html`<button @click="${() => store.count++}">${store.count}</button>`
+  render: () => html`
+    <button @click="${() => store.setState(prev => ({ count: prev.count + 1 }))}">${store.getState().count}</button>
+  `
 });
 ```
 
 ## 💡 Tips
 
 - Use a single store for global state, or multiple stores for modular state.
-- Store is deeply reactive; array/object mutations are tracked.
+- Store is shallowly reactive; always use `setState()` for updates.
 - Works with all directives and templates.
 - TypeScript infers types from your initial state.
 
-For more, see the [API Reference](../src/lib/store.ts) and [examples](../src/components/examples/).
+For more, see the [API Reference](../src/lib/store.ts).

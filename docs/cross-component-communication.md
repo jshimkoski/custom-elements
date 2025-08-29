@@ -61,8 +61,8 @@ Use the built-in store for global or shared state.
   ```typescript
   component("theme-toggle", {
     render: (ctx) => html`
-      <button @click="${() => store.theme = store.theme === 'light' ? 'dark' : 'light'}">
-        Theme: ${store.theme}
+      <button @click="${() => store.getState().theme = store.getState().theme === 'light' ? 'dark' : 'light'}">
+        Theme: ${store.getState().theme}
       </button>
     `
   });

@@ -20,6 +20,22 @@ You are an expert in TypeScript, JavaScript, HTML, CSS. Your task is to produce 
 - Use lowercase with dashes for directory names (e.g., `components/auth-wizard`).
 - Use kebab-case for file names (e.g., `auth-wizard.ts`).
 - Avoid using "this" keyword in functional components.
+- Prefer pure functions and avoid side effects.
+- Use immutable data structures where possible.
+- Use JSDoc comments for functions and components to improve IDE intellisense.
+
+## Markdown Documentation
+
+All documentation written in the docs directory should be:
+
+- In Markdown format
+- Structured with clear headings and subheadings
+- Include code examples where applicable
+- Use consistent terminology and phrasing
+- Be 100% accurate with the actual code implementation
+- Be easy to read and understand
+- Be concise and to the point
+- Use emojis for titles
 
 ## Naming Conventions
 

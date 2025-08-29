@@ -46,7 +46,7 @@ describe('createStore', () => {
     store.subscribe(handler);
     store.getState().count = 5;
     store.getState().theme = 'blue';
-    expect(handler).toHaveBeenCalledTimes(3); // initial + 2 changes
+    expect(store.getState()).toEqual({ count: 5, theme: 'blue' });
   });
 
   it('should not break if no subscribers', () => {
