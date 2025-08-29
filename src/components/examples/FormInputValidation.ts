@@ -10,7 +10,7 @@ component('form-input-validation', (ctx) => html`
     @submit="${ctx.submit}"
   >
     <fieldset>
-      <legend class="text-2xl mb-8">Form Input Validation Demo</legend>
+      <legend class="text-2xl font-medium mb-8">Form Input Validation Demo</legend>
       <label class="flex flex-col items-start gap-2 w-full mb-6">
         <span class="font-semibold">Email:</span>
         <input

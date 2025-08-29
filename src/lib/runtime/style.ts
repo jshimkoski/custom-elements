@@ -687,6 +687,21 @@ export function parseArbitrary(className: string): string | null {
   return null;
 }
 
+/**
+ * Parse arbitrary variant from class name.
+ * Supports [attr=value]:utility or foo-[bar]:utility
+ */
+export function parseArbitraryVariant(token: string): string | null {
+  // [attr=value] or foo-[bar]
+  if (token.startsWith("[") && token.endsWith("]")) return token;
+  const bracketStart = token.indexOf("-[");
+  if (bracketStart > 0 && token.endsWith("]")) {
+    // e.g. foo-[bar]
+    return token.replace(/_/g, "-");
+  }
+  return null;
+}
+
 export function escapeClassName(name: string): string {
   // Escape only selector-relevant characters, not brackets
   return name.replace(/([!"#$%&'()*+,./:;<=>?@[\\\]^`{|}~])/g, '\\$1');
@@ -784,7 +799,13 @@ export function jitCSS(html: string): string {
       ? responsiveTokens[responsiveTokens.length - 1]
       : null;
 
+    // --- Arbitrary variant support ---
     for (const token of before) {
+      const arbitrary = parseArbitraryVariant(token);
+      if (arbitrary) {
+        selector = `${arbitrary}${selector}`;
+        continue;
+      }
       if (responsiveOrder.includes(token)) continue;
       const variantFn = selectorVariants[token];
       if (typeof variantFn === "function") {

@@ -225,7 +225,6 @@ export function htmlImpl(
     if (isAnchorBlock(val)) {
       const anchorKey = (val as VNode).key ?? baseKey;
       let anchorChildren = (val as any).children as VNode[] | undefined;
-
       targetChildren.push({
         ...(val as VNode),
         key: anchorKey,
@@ -281,7 +280,7 @@ export function htmlImpl(
       const vnodeProps: {
         props: Record<string, unknown>;
         attrs: Record<string, unknown>;
-        directives?: Record<string, { value: any; modifiers: string[] }>;
+        directives?: Record<string, { value: any, modifiers: string[] }>;
       } = { props: {}, attrs: {} };
 
       for (const k in rawProps) vnodeProps.props[k] = rawProps[k];
@@ -292,7 +291,6 @@ export function htmlImpl(
         if (directiveName === "bind") {
           // #bind directive - can be object syntax or simple value
           if (typeof directive.value === "object" && directive.value !== null) {
-            // #bind object syntax: #bind="{ disabled: true, class: 'foo' }"
             for (const [key, value] of Object.entries(directive.value)) {
               if (typeof value === "boolean") {
                 vnodeProps.attrs[key] = value;
@@ -301,20 +299,22 @@ export function htmlImpl(
               }
             }
           } else if (directive.value != null) {
-            // Simple #bind (though this is unusual - typically it's object syntax)
             vnodeProps.attrs[directiveName] = String(directive.value);
           }
-        } else if (directiveName === "show") {
-          // #show directive
+        }
+        // Always preserve #show, #class, #style in props.directives for root-level diagnostics
+        if (["show", "class", "style"].includes(directiveName)) {
+          if (!vnodeProps.directives) vnodeProps.directives = {};
+          vnodeProps.directives[directiveName] = directive;
+        }
+        if (directiveName === "show") {
           const visible = Boolean(directive.value);
           vnodeProps.attrs.style =
             (vnodeProps.attrs.style || "") +
             (visible ? "" : "; display: none !important");
         } else if (directiveName === "class") {
-          // #class directive
           const classValue = directive.value;
           let classNames: string[] = [];
-
           if (typeof classValue === "string") {
             classNames = classValue.split(/\s+/).filter(Boolean);
           } else if (Array.isArray(classValue)) {
@@ -336,7 +336,6 @@ export function htmlImpl(
               }
             }
           }
-
           const existingClass = (vnodeProps.attrs.class as string) || "";
           const newClasses = [
             ...new Set([
@@ -346,10 +345,8 @@ export function htmlImpl(
           ];
           vnodeProps.attrs.class = newClasses.join(" ");
         } else if (directiveName === "style") {
-          // #style directive
           const styleValue = directive.value;
           let styleString = "";
-
           if (typeof styleValue === "string") {
             styleString = styleValue;
           } else if (styleValue && typeof styleValue === "object") {
@@ -399,7 +396,6 @@ export function htmlImpl(
             styleString =
               styleRules.join("; ") + (styleRules.length > 0 ? ";" : "");
           }
-
           const existingStyle = (vnodeProps.attrs.style as string) || "";
           vnodeProps.attrs.style =
             existingStyle +
@@ -446,12 +442,21 @@ export function htmlImpl(
           currentChildren = prev.children;
           currentChildren.push(node);
         } else {
-          root = node;
+          // If there is no previous tag, this is a root-level node
+          fragmentChildren.push(node);
+          currentTag = null;
+          currentProps = {};
+          currentKey = undefined;
+          currentChildren = [];
         }
       } else if (isSelfClosing) {
         const key = undefined;
-        const targetChildren = currentTag ? currentChildren : fragmentChildren;
-        targetChildren.push(h(tagName, vnodeProps, undefined, key));
+        // Always push self-closing tags to fragmentChildren if not inside another tag
+        if (currentTag) {
+          currentChildren.push(h(tagName, vnodeProps, undefined, key));
+        } else {
+          fragmentChildren.push(h(tagName, vnodeProps, undefined, key));
+        }
       } else {
         if (currentTag) {
           stack.push({
@@ -496,35 +501,30 @@ export function htmlImpl(
     }
   }
 
-  // If we have a single root element, return it
+  // Normalize output: prefer array for true multi-root, single node for single root
   if (root) {
-    // Clean empty text nodes at root level
-    if (isElementVNode(root) && Array.isArray(root.children)) {
-      root.children = (root.children as VNode[]).filter(
-        (child): child is VNode =>
-          isElementVNode(child)
-            ? child.tag !== "#text" ||
-              (typeof child.children === "string" &&
-                child.children.trim() !== "")
-            : true, // keep non-element VNodes (including anchors) as-is
-      );
-    }
+    // If root is an anchor block or element, return as-is
     return root;
   }
 
-  // If we have fragment children (multiple root nodes), return them as array
-  if (fragmentChildren.length > 0) {
-    // Filter out empty text nodes
-    const cleanedFragments = fragmentChildren.filter((child): child is VNode =>
-      isElementVNode(child)
-        ? child.tag !== "#text" ||
-          (typeof child.children === "string" && child.children.trim() !== "")
-        : true,
-    );
+  // Filter out empty text nodes and whitespace-only nodes
+  const cleanedFragments = fragmentChildren.filter((child): child is VNode => {
+    if (isElementVNode(child)) {
+      if (child.tag === "#text") {
+        return typeof child.children === "string" && child.children.trim() !== "";
+      }
+      return true;
+    }
+    // Always keep anchor blocks and non-element nodes
+    return true;
+  });
 
-    return cleanedFragments.length === 1
-      ? cleanedFragments[0]
-      : cleanedFragments;
+  if (cleanedFragments.length === 1) {
+    // Single non-empty root node
+    return cleanedFragments[0];
+  } else if (cleanedFragments.length > 1) {
+    // True multi-root: return array
+    return cleanedFragments;
   }
 
   // Fallback for empty content

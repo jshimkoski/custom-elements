@@ -716,7 +716,8 @@ export function createElement(
     const frag = document.createDocumentFragment();
     frag.appendChild(start);
     for (const child of children) {
-      frag.appendChild(createElement(child, context));
+      const childNode = createElement(child, context);
+      frag.appendChild(childNode);
     }
     frag.appendChild(end);
     return frag;
@@ -1060,22 +1061,19 @@ export function patch(
     const children = Array.isArray(anchorVNode.children)
       ? anchorVNode.children
       : [];
-
     const start = anchorVNode._startNode ?? document.createTextNode("");
     const end = anchorVNode._endNode ?? document.createTextNode("");
-
     if (anchorVNode.key != null) {
       (start as any).key = `${anchorVNode.key}:start`;
       (end as any).key = `${anchorVNode.key}:end`;
     }
-
     anchorVNode._startNode = start;
     anchorVNode._endNode = end;
-
     const frag = document.createDocumentFragment();
     frag.appendChild(start);
     for (const child of children) {
-      frag.appendChild(createElement(child, context));
+      const childNode = createElement(child, context);
+      frag.appendChild(childNode);
     }
     frag.appendChild(end);
     dom.parentNode?.replaceChild(frag, dom);
@@ -1171,6 +1169,16 @@ export function vdomRenderer(
     if (newVNode && typeof newVNode === "object" && newVNode.key == null) {
       newVNode = { ...newVNode, key: "__root__" };
     }
+  }
+
+  // If the root is an AnchorBlock, wrap it in a real element for DOM insertion
+  if (newVNode && typeof newVNode === "object" && newVNode.tag === "#anchor") {
+    newVNode = {
+      tag: "div",
+      key: "__anchor_root__",
+      props: { attrs: { 'data-anchor-block-root': '', key: "__anchor_root__" } },
+      children: [newVNode]
+    };
   }
 
   newVNode = assignKeysDeep(newVNode, String(newVNode.key ?? "root")) as VNode;

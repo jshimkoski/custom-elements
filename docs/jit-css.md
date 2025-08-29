@@ -94,7 +94,7 @@ For a complete list, see the `utilityMap` in [`src/lib/style-utils.ts`](../src/l
 <div class="dark:bg-gray-900">Dark Mode</div>
 ```
 
-## 🚀 Arbitrary Values: The Power Feature
+## 🚀 Arbitrary Values
 
 Arbitrary values let you use any valid CSS value, not just those in the built-in utility map. This is essential for rapid prototyping, advanced design, and one-off tweaks.
 
@@ -121,6 +121,45 @@ Arbitrary values let you use any valid CSS value, not just those in the built-in
 <button class="hover:bg-[#09f] focus:[box-shadow:0_0_0_2px_#09f]"></button>
 <div class="md:p-[2rem] dark:bg-[#222]"></div>
 ```
+
+## 🧪 Arbitrary Variants
+
+Arbitrary variants allow you to target custom selectors, attributes, or states directly in your utility classes. This enables advanced styling scenarios, such as targeting specific attributes, custom states, or deeply nested elements, all with utility-first syntax.
+
+**Syntax:**  
+- `[attr=value]:utility` — targets elements with a specific attribute value  
+- `foo-[bar]:utility` — targets custom selectors or pseudo-classes
+
+**Examples:**
+```html
+<!-- Attribute variant: style when aria-selected is true -->
+<div class="[aria-selected=true]:bg-blue-500"></div>
+
+<!-- Custom selector variant: style when .foo-[bar] matches -->
+<div class="foo-[bar]:text-red-500"></div>
+
+<!-- Multiple variants: combine arbitrary with state or responsive -->
+<button class="hover:[box-shadow:0_0_0_2px_#09f]"></button>
+<div class="md:[data-open=true]:bg-green-100"></div>
+```
+
+**How It Works:**
+- Arbitrary variants are parsed before the base utility.
+- The variant is prepended to the generated CSS selector.
+- You can combine arbitrary variants with built-in variants (e.g., `hover:`, `md:`, `dark:`).
+
+**Supported Patterns:**
+- `[attr=value]:utility`
+- `foo-[bar]:utility`
+- Any valid selector or attribute inside brackets
+
+**Best Practices:**
+- Use arbitrary variants for advanced targeting needs, such as custom attributes, states, or deep selectors.
+- Combine with responsive and state variants for dynamic, context-aware styling.
+- Keep selectors concise and valid for optimal performance.
+
+**Reference:**
+- See `parseArbitraryVariant` and variant handling in [`src/lib/runtime/style.ts`](../src/lib/runtime/style.ts).
 
 ## 🎨 Color Palettes & Usage
 

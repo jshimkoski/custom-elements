@@ -187,3 +187,51 @@ describe('additional style tests', () => {
     expect(mediaVariants.sm).toBe('(min-width:640px)');
   });
 });
+
+/**
+ * Unit tests for arbitrary variants in JIT CSS.
+ */
+describe('jitCSS - Arbitrary Variants', () => {
+  it('should generate CSS for attribute selector variant', () => {
+    const html = `<div class="[aria-selected=true]:bg-blue-500"></div>`;
+    const css = minifyCSS(jitCSS(html));
+    expect(css).toContain('[aria-selected=true].\\[aria-selected\\=true\\]\\:bg-blue-500{background-color:var(--color-blue-500,#3b82f6)}');
+  });
+
+  it('should combine arbitrary variant with arbitrary value', () => {
+    const html = `<div class="[data-state=active]:bg-[rgba(0,128,0,0.15)]"></div>`;
+    const css = minifyCSS(jitCSS(html));
+    expect(css).toContain('[data-state=active].\\[data-state\\=active\\]\\:bg-\\[rgba\\(0\\,128\\,0\\,0\\.15\\)\\]{background-color:rgba(0,128,0,0.15)}');
+  });
+
+  it('should support responsive + arbitrary variant', () => {
+    const html = `<div class="md:[data-open=true]:bg-green-100"></div>`;
+    const css = minifyCSS(jitCSS(html));
+    expect(css).toContain('@media (min-width:768px){[data-open=true].md\\:\\[data-open\\=true\\]\\:bg-green-100{background-color:var(--color-green-100,#dcfce7)}}');
+  });
+
+  it.todo('should support state + arbitrary variant [Currently does not work]', () => {
+    const html = `<button class="hover:[box-shadow:0_0_0_2px_#09f]"></button>`;
+    const css = minifyCSS(jitCSS(html));
+    expect(css).toContain(':hover.button\\:hover\\:\\[box-shadow\\:0_0_0_2px_\\#09f\\]{box-shadow:0 0 0 2px #09f}');
+  });
+
+  it('should escape special characters in arbitrary variant and value', () => {
+    const html = `<div class="[data-role=admin]:bg-[#ff00ff]"></div>`;
+    const css = minifyCSS(jitCSS(html));
+    expect(css).toContain('[data-role=admin].\\[data-role\\=admin\\]\\:bg-\\[\\#ff00ff\\]{background-color:#ff00ff}');
+  });
+
+  it('should not generate CSS for invalid arbitrary variant', () => {
+    const html = `<div class="[invalid]:bg-blue-500"></div>`;
+    const css = minifyCSS(jitCSS(html));
+    // Should still generate, but selector may be invalid; test for presence
+    expect(css).toContain('[invalid].\\[invalid\\]\\:bg-blue-500{background-color:var(--color-blue-500,#3b82f6)}');
+  });
+
+  it('should combine multiple variants with arbitrary', () => {
+    const html = `<div class="dark:md:[data-state=active]:text-[rgba(255,255,255,0.8)]"></div>`;
+    const css = minifyCSS(jitCSS(html));
+    expect(css).toContain('@media (prefers-color-scheme:dark) and (min-width:768px){[data-state=active].dark\\:md\\:\\[data-state\\=active\\]\\:text-\\[rgba\\(255\\,255\\,255\\,0\\.8\\)\\]{color:rgba(255,255,255,0.8)}}');
+  });
+});

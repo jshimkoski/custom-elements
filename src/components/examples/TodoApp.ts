@@ -11,18 +11,37 @@ interface Todo {
 }
 
 export const TodoApp = component('todo-app', (ctx) => html`
-  <div class="todo-container">
-    <h2>Todo List</h2>
-    <form @submit="${ctx.submitForm}">
-      <input #model="input" type="text" placeholder="Add todo" />
-      <button type="submit">Add</button>
+  <div class="todo-container max-w-[400px] mx-auto my-8 p-8 bg-white dark:bg-black rounded-lg shadow-lg">
+    <h2 class="text-2xl font-medium mb-8">Todo List</h2>
+    <form
+      class="flex gap-2 mb-4"
+      @submit="${ctx.submitForm}"
+    >
+      <input
+        #model="input"
+        class="grow px-2 py-1 border border-neutral-300 dark:border-neutral-800 rounded"
+        type="text"
+        placeholder="Add todo"
+      />
+      <button
+        type="submit"
+        class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:bg-blue-700"
+      >Add</button>
     </form>
     <ul>
       ${each(ctx.todos, (todo) => html`
-        <li>
-          <input type="checkbox" :checked="${todo.done}" @change="${() => ctx.toggleTodo(ctx, todo.id)}" />
-          <span class="todo-text" data-done="${todo.done}">${todo.text}</span>
-          <button class="remove-btn" @click="${() => ctx.removeTodo(ctx, todo.id)}">Remove</button>
+        <li class="flex items-center gap-2 py-2 border-b border-neutral-200 dark:border-neutral-800">
+          <input
+            type="checkbox"
+            :checked="${todo.done}" @change="${() => ctx.toggleTodo(ctx, todo.id)}" />
+          <span
+            class="todo-text grow text-left [data-done=true]:line-through [data-done=true]:text-gray-500"
+            :data-done="${todo.done}"
+          >${todo.text}</span>
+          <button
+            class="remove-btn px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 focus:bg-red-700"
+            @click="${() => ctx.removeTodo(ctx, todo.id)}"
+          >Remove</button>
         </li>
       `)}
     </ul>
@@ -47,81 +66,4 @@ export const TodoApp = component('todo-app', (ctx) => html`
   removeTodo(ctx, id: number) {
     ctx.todos = ctx.todos.filter(todo => todo.id !== id);
   },
-  style: css`
-    .todo-container {
-      max-width: 400px;
-      margin: 2rem auto;
-      padding: 2rem;
-      background: #fff;
-      border-radius: 8px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.07);
-      font-family: system-ui, sans-serif;
-    }
-    h2 {
-      margin-bottom: 1rem;
-      font-size: 1.3rem;
-      font-weight: 600;
-    }
-    form {
-      display: flex;
-      gap: 0.5rem;
-      margin-bottom: 1rem;
-    }
-    input[type="text"] {
-      flex: 1;
-      padding: 0.5rem;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      font-size: 1rem;
-    }
-    button[type="submit"] {
-      background: #0078d4;
-      color: #fff;
-      border: none;
-      border-radius: 4px;
-      padding: 0.6rem 1.2rem;
-      font-size: 1rem;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
-    button[type="submit"]:hover {
-      background: #005fa3;
-    }
-    ul {
-      list-style: none;
-      padding: 0;
-      margin: 0;
-    }
-    li {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.5rem 0;
-      border-bottom: 1px solid #eee;
-    }
-    .todo-text {
-      flex-grow: 1;
-      text-align: left;
-    }
-    li:hover {
-      background: #f9f9f9;
-    }
-    .todo-text[data-done="true"] {
-      text-decoration: line-through;
-      color: #888;
-    }
-    .remove-btn {
-      background: #e53e3e;
-      color: #fff;
-      border: none;
-      border-radius: 4px;
-      padding: 0.3rem 0.8rem;
-      font-size: 0.95rem;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
-    .remove-btn:hover {
-      background: #c53030;
-    }
-  `
 });
