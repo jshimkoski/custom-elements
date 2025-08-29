@@ -309,13 +309,13 @@ export function initRouter(config: RouterConfig) {
       let componentTag = match.route.component;
       if (match.route.load) {
         const loaded = await match.route.load();
-        // Only support string tag names for runtime
         if (typeof loaded.default === 'string') {
           componentTag = loaded.default;
         }
       }
       if (typeof componentTag === 'string') {
-        return html`<${componentTag}></${componentTag}>`;
+        // Return a VNode directly, not a template string
+        return { tag: componentTag, props: {}, children: [] };
       }
       return html`<div>Invalid route component</div>`;
     },

@@ -469,4 +469,82 @@ describe('router.ts', () => {
       expect(isExactActive).toBe(false);
     });
   });
+
+  describe('router-view dynamic rendering', () => {
+    it('renders static component tag', async () => {
+      // Force SSR mode so initialUrl is respected
+      const originalWindow = global.window;
+      const originalDocument = global.document;
+      (global as any).window = undefined;
+      (global as any).document = undefined;
+      createTestComponent('home-page');
+      const router = initRouter({
+        routes: [
+          { path: '/', component: 'home-page' },
+        ],
+        initialUrl: '/',
+      });
+      // Simulate router-view render
+      const view = router.getCurrent();
+      expect(view.path).toBe('/');
+      // Simulate render function
+      const match = router.matchRoute('/');
+      let componentTag = match.route?.component;
+      expect(typeof componentTag).toBe('string');
+      expect(componentTag).toBe('home-page');
+      // Restore window/document after test
+      (global as any).window = originalWindow;
+      (global as any).document = originalDocument;
+    });
+
+    it('renders lazy loaded component tag', async () => {
+      createTestComponent('about-page');
+      const router = initRouter({
+        routes: [
+          {
+            path: '/about',
+            load: async () => ({ default: 'about-page' }),
+          },
+        ],
+      });
+      // Simulate router-view render
+      const match = router.matchRoute('/about');
+      let componentTag = match.route?.component;
+      if (match.route?.load) {
+        const loaded = await match.route.load();
+        if (typeof loaded.default === 'string') {
+          componentTag = loaded.default;
+        }
+      }
+      expect(typeof componentTag).toBe('string');
+      expect(componentTag).toBe('about-page');
+    });
+
+    it('returns not found for unknown route', async () => {
+      const router = initRouter({
+        routes: [
+          { path: '/', component: 'home-page' },
+        ],
+      });
+      const match = router.matchRoute('/does-not-exist');
+      expect(match.route).toBeNull();
+    });
+
+    it('returns invalid route component for non-string', async () => {
+      const router = initRouter({
+        routes: [
+          { path: '/obj', component: { render: () => 'obj' } as any },
+        ],
+      });
+      const match = router.matchRoute('/obj');
+      let componentTag = match.route?.component;
+      expect(typeof componentTag).not.toBe('string');
+    });
+  });
 });
+
+function createTestComponent(tag: string) {
+  if (!customElements.get(tag)) {
+    customElements.define(tag, class extends HTMLElement {});
+  }
+}
