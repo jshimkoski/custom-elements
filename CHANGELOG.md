@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v0.1.6] - 2025-08-29
+
+- fix: reference the prop ctx variables in router-link (b174807)
+- fix: add tests for router-view dynamic rendering and improve component rendering logic (8ef94bd)
+
+
 ## [v0.1.5] - 2025-08-29
 
 - fix: add tests for router-view dynamic rendering and improve component rendering logic (8ef94bd)
