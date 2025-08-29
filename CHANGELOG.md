@@ -1,6 +1,13 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v0.1.4] - 2025-08-29
+
+- fix: update assertion for div existence in minimal example test (81366e6)
+- feat: enhance documentation and improve router functionality with navigation guards (fd39856)
+- refactor: refactored the lib directory and how the package is published. docs: added router documentation feat: added router to module export (87902f5)
+
+
 ## [v0.1.3] - 2025-08-28
 
 - refactor: refactored the lib directory and how the package is published. docs: added router documentation feat: added router to module export (87902f5)
