@@ -57,6 +57,30 @@ export interface Route {
   afterEnter?: (to: RouteState, from: RouteState) => void;
 }
 
+export interface RouterLinkProps {
+  to: string;
+  tag: string;
+  replace: boolean;
+  exact: boolean;
+  activeClass: string;
+  exactActiveClass: string;
+  ariaCurrentValue: string;
+  disabled: boolean;
+  external: boolean;
+  style: string;
+}
+
+export interface RouterLinkComputed {
+  current: RouteState;
+  isExactActive: boolean;
+  isActive: boolean;
+  className: string;
+  ariaCurrent: string;
+  isButton: boolean;
+  disabledAttr: string;
+  externalAttr: string;
+}
+
 export interface RouterConfig {
   routes: Route[];
   base?: string;
@@ -330,30 +354,6 @@ export function initRouter(config: RouterConfig) {
     }
   });
 
-  interface RouterLinkProps {
-    to: string;
-    tag: string;
-    replace: boolean;
-    exact: boolean;
-    activeClass: string;
-    exactActiveClass: string;
-    ariaCurrentValue: string;
-    disabled: boolean;
-    external: boolean;
-    style: string;
-  }
-
-  interface RouterLinkComputed {
-    current: RouteState;
-    isExactActive: boolean;
-    isActive: boolean;
-    className: string;
-    ariaCurrent: string;
-    isButton: boolean;
-    disabledAttr: string;
-    externalAttr: string;
-  }
-
   component<{}, RouterLinkComputed, RouterLinkProps>('router-link', {
     state: {},
     props: {
@@ -373,18 +373,18 @@ export function initRouter(config: RouterConfig) {
         }
       ` },
     },
-    style: (context) => context.props.style,
-    render: (context) => {
+    style: (ctx) => ctx.style,
+    render: (ctx) => {
       // Recalculate computed values in render
       const current = router.getCurrent();
-      const to = context.props.to;
-      const exact = context.props.exact;
-      const exactActiveClass = context.props.exactActiveClass;
-      const activeClass = context.props.activeClass;
-      const ariaCurrentValue = context.props.ariaCurrentValue;
-      const tag = context.props.tag;
-      const disabled = context.props.disabled;
-      const external = context.props.external;
+      const to = ctx.to;
+      const exact = ctx.exact;
+      const exactActiveClass = ctx.exactActiveClass;
+      const activeClass = ctx.activeClass;
+      const ariaCurrentValue = ctx.ariaCurrentValue;
+      const tag = ctx.tag;
+      const disabled = ctx.disabled;
+      const external = ctx.external;
       // Computed
       const isExactActive = current.path === to;
       const isActive = exact
