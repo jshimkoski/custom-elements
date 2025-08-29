@@ -1,6 +1,13 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v0.1.5] - 2025-08-29
+
+- fix: add tests for router-view dynamic rendering and improve component rendering logic (8ef94bd)
+- fix: update assertion for div existence in minimal example test (81366e6)
+- feat: enhance documentation and improve router functionality with navigation guards (fd39856)
+
+
 ## [v0.1.4] - 2025-08-29
 
 - fix: update assertion for div existence in minimal example test (81366e6)
