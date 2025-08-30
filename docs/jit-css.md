@@ -232,7 +232,7 @@ JIT CSS provides a rich set of built-in color palettes, all accessible via utili
 }
 ```
 
-**Tip:** You can use any palette with `bg-`, `text-`, `border-`, `shadow-`, `outline-`, `caret`, `accent`, and arbitrary value syntax for full flexibility.
+**Tip:** You can use any palette with `bg-`, `text-`, `border-`, `shadow-`, `outline-`, `caret`, `accent`, `fill`, and `stroke` utilities for full flexibility.
 
 ## 📚 Tips & Best Practices
 

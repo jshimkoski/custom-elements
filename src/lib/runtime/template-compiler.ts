@@ -150,7 +150,30 @@ export function htmlImpl(
   }
 
   // Matches: tags (open/close/self), standalone interpolation markers, or any other text
-  const tagRegex = /<\/?([a-zA-Z0-9-]+)([^>]*)\/?>|{{(\d+)}}|([^<]+)/g;
+  // How this works:
+  // const tagRegex =
+  //   /<\/?([a-zA-Z0-9-]+)                            # tag name
+  //   (                                               # start attributes group
+  //     (?:\s+                                        # whitespace before attribute
+  //       [^\s=>/]+                                   # attribute name
+  //       (?:\s*=\s*                                  # optional equals
+  //         (?:
+  //           "(?:\\.|[^"])*"                         # double-quoted value
+  //           |'(?:\\.|[^'])*'                        # single-quoted value
+  //           |[^\s>]+                                # unquoted value
+  //         )
+  //       )?
+  //     )*                                            # repeat for multiple attributes
+  //   )\s*\/?>                                        # end of tag
+  //   |{{(\d+)}}                                      # placeholder
+  //   |([^<]+)                                        # text node
+  //   /gmx;
+  // We explicitly match attributes one by one, and if a value is quoted, we allow anything inside (including >).
+  // Handles both ' and " quotes.
+  // Matches unquoted attributes like disabled or checked.
+  // Keeps {{(\d+)}} and text node capture groups intact.
+  const tagRegex =
+    /<\/?([a-zA-Z0-9-]+)((?:\s+[^\s=>/]+(?:\s*=\s*(?:"(?:\\.|[^"])*"|'(?:\\.|[^'])*'|[^\s>]+))?)*)\s*\/?>|{{(\d+)}}|([^<]+)/g;
 
   const stack: Array<{
     tag: string;

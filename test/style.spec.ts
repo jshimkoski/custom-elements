@@ -44,7 +44,7 @@ describe('jitCSS', () => {
     const html = '<div class="p-4 text-xl font-bold"></div>';
     const css = jitCSS(html);
     expect(css).toContain('.p-4');
-    expect(css).toContain('padding:calc(var(--spacing, 0.25rem) * 4);');
+    expect(css).toContain('padding:calc(0.25rem * 4);');
     expect(css).toContain('.text-xl');
     expect(css).toContain('font-size:1.25rem;');
   });
@@ -118,8 +118,8 @@ describe('additional style tests', () => {
   });
 
   it('parseSpacing returns correct CSS', () => {
-    expect(parseSpacing('mx-2')).toBe('margin-inline:calc(var(--spacing, 0.25rem) * 2);');
-    expect(parseSpacing('-mx-2')).toBe('margin-inline:calc(-var(--spacing, 0.25rem) * 2);');
+    expect(parseSpacing('mx-2')).toBe('margin-inline:calc(0.25rem * 2);');
+    expect(parseSpacing('-mx-2')).toBe('margin-inline:calc(-0.25rem * 2);');
     expect(parseSpacing('foo-2')).toBeNull();
     expect(parseSpacing('mx-x')).toBeNull();
   });
@@ -210,7 +210,7 @@ describe('jitCSS - Arbitrary Variants', () => {
     expect(css).toContain('@media (min-width:768px){[data-open=true].md\\:\\[data-open\\=true\\]\\:bg-green-100{background-color:var(--color-green-100,#dcfce7)}}');
   });
 
-  it.todo('should support state + arbitrary variant [Currently does not work]', () => {
+  it.skip('should support state + arbitrary variant [Currently does not work]', () => {
     const html = `<button class="hover:[box-shadow:0_0_0_2px_#09f]"></button>`;
     const css = minifyCSS(jitCSS(html));
     expect(css).toContain(':hover.button\\:hover\\:\\[box-shadow\\:0_0_0_2px_\\#09f\\]{box-shadow:0 0 0 2px #09f}');

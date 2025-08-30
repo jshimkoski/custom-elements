@@ -455,7 +455,7 @@ export const utilityMap: CSSMap = {
   "transition-transform": "transition-property:transform;",
 };
 
-export const spacing = "var(--spacing, 0.25rem)";
+export const spacing = "0.25rem";
 
 export const spacingProps: Record<string, string[]> = {
   m: ["margin"],
@@ -564,7 +564,7 @@ export function hexToRgb(hex: string): string {
 
 export function parseColorClass(className: string): string | null {
   // Match bg-red-500, text-gray-200, border-blue-600, etc.
-  const match = /^(bg|text|border|shadow|outline|caret|accent)-([a-z]+)-?(\d{2,3}|DEFAULT)?$/.exec(className);
+  const match = /^(bg|text|border|decoration|shadow|outline|caret|accent|fill|stroke)-([a-z]+)-?(\d{2,3}|DEFAULT)?$/.exec(className);
   if (!match) return null;
 
   const [, type, colorName, shade = "DEFAULT"] = match;
@@ -573,12 +573,16 @@ export function parseColorClass(className: string): string | null {
 
   const propMap: Record<string, string> = {
     bg: "background-color",
+    decoration: "text-decoration-color",
     text: "color",
     border: "border-color",
     shadow: "box-shadow",
     outline: "outline-color",
     caret: "caret-color",
     accent: "accent-color",
+    placeholder: "placeholder-color",
+    fill: "fill-color",
+    stroke: "stroke-color",
   };
 
   return `${propMap[type]}:${colorValue};`;
@@ -713,18 +717,9 @@ export function extractClassesFromHTML(html: string): string[] {
   let match: RegExpExecArray | null;
 
   while ((match = classAttrRegex.exec(html))) {
-    // Split on spaces not inside brackets
-    let buffer = '';
-    let inBracket = false;
-    for (const char of match[1]) {
-      if (char === '[') inBracket = true;
-      if (char === ']') inBracket = false;
-      if (char === ' ' && !inBracket) {
-        if (buffer) classList.push(buffer);
-        buffer = '';
-      } else buffer += char;
-    }
-    if (buffer) classList.push(buffer);
+    // Match class tokens, including arbitrary variants and values
+    const tokens = match[1].match(/(?:\[[^\]]+\]:[^\s]+|[^\s]+)/g);
+    if (tokens) classList.push(...tokens);
   }
   return classList.filter(Boolean);
 }
