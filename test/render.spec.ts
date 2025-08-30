@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderComponent, renderOutput } from './render';
-import type { VNode, ComponentConfig, ComponentContext, Refs } from './types';
+import { renderComponent, renderOutput } from '../src/lib/runtime/render';
+import type { VNode, ComponentConfig, ComponentContext, Refs } from '../src/lib/runtime/types';
 
-vi.mock('./vdom', () => ({
+vi.mock('../src/lib/runtime/vdom', () => ({
   vdomRenderer: vi.fn()
 }));
-import { vdomRenderer } from './vdom';
+import { vdomRenderer } from '../src/lib/runtime/vdom';
 
 describe('renderComponent', () => {
   let shadowRoot: ShadowRoot;

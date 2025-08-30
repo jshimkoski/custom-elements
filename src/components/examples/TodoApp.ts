@@ -2,7 +2,7 @@
  * TodoApp: A classic todo list example.
  * Demonstrates ctx, directives, and input binding.
  */
-import { component, html, css, each } from '../../lib';
+import { component, html, each } from '../../lib';
 
 interface Todo {
   id: number;

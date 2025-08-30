@@ -5,8 +5,8 @@ import {
   initRouter,
   resolveRouteComponent,
   parseQuery,
-} from './router';
-import * as componentModule from './runtime/component';
+} from '../src/lib/router';
+import * as componentModule from '../src/lib/runtime/component';
 
 describe('router.ts', () => {
   describe('parseQuery', () => {

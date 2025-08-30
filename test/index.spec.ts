@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import * as index from './index';
+import * as index from '../src/lib/index';
 
 describe('index.ts', () => {
   it('should export runtime types', () => {

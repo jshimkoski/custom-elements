@@ -16,8 +16,8 @@ import {
   patch,
   vdomRenderer,
   renderToString,
-} from './vdom';
-import type { VNode, VDomRefs } from './types';
+} from '../src/lib/runtime/vdom';
+import type { VNode, VDomRefs } from '../src/lib/runtime/types';
 
 describe('vdom.ts edge cases', () => {
   it('cleanupRefs does nothing for non-HTMLElement', () => {

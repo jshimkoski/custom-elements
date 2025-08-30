@@ -16,8 +16,8 @@ import {
   patch,
   vdomRenderer,
   renderToString,
-} from './vdom';
-import type { VNode, VDomRefs, AnchorBlockVNode } from './types';
+} from '../src/lib/runtime/vdom';
+import type { VNode, VDomRefs, AnchorBlockVNode } from '../src/lib/runtime/types';
 
 describe('vdom.ts', () => {
   describe('cleanupRefs', () => {
