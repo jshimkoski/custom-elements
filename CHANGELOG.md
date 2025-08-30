@@ -1,6 +1,13 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v0.1.7] - 2025-08-30
+
+- fix: update utility classes and spacing handling in JIT CSS fix: improve template parsing to accommodate arbitrary variants (3ecfda7)
+- fix: add arbitrary variant support. docs: update docs to mention arbitrary variants (2077166)
+- fix: reference the prop ctx variables in router-link (b174807)
+
+
 ## [v0.1.6] - 2025-08-29
 
 - fix: reference the prop ctx variables in router-link (b174807)
