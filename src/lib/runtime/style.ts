@@ -453,6 +453,14 @@ export const utilityMap: CSSMap = {
   "transition-colors": "transition-property:color,background-color,border-color,text-decoration-color,fill,stroke;",
   "transition-opacity": "transition-property:opacity;",
   "transition-transform": "transition-property:transform;",
+
+  /* Z-index */
+  "z-0": "z-index:0;",
+  "z-10": "z-index:10;",
+  "z-20": "z-index:20;",
+  "z-30": "z-index:30;",
+  "z-40": "z-index:40;",
+  "z-50": "z-index:50;",
 };
 
 export const spacing = "0.25rem";
@@ -628,6 +636,18 @@ export function parseColorWithOpacity(className: string): string | null {
 }
 
 /**
+ * Parse opacity utility class (e.g., opacity-25)
+ * Returns CSS rule string or null if not valid
+ */
+export function parseOpacity(className: string): string | null {
+  const match = /^opacity-(\d{1,3})$/.exec(className);
+  if (!match) return null;
+  const value = parseInt(match[1], 10);
+  if (value < 0 || value > 100) return null;
+  return `opacity:${value / 100};`;
+}
+
+/**
  * Arbitrary value parser — supports:
  * - prop-[value]
  */
@@ -769,13 +789,14 @@ export function jitCSS(html: string): string {
   function generateRule(cls: string, stripDark = false): string | null {
     const parts = cls.split(":");
     const basePart = parts.find(
-      p => utilityMap[p] || parseSpacing(p) || parseColorWithOpacity(p) || parseArbitrary(p)
+      p => utilityMap[p] || parseSpacing(p) || parseOpacity(p) || parseColorWithOpacity(p) || parseArbitrary(p)
     );
     if (!basePart) return null;
 
     const baseRule =
       utilityMap[basePart] ??
       parseSpacing(basePart) ??
+      parseOpacity(basePart) ??
       parseColorWithOpacity(basePart) ??
       parseArbitrary(basePart);
 
@@ -826,7 +847,7 @@ export function jitCSS(html: string): string {
   for (const cls of seen) {
     const parts = cls.split(":");
     const basePart = parts.find(
-      p => utilityMap[p] || parseSpacing(p) || parseColorWithOpacity(p) || parseArbitrary(p)
+      p => utilityMap[p] || parseSpacing(p) || parseOpacity(p) || parseColorWithOpacity(p) || parseArbitrary(p)
     );
     if (!basePart) continue;
     const baseIndex = parts.indexOf(basePart);
