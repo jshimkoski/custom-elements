@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v0.1.13] - 2025-08-31
+
+- fix: update binding syntax from #model to :model across documentation and examples; enhance clarity and consistency (72bb626)
+- fix: enhance bindings documentation and add class binding examples; improve router functionality and tests; add component edge cases and props tests (0a3a1e3)
+
+
 ## [v0.1.12] - 2025-08-31
 
 - fix: enhance bindings documentation and add class binding examples; improve router functionality and tests; add component edge cases and props tests (0a3a1e3)
