@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v0.1.12] - 2025-08-31
+
+- fix: enhance bindings documentation and add class binding examples; improve router functionality and tests; add component edge cases and props tests (0a3a1e3)
+- fix: add class binding to router link and button components (4e43813)
+
+
 ## [v0.1.11] - 2025-08-31
 
 - fix: add class binding to router link and button components (4e43813)
