@@ -62,7 +62,7 @@ vdomRenderer(
 ## 🛠️ Features & Integrations
 
 - **Directives:** Processes `when`, `each`, `match` for conditional and list rendering
-- **Bindings:** Handles `:attr`, `@event`, `#model` for reactive updates
+- **Bindings:** Handles `:attr`, `@event`, `:model` for reactive updates
 - **Error boundaries:** Supports error handling during rendering
 - **SSR-friendly:** Can generate VNode trees for server-side rendering
 

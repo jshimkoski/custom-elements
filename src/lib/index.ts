@@ -1,7 +1,7 @@
 /**
  * Custom Elements Runtime
  * Lightweight, strongly typed, functional custom element runtime for two-way binding, event, and prop support.
- * Supports: state, computed, props, style, render, lifecycle hooks, #model-* and data-on-* attributes.
+ * Supports: state, computed, props, style, render, lifecycle hooks, :model and @event attributes.
  * No external dependencies. Mobile-first, secure, and developer friendly.
  */
 

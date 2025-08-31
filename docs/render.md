@@ -21,7 +21,7 @@ render: (ctx) => html`<div>Hello, ${ctx.name}!</div>`
 - **Computed**: All computed properties (auto-injected).
 - **Methods**: Any custom methods defined in config.
 - **Directives**: Use `when`, `each`, `match` for conditional and list rendering.
-- **Bindings**: Use `:attr`, `@event`, `#model` for attribute, event, and two-way bindings.
+- **Bindings**: Use `:attr`, `:model`, `@event` for attribute, two-way, and event bindings.
 
 ## ⏳ Async Rendering
 

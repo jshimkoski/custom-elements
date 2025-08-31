@@ -175,39 +175,39 @@ component("my-greeting", {
 
         <div class="form-group">
           <label>Name:</label>
-          <input type="text" #model="name" #show="${state.isActive}" />
+          <input type="text" :model="name" :show="${state.isActive}" />
 
           <div class="form-group">
-            <label>Name (#model):</label>
+            <label>Name (:model):</label>
             <input
               type="text"
-              #model="name"
-              #class="${ ['form-control', { 'active': state.isActive }] }"
-              #style="${ { color: state.isActive ? 'green' : 'red' } }"
+              :model="name"
+              :class="${ ['form-control', { 'active': state.isActive }] }"
+              :style="${ { color: state.isActive ? 'green' : 'red' } }"
             />
-            <button #bind="${ { disabled: state.isActive } }">Submit</button>
+            <button :bind="${ { disabled: state.isActive } }">Submit</button>
             <button :disabled="${state.isActive}">Submit</button>
           </div>
         </div>
 
         <div class="form-group">
           <label>Email:</label>
-          <input type="email" #model="email" />
+          <input type="email" :model="email" />
         </div>
 
         <div class="form-group">
           <label>Age:</label>
-          <input type="number" #model="age" />
+          <input type="number" :model="age" />
         </div>
 
         <div class="form-group">
           <label>Active:</label>
-          <input type="checkbox" #model="isActive" />
+          <input type="checkbox" :model="isActive" />
         </div>
 
         <div class="form-group">
           <label>Color:</label>
-          <select #model="color">
+          <select :model="color">
             <option value="red">Red</option>
             <option value="green">Green</option>
             <option value="blue">Blue</option>
@@ -224,8 +224,8 @@ component("my-greeting", {
                 type="checkbox"
                 key="checkbox-${item}"
                 value="${item}"
-                #model="array"
-                #class="['item', item === 'A' ? 'active' : '']"
+                :model="array"
+                :class="['item', item === 'A' ? 'active' : '']"
               />
             `,
           )}

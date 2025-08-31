@@ -45,11 +45,11 @@ html`
 
 ## 🔗 Two-way Binding
 
-Sync input values with state using `#model`:
+Sync input values with state using `:model`:
 
 ```ts
 html`
-  <input #model="count" type="number" />
+  <input :model="count" type="number" />
 `
 ```
 

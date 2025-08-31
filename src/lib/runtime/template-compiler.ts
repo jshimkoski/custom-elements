@@ -52,7 +52,7 @@ export function parseProps(
   while ((match = attrRegex.exec(str))) {
     const prefix = match[1];
     const rawName = match[2];
-    const rawVal = (match[4] || match[6]) ?? ""; // Extract value from either quote type
+    const rawVal = (match[4] || match[6]) ?? "";
 
     // Interpolation detection
     const interpMatch = rawVal.match(/^{{(\d+)}}$/);
@@ -60,7 +60,7 @@ export function parseProps(
       ? values[Number(interpMatch[1])] ?? null
       : rawVal;
 
-    // Type inference
+    // Type inference for booleans, null, numbers
     if (!interpMatch) {
       if (value === "true") value = true;
       else if (value === "false") value = false;
@@ -68,50 +68,18 @@ export function parseProps(
       else if (!isNaN(Number(value))) value = Number(value);
     }
 
-    // Treat :class as #class directive for unified handling
-    if ((prefix === ":" && rawName === "class") || (prefix === "#")) {
-      const [directiveName, ...modifierParts] = rawName.split(".");
-      const modifiers = [...modifierParts];
-
-      let finalValue = value;
-      let finalModifiers = [...modifiers];
-
-      if (
-        directiveName === "model" &&
-        typeof finalValue === "string" &&
-        finalValue.includes(".")
-      ) {
-        const commonModifiers = ["trim", "number", "lazy"];
-        const valueParts = finalValue.split(".");
-        let actualValue = finalValue;
-        const valueModifiers: string[] = [];
-
-        for (let i = valueParts.length - 1; i > 0; i--) {
-          if (commonModifiers.includes(valueParts[i])) {
-            valueModifiers.unshift(valueParts[i]);
-            actualValue = valueParts.slice(0, i).join(".");
-          } else {
-            break;
-          }
-        }
-
-        finalValue = actualValue;
-        finalModifiers.push(...valueModifiers);
-      }
-
-      directives[directiveName] = {
-        value: finalValue,
-        modifiers: finalModifiers,
-      };
-    } else if (prefix === ":") {
-      if (typeof value === "boolean") {
+    // Known directive names
+    const knownDirectives = ["model", "bind", "show", "class", "style"];
+    if (prefix === ":") {
+      const [maybeDirective, ...modifierParts] = rawName.split(".");
+      if (knownDirectives.includes(maybeDirective)) {
+        const modifiers = [...modifierParts];
+        directives[maybeDirective] = {
+          value,
+          modifiers,
+        };
+      } else {
         attrs[rawName] = value;
-      } else if (value !== undefined && value !== null) {
-        if (typeof context[value] !== "undefined") {
-          props[rawName] = context[value];
-        } else {
-          props[rawName] = value;
-        }
       }
     } else if (prefix === "@") {
       const onName = "on" + rawName.charAt(0).toUpperCase() + rawName.slice(1);
@@ -132,7 +100,7 @@ export function parseProps(
 }
 
 /**
- * Internal implementation allowing an optional compile context for #model.
+ * Internal implementation allowing an optional compile context for :model.
  * Fixes:
  *  - Recognize interpolation markers embedded in text ("World{{1}}") and replace them.
  *  - Skip empty arrays from directives so markers don't leak as text.
@@ -327,136 +295,9 @@ export function htmlImpl(
       for (const k in rawAttrs) vnodeProps.attrs[k] = rawAttrs[k];
 
       // Process built-in directives that should be converted to props/attrs
-      for (const [directiveName, directive] of Object.entries(directives)) {
-        if (directiveName === "bind") {
-          // #bind directive - can be object syntax or simple value
-          if (typeof directive.value === "object" && directive.value !== null) {
-            for (const [key, value] of Object.entries(directive.value)) {
-              if (typeof value === "boolean") {
-                vnodeProps.attrs[key] = value;
-              } else if (value != null) {
-                vnodeProps.attrs[key] = String(value);
-              }
-            }
-          } else if (directive.value != null) {
-            vnodeProps.attrs[directiveName] = String(directive.value);
-          }
-        }
-        // Always preserve #show, #class, #style in props.directives for root-level diagnostics
-        if (["show", "class", "style"].includes(directiveName)) {
-          if (!vnodeProps.directives) vnodeProps.directives = {};
-          vnodeProps.directives[directiveName] = directive;
-        }
-        if (directiveName === "show") {
-          const visible = Boolean(directive.value);
-          vnodeProps.attrs.style =
-            (vnodeProps.attrs.style || "") +
-            (visible ? "" : "; display: none !important");
-        } else if (directiveName === "class") {
-          const classValue = directive.value;
-          let classNames: string[] = [];
-          if (typeof classValue === "string") {
-            classNames = classValue.split(/\s+/).filter(Boolean);
-          } else if (Array.isArray(classValue)) {
-            for (const cls of classValue as any[]) {
-              if (typeof cls === "string") {
-                classNames.push(...cls.split(/\s+/).filter(Boolean));
-              } else if (cls && typeof cls === "object") {
-                for (const [className, condition] of Object.entries(cls)) {
-                  if (condition) {
-                    classNames.push(...className.split(/\s+/).filter(Boolean));
-                  }
-                }
-              }
-            }
-          } else if (classValue && typeof classValue === "object") {
-            for (const [className, condition] of Object.entries(classValue)) {
-              if (condition) {
-                classNames.push(...className.split(/\s+/).filter(Boolean));
-              }
-            }
-          }
-          const existingClass = (vnodeProps.attrs.class as string) || "";
-          const newClasses = [
-            ...new Set([
-              ...existingClass.split(/\s+/).filter(Boolean),
-              ...classNames,
-            ]),
-          ];
-          vnodeProps.attrs.class = newClasses.join(" ");
-        } else if (directiveName === "style") {
-          const styleValue = directive.value;
-          let styleString = "";
-          if (typeof styleValue === "string") {
-            styleString = styleValue;
-          } else if (styleValue && typeof styleValue === "object") {
-            const styleRules: string[] = [];
-            for (const [property, value] of Object.entries(styleValue)) {
-              if (value != null && value !== "") {
-                const kebabProperty = property.replace(
-                  /[A-Z]/g,
-                  (match) => `-${match.toLowerCase()}`,
-                );
-                const needsPx = [
-                  "width",
-                  "height",
-                  "top",
-                  "right",
-                  "bottom",
-                  "left",
-                  "margin",
-                  "margin-top",
-                  "margin-right",
-                  "margin-bottom",
-                  "margin-left",
-                  "padding",
-                  "padding-top",
-                  "padding-right",
-                  "padding-bottom",
-                  "padding-left",
-                  "font-size",
-                  "line-height",
-                  "border-width",
-                  "border-radius",
-                  "min-width",
-                  "max-width",
-                  "min-height",
-                  "max-height",
-                ];
-                let cssValue = String(value);
-                if (
-                  typeof value === "number" &&
-                  needsPx.includes(kebabProperty)
-                ) {
-                  cssValue = `${value}px`;
-                }
-                styleRules.push(`${kebabProperty}: ${cssValue}`);
-              }
-            }
-            styleString =
-              styleRules.join("; ") + (styleRules.length > 0 ? ";" : "");
-          }
-          const existingStyle = (vnodeProps.attrs.style as string) || "";
-          vnodeProps.attrs.style =
-            existingStyle +
-            (existingStyle && !existingStyle.endsWith(";") ? "; " : "") +
-            styleString;
-        }
-      }
-
-      // Add remaining directives that need special handling by the VDOM renderer
-      const remainingDirectives: Record<
-        string,
-        { value: any; modifiers: string[] }
-      > = {};
-      for (const [directiveName, directive] of Object.entries(directives)) {
-        if (!["bind", "show", "class", "style"].includes(directiveName)) {
-          remainingDirectives[directiveName] = directive;
-        }
-      }
-
-      if (Object.keys(remainingDirectives).length > 0) {
-        vnodeProps.directives = remainingDirectives;
+      // Only attach directives to VNode; normalization/merging is handled in vdom.ts
+      if (Object.keys(directives).length > 0) {
+        vnodeProps.directives = { ...directives };
       }
 
       if (isClosing) {

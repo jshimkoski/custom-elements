@@ -25,24 +25,24 @@ describe('template-compiler multi-root normalization', () => {
 });
 
 describe('template-compiler root-level directives', () => {
-  it('parses root-level #show directive', () => {
-    const output = html`<div #show="true">Visible</div>`;
+  it('parses root-level :show directive', () => {
+    const output = html`<div :show="true">Visible</div>`;
     expect(typeof output).toBe('object');
     expect((output as any).tag).toBe('div');
     expect((output as any).props?.directives?.show).toBeDefined();
     expect((output as any).children).toBe('Visible');
   });
 
-  it('parses root-level #class directive', () => {
-    const output = html`<div #class="'active'">Classy</div>`;
+  it('parses root-level :class directive', () => {
+    const output = html`<div :class="'active'">Classy</div>`;
     expect(typeof output).toBe('object');
     expect((output as any).tag).toBe('div');
     expect((output as any).props?.directives?.class).toBeDefined();
     expect((output as any).children).toBe('Classy');
   });
 
-  it('parses root-level #model directive', () => {
-    const output = html`<input #model="foo" type="text" />`;
+  it('parses root-level :model directive', () => {
+    const output = html`<input :model="foo" type="text" />`;
     expect(typeof output).toBe('object');
     expect((output as any).tag).toBe('input');
     expect((output as any).props?.directives?.model).toBeDefined();

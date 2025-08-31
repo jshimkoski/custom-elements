@@ -2,13 +2,13 @@
 
 ## 🧬 Overview
 
-Bindings allow you to connect your component's state, props, and events directly to the DOM. The runtime supports three core binding types: attribute binding (`:attr`), event binding (`@event`), and two-way binding (`#model`). These make your templates interactive, reactive, and easy to maintain.
+Bindings allow you to connect your component's state, props, and events directly to the DOM. The runtime supports three core binding types: attribute binding (`:attr`), event binding (`@event`), and two-way binding (`:model`). These make your templates interactive, reactive, and easy to maintain.
 
 ## 🛠️ Supported Bindings
 
 - `:attr` — Attribute binding
 - `@event` — Event binding
-- `#model` — Two-way binding for form elements
+- `:model` — Two-way binding for form elements
 - `ref` — Ref binding
 
 ## 🏷️ Attribute Binding (`:attr`)
@@ -63,15 +63,54 @@ component('class-binding-demo', {
 });
 ```
 
-## 🔄 Two-Way Binding (`#model`)
+## 🎨 Style Binding (`:style`)
+
+Bind dynamic styles to your elements using `:style`. This enables conditional, object and string-based style assignment for flexible inline styling.
+
+### Usage
+
+```html
+<div :style="${{ color: isActive ? 'green' : 'red', fontWeight: 'bold' }}"></div>
+<div :style="${'background: yellow; border: 1px solid #ccc;'}"></div>
+```
+
+### Best Practices
+- Use object syntax for conditional and multiple styles.
+- Use string syntax for static or precomputed style strings.
+- Prefer camelCase keys in objects (e.g., `fontWeight`), which are auto-converted to kebab-case.
+- Avoid empty strings or falsy values in arrays/objects.
+
+### Example
+
+```typescript
+component('style-binding-demo', {
+  state: { isActive: true, color: 'blue' },
+  render: (ctx) => html`
+    <div :style="${{ color: ctx.color, fontWeight: ctx.isActive ? 'bold' : 'normal' }}">Styled</div>
+    <div :style="${'background: #eee; padding: 10px;'}">Static + Dynamic</div>
+  `,
+});
+```
+
+### How It Works
+- Object syntax: `{ color: 'red', fontWeight: 'bold' }` → `color: red; font-weight: bold;`
+- String syntax: `'background: yellow; border: 1px solid #ccc;'` → used as-is.
+- All styles are merged and applied as inline styles.
+
+### Tips
+- Use conditional logic for dynamic styles.
+- Combine with static styles using string concatenation if needed.
+- Avoid setting styles that conflict with your CSS classes.
+
+## 🔄 Two-Way Binding (`:model`)
 
 Synchronize form element values with state.
 
 ```html
-<input #model="email" />
+<input :model="email" />
 ```
-- Use `#model` for two-way binding on form fields.
-- Supports nested state: `#model="user.name"`
+- Use `:model` for two-way binding on form fields.
+- Supports nested state: `:model="user.name"`
 - Updates state when the input value changes, and vice versa.
 
 ## 🪝 Ref Binding (`ref`)
@@ -110,7 +149,7 @@ component('binding-demo', {
   state: { name: '', count: 0 },
   render: (ctx) => html`
     <div>
-      <input #model="name" ref="nameInput" placeholder="Name" />
+      <input :model="name" ref="nameInput" placeholder="Name" />
       <button @click="${() => ctx.count++}">Clicked ${ctx.count} times</button>
       <div :data-name="name">Hello, ${ctx.name}</div>
       <button @click="${() => ctx.refs.nameInput?.focus()}">Focus Name Input</button>
@@ -130,7 +169,7 @@ component('binding-demo', {
 
 - Use `:attr` for dynamic attributes (e.g., `:disabled`, `:class`).
 - Use `@event` for all user interactions.
-- Use `#model` for forms and user input.
+- Use `:model` for forms and user input.
 - Use `ref` to access DOM elements when necessary.
 - Prefer simple, declarative bindings for maintainability.
 - Avoid side effects in event handlers unless necessary.

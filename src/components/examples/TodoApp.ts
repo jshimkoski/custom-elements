@@ -18,7 +18,7 @@ export const TodoApp = component('todo-app', (ctx) => html`
       @submit="${ctx.submitForm}"
     >
       <input
-        #model="input"
+        :model="input"
         class="grow px-2 py-1 border border-neutral-300 dark:border-neutral-800 rounded"
         type="text"
         placeholder="Add todo"

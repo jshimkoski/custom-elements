@@ -9,6 +9,9 @@ import { escapeHTML } from "./helpers";
 
 /**
  * Recursively clean up refs for all descendants of a node
+ * @param node The node to clean up.
+ * @param refs The refs to clean up.
+ * @returns 
  */
 export function cleanupRefs(node: Node, refs?: VDomRefs) {
   if (!refs) return;
@@ -27,6 +30,9 @@ export function cleanupRefs(node: Node, refs?: VDomRefs) {
 
 /**
  * Get nested property value from object using dot notation
+ * @param obj The object to search.
+ * @param path The dot-separated path to the property.
+ * @returns The value of the nested property, or undefined if not found.
  */
 export function getNestedValue(obj: any, path: string): any {
   if (typeof path === 'string') {
@@ -38,6 +44,10 @@ export function getNestedValue(obj: any, path: string): any {
 
 /**
  * Set nested property value in object using dot notation
+ * @param obj 
+ * @param path 
+ * @param value 
+ * @returns 
  */
 export function setNestedValue(obj: any, path: string, value: any): void {
   const keys = path.split(".");
@@ -57,7 +67,15 @@ export function setNestedValue(obj: any, path: string, value: any): void {
 }
 
 /**
- * Process #model directive for two-way data binding
+ * Process :model directive for two-way data binding
+ * @param value 
+ * @param modifiers 
+ * @param props 
+ * @param attrs 
+ * @param listeners 
+ * @param context 
+ * @param el 
+ * @returns 
  */
 export function processModelDirective(
   value: string,
@@ -330,7 +348,12 @@ export function processModelDirective(
 }
 
 /**
- * Process #bind directive for attribute/property binding
+ * Process :bind directive for attribute/property binding
+ * @param value 
+ * @param props 
+ * @param attrs 
+ * @param context 
+ * @returns 
  */
 export function processBindDirective(
   value: string,
@@ -340,24 +363,35 @@ export function processBindDirective(
 ): void {
   if (!context) return;
 
-  try {
-    // Parse as object binding
-    const bindings = JSON.parse(value);
-    if (typeof bindings === "object") {
-      for (const [key, val] of Object.entries(bindings)) {
-        props[key] = val;
-      }
+  // Support both object and string syntax for :bind
+  if (typeof value === "object" && value !== null) {
+    for (const [key, val] of Object.entries(value)) {
+      props[key] = val;
     }
-  } catch {
-    // Parse as single property binding
-    const currentValue = getNestedValue(context, value);
-    // Default to binding as attribute
-    attrs[value] = currentValue;
+  } else if (typeof value === "string") {
+    try {
+      // Try to parse as JSON object
+      const bindings = JSON.parse(value);
+      if (typeof bindings === "object" && bindings !== null) {
+        for (const [key, val] of Object.entries(bindings)) {
+          props[key] = val;
+        }
+        return;
+      }
+    } catch {
+      // Fallback: treat as single property binding
+      const currentValue = getNestedValue(context, value);
+      attrs[value] = currentValue;
+    }
   }
 }
 
 /**
- * Process #show directive for conditional display
+ * Process :show directive for conditional display
+ * @param value 
+ * @param attrs 
+ * @param context 
+ * @returns 
  */
 export function processShowDirective(
   value: string,
@@ -390,7 +424,11 @@ export function processShowDirective(
 }
 
 /**
- * Process #class directive for conditional CSS classes
+ * Process :class directive for conditional CSS classes
+ * @param value 
+ * @param attrs 
+ * @param context 
+ * @returns 
  */
 export function processClassDirective(
   value: string,
@@ -423,6 +461,13 @@ export function processClassDirective(
   }
 }
 
+/**
+ * Process :style directive for dynamic inline styles
+ * @param value 
+ * @param attrs 
+ * @param context 
+ * @returns 
+ */
 export function processStyleDirective(
   value: any,
   attrs: Record<string, any>,
@@ -494,6 +539,11 @@ export function processStyleDirective(
 
 /**
  * Process directives and return merged props, attrs, and event listeners
+ * @param directives 
+ * @param context 
+ * @param el 
+ * @param vnodeAttrs 
+ * @returns 
  */
 export function processDirectives(
   directives: Record<string, { value: any; modifiers: string[] }>,
@@ -543,6 +593,12 @@ export function processDirectives(
   return { props, attrs, listeners };
 }
 
+/**
+ * Assign unique keys to VNodes for efficient rendering
+ * @param nodeOrNodes 
+ * @param baseKey 
+ * @returns 
+ */
 export function assignKeysDeep(
   nodeOrNodes: VNode | VNode[],
   baseKey: string,
@@ -602,6 +658,10 @@ export function assignKeysDeep(
 /**
  * Patch props on an element.
  * Only update changed props, remove old, add new.
+ * @param el 
+ * @param oldProps 
+ * @param newProps 
+ * @param context 
  */
 export function patchProps(
   el: HTMLElement,
@@ -680,6 +740,13 @@ export function patchProps(
   }
 }
 
+/**
+ * Create a DOM element from a VNode.
+ * @param vnode 
+ * @param context 
+ * @param refs 
+ * @returns 
+ */
 export function createElement(
   vnode: VNode | string,
   context?: any,
@@ -749,17 +816,31 @@ export function createElement(
   // Set attributes
   for (const key in mergedAttrs) {
     const val = mergedAttrs[key];
+    // Only allow valid attribute names (string, not object)
+    if (typeof key !== 'string' || /\[object Object\]/.test(key)) {
+      if (typeof window !== 'undefined' && window.console) {
+        console.warn('Skipping invalid attribute key:', key, val);
+      }
+      continue;
+    }
     if (typeof val === "boolean") {
       if (val) el.setAttribute(key, "");
       // If false, do not set attribute
     } else if (val !== undefined && val !== null) {
-      el.setAttribute(key, String(val));
+      el.setAttribute(key, val);
     }
   }
 
   // Set props and event listeners
   for (const key in mergedProps) {
     const val = mergedProps[key];
+    // Only allow valid attribute names (string, not object)
+    if (typeof key !== 'string' || /\[object Object\]/.test(key)) {
+      if (typeof window !== 'undefined' && window.console) {
+        console.warn('Skipping invalid prop key:', key, val);
+      }
+      continue;
+    }
     if (
       key === "value" &&
       (el instanceof HTMLInputElement ||
@@ -807,6 +888,12 @@ export function createElement(
 
 /**
  * Patch children using keys for node matching.
+ * @param parent 
+ * @param oldChildren 
+ * @param newChildren 
+ * @param context 
+ * @param refs 
+ * @returns 
  */
 export function patchChildren(
   parent: HTMLElement,
@@ -1035,6 +1122,12 @@ export function patchChildren(
 
 /**
  * Patch a node using keys for node matching.
+ * @param dom 
+ * @param oldVNode 
+ * @param newVNode 
+ * @param context 
+ * @param refs 
+ * @returns 
  */
 export function patch(
   dom: Node,
@@ -1149,8 +1242,11 @@ export function patch(
 }
 
 /**
- * Main renderer: uses patching and keys for node reuse.
- * Never uses innerHTML. Only updates what has changed.
+ * Virtual DOM renderer.
+ * @param root The root element to render into.
+ * @param vnodeOrArray The virtual node or array of virtual nodes to render.
+ * @param context The context to use for rendering.
+ * @param refs The refs to use for rendering.
  */
 export function vdomRenderer(
   root: ShadowRoot,
@@ -1229,6 +1325,11 @@ export function vdomRenderer(
   (root as any)._prevDom = newDom;
 }
 
+/**
+ * Render a VNode to a string.
+ * @param vnode The virtual node to render.
+ * @returns The rendered HTML string.
+ */
 export function renderToString(vnode: VNode): string {
   if (typeof vnode === "string") return escapeHTML(vnode) as string;
 
