@@ -32,6 +32,37 @@ Bind event listeners to DOM events.
 - Use `@eventName` to bind a handler function.
 - Handler can access and update state, props, or call injected methods.
 
+## 🎨 Class Binding (`:class`)
+
+Bind dynamic classes to your elements using `:class`. This enables conditional, array, and object-based class assignment for flexible styling.
+
+### Usage
+
+```html
+<div :class="${{ active: isActive, error: hasError }}"></div>
+<div :class="${['foo', isBar ? 'bar' : '']}"></div>
+<div :class="${'static-class' + (isActive ? ' active' : '')}"></div>
+```
+
+### Best Practices
+- Use object syntax for conditional classes.
+- Use array syntax for multiple dynamic classes.
+- Avoid empty strings or falsy values in arrays/objects.
+- Combine with static classes using string concatenation if needed.
+
+### Example
+
+```typescript
+component('class-binding-demo', {
+  state: { isActive: true, hasError: false },
+  render: (ctx) => html`
+    <div :class="${{ active: ctx.isActive, error: ctx.hasError }}">Status</div>
+    <div :class="${['foo', ctx.isActive ? 'active' : '', ctx.hasError && 'error']}">Multi</div>
+    <div :class="${'static' + (ctx.isActive ? ' active' : '')}">Static + Dynamic</div>
+  `,
+});
+```
+
 ## 🔄 Two-Way Binding (`#model`)
 
 Synchronize form element values with state.

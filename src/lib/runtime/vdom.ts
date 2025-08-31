@@ -29,7 +29,11 @@ export function cleanupRefs(node: Node, refs?: VDomRefs) {
  * Get nested property value from object using dot notation
  */
 export function getNestedValue(obj: any, path: string): any {
-  return path.split(".").reduce((current, key) => current?.[key], obj);
+  if (typeof path === 'string') {
+    return path.split(".").reduce((current, key) => current?.[key], obj);
+  }
+  // If path is an object, handle accordingly or return a default value
+  return path;
 }
 
 /**
@@ -406,7 +410,7 @@ export function processClassDirective(
     // Object syntax: { className: condition }
     classes = Object.entries(classValue)
       .filter(([, condition]) => Boolean(condition))
-      .map(([className]) => className);
+      .flatMap(([className]) => className.split(/\s+/).filter(Boolean));
   }
 
   const existingClasses = attrs.class || "";

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { vdomRenderer, renderToString } from '../src/lib/runtime/vdom';
+import { vdomRenderer, renderToString, cleanupRefs, patch } from '../src/lib/runtime/vdom';
 import type { VNode } from '../src/lib/runtime/types';
 
 function vnode(tag: any, children: any, key: any, props: any): VNode {
@@ -251,5 +251,146 @@ describe('renderToString edge cases', () => {
       ]
     };
     expect(renderToString(vnode)).toBe('<section><header>Title</header><main><article>Content</article></main></section>');
+  });
+});
+
+describe('vdom.ts coverage additions', () => {
+  it('vdomRenderer handles multi-root array', () => {
+    const root = document.createElement('div').attachShadow({ mode: 'open' });
+    const tree = [
+      { tag: 'span', children: 'A' },
+      { tag: 'span', children: 'B' }
+    ];
+    expect(() => vdomRenderer(root, tree)).not.toThrow();
+    expect(root.innerHTML).toContain('span');
+  });
+
+  it('vdomRenderer handles anchor block as root', () => {
+    const root = document.createElement('div').attachShadow({ mode: 'open' });
+    const anchor = { tag: '#anchor', key: 'anchor', children: [ { tag: 'span', children: 'X' } ] };
+    expect(() => vdomRenderer(root, anchor)).not.toThrow();
+    expect(root.innerHTML).toContain('span');
+  });
+
+  it('renderToString handles props with non-string values and directives', () => {
+    const vnode = {
+      tag: 'div',
+      props: {
+        attrs: { id: 'x', 'data-num': 42 },
+        custom: { foo: 'bar' },
+        directives: { show: { value: 'true', modifiers: [] } }
+      },
+      children: 'hi'
+    };
+    const html = renderToString(vnode);
+    expect(html).toContain('id="x"');
+    expect(html).toContain('data-num="42"');
+    expect(html).toContain('hi');
+  });
+
+  it('cleanupRefs does nothing for text node', () => {
+    const text = document.createTextNode('hi');
+    const refs: Record<string, any> = { foo: text };
+    cleanupRefs(text, refs);
+    expect(refs.foo).toBe(text);
+  });
+
+  it('patch returns comment node for null newVNode', () => {
+    const vnode = { tag: 'div', key: 'x', props: {}, children: '' };
+    const dom = document.createElement('div');
+    const node = patch(dom, vnode, null);
+    expect(node.nodeType).toBe(Node.COMMENT_NODE);
+  });
+
+  it('patch returns text node for string newVNode', () => {
+    const vnode = { tag: 'div', key: 'x', props: {}, children: '' };
+    const dom = document.createElement('div');
+    const node = patch(dom, vnode, 'hello');
+    expect(node.nodeType).toBe(Node.TEXT_NODE);
+    expect(node.textContent).toBe('hello');
+  });
+});
+
+describe('vdom.ts more edge cases for coverage', () => {
+  it('vdomRenderer handles empty array as input', () => {
+    const root = document.createElement('div').attachShadow({ mode: 'open' });
+    expect(() => vdomRenderer(root, [])).not.toThrow();
+    expect(root.innerHTML).toContain('div'); // Should wrap in div
+  });
+
+  it('vdomRenderer assigns __root__ key for single VNode without key', () => {
+    const root = document.createElement('div').attachShadow({ mode: 'open' });
+    const vnode = { tag: 'span', children: 'A' };
+    vdomRenderer(root, vnode);
+    expect((root as any)._prevVNode.key).toBe('__root__');
+  });
+
+  it('vdomRenderer wraps anchor block in div with __anchor_root__ key', () => {
+    const root = document.createElement('div').attachShadow({ mode: 'open' });
+    const anchor = { tag: '#anchor', key: 'anchor', children: [ { tag: 'span', children: 'X' } ] };
+    vdomRenderer(root, anchor);
+    expect((root as any)._prevVNode.key).toBe('__anchor_root__');
+    expect(root.innerHTML).toContain('span');
+  });
+
+  it('renderToString handles VNode with props containing ref and key', () => {
+    const vnode = {
+      tag: 'div',
+      props: { attrs: { id: 'x' }, ref: 'myref', key: 'mykey' },
+      children: 'hi'
+    };
+    const html = renderToString(vnode);
+    expect(html).toContain('id="x"');
+    expect(html).toContain('hi');
+  });
+
+  it('renderToString handles VNode with children as undefined', () => {
+    const vnode = { tag: 'div', children: undefined };
+    const html = renderToString(vnode);
+    expect(html).toContain('<div></div>');
+  });
+
+  it('renderToString handles VNode with children as undefined', () => {
+    const vnode = { tag: 'div', children: undefined };
+    const html = renderToString(vnode);
+    expect(html).toContain('<div></div>');
+  });
+
+  it('renderToString handles VNode with children as stringified number', () => {
+    const vnode = { tag: 'span', children: String(123) };
+    const html = renderToString(vnode);
+    expect(html).toContain('123');
+  });
+
+  it('renderToString handles VNode with props containing boolean', () => {
+    const vnode = { tag: 'div', props: { attrs: { id: 'x', 'data-flag': true } }, children: 'hi' };
+    const html = renderToString(vnode);
+    expect(html).toContain('data-flag="true"');
+  });
+});
+
+describe('vdom.ts targeted ref patch coverage', () => {
+  it('patch assigns ref for matching VNode', () => {
+    const vnodeOld = { tag: 'div', key: 'x', props: { ref: 'myref' }, children: 'A' };
+    const vnodeNew = { tag: 'div', key: 'x', props: { ref: 'myref' }, children: 'B' };
+    const dom = document.createElement('div');
+    dom.textContent = 'A';
+    const refs: Record<string, HTMLElement> = {};
+    const node = patch(dom, vnodeOld, vnodeNew, {}, refs);
+    expect(refs.myref).toBe(node);
+    expect(node.textContent).toBe('B');
+  });
+
+  it('patch cleans up old ref and assigns new ref for replaced node', () => {
+    const vnodeOld = { tag: 'span', key: 'x', props: { ref: 'oldref' }, children: 'A' };
+    const vnodeNew = { tag: 'div', key: 'y', props: { ref: 'newref' }, children: 'B' };
+    const dom = document.createElement('span');
+    dom.textContent = 'A';
+    const refs: Record<string, HTMLElement> = { oldref: dom };
+    const node = patch(dom, vnodeOld, vnodeNew, {}, refs);
+    expect(refs.oldref).toBeUndefined();
+    expect(refs.newref).toBe(node);
+  expect(node.textContent).toBe('B');
+  expect((node as HTMLElement).tagName).toBe('DIV');
   });
 });

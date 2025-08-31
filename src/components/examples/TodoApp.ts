@@ -35,8 +35,10 @@ export const TodoApp = component('todo-app', (ctx) => html`
             type="checkbox"
             :checked="${todo.done}" @change="${() => ctx.toggleTodo(ctx, todo.id)}">
           <span
-            class="todo-text grow text-left [data-done=true]:line-through [data-done=true]:text-gray-500"
-            :data-done="${todo.done}"
+            :class="${{
+              'todo-text grow text-left ': true,
+              'line-through text-gray-500': todo.done
+            }}"
           >${todo.text}</span>
           <button
             class="remove-btn px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 focus:bg-red-700"

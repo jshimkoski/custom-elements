@@ -68,25 +68,8 @@ export function parseProps(
       else if (!isNaN(Number(value))) value = Number(value);
     }
 
-    if (prefix === ":") {
-      if (typeof value === "boolean") {
-        attrs[rawName] = value;
-      } else if (value !== undefined && value !== null) {
-        if (typeof context[value] !== "undefined") {
-          props[rawName] = context[value];
-        } else {
-          props[rawName] = value;
-        }
-      }
-    } else if (prefix === "@") {
-      const onName = "on" + rawName.charAt(0).toUpperCase() + rawName.slice(1);
-      props[onName] =
-        typeof value === "function"
-          ? value
-          : typeof context[value] === "function"
-          ? context[value]
-          : undefined;
-    } else if (prefix === "#") {
+    // Treat :class as #class directive for unified handling
+    if ((prefix === ":" && rawName === "class") || (prefix === "#")) {
       const [directiveName, ...modifierParts] = rawName.split(".");
       const modifiers = [...modifierParts];
 
@@ -120,6 +103,24 @@ export function parseProps(
         value: finalValue,
         modifiers: finalModifiers,
       };
+    } else if (prefix === ":") {
+      if (typeof value === "boolean") {
+        attrs[rawName] = value;
+      } else if (value !== undefined && value !== null) {
+        if (typeof context[value] !== "undefined") {
+          props[rawName] = context[value];
+        } else {
+          props[rawName] = value;
+        }
+      }
+    } else if (prefix === "@") {
+      const onName = "on" + rawName.charAt(0).toUpperCase() + rawName.slice(1);
+      props[onName] =
+        typeof value === "function"
+          ? value
+          : typeof context[value] === "function"
+          ? context[value]
+          : undefined;
     } else if (rawName === "ref") {
       props.ref = value;
     } else {

@@ -290,9 +290,70 @@ export function useRouter(config: RouterConfig) {
       query: initial.query
     });
 
-    update = async () => {};
-    push = async () => {};
-    replaceFn = async () => {};
+    update = async () => {
+      const loc = getLocation();
+      await navigateSSR(loc.path);
+    };
+
+    const navigateSSR = async (path: string) => {
+      try {
+        const loc = {
+          path: path.replace(base, '') || '/',
+          query: {}
+        };
+        const match = matchRoute(routes, loc.path);
+        if (!match) throw new Error(`No route found for ${loc.path}`);
+
+        const from = store.getState();
+        const to: RouteState = {
+          path: loc.path,
+          params: match.params,
+          query: loc.query
+        };
+
+        // beforeEnter guard
+        const matched = routes.find(r => matchRoute([r], to.path).route !== null);
+        if (matched?.beforeEnter) {
+          try {
+            const result = await matched.beforeEnter(to, from);
+            if (typeof result === 'string') {
+              // Redirect
+              await navigateSSR(result);
+              return;
+            }
+            if (result === false) return;
+          } catch (err) {
+            return;
+          }
+        }
+
+        // onEnter guard
+        if (matched?.onEnter) {
+          try {
+            const result = await matched.onEnter(to, from);
+            if (typeof result === 'string') {
+              await navigateSSR(result);
+              return;
+            }
+            if (result === false) return;
+          } catch (err) {
+            return;
+          }
+        }
+
+        store.setState(to);
+
+        // afterEnter hook
+        if (matched?.afterEnter) {
+          try {
+            matched.afterEnter(to, from);
+          } catch (err) {}
+        }
+      } catch (err) {}
+    };
+
+    push = async (path: string) => navigateSSR(path);
+    replaceFn = async (path: string) => navigateSSR(path);
     back = () => {};
   }
 
@@ -434,20 +495,19 @@ export function initRouter(config: RouterConfig) {
           .done()}
       `;
     },
-    navigate: (e: MouseEvent, context: ComponentContext<{}, RouterLinkComputed, RouterLinkProps, any>) => {
-      const { disabled, external, tag, replace, to } = context.props;
-      if (disabled) {
+    navigate: (e: MouseEvent, ctx: ComponentContext<{}, RouterLinkComputed, RouterLinkProps, any>) => {
+      if (ctx.disabled) {
         e.preventDefault();
         return;
       }
-      if (external && (tag === 'a' || !tag)) {
+      if (ctx.external && (ctx.tag === 'a' || !ctx.tag)) {
         return;
       }
       e.preventDefault();
-      if (replace) {
-        router.replace(to);
+      if (ctx.replace) {
+        router.replace(ctx.to);
       } else {
-        router.push(to);
+        router.push(ctx.to);
       }
     }
   });
