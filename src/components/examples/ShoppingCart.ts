@@ -84,6 +84,12 @@ export const ShoppingCart = component('shopping-cart', (ctx) => html`
       box-shadow: 0 2px 8px rgba(0,0,0,0.07);
       font-family: system-ui, sans-serif;
     }
+    @media (prefers-color-scheme: dark) {
+      .cart-container {
+        background: #111;
+        color: #fff;
+      }
+    }
     h2 {
       margin-bottom: 1rem;
       font-size: 1.3rem;

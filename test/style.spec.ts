@@ -210,8 +210,20 @@ describe('jitCSS - Arbitrary Variants', () => {
     expect(css).toContain('@media (min-width:768px){[data-open=true].md\\:\\[data-open\\=true\\]\\:bg-green-100{background-color:var(--color-green-100,#dcfce7)}}');
   });
 
-  it.skip('should support state + arbitrary variant [Currently does not work]', () => {
-    const html = `<button class="hover:[box-shadow:0_0_0_2px_#09f]"></button>`;
+  it('should support dark + responsive + arbitrary variant + arbitrary value', () => {
+    const html = `<button class="dark:md:[&>h2]:hover:shadow-[0_0_0_2px_#09f]"></button>`;
+    const css = minifyCSS(jitCSS(html));
+    expect(css).toContain('@media (prefers-color-scheme:dark) and (min-width:768px){.dark\\:md\\:\\[\\&\\>h2\\]\\:hover\\:shadow-\\[0_0_0_2px_\\#09f\\]:hover>h2{box-shadow:0 0 0 2px #09f}}');
+  });
+
+  it('should support dark + responsive + arbitrary variant (with hover) + arbitrary value', () => {
+    const html = `<button class="dark:md:[&>h2:hover]:hover:shadow-[0_0_0_2px_#09f]"></button>`;
+    const css = minifyCSS(jitCSS(html));
+    expect(css).toContain('@media (prefers-color-scheme:dark) and (min-width:768px){.dark\\:md\\:\\[\\&\\>h2\\:hover\\]\\:hover\\:shadow-\\[0_0_0_2px_\\#09f\\]:hover>h2:hover{box-shadow:0 0 0 2px #09f}}');
+  });
+
+  it.skip('should support extremely complicated monster classes', () => {
+    const html = `<button class="dark:xl:group-hover:peer-focus:[&:is(section,article):nth-child(2)>h2[data-state=open]:hover]:focus-within:!shadow-[0_0_0_3px_rgba(255,0,255,0.75)]"></button>`;
     const css = minifyCSS(jitCSS(html));
     expect(css).toContain(':hover.button\\:hover\\:\\[box-shadow\\:0_0_0_2px_\\#09f\\]{box-shadow:0 0 0 2px #09f}');
   });

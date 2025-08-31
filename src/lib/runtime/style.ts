@@ -498,22 +498,39 @@ export const spacingProps: Record<string, string[]> = {
   "gap-y": ["row-gap"]
 };
 
+function insertPseudoBeforeCombinator(sel: string, pseudo: string): string {
+  // Find the first combinator that is NOT inside escaped class name brackets
+  let depth = 0;
+  for (let i = 0; i < sel.length; i++) {
+    const ch = sel[i];
+    if (ch === '[') depth++;
+    else if (ch === ']') depth--;
+    else if (depth === 0 && (ch === '>' || ch === '+' || ch === '~' || ch === ' ')) {
+      // Insert pseudo before this combinator
+      return sel.slice(0, i) + pseudo + sel.slice(i);
+    }
+  }
+  // No combinator found outside brackets — append at end
+  return sel + pseudo;
+}
+
+
 export const selectorVariants: SelectorVariantMap = {
   // State variants
   before: (sel, body) => `${sel}::before{${body}}`,
   after: (sel, body) => `${sel}::after{${body}}`,
-  hover: (sel, body) => `${sel}:hover{${body}}`,
-  focus: (sel, body) => `${sel}:focus{${body}}`,
-  active: (sel, body) => `${sel}:active{${body}}`,
-  disabled: (sel, body) => `${sel}:disabled{${body}}`,
-  visited: (sel, body) => `${sel}:visited{${body}}`,
-  checked: (sel, body) => `${sel}:checked{${body}}`,
-  first: (sel, body) => `${sel}:first-child{${body}}`,
-  last: (sel, body) => `${sel}:last-child{${body}}`,
-  odd: (sel, body) => `${sel}:nth-child(odd){${body}}`,
-  even: (sel, body) => `${sel}:nth-child(even){${body}}`,
-  "focus-within": (sel, body) => `${sel}:focus-within{${body}}`,
-  "focus-visible": (sel, body) => `${sel}:focus-visible{${body}}`,
+  hover: (sel, body) => `${insertPseudoBeforeCombinator(sel, ":hover")}{${body}}`,
+  focus: (sel, body) => `${insertPseudoBeforeCombinator(sel, ":focus")}{${body}}`,
+  active: (sel, body) => `${insertPseudoBeforeCombinator(sel, ":active")}{${body}}`,
+  disabled: (sel, body) => `${insertPseudoBeforeCombinator(sel, ":disabled")}{${body}}`,
+  visited: (sel, body) => `${insertPseudoBeforeCombinator(sel, ":visited")}{${body}}`,
+  checked: (sel, body) => `${insertPseudoBeforeCombinator(sel, ":checked")}{${body}}`,
+  first: (sel, body) => `${insertPseudoBeforeCombinator(sel, ":first-child")}{${body}}`,
+  last: (sel, body) => `${insertPseudoBeforeCombinator(sel, ":last-child")}{${body}}`,
+  odd: (sel, body) => `${insertPseudoBeforeCombinator(sel, ":nth-child(odd)")}{${body}}`,
+  even: (sel, body) => `${insertPseudoBeforeCombinator(sel, ":nth-child(even)")}{${body}}`,
+  "focus-within": (sel, body) => `${insertPseudoBeforeCombinator(sel, ":focus-within")}{${body}}`,
+  "focus-visible": (sel, body) => `${insertPseudoBeforeCombinator(sel, ":focus-visible")}{${body}}`,
 
   // Group variants
   "group-hover": (sel, body) => `.group:hover ${sel}{${body}}`,
@@ -716,13 +733,20 @@ export function parseArbitrary(className: string): string | null {
  * Supports [attr=value]:utility or foo-[bar]:utility
  */
 export function parseArbitraryVariant(token: string): string | null {
-  // [attr=value] or foo-[bar]
-  if (token.startsWith("[") && token.endsWith("]")) return token;
+  // [attr=value] or [&...]
+  if (token.startsWith("[") && token.endsWith("]")) {
+    const inner = token.slice(1, -1);
+    // If it contains &, return without brackets so & can be replaced
+    return inner.includes("&") ? inner : token;
+  }
+
+  // foo-[bar] style
   const bracketStart = token.indexOf("-[");
   if (bracketStart > 0 && token.endsWith("]")) {
-    // e.g. foo-[bar]
-    return token.replace(/_/g, "-");
+    const inner = token.slice(bracketStart + 2, -1).replace(/_/g, "-");
+    return inner.includes("&") ? inner : token.replace(/_/g, "-");
   }
+
   return null;
 }
 
@@ -786,63 +810,114 @@ export function jitCSS(html: string): string {
     return 4;
   }
 
-  function generateRule(cls: string, stripDark = false): string | null {
-    const parts = cls.split(":");
-    const basePart = parts.find(
-      p => utilityMap[p] || parseSpacing(p) || parseOpacity(p) || parseColorWithOpacity(p) || parseArbitrary(p)
-    );
-    if (!basePart) return null;
-
-    const baseRule =
-      utilityMap[basePart] ??
-      parseSpacing(basePart) ??
-      parseOpacity(basePart) ??
-      parseColorWithOpacity(basePart) ??
-      parseArbitrary(basePart);
-
-    if (!baseRule) return null;
-
-    let selector = `.${escapeClassName(cls)}`;
-    let body = baseRule;
-
-    const baseIndex = parts.indexOf(basePart);
-    let before = baseIndex >= 0 ? parts.slice(0, baseIndex) : [];
-
-    if (stripDark) before = before.filter(t => t !== "dark");
-
-    const responsiveTokens = before.filter(t => responsiveOrder.includes(t));
-    const lastResponsive = responsiveTokens.length
-      ? responsiveTokens[responsiveTokens.length - 1]
-      : null;
-
-    // --- Arbitrary variant support ---
-    for (const token of before) {
-      const arbitrary = parseArbitraryVariant(token);
-      if (arbitrary) {
-        selector = `${arbitrary}${selector}`;
-        continue;
-      }
-      if (responsiveOrder.includes(token)) continue;
-      const variantFn = selectorVariants[token];
-      if (typeof variantFn === "function") {
-        selector = variantFn(selector, body).replace(/\{.*$/, "");
-      }
+// Split on ":" but ignore colons inside square brackets (arbitrary variants/values)
+function splitVariants(input: string): string[] {
+  const out: string[] = [];
+  let buf = "";
+  let depth = 0; // bracket depth for [ ... ]
+  for (let i = 0; i < input.length; i++) {
+    const ch = input[i];
+    if (ch === "[") depth++;
+    if (ch === "]" && depth > 0) depth--;
+    if (ch === ":" && depth === 0) {
+      out.push(buf);
+      buf = "";
+    } else {
+      buf += ch;
     }
-
-    let rule = `${selector}{${body}}`;
-
-    if (stripDark && lastResponsive) {
-      const responsiveQuery = mediaVariants[lastResponsive] as string;
-      rule = `@media (prefers-color-scheme: dark) and ${responsiveQuery}{${rule}}`;
-    } else if (stripDark) {
-      rule = `@media (prefers-color-scheme: dark){${rule}}`;
-    } else if (lastResponsive) {
-      const responsiveQuery = mediaVariants[lastResponsive] as string;
-      rule = `@media ${responsiveQuery}{${rule}}`;
-    }
-
-    return rule;
   }
+  if (buf) out.push(buf);
+  return out;
+}
+
+function generateRule(cls: string, stripDark = false): string | null {
+  const parts = splitVariants(cls);
+
+  // Find the utility part (the actual class that produces CSS)
+  const basePart = parts.find(
+    p =>
+      utilityMap[p] ||
+      parseSpacing(p) ||
+      parseOpacity(p) ||
+      parseColorWithOpacity(p) ||
+      parseArbitrary(p)
+  );
+  if (!basePart) return null;
+
+  const baseRule =
+    utilityMap[basePart] ??
+    parseSpacing(basePart) ??
+    parseOpacity(basePart) ??
+    parseColorWithOpacity(basePart) ??
+    parseArbitrary(basePart);
+
+  if (!baseRule) return null;
+
+  const baseIndex = parts.indexOf(basePart);
+  let before = baseIndex >= 0 ? parts.slice(0, baseIndex) : [];
+  if (stripDark) before = before.filter(t => t !== "dark");
+
+  const arbitraryVariantToken = before.find(t => parseArbitraryVariant(t));
+  const escapedClass = `.${escapeClassName(cls)}`;
+
+  // Build the selector (preserving child/descendant pieces outside the class)
+  let selector: string;
+  const body = baseRule;
+
+  if (arbitraryVariantToken) {
+    const variantSelector = parseArbitraryVariant(arbitraryVariantToken);
+    if (variantSelector) {
+      if (variantSelector.includes("&")) {
+        // Replace & with escaped class, keep combinators/children raw
+        selector = variantSelector.replace(/&/g, escapedClass);
+      } else {
+        // Attribute-style arbitrary variant (no &): keep brackets and append class
+        selector = `${variantSelector}${escapedClass}`;
+      }
+    } else {
+      selector = escapedClass;
+    }
+  } else {
+    selector = escapedClass;
+  }
+
+  // Apply non-responsive selector variants to the entire selector
+  for (const token of before) {
+    if (responsiveOrder.includes(token) || token === "dark") continue;
+    if (token === arbitraryVariantToken) continue;
+    const variantFn = selectorVariants[token];
+    if (typeof variantFn === "function") {
+      // Wrap the whole selector (variantFn returns "selector{body}")
+      selector = variantFn(selector, body).replace(/\{.*$/, "");
+    }
+  }
+
+  let rule = `${selector}{${body}}`;
+
+  // Wrap in media queries for responsive/dark
+  const responsiveTokens = before.filter(t => responsiveOrder.includes(t));
+  const lastResponsive = responsiveTokens.length
+    ? responsiveTokens[responsiveTokens.length - 1]
+    : null;
+  const hasDark = before.includes("dark");
+
+  if (stripDark && lastResponsive) {
+    const responsiveQuery = mediaVariants[lastResponsive] as string;
+    rule = `@media (prefers-color-scheme: dark) and ${responsiveQuery}{${rule}}`;
+  } else if (stripDark) {
+    rule = `@media (prefers-color-scheme: dark){${rule}}`;
+  } else if (hasDark && lastResponsive) {
+    const responsiveQuery = mediaVariants[lastResponsive] as string;
+    rule = `@media (prefers-color-scheme: dark) and ${responsiveQuery}{${rule}}`;
+  } else if (hasDark) {
+    rule = `@media (prefers-color-scheme: dark){${rule}}`;
+  } else if (lastResponsive) {
+    const responsiveQuery = mediaVariants[lastResponsive] as string;
+    rule = `@media ${responsiveQuery}{${rule}}`;
+  }
+
+  return rule;
+}
 
   for (const cls of seen) {
     const parts = cls.split(":");
