@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v0.1.9] - 2025-08-31
+
+- fix: enhance bindings and context handling in template compiler and examples (4f9582d)
+- fix: move test files to test directory fix: remove unnecessary import from TodoApp.ts (b496a63)
+
+
 ## [v0.1.8] - 2025-08-30
 
 - fix: move test files to test directory fix: remove unnecessary import from TodoApp.ts (b496a63)
