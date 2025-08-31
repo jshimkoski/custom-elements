@@ -22,7 +22,7 @@ export const TodoApp = component('todo-app', (ctx) => html`
         class="grow px-2 py-1 border border-neutral-300 dark:border-neutral-800 rounded"
         type="text"
         placeholder="Add todo"
-      />
+      >
       <button
         type="submit"
         class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:bg-blue-700"

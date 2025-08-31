@@ -19,7 +19,7 @@ component('form-input-validation', (ctx) => html`
           type="email"
           required
           class="w-full px-2 py-1 rounded border border-neutral-300 dark:border-neutral-800 hover:bg-neutral-50 focus:bg-white dark:hover:bg-neutral-900 dark:focus:bg-black"
-        />
+        >
       </label>
       <label class="flex flex-col items-start gap-2 w-full mb-6">
         <span class="font-semibold">Username:</span>
@@ -29,7 +29,7 @@ component('form-input-validation', (ctx) => html`
           minlength="3"
           required
           class="w-full px-2 py-1 rounded border border-neutral-300 dark:border-neutral-800 hover:bg-neutral-50 focus:bg-white dark:hover:bg-neutral-900 dark:focus:bg-black"
-        />
+        >
       </label>
       <label class="flex flex-col items-start gap-2 w-full mb-6">
         <span class="font-semibold">Bio:</span>
@@ -43,21 +43,21 @@ component('form-input-validation', (ctx) => html`
       </label>
       <div class="flex flex-col items-start gap-2 w-full mb-6">
         <span class="font-semibold">Gender:</span>
-        <label><input #model="gender" type="radio" value="male" name="gender" /> Male</label>
-        <label><input #model="gender" type="radio" value="female" name="gender" /> Female</label>
-        <label><input #model="gender" type="radio" value="other" name="gender" /> Other</label>
+        <label><input #model="gender" type="radio" value="male" name="gender"> Male</label>
+        <label><input #model="gender" type="radio" value="female" name="gender"> Female</label>
+        <label><input #model="gender" type="radio" value="other" name="gender"> Other</label>
       </div>
       <label class="flex flex-col items-start gap-2 w-full mb-6">
         <span class="font-semibold">Subscribe:</span>
         <div>
-          <input #model="subscribe" type="checkbox" /> Yes
+          <input #model="subscribe" type="checkbox"> Yes
         </div>
       </label>
       <div class="flex flex-col items-start gap-2 w-full mb-6">
         <span class="font-semibold">Favorite Fruits:</span>
-        <label><input #model="fruits" type="checkbox" value="apple" /> Apple</label>
-        <label><input #model="fruits" type="checkbox" value="banana" /> Banana</label>
-        <label><input #model="fruits" type="checkbox" value="orange" /> Orange</label>
+        <label><input #model="fruits" type="checkbox" value="apple"> Apple</label>
+        <label><input #model="fruits" type="checkbox" value="banana"> Banana</label>
+        <label><input #model="fruits" type="checkbox" value="orange"> Orange</label>
       </div>
       <label class="flex flex-col items-start gap-2 w-full mb-6">
         <span class="font-semibold">Country:</span>

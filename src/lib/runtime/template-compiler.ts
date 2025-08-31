@@ -297,12 +297,17 @@ export function htmlImpl(
     targetChildren.push(textVNode(String(val), baseKey));
   }
 
+  const voidElements = new Set([
+    'area','base','br','col','embed','hr','img','input',
+    'link','meta','param','source','track','wbr'
+  ]);
+
   while ((match = tagRegex.exec(template))) {
     if (match[1]) {
       // Tag token
       const tagName = match[1];
       const isClosing = match[0][1] === "/";
-      const isSelfClosing = match[0][match[0].length - 2] === "/";
+      const isSelfClosing = match[0][match[0].length - 2] === "/" || voidElements.has(tagName);
 
       const {
         props: rawProps,
