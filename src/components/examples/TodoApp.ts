@@ -3,7 +3,6 @@
  * Demonstrates ctx, directives, and input binding.
  */
 import { component, html, each } from '../../lib';
-
 interface Todo {
   id: number;
   text: string;
@@ -11,7 +10,7 @@ interface Todo {
 }
 
 export const TodoApp = component('todo-app', (ctx) => html`
-  <div class="todo-container max-w-[400px] mx-auto my-8 p-8 bg-white dark:bg-black rounded-lg shadow-lg">
+  <div class="max-w-[400px] mx-auto my-8 p-8 bg-white dark:bg-black text-black dark:text-white rounded-lg shadow-lg">
     <h2 class="text-2xl font-medium mb-8">Todo List</h2>
     <form
       class="flex gap-2 mb-4"
@@ -19,7 +18,7 @@ export const TodoApp = component('todo-app', (ctx) => html`
     >
       <input
         :model="input"
-        class="grow px-2 py-1 border border-neutral-300 dark:border-neutral-800 rounded"
+        class="grow px-2 py-1 border border-neutral-300 dark:border-neutral-700 rounded"
         type="text"
         placeholder="Add todo"
       >
