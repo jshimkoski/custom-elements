@@ -1,6 +1,13 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v0.1.8] - 2025-08-30
+
+- fix: move test files to test directory fix: remove unnecessary import from TodoApp.ts (b496a63)
+- fix: update utility classes and spacing handling in JIT CSS fix: improve template parsing to accommodate arbitrary variants (3ecfda7)
+- fix: add arbitrary variant support. docs: update docs to mention arbitrary variants (2077166)
+
+
 ## [v0.1.7] - 2025-08-30
 
 - fix: update utility classes and spacing handling in JIT CSS fix: improve template parsing to accommodate arbitrary variants (3ecfda7)
