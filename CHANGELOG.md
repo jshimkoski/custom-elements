@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v0.1.10] - 2025-08-31
+
+- fix: void elements will no longer break template compilation (89b3da9)
+- fix: enhance bindings and context handling in template compiler and examples (4f9582d)
+
+
 ## [v0.1.9] - 2025-08-31
 
 - fix: enhance bindings and context handling in template compiler and examples (4f9582d)
