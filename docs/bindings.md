@@ -16,7 +16,7 @@ Bindings allow you to connect your component's state, props, and events directly
 Bind state or props to element attributes.
 
 ```html
-<input :value="state.name" />
+<input :value="name" />
 ```
 - Use `:attrName` to bind any attribute to a state/prop value.
 - Updates automatically when the value changes.
@@ -27,6 +27,7 @@ Bind event listeners to DOM events.
 
 ```html
 <button @click="${() => ctx.count++}">Increment</button>
+<button @click="increment">Increment</button>
 ```
 - Use `@eventName` to bind a handler function.
 - Handler can access and update state, props, or call injected methods.

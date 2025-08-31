@@ -1,4 +1,5 @@
 import type { VNode } from "./types";
+import { contextStack } from "./render";
 
 export function h(
   tag: string,
@@ -71,7 +72,11 @@ export function parseProps(
       if (typeof value === "boolean") {
         attrs[rawName] = value;
       } else if (value !== undefined && value !== null) {
-        props[rawName] = value;
+        if (typeof context[value] !== "undefined") {
+          props[rawName] = context[value];
+        } else {
+          props[rawName] = value;
+        }
       }
     } else if (prefix === "@") {
       const onName = "on" + rawName.charAt(0).toUpperCase() + rawName.slice(1);
@@ -138,6 +143,12 @@ export function htmlImpl(
   values: unknown[],
   context?: Record<string, any>,
 ): VNode | VNode[] {
+  // Retrieve current context from stack (transparent injection)
+  const injectedContext = contextStack.length > 0 ? contextStack[contextStack.length - 1] : undefined;
+  
+  // Use injected context if no explicit context provided
+  const effectiveContext = context ?? injectedContext;
+
   function textVNode(text: string, key: string): VNode {
     return h("#text", {}, text, key);
   }
@@ -297,7 +308,7 @@ export function htmlImpl(
         props: rawProps,
         attrs: rawAttrs,
         directives,
-      } = parseProps(match[2] || "", values, context);
+      } = parseProps(match[2] || "", values, effectiveContext);
 
       // Shape props into { props, attrs, directives } expected by VDOM
       const vnodeProps: {

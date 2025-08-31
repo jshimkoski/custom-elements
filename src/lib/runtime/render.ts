@@ -2,6 +2,9 @@ import { vdomRenderer } from "./vdom";
 import { minifyCSS, getBaseResetSheet, sanitizeCSS, jitCSS } from "./style";
 import type { ComponentConfig, ComponentContext, VNode, Refs } from "./types";
 
+// Module-level stack for context injection (scoped to render cycle, no global pollution)
+export const contextStack: any[] = [];
+
 /**
  * Renders the component output.
  */
@@ -17,43 +20,51 @@ export function renderComponent<S extends object, C extends object, P extends ob
 ): void {
   if (!shadowRoot) return;
 
-  if (cfg.loadingTemplate && context.isLoading) {
-    renderOutput(shadowRoot, cfg.loadingTemplate(context), context, refs, setHtmlString);
-    return;
-  }
+  // Push context to stack before rendering
+  contextStack.push(context);
 
-  if (cfg.errorTemplate && context.hasError) {
-    if (context.error instanceof Error) {
-      renderOutput(shadowRoot, cfg.errorTemplate(context.error, context), context, refs, setHtmlString);
-    }
-    return;
-  }
-
-  const outputOrPromise = cfg.render(context);
-
-  if (outputOrPromise instanceof Promise) {
-    setLoading(true);
-    outputOrPromise
-      .then((output) => {
-        setLoading(false);
-        setError(null);
-        renderOutput(shadowRoot, output, context, refs, setHtmlString);
-        applyStyle(shadowRoot.innerHTML);
-      })
-      .catch((error) => {
-        setLoading(false);
-        setError(error);
-        if (cfg.errorTemplate)
-          renderOutput(shadowRoot, cfg.errorTemplate(error, context), context, refs, setHtmlString);
-      });
-
-    if (cfg.loadingTemplate)
+  try {
+    if (cfg.loadingTemplate && context.isLoading) {
       renderOutput(shadowRoot, cfg.loadingTemplate(context), context, refs, setHtmlString);
-    return;
-  }
+      return;
+    }
 
-  renderOutput(shadowRoot, outputOrPromise, context, refs, setHtmlString);
-  applyStyle(shadowRoot.innerHTML);
+    if (cfg.errorTemplate && context.hasError) {
+      if (context.error instanceof Error) {
+        renderOutput(shadowRoot, cfg.errorTemplate(context.error, context), context, refs, setHtmlString);
+      }
+      return;
+    }
+
+    const outputOrPromise = cfg.render(context);
+
+    if (outputOrPromise instanceof Promise) {
+      setLoading(true);
+      outputOrPromise
+        .then((output) => {
+          setLoading(false);
+          setError(null);
+          renderOutput(shadowRoot, output, context, refs, setHtmlString);
+          applyStyle(shadowRoot.innerHTML);
+        })
+        .catch((error) => {
+          setLoading(false);
+          setError(error);
+          if (cfg.errorTemplate)
+            renderOutput(shadowRoot, cfg.errorTemplate(error, context), context, refs, setHtmlString);
+        });
+
+      if (cfg.loadingTemplate)
+        renderOutput(shadowRoot, cfg.loadingTemplate(context), context, refs, setHtmlString);
+      return;
+    }
+
+    renderOutput(shadowRoot, outputOrPromise, context, refs, setHtmlString);
+    applyStyle(shadowRoot.innerHTML);
+  } finally {
+    // Always pop context from stack after rendering (ensures cleanup even on errors)
+    contextStack.pop();
+  }
 }
 
 /**
