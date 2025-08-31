@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v0.1.14] - 2025-08-31
+
+- fix: add z-index and opacity utility classes; enhance CSS utility functionality (09653d3)
+- fix: update binding syntax from #model to :model across documentation and examples; enhance clarity and consistency (72bb626)
+
+
 ## [v0.1.13] - 2025-08-31
 
 - fix: update binding syntax from #model to :model across documentation and examples; enhance clarity and consistency (72bb626)
