@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v0.1.16] - 2025-08-31
+
+- fix: enhance jitCSS for improved arbitrary variant support (a2f635e)
+- fix: refine TodoApp styles and fix border color for input field (a0de062)
+
+
 ## [v0.1.15] - 2025-08-31
 
 - fix: refine TodoApp styles and fix border color for input field (a0de062)
