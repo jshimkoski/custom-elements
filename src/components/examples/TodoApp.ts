@@ -33,7 +33,7 @@ export const TodoApp = component('todo-app', (ctx) => html`
         <li class="flex items-center gap-2 py-2 border-b border-neutral-200 dark:border-neutral-800">
           <input
             type="checkbox"
-            :checked="${todo.done}" @change="${() => ctx.toggleTodo(ctx, todo.id)}" />
+            :checked="${todo.done}" @change="${() => ctx.toggleTodo(ctx, todo.id)}">
           <span
             class="todo-text grow text-left [data-done=true]:line-through [data-done=true]:text-gray-500"
             :data-done="${todo.done}"

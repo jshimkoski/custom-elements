@@ -366,6 +366,7 @@ export function initRouter(config: RouterConfig) {
       ariaCurrentValue: { type: String, default: 'page' },
       disabled: { type: Boolean, default: false },
       external: { type: Boolean, default: false },
+      class: { type: String, default: '' },
       style: { type: String, default: css`
         [aria-disabled="true"] {
           pointer-events: none;
@@ -412,22 +413,22 @@ export function initRouter(config: RouterConfig) {
           .when(isButton, html`
             <button
               part="button"
-              class="${className}"
+              :class="${ctx.class} ${className}"
               ${ariaCurrent}
               ${disabledAttr}
               ${externalAttr}
-              data-on-click="navigate"
+              @click="navigate"
             ><slot></slot></button>
           `)
           .otherwise(html`
             <a
               part="link"
               href="${to}"
-              class="${className}"
+              :class="${ctx.class} ${className}"
               ${ariaCurrent}
               ${disabledAttr}
               ${externalAttr}
-              data-on-click="navigate"
+              @click="navigate"
             ><slot></slot></a>
           `)
           .done()}
