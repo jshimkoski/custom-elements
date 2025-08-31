@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v0.1.15] - 2025-08-31
+
+- fix: refine TodoApp styles and fix border color for input field (a0de062)
+- fix: add z-index and opacity utility classes; enhance CSS utility functionality (09653d3)
+
+
 ## [v0.1.14] - 2025-08-31
 
 - fix: add z-index and opacity utility classes; enhance CSS utility functionality (09653d3)
