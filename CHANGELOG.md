@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v0.1.11] - 2025-08-31
+
+- fix: add class binding to router link and button components (4e43813)
+- fix: void elements will no longer break template compilation (89b3da9)
+
+
 ## [v0.1.10] - 2025-08-31
 
 - fix: void elements will no longer break template compilation (89b3da9)
