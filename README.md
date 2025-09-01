@@ -6,6 +6,8 @@
 
 Build modern components with strict TypeScript, zero dependencies, and a clean functional API. Designed for speed, standards compliance, and productivity.
 
+🕹️ Try it on [Codepen.io](https://codepen.io/jshimkoski/pen/JoYmpxm).
+
 ## ✨ Why You'll Love It
 
 - ⚡ **Blazing Fast:** Minimal runtime, instant updates, zero dependencies.

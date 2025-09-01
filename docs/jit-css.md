@@ -19,9 +19,6 @@ Custom Elements Runtime provides a high-performance, zero-dependency JIT CSS eng
 `w-full`, `w-screen`, `h-full`, `h-screen`, `max-w-full`, `max-h-full`, `min-w-0`, `min-h-0`, `m-auto`, `mx-auto`, `my-auto`,
 `p-4`, `m-2`, `mx-auto`, `gap-2`, `gap-x-2`, `gap-y-2`, etc. (all axis and negative values supported)
 
-**Spacing keys (shorthands parsed at runtime):**
-`m, mx, my, mt, mr, mb, ml, p, px, py, pt, pr, pb, pl, inset, inset-x, inset-y, h, w, min-h, min-w, max-h, max-w, top, bottom, left, right, gap, gap-x, gap-y`
-
 **Overflow:**
 `overflow-auto`, `overflow-hidden`, `overflow-visible`, `overflow-scroll`
 
@@ -81,7 +78,7 @@ Custom Elements Runtime provides a high-performance, zero-dependency JIT CSS eng
 
 For a complete list, see the `utilityMap` in [`src/lib/runtime/style.ts`](../src/lib/runtime/style.ts).
 
-Note: some utilities are parsed at runtime rather than enumerated as literal keys in `utilityMap`. Color utilities (e.g. `bg-<color>-<shade>`), opacity modifiers (`/50`), arbitrary values (`prop-[value]`) and spacing shorthands (`m`, `mx`, `p`, `px`, `gap`, etc.) are handled by the runtime helpers `parseColorClass`, `parseOpacityModifier`, `parseArbitrary`, and `parseSpacing` respectively (see `src/lib/runtime/style.ts`).
+**Note:** Some utilities are parsed at runtime rather than enumerated as literal keys in `utilityMap`. Color utilities (e.g. `bg-<color>-<shade>`), opacity modifiers (`/50`), arbitrary values (`prop-[value]`) and spacing shorthands (`m`, `mx`, `p`, `px`, `gap`, etc.) are handled by the runtime helpers `parseColorClass`, `parseOpacityModifier`, `parseArbitrary`, and `parseSpacing` respectively (see `src/lib/runtime/style.ts`).
 
 ## 🧑‍💻 Variants
 
