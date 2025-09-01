@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v0.1.18] - 2025-09-01
+
+- fix: improve handling multiple pseudos and arbitrary values in jitCSS (74b8abb)
+- fix: enhance jitCSS tests for complex variants and dark mode support (4297752)
+
+
 ## [v0.1.17] - 2025-09-01
 
 - fix: enhance jitCSS tests for complex variants and dark mode support (4297752)
