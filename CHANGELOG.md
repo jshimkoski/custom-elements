@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v0.1.17] - 2025-09-01
+
+- fix: enhance jitCSS tests for complex variants and dark mode support (4297752)
+- fix: enhance jitCSS for improved arbitrary variant support (a2f635e)
+
+
 ## [v0.1.16] - 2025-08-31
 
 - fix: enhance jitCSS for improved arbitrary variant support (a2f635e)
