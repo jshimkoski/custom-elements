@@ -12,13 +12,21 @@ Custom Elements Runtime provides a high-performance, zero-dependency JIT CSS eng
 
 ## 🧩 Built-in Utilities
 
-
 **Layout:**
 `block`, `inline`, `inline-block`, `flex`, `inline-flex`, `grid`, `hidden`
 
 **Sizing & Spacing:**
 `w-full`, `w-screen`, `h-full`, `h-screen`, `max-w-full`, `max-h-full`, `min-w-0`, `min-h-0`, `m-auto`, `mx-auto`, `my-auto`,
 `p-4`, `m-2`, `mx-auto`, `gap-2`, `gap-x-2`, `gap-y-2`, etc. (all axis and negative values supported)
+
+**Spacing keys (shorthands parsed at runtime):**
+`m, mx, my, mt, mr, mb, ml, p, px, py, pt, pr, pb, pl, inset, inset-x, inset-y, h, w, min-h, min-w, max-h, max-w, top, bottom, left, right, gap, gap-x, gap-y`
+
+**Overflow:**
+`overflow-auto`, `overflow-hidden`, `overflow-visible`, `overflow-scroll`
+
+**Pointer events:**
+`pointer-events-none`, `pointer-events-auto`
 
 **Accessibility:**
 `sr-only`, `not-sr-only`
@@ -53,6 +61,9 @@ Custom Elements Runtime provides a high-performance, zero-dependency JIT CSS eng
 **Visibility:**
 `visible`, `invisible`
 
+**Z-index:**
+`z-0`, `z-10`, `z-20`, `z-30`, `z-40`, `z-50`
+
 **Flex:**
 `items-center`, `items-start`, `items-end`, `items-baseline`, `items-stretch`, `justify-center`, `justify-start`, `justify-between`, `justify-around`, `justify-evenly`, `justify-end`, `flex-wrap`, `flex-nowrap`, `flex-wrap-reverse`, `content-center`, `content-start`, `content-end`, `content-between`, `content-around`, `content-stretch`, `self-auto`, `self-start`, `self-end`, `self-center`, `self-stretch`, `flex-1`, `flex-auto`, `flex-initial`, `flex-none`, `flex-col`, `flex-row`, `grow`, `shrink`, `grow-0`, `shrink-0`, `basis-[value]`
 
@@ -68,7 +79,9 @@ Custom Elements Runtime provides a high-performance, zero-dependency JIT CSS eng
 **Colors:**
 `bg-gray-100`, `text-blue-500`, `border-red-500`, `shadow-blue-500`, etc. (full palette, semantic, and arbitrary)
 
-For a complete list, see the `utilityMap` in [`src/lib/style-utils.ts`](../src/lib/style-utils.ts).
+For a complete list, see the `utilityMap` in [`src/lib/runtime/style.ts`](../src/lib/runtime/style.ts).
+
+Note: some utilities are parsed at runtime rather than enumerated as literal keys in `utilityMap`. Color utilities (e.g. `bg-<color>-<shade>`), opacity modifiers (`/50`), arbitrary values (`prop-[value]`) and spacing shorthands (`m`, `mx`, `p`, `px`, `gap`, etc.) are handled by the runtime helpers `parseColorClass`, `parseOpacityModifier`, `parseArbitrary`, and `parseSpacing` respectively (see `src/lib/runtime/style.ts`).
 
 ## 🧑‍💻 Variants
 
@@ -143,7 +156,7 @@ Arbitrary variants allow you to target custom selectors, attributes, or states d
 <div class="md:[data-open=true]:bg-green-100"></div>
 ```
 
-**How It Works:**
+- **How It Works:**
 - Arbitrary variants are parsed before the base utility.
 - The variant is prepended to the generated CSS selector.
 - You can combine arbitrary variants with built-in variants (e.g., `hover:`, `md:`, `dark:`).
@@ -251,4 +264,4 @@ JIT CSS provides a rich set of built-in color palettes, all accessible via utili
 - Utility classes: see `utilityMap` in `style-utils.ts`
 - Variants: see `selectorVariants` and `mediaVariants`
 
-For full details, see the source in [`src/lib/style-utils.ts`](../src/lib/style-utils.ts).
+For full details, see the source in [`src/lib/runtime/style.ts`](../src/lib/runtime/style.ts).
