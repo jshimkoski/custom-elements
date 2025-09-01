@@ -1,5 +1,5 @@
+import { describe, it, expect, afterEach } from 'vitest';
 import { initRouter } from '../src/lib/router';
-import { component } from '../src/lib/runtime/component';
 
 // Simple helper to mount a router-view and return its shadow root innerHTML
 function mountAndGetHtml() {
