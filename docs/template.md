@@ -80,7 +80,7 @@ html`
 
 ## 💡 Tips
 
-- Always return a single root node from your render function.
+- Prefer returning a single root node from your render function for simpler VDOM updates; multi-root templates are supported when necessary.
 - Use directives and bindings for maximum reactivity.
 - TypeScript infers types for template variables.
 - Works seamlessly with state, props, computed, store, and event bus.

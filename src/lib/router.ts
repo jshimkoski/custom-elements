@@ -32,7 +32,7 @@ export interface Route {
   /**
    * Statically available component (already imported)
    */
-  component?: string;
+  component?: string | (() => any);
 
   /**
    * Lazy loader that resolves to something renderable
@@ -391,18 +391,32 @@ export function initRouter(config: RouterConfig) {
       const { path } = current;
       const match = router.matchRoute(path);
       if (!match.route) return html`<div>Not found</div>`;
-      let componentTag = match.route.component;
-      if (match.route.load) {
-        const loaded = await match.route.load();
-        if (typeof loaded.default === 'string') {
-          componentTag = loaded.default;
+
+      // Resolve the component (supports cached async loaders)
+      try {
+        const comp = await router.resolveRouteComponent(match.route);
+
+        // String tag (custom element) -> render as VNode
+        if (typeof comp === 'string') {
+          return { tag: comp, props: {}, children: [] };
         }
+
+        // Function component (sync or async) -> call and return its VNode(s)
+        if (typeof comp === 'function') {
+          const out = comp();
+          const resolved = out instanceof Promise ? await out : out;
+          // If the function returned a string tag, render that element
+          if (typeof resolved === 'string') return { tag: resolved, props: {}, children: [] };
+          // Otherwise assume it's a VNode or VNode[] and return it directly
+          return resolved as any;
+        }
+
+        // Unknown component type
+        return html`<div>Invalid route component</div>`;
+      } catch (err) {
+        // Propagate as an invalid route component to show a clear message in the view
+        return html`<div>Invalid route component</div>`;
       }
-      if (typeof componentTag === 'string') {
-        // Return a VNode directly, not a template string
-        return { tag: componentTag, props: {}, children: [] };
-      }
-      return html`<div>Invalid route component</div>`;
     },
     onConnected(ctx) {
       if (router && typeof router.subscribe === 'function') {

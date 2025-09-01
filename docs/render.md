@@ -79,7 +79,7 @@ component('user-card', {
 
 - Keep render functions pure and declarative.
 - Use directives and bindings for clean, readable templates.
-- Prefer returning a single root node for best performance.
+- Prefer returning a single root node for best performance, but multi-root (array) returns are supported by the runtime when required.
 - Use async render only when necessary; provide loading/error templates for UX.
 - Avoid side effects inside render.
 

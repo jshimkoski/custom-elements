@@ -1,13 +1,10 @@
 # 🧩 Custom Elements Runtime
 
-> **Ultra-lightweight, type-safe runtime for fast, reactive, and maintainable web components.**
+[![Patreon](https://img.shields.io/badge/support-patreon-orange?logo=patreon)](https://patreon.com/jshimkoski)
+
+> **Ultra-powerful, type-safe runtime for fast, reactive, and maintainable web components.**
 
 Build modern components with strict TypeScript, zero dependencies, and a clean functional API. Designed for speed, standards compliance, and productivity.
-
-## 🚧 **Active Development Notice**
-
-> ⚠️ **This package is in active development and not yet ready for production use.**
-> Features, APIs, and stability may change frequently. Please use for testing, experimentation, or contribution only.
 
 ## ✨ Why You'll Love It
 
@@ -39,11 +36,11 @@ component('my-counter', (ctx) => html`
   ```
 4. **Enjoy instant reactivity and type safety!**
 
-# 📖 Documentation Index
+## 📖 Documentation Index
 
 Explore the full documentation for every runtime feature:
 
-## 🏗️ Core Concepts
+### 🏗️ Core Concepts
 - [Component Config](./docs/component-config.md)
 - [Component](./docs/component.md)
 - [Render](./docs/render.md)
@@ -56,31 +53,31 @@ Explore the full documentation for every runtime feature:
 - [Event Bus](./docs/event-bus.md)
 - [Template](./docs/template.md)
 
-## 🧩 Reactivity & Patterns
+### 🧩 Reactivity & Patterns
 - [Directives](./docs/directives.md)
 - [Bindings](./docs/bindings.md)
 - [Slot](./docs/slot.md)
 - [Advanced Usage Patterns](./docs/advanced-usage-patterns.md)
 - [Cross-Component Communication](./docs/cross-component-communication.md)
 
-## 🎨 Styling
+### 🎨 Styling
 - [Style](./docs/style.md)
 - [Deep Dive: JIT CSS](./docs/jit-css.md)
 
-## ⚡ Performance & Architecture
+### ⚡ Performance & Architecture
 - [Virtual DOM](./docs/virtual-dom.md)
 - [HMR](./docs/hmr.md)
 - [SSR](./docs/ssr.md)
 
-## 🛡️ Error Handling & Lifecycle
+### 🛡️ Error Handling & Lifecycle
 - [Error](./docs/error.md)
 - [Hooks](./docs/hooks.md)
 - [Method Injection](./docs/method-injection.md)
 
-## 🧰 Utilities & Troubleshooting
+### 🧰 Utilities & Troubleshooting
 - [Troubleshooting](./docs/troubleshooting.md)
 
-## 🔗 Framework Integration
+### 🔗 Framework Integration
 - [Vue Integration](./docs/vue-integration.md)
 - [React Integration](./docs/react-integration.md)
 - [Svelte Integration](./docs/svelte-integration.md)
@@ -95,16 +92,14 @@ For deep dives, see each guide above or browse the source code in `src/lib/`.
 - [Todo App](./src/components/examples/TodoApp.ts)
 
 ## 🌟 Showcase & Community
+
 - **Showcase your components!** Open a PR to add your project to our gallery.
 - **Questions or ideas?** [Start a discussion](https://github.com/jasonshimmy/custom-elements-runtime/discussions) or [open an issue](https://github.com/jasonshimmy/custom-elements-runtime/issues).
 - **Contribute:** We welcome PRs for docs, features, and examples.
+- ❤️ Like what you see? [Support ongoing development on Patreon](https://patreon.com/jshimkoski)
 
-## 🛠 Local Dev
+## 💖 Support This Project
 
-```
-# Clone the repo
-git clone <repo-url>
+Custom Elements Runtime is a labor of love built to make modern web development faster and more expressive. If it's helping you build better components, consider [supporting me on Patreon](https://patreon.com/jshimkoski) to help keep the momentum going.
 
-# Run examples
-npm run dev
-```
+Your support helps fund continued development, documentation, and community engagement. Every bit helps—thank you!

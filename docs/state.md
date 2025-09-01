@@ -80,7 +80,7 @@ computed: {
 - Do not unwrap `ctx` in your render function; use it directly.
   - This preserves reactivity and ensures updates are tracked.
 - Use TypeScript for type safety and intellisense.
-- Always return a single root node from your render function.
+- Prefer returning a single root node from your render function for simpler updates; the runtime supports multi-root returns when useful.
 - State is local to each component; use `createStore` for global state.
 
 For more, see the [API Reference](../src/lib/index.ts) and [examples](../src/components/examples/).

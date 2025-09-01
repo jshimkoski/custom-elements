@@ -77,8 +77,27 @@ export function component<
   }
 
   registry.set(normalizedTag, finalConfig);
-  if (typeof window !== "undefined" && !customElements.get(normalizedTag)) {
-    customElements.define(normalizedTag, createElementClass<S, C, P, T>(finalConfig) as CustomElementConstructor);
+  if (typeof window !== "undefined") {
+    // If the custom element is not defined yet, define it.
+    if (!customElements.get(normalizedTag)) {
+    customElements.define(normalizedTag, createElementClass<S, C, P, T>(normalizedTag, finalConfig) as CustomElementConstructor);
+    } else {
+      // If it is already defined (e.g., re-registration during tests or HMR),
+      // update existing instances to use the new config and request a render.
+      try {
+        document.querySelectorAll(normalizedTag).forEach((el) => {
+          try {
+            // @ts-ignore - internal API used for hot-swap/update
+            if (typeof (el as any)._cfg !== 'undefined') (el as any)._cfg = finalConfig;
+            if (typeof (el as any)._render === 'function') (el as any)._render(finalConfig);
+          } catch (e) {
+            // ignore per-instance errors
+          }
+        });
+      } catch (e) {
+        // document may be unavailable in some environments, ignore
+      }
+    }
   }
 }
 
@@ -87,7 +106,7 @@ export function createElementClass<
   C extends object,
   P extends object,
   T extends object = any,
->(config: ComponentConfig<S, C, P, T>): CustomElementConstructor | { new (): object } {
+>(tag: string, config: ComponentConfig<S, C, P, T>): CustomElementConstructor | { new (): object } {
   // Validate that render is provided
   if (!config.render) {
     throw new Error(
@@ -143,7 +162,9 @@ export function createElementClass<
     constructor() {
       super();
       this.attachShadow({ mode: "open" });
-      this._cfg = config;
+      // Always read the latest config from the registry so re-registration
+      // (HMR / tests) updates future instances.
+      this._cfg = (registry.get(tag) as ComponentConfig<S, C, P, T>) || config;
 
       const reactiveContext = this._initContext(config);
 
@@ -203,8 +224,9 @@ export function createElementClass<
       });
 
       // --- Inject config methods into state ---
-      Object.keys(config).forEach((key) => {
-        const fn = (config as any)[key];
+      const cfgToUse = (registry.get(tag) as ComponentConfig<S, C, P, T>) || config;
+      Object.keys(cfgToUse).forEach((key) => {
+        const fn = (cfgToUse as any)[key];
         if (typeof fn === "function" && !key.startsWith("on")) {
           (this.context as any)[key] = (...args: any[]) =>
             fn(...args, this.context);
@@ -225,15 +247,15 @@ export function createElementClass<
         }
       });
 
-      this._applyComputed(config);
+      this._applyComputed(cfgToUse);
 
       this._initializing = false;
 
       // Initialize watchers after initialization phase is complete
-      this._initWatchers(config);
+      this._initWatchers(cfgToUse);
 
       // Initial render (styles are applied within render)
-      this._render(config);
+      this._render(cfgToUse);
     }
 
     connectedCallback() {

@@ -15,7 +15,7 @@ Directives provide powerful, declarative control over rendering in your custom e
 Render content only if a condition is true.
 
 ```typescript
-import { when } from 'runtime';
+import { when } from '@jasonshimmy/custom-elements-runtime';
 
 render: (ctx) => html`
   ${when(ctx.isVisible, html`<div>Visible!</div>`)}
@@ -35,7 +35,7 @@ ${when(ctx.hasError, html`<div>Error!</div>`, html`<div>All good!</div>`)}
 Render a list of items.
 
 ```typescript
-import { each } from 'runtime';
+import { each } from '@jasonshimmy/custom-elements-runtime';
 
 render: (ctx) => html`
   <ul>
@@ -51,7 +51,7 @@ render: (ctx) => html`
 Pattern matching for multiple cases.
 
 ```typescript
-import { match } from 'runtime';
+import { match } from '@jasonshimmy/custom-elements-runtime';
 
 render: (ctx) => html`
   ${match()

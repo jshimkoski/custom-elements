@@ -147,7 +147,7 @@ component('my-widget', {
 - Only `render` is required; all other options are optional.
 - All config methods (except lifecycle hooks) are injected into state.
 - Use kebab-case for component tags.
-- Always return a single root node from `render`.
+- Prefer returning a single root node from `render` for simpler VDOM patches, but the runtime supports multiple root nodes (arrays) when needed.
 - Use TypeScript for best experience and type safety.
 
 For more, see the [API Reference](../src/lib/index.ts) and [examples](../src/components/examples/).
