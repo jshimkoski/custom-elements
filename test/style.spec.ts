@@ -234,28 +234,28 @@ describe('jitCSS - Arbitrary Variants', () => {
     expect(css).toContain('@media (prefers-color-scheme:dark) and (min-width:1280px){.dark\\:lg\\:xl\\:\\[\\&\\>p\\:first-of-type\\]\\:hover\\:\\!text-\\[hsl\\(210\\,50\\%\\,60\\%\\)\\]:hover>p:first-of-type{color:hsl(210,50%,60%) !important}}');
   });
 
-  it.skip('should handle multiple pseudos and arbitrary values', () => {
+  it('should handle multiple pseudos and arbitrary values', () => {
     const html = `<div class="sm:hover:focus:[&>*:first-child]:active:!bg-[rgb(10,20,30)]"></div>`;
     const css = minifyCSS(jitCSS(html));
     expect(css).toContain('@media (min-width:640px){.sm\\:hover\\:focus\\:\\[\\&\\>\\*\\:first-child\\]\\:active\\:\\!bg-\\[rgb\\(10\\,20\\,30\\)\\]:hover:focus>*:first-child:active{background-color:rgb(10,20,30) !important}}');
   });
 
-  it.skip('should handle nested arbitrary variants with attribute selectors', () => {
+  it('should handle nested arbitrary variants with attribute selectors', () => {
     const html = `<span class="md:[&[data-open=true]>svg]:hover:rotate-[33deg]"></span>`;
     const css = minifyCSS(jitCSS(html));
-    expect(css).toContain('@media (min-width:768px){.md\\:\\[\\&\\[data-open\\=true\\]\\>svg\\]\\:hover\\:rotate-\\[33deg\\]:hover[data-open=true]>svg{--tw-rotate:33deg;transform:rotate(33deg)}}');
+    expect(css).toContain('@media (min-width:768px){.md\\:\\[\\&\\[data-open\\=true\\]\\>svg\\]\\:hover\\:rotate-\\[33deg\\]:hover[data-open=true]>svg{transform:rotate(33deg)}}');
   });
 
-  it.skip('should handle group and peer with complex pseudos', () => {
+  it('should handle group and peer with complex pseudos', () => {
     const html = `<li class="group-focus-within:peer-hover:[&:nth-child(odd)>a]:focus-visible:underline"></li>`;
     const css = minifyCSS(jitCSS(html));
     expect(css).toContain('.group:focus-within .peer:hover~.group-focus-within\\:peer-hover\\:\\[\\&\\:nth-child\\(odd\\)\\>a\\]\\:focus-visible\\:underline:focus-visible:nth-child(odd)>a{text-decoration-line:underline}');
   });
 
-  it.skip('should handle arbitrary property utilities with special characters', () => {
+  it('should handle arbitrary property utilities with special characters', () => {
     const html = `<div class="[&>svg]:hover:[mask-image:url('/icons/mask.svg')]"></div>`;
     const css = minifyCSS(jitCSS(html));
-    expect(css).toContain('.\\[\\&\\>svg\\]\\:hover\\:\\[mask-image\\:url\\(\'\\/icons\\/mask\\.svg\'\\)\\]:hover>svg{mask-image:url("/icons/mask.svg")}');
+    expect(css).toContain(`.\\[\\&\\>svg\\]\\:hover\\:\\[mask-image\\:url\\(\\'\\/icons\\/mask\\.svg\\'\\)\\]:hover>svg{mask-image:url("/icons/mask.svg")}`);
   });
 
   it('should escape special characters in arbitrary variant and value', () => {

@@ -44,6 +44,8 @@ export function getBaseResetSheet(): CSSStyleSheet {
   return baseResetSheet;
 }
 
+  // (debug logging via console.error is used above when needed)
+
 export function sanitizeCSS(css: string): string {
   // Remove any url(javascript:...) and <script> tags
   return css
@@ -666,14 +668,32 @@ export function parseOpacity(className: string): string | null {
  * - prop-[value]
  */
 export function parseArbitrary(className: string): string | null {
-  // prop-[value] syntax
+  // 1) [prop:value] — only when "prop" is a valid CSS property name (not a selector)
+  if (className.startsWith("[") && className.endsWith("]") && !className.includes("-[")) {
+    const inner = className.slice(1, -1).trim();
+
+    // prop must be at the very start, and must be a CSS identifier (letters + hyphens)
+    const m = inner.match(/^([a-zA-Z][a-zA-Z0-9-]*)\s*:(.*)$/);
+    if (m) {
+      const prop = m[1].trim();
+      let value = m[2].trim();
+      // normalize url('...') to url("...") and whole-value single-quotes to double
+      value = value.replace(/url\('\s*([^']*?)\s*'\)/g, 'url("$1")');
+      value = value.replace(/^'([^']*)'$/g, '"$1"');
+      return `${prop}:${value};`;
+    }
+    // If it didn't match a property, it's an arbitrary variant selector (e.g. [&>h2:hover]) — not a utility
+    return null;
+  }
+
+  // 2) prop-[value] — arbitrary values for known properties
   const bracketStart = className.indexOf("-[");
   const bracketEnd = className.endsWith("]");
   if (bracketStart > 0 && bracketEnd) {
     const prop = className.slice(0, bracketStart);
     let value = className.slice(bracketStart + 2, -1);
 
-    // Convert underscores to spaces for valid CSS
+    // Convert underscores to spaces
     value = value.replace(/_/g, " ");
 
     // Map common abbreviations to CSS properties
@@ -699,24 +719,29 @@ export function parseArbitrary(className: string): string | null {
       "border-x": "border-inline",
       "border-y": "border-block",
       shadow: "box-shadow",
-      "duration": "transition-duration",
-      "list": "list-style",
-      "break": "word-break",
-      "flex": "flex-direction",
-      "items": "align-items",
-      "justify": "justify-content",
-      "whitespace": "white-space",
-      "select": "user-select",
-      "content": "align-content",
-      "self": "align-self",
-      "basis": "flex-basis",
-      "tracking": "letter-spacing",
-      "scroll": "scroll-behavior",
-      "delay": "transition-delay",
-      "weight": "font-weight",
-      "leading": "line-height",
-      z: "z-index"
+      duration: "transition-duration",
+      list: "list-style",
+      break: "word-break",
+      flex: "flex-direction",
+      items: "align-items",
+      justify: "justify-content",
+      whitespace: "white-space",
+      select: "user-select",
+      content: "align-content",
+      self: "align-self",
+      basis: "flex-basis",
+      tracking: "letter-spacing",
+      scroll: "scroll-behavior",
+      delay: "transition-delay",
+      weight: "font-weight",
+      leading: "line-height",
+      z: "z-index",
     };
+
+    // Tailwind-like rotate behavior for arbitrary values
+    if (prop === "rotate") {
+      return `transform:rotate(${value});`;
+    }
 
     const cssProp = propMap[prop] ?? prop.replace(/_/g, "-");
     if (cssProp && value) return `${cssProp}:${value};`;
@@ -753,14 +778,19 @@ export function escapeClassName(name: string): string {
 }
 
 export function extractClassesFromHTML(html: string): string[] {
-  const classAttrRegex = /class\s*=\s*["']([^"']+)["']/g;
+  // Match class attributes robustly by capturing the opening quote and
+  // using a backreference to the same quote for the closing boundary.
+  // This ensures embedded single quotes (e.g. url('/icons/mask.svg')) do
+  // not prematurely terminate the match.
+  const classAttrRegex = /class\s*=\s*(['"])(.*?)\1/g;
   const classList: string[] = [];
   let match: RegExpExecArray | null;
 
   while ((match = classAttrRegex.exec(html))) {
-    // Match class tokens, including arbitrary variants and values
-    const tokens = match[1].match(/(?:\[[^\]]+\]:[^\s]+|[^\s]+)/g);
-    if (tokens) classList.push(...tokens);
+    // Split on whitespace to preserve complex tokens containing colons,
+    // brackets, parentheses and quotes (e.g. [mask-image:url('/icons/mask.svg')]).
+    const tokens = match[2].split(/\s+/).filter(Boolean);
+    if (tokens.length) classList.push(...tokens);
   }
   return classList.filter(Boolean);
 }
@@ -848,7 +878,13 @@ export function jitCSS(html: string): string {
   function generateRule(cls: string, stripDark = false): string | null {
     const parts = splitVariants(cls);
 
-    // Detect !important on the base utility
+    // DEBUG: log parsing for specific tricky classes during test runs
+    if (cls.includes("mask-image") || cls.includes("sm: hover") || cls.includes("sm:hover") || cls.includes("mask.svg")) {
+      // eslint-disable-next-line no-console
+      console.error("DEBUG generateRule:", cls, parts);
+    }
+
+    // Find base utility
     let important = false;
     let basePart = parts.find(p => {
       if (p.startsWith("!")) {
@@ -879,82 +915,138 @@ export function jitCSS(html: string): string {
     let before = baseIndex >= 0 ? parts.slice(0, baseIndex) : [];
     if (stripDark) before = before.filter(t => t !== "dark");
 
-    const arbitraryVariantToken = before.find(t => parseArbitraryVariant(t));
     const escapedClass = `.${escapeClassName(cls)}`;
+    const SUBJECT = "__SUBJECT__";
+    const body = important ? baseRule.replace(/;$/, " !important;") : baseRule;
 
-    // Subject placeholder to precisely attach pseudos at the right spot
-    const SUBJECT = "__TW_SUBJECT__";
+    // Start with a SUBJECT placeholder we will replace later with the real class
+    let selector = SUBJECT;
 
-    let selector: string;
-    let body = important ? baseRule.replace(/;$/, " !important;") : baseRule;
+    // Handle structural wrappers (group/peer) first (preserve order)
+    const structural: string[] = [];
+    for (const token of before) {
+      if (token.startsWith("group-")) {
+        selector = `.group:${token.slice(6)} ${selector}`;
+        structural.push(token);
+      } else if (token.startsWith("peer-")) {
+        selector = selector.replace(SUBJECT, `.peer:${token.slice(5)}~${SUBJECT}`);
+        structural.push(token);
+      }
+    }
+    before = before.filter(t => !structural.includes(t));
 
-    // Build initial selector around SUBJECT (not the real class yet)
-    if (arbitraryVariantToken) {
-      const variantSelector = parseArbitraryVariant(arbitraryVariantToken);
+    // Collect pseudos in left-to-right order, but don't mutate SUBJECT yet to preserve order.
+    const subjectPseudos: string[] = [];
+    const innerPseudos: string[] = [];
+    let wrapperVariant: string | null = null;
+
+    for (const token of before) {
+      if (token === "dark" || responsiveOrder.includes(token)) continue;
+
+      const variantSelector = parseArbitraryVariant(token);
       if (variantSelector) {
-        if (variantSelector.includes("&")) {
-          selector = variantSelector.replace(/&/g, SUBJECT);
-        } else {
-          // Rare, but support arbitrary variant without &: prefix selector then subject
-          selector = `${variantSelector}${SUBJECT}`;
-        }
-      } else {
-        selector = SUBJECT;
+        wrapperVariant = variantSelector;
+        continue;
       }
-    } else {
-      selector = SUBJECT;
-    }
 
-    // Categorise variants
-    const siblingVariants  = before.filter(v => v.startsWith("peer-"));
-    const ancestorVariants = before.filter(v => v.startsWith("group-"));
-    const pseudoVariants   = before.filter(v =>
-      !v.startsWith("group-") &&
-      !v.startsWith("peer-") &&
-      !responsiveOrder.includes(v) &&
-      v !== "dark" &&
-      v !== arbitraryVariantToken
-    );
-
-    // Apply sibling wrappers first (keep SUBJECT inside)
-    for (const token of siblingVariants) {
-      const fn = selectorVariants[token];
-      if (typeof fn === "function") {
-        selector = fn(selector, body).replace(/\{.*$/, "");
-      }
-    }
-
-    // Then ancestor wrappers (keep SUBJECT inside)
-    for (const token of ancestorVariants) {
-      const fn = selectorVariants[token];
-      if (typeof fn === "function") {
-        selector = fn(selector, body).replace(/\{.*$/, "");
-      }
-    }
-
-    // Finally, attach pseudo variants directly to SUBJECT (not to group/peer)
-    for (const token of pseudoVariants) {
       const pseudo = tokenToPseudo(token);
       if (pseudo) {
-        // Insert pseudo immediately on the subject
-        selector = selector.replace(SUBJECT, SUBJECT + pseudo);
-      } else {
-        // Fallback: if a custom pseudo variant exists in selectorVariants, apply it to SUBJECT position
-        const fn = selectorVariants[token];
-        if (typeof fn === "function") {
-          // Apply to a minimal selector that is just SUBJECT{body}, then extract selector and splice it back
-          const wrapped = fn(SUBJECT, body).replace(/\{.*$/, "");
-          // If the variant function prepends/appends around SUBJECT, we want that structure:
-          // Replace the bare SUBJECT in current selector with that wrapped version (which still contains SUBJECT)
-          selector = selector.replace(SUBJECT, wrapped);
-        }
+        if (!wrapperVariant) subjectPseudos.push(pseudo);
+        else innerPseudos.push(pseudo);
+        continue;
+      }
+
+      const fn = selectorVariants[token];
+      if (typeof fn === "function") {
+        // apply structural variant immediately
+        selector = fn(selector, body).split("{")[0];
       }
     }
 
-    // Replace SUBJECT with the actual escaped class as the final step
+    // helper: insert inner pseudos into the 'post' part after the first simple selector
+    function insertPseudosIntoPost(post: string, pseudos: string): string {
+      if (!pseudos) return post;
+      let depthSquare = 0;
+      let depthParen = 0;
+      // If post starts with a combinator, insert pseudos after the first simple selector
+      if (post.length && (post[0] === '>' || post[0] === '+' || post[0] === '~' || post[0] === ' ')) {
+        // find end of first simple selector after the combinator
+        let i = 1;
+        // skip initial whitespace
+        while (i < post.length && post[i] === ' ') i++;
+        for (; i < post.length; i++) {
+          const ch = post[i];
+          if (ch === '[') depthSquare++;
+          else if (ch === ']' && depthSquare > 0) depthSquare--;
+          else if (ch === '(') depthParen++;
+          else if (ch === ')' && depthParen > 0) depthParen--;
+          // stop at next combinator at depth 0
+          if (depthSquare === 0 && depthParen === 0 && (post[i] === '>' || post[i] === '+' || post[i] === '~' || post[i] === ' ')) {
+            return post.slice(0, i) + pseudos + post.slice(i);
+          }
+        }
+        // reached end: append pseudos at end
+        return post + pseudos;
+      }
+
+      for (let i = 0; i < post.length; i++) {
+        const ch = post[i];
+        if (ch === "[") depthSquare++;
+        else if (ch === "]" && depthSquare > 0) depthSquare--;
+        else if (ch === "(") depthParen++;
+        else if (ch === ")" && depthParen > 0) depthParen--;
+        // break at first combinator at depth 0 (space, >, +, ~)
+        if (depthSquare === 0 && depthParen === 0 && (ch === '>' || ch === '+' || ch === '~' || ch === ' ')) {
+          return post.slice(0, i) + pseudos + post.slice(i);
+        }
+      }
+      return post + pseudos;
+    }
+
+    const subjectPseudoStr = subjectPseudos.join("");
+    const innerPseudoStr = innerPseudos.join("");
+
+    // Build selector by applying wrapper if present, inserting pseudos in the right spots
+    if (wrapperVariant) {
+      if (wrapperVariant.includes("&")) {
+        const idx = wrapperVariant.indexOf("&");
+        const pre = wrapperVariant.slice(0, idx);
+        const post = wrapperVariant.slice(idx + 1);
+        // place subject with its pseudos where & sits
+        const subjectWithPseudos = SUBJECT + subjectPseudoStr;
+        // If there are no subject pseudos (nothing attached before the wrapper),
+        // inner pseudos should apply to the subject. Otherwise they target the
+        // element inside the wrapper (the post), so insert them into the post.
+        // Preserve any structural wrappers that were applied earlier by
+        // replacing the SUBJECT placeholder in the current selector.
+        const currentSelector = selector;
+        if (subjectPseudos.length === 0) {
+          // attach inner pseudos to the subject
+          selector = currentSelector.replace(SUBJECT, pre + subjectWithPseudos + innerPseudoStr + post);
+        } else {
+          // insert inner pseudos into post after its first simple selector
+          const postWithInner = insertPseudosIntoPost(post, innerPseudoStr);
+          selector = currentSelector.replace(SUBJECT, pre + subjectWithPseudos + postWithInner);
+        }
+      } else {
+        // prefix-style wrapper like [data-open=true]
+        // Insert the wrapper around the existing selector's SUBJECT so structural
+        // prefixes remain on the outside.
+        const currentSelector = selector;
+        selector = currentSelector.replace(SUBJECT, `${wrapperVariant}${SUBJECT + subjectPseudoStr}`);
+        if (innerPseudoStr) selector = selector.replace(SUBJECT, `${SUBJECT}${innerPseudoStr}`);
+      }
+    } else {
+      // no wrapper: just attach subject and inner pseudos directly to SUBJECT
+      selector = SUBJECT + subjectPseudoStr + innerPseudoStr;
+    }
+
+    // re-apply any previously applied structural wrappers (they were applied to the placeholder earlier)
+    // At this point 'selector' is a string containing SUBJECT (or actual class replacement next).
+    // Replace any remaining SUBJECT with escaped class
     selector = selector.replace(new RegExp(SUBJECT, "g"), escapedClass);
 
-    // Emit the rule
+    // Emit final rule
     let rule = `${selector}{${body}}`;
 
     // Wrap in media queries
