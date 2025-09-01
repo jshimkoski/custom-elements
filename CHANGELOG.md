@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v0.1.20] - 2025-09-01
+
+- fix(router): enhance route component resolution and caching (9eaf2a5)
+- fix: enhance class handling for JIT CSS in initRouter function (ac111de)
+
+
 ## [v0.1.19] - 2025-09-01
 
 - fix: enhance class handling for JIT CSS in initRouter function (ac111de)
