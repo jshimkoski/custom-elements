@@ -499,24 +499,22 @@ export const spacingProps: Record<string, string[]> = {
 };
 
 function insertPseudoBeforeCombinator(sel: string, pseudo: string): string {
-  // Find the first combinator that is NOT inside escaped class name brackets
-  let depth = 0;
+  let depthSquare = 0;
+  let depthParen = 0;
   for (let i = 0; i < sel.length; i++) {
     const ch = sel[i];
-    if (ch === '[') depth++;
-    else if (ch === ']') depth--;
-    else if (depth === 0 && (ch === '>' || ch === '+' || ch === '~' || ch === ' ')) {
-      // Insert pseudo before this combinator
+    if (ch === "[") depthSquare++;
+    else if (ch === "]" && depthSquare > 0) depthSquare--;
+    else if (ch === "(") depthParen++;
+    else if (ch === ")" && depthParen > 0) depthParen--;
+    else if (depthSquare === 0 && depthParen === 0 && (ch === ">" || ch === "+" || ch === "~" || ch === " ")) {
       return sel.slice(0, i) + pseudo + sel.slice(i);
     }
   }
-  // No combinator found outside brackets — append at end
   return sel + pseudo;
 }
 
-
 export const selectorVariants: SelectorVariantMap = {
-  // State variants
   before: (sel, body) => `${sel}::before{${body}}`,
   after: (sel, body) => `${sel}::after{${body}}`,
   hover: (sel, body) => `${insertPseudoBeforeCombinator(sel, ":hover")}{${body}}`,
@@ -532,18 +530,17 @@ export const selectorVariants: SelectorVariantMap = {
   "focus-within": (sel, body) => `${insertPseudoBeforeCombinator(sel, ":focus-within")}{${body}}`,
   "focus-visible": (sel, body) => `${insertPseudoBeforeCombinator(sel, ":focus-visible")}{${body}}`,
 
-  // Group variants
   "group-hover": (sel, body) => `.group:hover ${sel}{${body}}`,
   "group-focus": (sel, body) => `.group:focus ${sel}{${body}}`,
   "group-active": (sel, body) => `.group:active ${sel}{${body}}`,
   "group-disabled": (sel, body) => `.group:disabled ${sel}{${body}}`,
 
-  // Peer variants
   "peer-hover": (sel, body) => `.peer:hover ~ ${sel}{${body}}`,
   "peer-focus": (sel, body) => `.peer:focus ~ ${sel}{${body}}`,
   "peer-checked": (sel, body) => `.peer:checked ~ ${sel}{${body}}`,
   "peer-disabled": (sel, body) => `.peer:disabled ~ ${sel}{${body}}`,
 };
+
 
 export const mediaVariants: MediaVariantMap = {
   // Responsive
@@ -779,11 +776,8 @@ export const JIT_CSS_THROTTLE_MS = 16; // 60fps
 export function jitCSS(html: string): string {
   const now = Date.now();
   const cached = jitCssCache.get(html);
-
-  // Use cached CSS if within throttle window
   if (cached && now - cached.timestamp < JIT_CSS_THROTTLE_MS) return cached.css;
 
-  // ...existing JIT CSS logic...
   const classes = extractClassesFromHTML(html);
   const seen = new Set(classes);
 
@@ -810,117 +804,184 @@ export function jitCSS(html: string): string {
     return 4;
   }
 
-// Split on ":" but ignore colons inside square brackets (arbitrary variants/values)
-function splitVariants(input: string): string[] {
-  const out: string[] = [];
-  let buf = "";
-  let depth = 0; // bracket depth for [ ... ]
-  for (let i = 0; i < input.length; i++) {
-    const ch = input[i];
-    if (ch === "[") depth++;
-    if (ch === "]" && depth > 0) depth--;
-    if (ch === ":" && depth === 0) {
-      out.push(buf);
-      buf = "";
-    } else {
-      buf += ch;
+  function splitVariants(input: string): string[] {
+    const out: string[] = [];
+    let buf = "";
+    let depthSquare = 0;
+    let depthParen = 0;
+    for (let i = 0; i < input.length; i++) {
+      const ch = input[i];
+      if (ch === "[") depthSquare++;
+      else if (ch === "]" && depthSquare > 0) depthSquare--;
+      else if (ch === "(") depthParen++;
+      else if (ch === ")" && depthParen > 0) depthParen--;
+      if (ch === ":" && depthSquare === 0 && depthParen === 0) {
+        out.push(buf);
+        buf = "";
+      } else {
+        buf += ch;
+      }
+    }
+    if (buf) out.push(buf);
+    return out;
+  }
+
+  // Map Tailwind pseudo-variant tokens to their CSS pseudo class strings
+  function tokenToPseudo(token: string): string | null {
+    switch (token) {
+      case "hover": return ":hover";
+      case "focus": return ":focus";
+      case "active": return ":active";
+      case "visited": return ":visited";
+      case "disabled": return ":disabled";
+      case "checked": return ":checked";
+      case "first": return ":first-child";
+      case "last": return ":last-child";
+      case "odd": return ":nth-child(odd)";
+      case "even": return ":nth-child(even)";
+      case "focus-within": return ":focus-within";
+      case "focus-visible": return ":focus-visible";
+      default: return null;
     }
   }
-  if (buf) out.push(buf);
-  return out;
-}
 
-function generateRule(cls: string, stripDark = false): string | null {
-  const parts = splitVariants(cls);
+  function generateRule(cls: string, stripDark = false): string | null {
+    const parts = splitVariants(cls);
 
-  // Find the utility part (the actual class that produces CSS)
-  const basePart = parts.find(
-    p =>
-      utilityMap[p] ||
-      parseSpacing(p) ||
-      parseOpacity(p) ||
-      parseColorWithOpacity(p) ||
-      parseArbitrary(p)
-  );
-  if (!basePart) return null;
+    // Detect !important on the base utility
+    let important = false;
+    let basePart = parts.find(p => {
+      if (p.startsWith("!")) {
+        important = true;
+        p = p.slice(1);
+      }
+      return (
+        utilityMap[p] ||
+        parseSpacing(p) ||
+        parseOpacity(p) ||
+        parseColorWithOpacity(p) ||
+        parseArbitrary(p)
+      );
+    });
+    if (!basePart) return null;
 
-  const baseRule =
-    utilityMap[basePart] ??
-    parseSpacing(basePart) ??
-    parseOpacity(basePart) ??
-    parseColorWithOpacity(basePart) ??
-    parseArbitrary(basePart);
+    const cleanBase = basePart.replace(/^!/, "");
+    const baseRule =
+      utilityMap[cleanBase] ??
+      parseSpacing(cleanBase) ??
+      parseOpacity(cleanBase) ??
+      parseColorWithOpacity(cleanBase) ??
+      parseArbitrary(cleanBase);
 
-  if (!baseRule) return null;
+    if (!baseRule) return null;
 
-  const baseIndex = parts.indexOf(basePart);
-  let before = baseIndex >= 0 ? parts.slice(0, baseIndex) : [];
-  if (stripDark) before = before.filter(t => t !== "dark");
+    const baseIndex = parts.indexOf(basePart);
+    let before = baseIndex >= 0 ? parts.slice(0, baseIndex) : [];
+    if (stripDark) before = before.filter(t => t !== "dark");
 
-  const arbitraryVariantToken = before.find(t => parseArbitraryVariant(t));
-  const escapedClass = `.${escapeClassName(cls)}`;
+    const arbitraryVariantToken = before.find(t => parseArbitraryVariant(t));
+    const escapedClass = `.${escapeClassName(cls)}`;
 
-  // Build the selector (preserving child/descendant pieces outside the class)
-  let selector: string;
-  const body = baseRule;
+    // Subject placeholder to precisely attach pseudos at the right spot
+    const SUBJECT = "__TW_SUBJECT__";
 
-  if (arbitraryVariantToken) {
-    const variantSelector = parseArbitraryVariant(arbitraryVariantToken);
-    if (variantSelector) {
-      if (variantSelector.includes("&")) {
-        // Replace & with escaped class, keep combinators/children raw
-        selector = variantSelector.replace(/&/g, escapedClass);
+    let selector: string;
+    let body = important ? baseRule.replace(/;$/, " !important;") : baseRule;
+
+    // Build initial selector around SUBJECT (not the real class yet)
+    if (arbitraryVariantToken) {
+      const variantSelector = parseArbitraryVariant(arbitraryVariantToken);
+      if (variantSelector) {
+        if (variantSelector.includes("&")) {
+          selector = variantSelector.replace(/&/g, SUBJECT);
+        } else {
+          // Rare, but support arbitrary variant without &: prefix selector then subject
+          selector = `${variantSelector}${SUBJECT}`;
+        }
       } else {
-        // Attribute-style arbitrary variant (no &): keep brackets and append class
-        selector = `${variantSelector}${escapedClass}`;
+        selector = SUBJECT;
       }
     } else {
-      selector = escapedClass;
+      selector = SUBJECT;
     }
-  } else {
-    selector = escapedClass;
-  }
 
-  // Apply non-responsive selector variants to the entire selector
-  for (const token of before) {
-    if (responsiveOrder.includes(token) || token === "dark") continue;
-    if (token === arbitraryVariantToken) continue;
-    const variantFn = selectorVariants[token];
-    if (typeof variantFn === "function") {
-      // Wrap the whole selector (variantFn returns "selector{body}")
-      selector = variantFn(selector, body).replace(/\{.*$/, "");
+    // Categorise variants
+    const siblingVariants  = before.filter(v => v.startsWith("peer-"));
+    const ancestorVariants = before.filter(v => v.startsWith("group-"));
+    const pseudoVariants   = before.filter(v =>
+      !v.startsWith("group-") &&
+      !v.startsWith("peer-") &&
+      !responsiveOrder.includes(v) &&
+      v !== "dark" &&
+      v !== arbitraryVariantToken
+    );
+
+    // Apply sibling wrappers first (keep SUBJECT inside)
+    for (const token of siblingVariants) {
+      const fn = selectorVariants[token];
+      if (typeof fn === "function") {
+        selector = fn(selector, body).replace(/\{.*$/, "");
+      }
     }
+
+    // Then ancestor wrappers (keep SUBJECT inside)
+    for (const token of ancestorVariants) {
+      const fn = selectorVariants[token];
+      if (typeof fn === "function") {
+        selector = fn(selector, body).replace(/\{.*$/, "");
+      }
+    }
+
+    // Finally, attach pseudo variants directly to SUBJECT (not to group/peer)
+    for (const token of pseudoVariants) {
+      const pseudo = tokenToPseudo(token);
+      if (pseudo) {
+        // Insert pseudo immediately on the subject
+        selector = selector.replace(SUBJECT, SUBJECT + pseudo);
+      } else {
+        // Fallback: if a custom pseudo variant exists in selectorVariants, apply it to SUBJECT position
+        const fn = selectorVariants[token];
+        if (typeof fn === "function") {
+          // Apply to a minimal selector that is just SUBJECT{body}, then extract selector and splice it back
+          const wrapped = fn(SUBJECT, body).replace(/\{.*$/, "");
+          // If the variant function prepends/appends around SUBJECT, we want that structure:
+          // Replace the bare SUBJECT in current selector with that wrapped version (which still contains SUBJECT)
+          selector = selector.replace(SUBJECT, wrapped);
+        }
+      }
+    }
+
+    // Replace SUBJECT with the actual escaped class as the final step
+    selector = selector.replace(new RegExp(SUBJECT, "g"), escapedClass);
+
+    // Emit the rule
+    let rule = `${selector}{${body}}`;
+
+    // Wrap in media queries
+    const responsiveTokens = before.filter(t => responsiveOrder.includes(t));
+    const lastResponsive = responsiveTokens.length
+      ? responsiveTokens[responsiveTokens.length - 1]
+      : null;
+    const hasDark = before.includes("dark");
+
+    if (stripDark && lastResponsive) {
+      rule = `@media (prefers-color-scheme: dark) and ${mediaVariants[lastResponsive]}{${rule}}`;
+    } else if (stripDark) {
+      rule = `@media (prefers-color-scheme: dark){${rule}}`;
+    } else if (hasDark && lastResponsive) {
+      rule = `@media (prefers-color-scheme: dark) and ${mediaVariants[lastResponsive]}{${rule}}`;
+    } else if (hasDark) {
+      rule = `@media (prefers-color-scheme: dark){${rule}}`;
+    } else if (lastResponsive) {
+      rule = `@media ${mediaVariants[lastResponsive]}{${rule}}`;
+    }
+
+    return rule;
   }
 
-  let rule = `${selector}{${body}}`;
-
-  // Wrap in media queries for responsive/dark
-  const responsiveTokens = before.filter(t => responsiveOrder.includes(t));
-  const lastResponsive = responsiveTokens.length
-    ? responsiveTokens[responsiveTokens.length - 1]
-    : null;
-  const hasDark = before.includes("dark");
-
-  if (stripDark && lastResponsive) {
-    const responsiveQuery = mediaVariants[lastResponsive] as string;
-    rule = `@media (prefers-color-scheme: dark) and ${responsiveQuery}{${rule}}`;
-  } else if (stripDark) {
-    rule = `@media (prefers-color-scheme: dark){${rule}}`;
-  } else if (hasDark && lastResponsive) {
-    const responsiveQuery = mediaVariants[lastResponsive] as string;
-    rule = `@media (prefers-color-scheme: dark) and ${responsiveQuery}{${rule}}`;
-  } else if (hasDark) {
-    rule = `@media (prefers-color-scheme: dark){${rule}}`;
-  } else if (lastResponsive) {
-    const responsiveQuery = mediaVariants[lastResponsive] as string;
-    rule = `@media ${responsiveQuery}{${rule}}`;
-  }
-
-  return rule;
-}
-
+  // Use safe splitting in the outer loop as well
   for (const cls of seen) {
-    const parts = cls.split(":");
+    const parts = splitVariants(cls);
     const basePart = parts.find(
       p => utilityMap[p] || parseSpacing(p) || parseOpacity(p) || parseColorWithOpacity(p) || parseArbitrary(p)
     );

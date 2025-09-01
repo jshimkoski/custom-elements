@@ -222,10 +222,40 @@ describe('jitCSS - Arbitrary Variants', () => {
     expect(css).toContain('@media (prefers-color-scheme:dark) and (min-width:768px){.dark\\:md\\:\\[\\&\\>h2\\:hover\\]\\:hover\\:shadow-\\[0_0_0_2px_\\#09f\\]:hover>h2:hover{box-shadow:0 0 0 2px #09f}}');
   });
 
-  it.skip('should support extremely complicated monster classes', () => {
+  it('should support extremely complicated monster classes', () => {
     const html = `<button class="dark:xl:group-hover:peer-focus:[&:is(section,article):nth-child(2)>h2[data-state=open]:hover]:focus-within:!shadow-[0_0_0_3px_rgba(255,0,255,0.75)]"></button>`;
     const css = minifyCSS(jitCSS(html));
-    expect(css).toContain(':hover.button\\:hover\\:\\[box-shadow\\:0_0_0_2px_\\#09f\\]{box-shadow:0 0 0 2px #09f}');
+    expect(css).toContain('@media (prefers-color-scheme:dark) and (min-width:1280px){.group:hover .peer:focus~.dark\\:xl\\:group-hover\\:peer-focus\\:\\[\\&\\:is\\(section\\,article\\)\\:nth-child\\(2\\)\\>h2\\[data-state\\=open\\]\\:hover\\]\\:focus-within\\:\\!shadow-\\[0_0_0_3px_rgba\\(255\\,0\\,255\\,0\\.75\\)\\]:focus-within:is(section,article):nth-child(2)>h2[data-state=open]:hover{box-shadow:0 0 0 3px rgba(255,0,255,0.75) !important}}');
+  });
+
+  it('should handle dark mode with multiple responsive breakpoints', () => {
+    const html = `<section class="dark:lg:xl:[&>p:first-of-type]:hover:!text-[hsl(210,50%,60%)]"></section>`;
+    const css = minifyCSS(jitCSS(html));
+    expect(css).toContain('@media (prefers-color-scheme:dark) and (min-width:1280px){.dark\\:lg\\:xl\\:\\[\\&\\>p\\:first-of-type\\]\\:hover\\:\\!text-\\[hsl\\(210\\,50\\%\\,60\\%\\)\\]:hover>p:first-of-type{color:hsl(210,50%,60%) !important}}');
+  });
+
+  it.skip('should handle multiple pseudos and arbitrary values', () => {
+    const html = `<div class="sm:hover:focus:[&>*:first-child]:active:!bg-[rgb(10,20,30)]"></div>`;
+    const css = minifyCSS(jitCSS(html));
+    expect(css).toContain('@media (min-width:640px){.sm\\:hover\\:focus\\:\\[\\&\\>\\*\\:first-child\\]\\:active\\:\\!bg-\\[rgb\\(10\\,20\\,30\\)\\]:hover:focus>*:first-child:active{background-color:rgb(10,20,30) !important}}');
+  });
+
+  it.skip('should handle nested arbitrary variants with attribute selectors', () => {
+    const html = `<span class="md:[&[data-open=true]>svg]:hover:rotate-[33deg]"></span>`;
+    const css = minifyCSS(jitCSS(html));
+    expect(css).toContain('@media (min-width:768px){.md\\:\\[\\&\\[data-open\\=true\\]\\>svg\\]\\:hover\\:rotate-\\[33deg\\]:hover[data-open=true]>svg{--tw-rotate:33deg;transform:rotate(33deg)}}');
+  });
+
+  it.skip('should handle group and peer with complex pseudos', () => {
+    const html = `<li class="group-focus-within:peer-hover:[&:nth-child(odd)>a]:focus-visible:underline"></li>`;
+    const css = minifyCSS(jitCSS(html));
+    expect(css).toContain('.group:focus-within .peer:hover~.group-focus-within\\:peer-hover\\:\\[\\&\\:nth-child\\(odd\\)\\>a\\]\\:focus-visible\\:underline:focus-visible:nth-child(odd)>a{text-decoration-line:underline}');
+  });
+
+  it.skip('should handle arbitrary property utilities with special characters', () => {
+    const html = `<div class="[&>svg]:hover:[mask-image:url('/icons/mask.svg')]"></div>`;
+    const css = minifyCSS(jitCSS(html));
+    expect(css).toContain('.\\[\\&\\>svg\\]\\:hover\\:\\[mask-image\\:url\\(\'\\/icons\\/mask\\.svg\'\\)\\]:hover>svg{mask-image:url("/icons/mask.svg")}');
   });
 
   it('should escape special characters in arbitrary variant and value', () => {
