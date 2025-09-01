@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v0.1.19] - 2025-09-01
+
+- fix: enhance class handling for JIT CSS in initRouter function (ac111de)
+- fix: improve handling multiple pseudos and arbitrary values in jitCSS (74b8abb)
+
+
 ## [v0.1.18] - 2025-09-01
 
 - fix: improve handling multiple pseudos and arbitrary values in jitCSS (74b8abb)
