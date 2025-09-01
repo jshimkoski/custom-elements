@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v0.1.21] - 2025-09-01
+
+- fix(router): remove unused import from router view tests (209c513)
+- fix(router): enhance route component resolution and caching (9eaf2a5)
+
+
 ## [v0.1.20] - 2025-09-01
 
 - fix(router): enhance route component resolution and caching (9eaf2a5)
