@@ -454,12 +454,19 @@ export function initRouter(config: RouterConfig) {
         : current && typeof current.path === 'string'
           ? current.path.startsWith(to)
           : false;
-      const className = isExactActive
-        ? exactActiveClass
-        : isActive
-        ? activeClass
-        : '';
       const ariaCurrent = isExactActive ? `aria-current="${ariaCurrentValue}"` : '';
+      // Build class object so JIT CSS can see the literal class names.
+      // Include user-provided classes (may be multiple space-separated) and
+      // static keys for active/exact-active so a JIT scanner can pick them up.
+      const userClassList = (ctx.class || '').split(/\s+/).filter(Boolean);
+      const userClasses: Record<string, boolean> = {};
+      for (const c of userClassList) userClasses[c] = true;
+      const classObject = {
+        ...userClasses,
+        // Also include the configurable names (may duplicate the above)
+        [activeClass]: isActive,
+        [exactActiveClass]: isExactActive,
+      };
       const isButton = tag === 'button';
       const disabledAttr = disabled
         ? isButton
@@ -474,7 +481,7 @@ export function initRouter(config: RouterConfig) {
           .when(isButton, html`
             <button
               part="button"
-              :class="${ctx.class} ${className}"
+              :class="${classObject}"
               ${ariaCurrent}
               ${disabledAttr}
               ${externalAttr}
@@ -485,7 +492,7 @@ export function initRouter(config: RouterConfig) {
             <a
               part="link"
               href="${to}"
-              :class="${ctx.class} ${className}"
+              :class="${classObject}"
               ${ariaCurrent}
               ${disabledAttr}
               ${externalAttr}
