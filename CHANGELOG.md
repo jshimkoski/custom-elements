@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v0.1.22] - 2025-09-01
+
+- docs(jit-css): update utility documentation and add missing sections (936469a)
+- fix(router): remove unused import from router view tests (209c513)
+
+
 ## [v0.1.21] - 2025-09-01
 
 - fix(router): remove unused import from router view tests (209c513)
