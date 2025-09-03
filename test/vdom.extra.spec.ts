@@ -85,9 +85,9 @@ describe('vdom.extra', () => {
     const el = document.createElement('input');
     el.type = 'text';
     const clickOld = () => {};
-    const oldProps = { props: { value: 'a', checked: true, onClick: clickOld }, attrs: { 'data-x': '1' } } as any;
+    const oldProps = { props: { value: 'a', checked: true, onHostClick: clickOld }, attrs: { 'data-x': '1' } } as any;
     const clickNew = vi.fn();
-    const newProps = { props: { value: 'b', checked: false, onClick: clickNew, title: 't' }, attrs: { 'data-x': undefined } } as any;
+    const newProps = { props: { value: 'b', checked: false, onHostClick: clickNew, title: 't' }, attrs: { 'data-x': undefined } } as any;
     patchProps(el, oldProps, newProps);
     expect(el.value).toBe('b');
     expect(el.checked).toBe(false);

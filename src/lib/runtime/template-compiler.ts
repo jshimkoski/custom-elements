@@ -82,7 +82,7 @@ export function parseProps(
         attrs[rawName] = value;
       }
     } else if (prefix === "@") {
-      const onName = "on" + rawName.charAt(0).toUpperCase() + rawName.slice(1);
+      const onName = "onHost" + rawName.charAt(0).toUpperCase() + rawName.slice(1);
       props[onName] =
         typeof value === "function"
           ? value

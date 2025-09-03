@@ -28,19 +28,19 @@ describe('Custom Element Runtime', () => {
     document.body.removeChild(el);
   });
 
-  it('emit calls onCustomEvent and dispatches event', async () => {
-    const onCustomEvent = vi.fn();
+  it('emit calls onHostCustomEvent and dispatches event', async () => {
+    const onHostCustomEvent = vi.fn();
     const config = {
       state: {},
       props: {
-        onCustomEvent: { type: Function },
+        onHostCustomEvent: { type: Function },
       },
       render(ctx: any) {
         return html`<button ref="btn">Emit</button>`;
       },
     };
     const el = mount('test-emit', config);
-    (el as any).onCustomEvent = onCustomEvent;
+    (el as any).onHostCustomEvent = onHostCustomEvent;
     document.body.appendChild(el);
     await Promise.resolve();
     // Listen for event
@@ -48,17 +48,17 @@ describe('Custom Element Runtime', () => {
     el.addEventListener('customEvent', eventSpy);
     // Call emit
     (el as any).context.emit('customEvent', { foo: 'bar' });
-    expect(onCustomEvent).toHaveBeenCalledWith({ foo: 'bar' }, (el as any).context);
+    expect(onHostCustomEvent).toHaveBeenCalledWith({ foo: 'bar' }, (el as any).context);
     expect(eventSpy).toHaveBeenCalled();
     expect(eventSpy.mock.calls[0][0].detail).toEqual({ foo: 'bar' });
     document.body.removeChild(el);
   });
 
-  it('onCustomEvent works via config and emit', async () => {
+  it('onHostCustomEvent works via config and emit', async () => {
     let called = false;
     const config = {
       state: {},
-      onCustomEvent(detail: any) {
+      onHostCustomEvent(detail: any) {
         called = true;
         expect(detail).toEqual({ test: 123 });
       },

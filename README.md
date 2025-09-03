@@ -28,6 +28,7 @@ import { component, html } from '@jasonshimmy/custom-elements-runtime';
 
 component('my-counter', (ctx) => html`
   <button
+    class="px-4 py-2 bg-blue-500 text-white rounded"
     @click="${() => ctx.count++}"
   >Count: ${ctx.count}</button>
 `, { state: { count: 0 } });
@@ -58,6 +59,7 @@ Explore the full documentation for every runtime feature:
 ### 🧩 Reactivity & Patterns
 - [Directives](./docs/directives.md)
 - [Bindings](./docs/bindings.md)
+- [Events](./docs/events-deep-dive.md)
 - [Slot](./docs/slot.md)
 - [Advanced Usage Patterns](./docs/advanced-usage-patterns.md)
 - [Cross-Component Communication](./docs/cross-component-communication.md)

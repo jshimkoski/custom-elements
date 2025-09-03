@@ -347,6 +347,11 @@ export function processModelDirective(
   }
 }
 
+const HOST_PREFIX = "onHost";
+function hostEventNameFromKey(key: string): string {
+  return key.slice(HOST_PREFIX.length).toLowerCase();
+}
+
 /**
  * Process :bind directive for attribute/property binding
  * @param value 
@@ -705,10 +710,10 @@ export function patchProps(
         if (el.value !== newVal) el.value = newVal ?? "";
       } else if (key === "checked" && el instanceof HTMLInputElement) {
         el.checked = !!newVal;
-      } else if (key.startsWith("on") && typeof newVal === "function") {
-        if (typeof oldVal === "function")
-          el.removeEventListener(key.slice(2).toLowerCase(), oldVal);
-        el.addEventListener(key.slice(2).toLowerCase(), newVal);
+      } else if (key.startsWith("onHost") && typeof newVal === "function") {
+        const ev = hostEventNameFromKey(key);
+        if (typeof oldVal === "function") el.removeEventListener(ev, oldVal);
+        el.addEventListener(ev, newVal);
       } else if (newVal === undefined || newVal === null || newVal === false) {
         el.removeAttribute(key);
       } else {
@@ -850,9 +855,9 @@ export function createElement(
       el.value = val ?? "";
     } else if (key === "checked" && el instanceof HTMLInputElement) {
       el.checked = !!val;
-    } else if (key.startsWith("on") && typeof val === "function") {
-      el.addEventListener(key.slice(2).toLowerCase(), val);
-    } else if (key.startsWith("on") && val === undefined) {
+    } else if (key.startsWith("onHost") && typeof val === "function") {
+      el.addEventListener(hostEventNameFromKey(key), val);
+    } else if (key.startsWith("onHost") && val === undefined) {
       continue; // skip undefined event handlers
     } else if (val === undefined || val === null || val === false) {
       el.removeAttribute(key);

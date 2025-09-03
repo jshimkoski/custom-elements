@@ -30,7 +30,8 @@ Set function props as properties on the element instance (not as attributes):
 
 ```typescript
 const el = document.createElement('user-card');
-el.onCustomEvent = (detail, ctx) => {
+// assign a host-level callback using the runtime convention
+el.onHostCustomEvent = (detail, ctx) => {
   // handle event
 };
 document.body.appendChild(el);

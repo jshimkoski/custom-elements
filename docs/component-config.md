@@ -6,6 +6,8 @@
 
 `ComponentConfig` is a strongly typed object that defines your component's state, props, computed values, styles, rendering logic, lifecycle hooks, and more. All options are optional except `render`.
 
+> Note: The runtime reserves host-level handler keys using the `onHost<Event>` convention. See [Events Deep Dive](./events-deep-dive.md) for more information.
+
 ## 🧩 Basic Example
 
 ```ts

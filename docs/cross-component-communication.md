@@ -42,7 +42,8 @@ Pass data from parent to child using props and attributes (string, number, boole
   ```typescript
   // In parent code
   const el = document.createElement('user-card');
-  el.onCustomEvent = (detail, ctx) => {
+  // assign a host-level callback using the runtime convention
+  el.onHostCustomEvent = (detail, ctx) => {
     // handle event
   };
   document.body.appendChild(el);
@@ -89,6 +90,8 @@ Use native DOM events for direct communication.
 **Note:**
 - The `@event` binding only works in templates rendered by the runtime or supported frameworks.
 - For plain HTML, always use `addEventListener`.
+
+For host-level handler conventions, naming, and the recommended `bubbles: true, composed: true` options for emitted events, see [Events Deep Dive](./events-deep-dive.md).
 
 ## 🚦 Best Practices
 
