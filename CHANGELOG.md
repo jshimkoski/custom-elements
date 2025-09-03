@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v0.1.24] - 2025-09-03
+
+- fix: Introduce host-level event handling with `onHost<Event>` convention (996be52)
+- docs: update README and JIT CSS documentation for clarity and consistency (3fb4ad5)
+
+
 ## [v0.1.23] - 2025-09-01
 
 - docs: update README and JIT CSS documentation for clarity and consistency (3fb4ad5)
