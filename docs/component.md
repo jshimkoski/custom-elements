@@ -58,12 +58,19 @@ component('my-element', {
 - `onError`, `errorFallback`: Error handling hooks.
 - Custom methods: Any additional functions (auto-injected into state).
 
-### Events and host handlers
+### Events
 
-The runtime uses a clear separation between host-level handlers (internal convention: `onHost<Event>`) and normal DOM events emitted by components.
+The runtime uses a DOM-first events API. Components should emit DOM CustomEvents
+via `context.emit` (events typically use `bubbles: true` and `composed: true`).
 
-- Framework users should continue to use framework-native listeners (`@click` in Vue, `on:click` in Svelte). Components must emit events with `bubbles: true` and `composed: true`.
-- For the deep technical details, precedence rules, and best practices, see [Events Deep Dive](./events-deep-dive.md).
+- Framework users: listen using your framework's normal event binding (`@event` in
+  Vue, `on:event` in Svelte, `(event)` in Angular).
+- Programmatic handlers: if you need to attach handlers to capture closures or
+  perform custom wiring, use refs and add DOM listeners directly to the element
+  instance.
+
+See [Events Deep Dive](./events-deep-dive.md) for recommended event emission
+options and integration tips.
 
 ## 🧪 Example: Full Component Usage
 

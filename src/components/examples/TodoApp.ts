@@ -70,4 +70,8 @@ export const TodoApp = component('todo-app', (ctx) => html`
   removeTodo(ctx, id: number) {
     ctx.todos = ctx.todos.filter(todo => todo.id !== id);
   },
+  handleTestClick(event, ctx) {
+    event.stopPropagation();
+    console.log('in parent')
+  }
 });

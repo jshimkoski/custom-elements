@@ -38,13 +38,16 @@ Integrate Custom Elements Runtime components in Angular projects:
     }
     ```
 
-  - Host-level callback (property) — if you need to pass a closure or use the runtime's host-callback precedence, set a property on the element instance via `ViewChild`:
+  - If you need to attach a handler programmatically (for example to capture
+    closures from the host framework), use `@ViewChild` and add a DOM listener
+    directly on the element instance. Prefer framework template bindings when
+    possible:
     ```ts
     @ViewChild('counterEl', { read: ElementRef }) counterEl!: ElementRef;
     ngAfterViewInit() {
-      this.counterEl.nativeElement.onHostCustomEvent = (detail, ctx) => {
-        // handle event
-      };
+      this.counterEl.nativeElement.addEventListener('custom-event', (e: CustomEvent) => {
+        // handle e.detail
+      });
     }
     ```
 
@@ -53,7 +56,7 @@ Integrate Custom Elements Runtime components in Angular projects:
 
 - Angular requires `CUSTOM_ELEMENTS_SCHEMA` for custom elements.
 - For two-way binding with `[(ngModel)]`, your custom element must emit the expected events (e.g., `input`). The runtime does not emit these by default; you may need to wire them manually using `context.emit` in your component.
-- See [Events Deep Dive](./events-deep-dive.md) for details on host-level handler naming (`onHost<Event>`), precedence, and recommended event emission options (`bubbles: true, composed: true`).
+- See [Events Deep Dive](./events-deep-dive.md) for recommended event emission options (`bubbles: true, composed: true`) and framework integration tips.
 - Works with Angular 9+.
 
 Angular + Custom Elements = 🚀

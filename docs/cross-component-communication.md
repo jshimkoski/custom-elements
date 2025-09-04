@@ -41,12 +41,12 @@ Pass data from parent to child using props and attributes (string, number, boole
 - **Function prop (event handler) example:**
   ```typescript
   // In parent code
-  const el = document.createElement('user-card');
-  // assign a host-level callback using the runtime convention
-  el.onHostCustomEvent = (detail, ctx) => {
-    // handle event
-  };
-  document.body.appendChild(el);
+    const el = document.createElement('user-card');
+    // attach a function prop or a listener via addEventListener
+    el.addEventListener('custom-event', (e) => {
+      // handle event e.detail
+    });
+    document.body.appendChild(el);
   ```
 
 ## 🏪 Shared Store
@@ -91,7 +91,7 @@ Use native DOM events for direct communication.
 - The `@event` binding only works in templates rendered by the runtime or supported frameworks.
 - For plain HTML, always use `addEventListener`.
 
-For host-level handler conventions, naming, and the recommended `bubbles: true, composed: true` options for emitted events, see [Events Deep Dive](./events-deep-dive.md).
+For recommended `bubbles: true, composed: true` options and integration tips, see [Events Deep Dive](./events-deep-dive.md).
 
 ## 🚦 Best Practices
 

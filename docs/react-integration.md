@@ -32,12 +32,14 @@ Use Custom Elements Runtime components in React projects:
     <my-counter ref={elRef} />
     ```
 
-  - Host-level callback (property) — assign a function prop (useful when you need to pass a closure) on the element instance via ref. The runtime resolves `onHost<Event>` handlers and also follows precedence rules when both exist.
+  - If you need closure capture in React, assign a programmatic listener via ref and
+    `addEventListener`. Prefer the `addEventListener` + ref approach since React
+    doesn't map custom events to props:
     ```jsx
     useEffect(() => {
-      elRef.current.onHostCustomEvent = (detail, ctx) => {
-        // handle event with access to closure state
-      };
+      function handler(e) { /* e.detail */ }
+      elRef.current.addEventListener('customEvent', handler);
+      return () => elRef.current.removeEventListener('customEvent', handler);
     }, []);
     ```
 
@@ -48,7 +50,7 @@ Use Custom Elements Runtime components in React projects:
 - For custom events, use refs and `addEventListener` as React does not natively map custom events to props.
 - For function props, always set them as properties on the element instance via ref.
 - For two-way binding, use refs and event handlers. Use `context.emit` in your component to emit events.
-- See [Events Deep Dive](./events-deep-dive.md) for details on host-level handler naming (`onHost<Event>`), precedence, and recommended event emission options (`bubbles: true, composed: true`).
+- See [Events Deep Dive](./events-deep-dive.md) for recommended event emission options (`bubbles: true, composed: true`) and integration tips.
 - Works with React 16.8+.
 
 Build modern UIs with zero config! ✨

@@ -114,12 +114,12 @@ describe('vdom additional helpers', () => {
     const newHandler = vi.fn();
 
     // initial add
-    patchProps(el, oldProps, { props: { onHostClick: oldHandler }, attrs: {} } as any);
+  patchProps(el, oldProps, { props: { onClick: oldHandler }, attrs: {} } as any);
     el.dispatchEvent(new MouseEvent('click'));
     expect(oldHandler).toHaveBeenCalledTimes(1);
 
     // replace handler
-    patchProps(el, { props: { onHostClick: oldHandler }, attrs: {} } as any, { props: { onHostClick: newHandler }, attrs: {} } as any);
+  patchProps(el, { props: { onClick: oldHandler }, attrs: {} } as any, { props: { onClick: newHandler }, attrs: {} } as any);
     el.dispatchEvent(new MouseEvent('click'));
     expect(newHandler).toHaveBeenCalledTimes(1);
   });

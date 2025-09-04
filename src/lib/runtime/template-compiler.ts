@@ -82,7 +82,8 @@ export function parseProps(
         attrs[rawName] = value;
       }
     } else if (prefix === "@") {
-      const onName = "onHost" + rawName.charAt(0).toUpperCase() + rawName.slice(1);
+      // Map @event to an `on<Event>` prop (DOM-first event listener convention)
+      const onName = "on" + rawName.charAt(0).toUpperCase() + rawName.slice(1);
       props[onName] =
         typeof value === "function"
           ? value

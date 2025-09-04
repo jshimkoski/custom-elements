@@ -14,9 +14,6 @@ describe('explicit host listener wiring', () => {
     const cfgHandler = vi.fn();
     const cfg = {
       state: {},
-      onHostPing(detail: any) {
-        cfgHandler(detail);
-      },
       render(ctx: any) {
         return html`<div></div>`;
       }
@@ -25,7 +22,10 @@ describe('explicit host listener wiring', () => {
     const el = mount('test-explicit-1', cfg);
     await Promise.resolve();
 
-    // Emit should invoke the runtime-wired host handler once.
+    // Listen for the dispatched event on the host element
+    el.addEventListener('ping', (e: any) => cfgHandler(e.detail));
+
+    // Emit should dispatch the event to host listeners
     (el as any).context.emit('ping', { x: 1 });
     expect(cfgHandler).toHaveBeenCalledTimes(1);
     expect(cfgHandler).toHaveBeenCalledWith({ x: 1 });
@@ -37,25 +37,25 @@ describe('explicit host listener wiring', () => {
     const propHandler = vi.fn();
     const cfg = {
       state: {},
-      onHostPong(detail: any, ctx: any) {
-        // default config-level handler is noop; runtime resolves precedence to prop
+      onPong(detail: any, ctx: any) {
+        // default config-level handler is noop; runtime exposes config methods
       },
       render(ctx: any) {
         return html`<div></div>`;
       }
     };
 
-    const el = mount('test-explicit-2', cfg) as any;
-    // set element property handler (highest precedence)
-    el.onHostPong = propHandler;
+  const el = mount('test-explicit-2', cfg) as any;
+  // attach an event listener on the host element
+  el.addEventListener('pong', (e: any) => propHandler(e.detail));
     await Promise.resolve();
 
     // Emit should cause the wired host listener to run and mark the event;
     // emit must not call propHandler again after the host listener runs.
-    el.context.emit('pong', { hi: true });
+  el.context.emit('pong', { hi: true });
 
-    expect(propHandler).toHaveBeenCalledTimes(1);
-    expect(propHandler).toHaveBeenCalledWith({ hi: true }, el.context);
+  expect(propHandler).toHaveBeenCalledTimes(1);
+  expect(propHandler).toHaveBeenCalledWith({ hi: true });
 
     document.body.removeChild(el);
   });

@@ -17,7 +17,7 @@ describe('emit host-handled marker', () => {
     const config = {
       state: {},
       props: {
-        onHostFoobar: { type: Function },
+        onFoobar: { type: Function },
       },
       render(ctx: any) {
         return html`<div></div>`;
@@ -25,8 +25,8 @@ describe('emit host-handled marker', () => {
     };
 
     const el = mount('test-emit-host', config);
-    // set the element property handler
-    (el as any).onHostFoobar = propHandler;
+  // set the element property handler via host listener
+  el.addEventListener('foobar', (e: any) => propHandler(e.detail));
 
     // Add a host listener via addEventListener which will be the "host listener"
     // that our runtime wires; the runtime should mark the event when invoking
@@ -42,9 +42,9 @@ describe('emit host-handled marker', () => {
     // be invoked twice (once via the host listener and once directly from emit).
     (el as any).context.emit('foobar', { a: 1 });
 
-    // The prop handler should be invoked exactly once (via the wired host listener).
-    expect(propHandler).toHaveBeenCalledTimes(1);
-    expect(propHandler).toHaveBeenCalledWith({ a: 1 }, (el as any).context);
+  // The prop handler should be invoked exactly once via the dispatched event.
+  expect(propHandler).toHaveBeenCalledTimes(1);
+  expect(propHandler).toHaveBeenCalledWith({ a: 1 });
 
     document.body.removeChild(el);
   });

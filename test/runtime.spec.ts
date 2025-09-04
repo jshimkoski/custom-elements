@@ -28,48 +28,48 @@ describe('Custom Element Runtime', () => {
     document.body.removeChild(el);
   });
 
-  it('emit calls onHostCustomEvent and dispatches event', async () => {
-    const onHostCustomEvent = vi.fn();
+  it('emit dispatches a CustomEvent', async () => {
+    const onCustomEvent = vi.fn();
     const config = {
       state: {},
       props: {
-        onHostCustomEvent: { type: Function },
+        onCustomEvent: { type: Function },
       },
       render(ctx: any) {
         return html`<button ref="btn">Emit</button>`;
       },
     };
     const el = mount('test-emit', config);
-    (el as any).onHostCustomEvent = onHostCustomEvent;
+    // listen for dispatched event
+    el.addEventListener('customEvent', onCustomEvent);
     document.body.appendChild(el);
     await Promise.resolve();
     // Listen for event
-    const eventSpy = vi.fn();
-    el.addEventListener('customEvent', eventSpy);
-    // Call emit
+    // Call emit and assert event dispatched
     (el as any).context.emit('customEvent', { foo: 'bar' });
-    expect(onHostCustomEvent).toHaveBeenCalledWith({ foo: 'bar' }, (el as any).context);
-    expect(eventSpy).toHaveBeenCalled();
-    expect(eventSpy.mock.calls[0][0].detail).toEqual({ foo: 'bar' });
+    expect(onCustomEvent).toHaveBeenCalled();
+    expect(onCustomEvent.mock.calls[0][0].detail).toEqual({ foo: 'bar' });
     document.body.removeChild(el);
   });
 
-  it('onHostCustomEvent works via config and emit', async () => {
-    let called = false;
+  it('dispatches events even when config contains handlers', async () => {
     const config = {
       state: {},
-      onHostCustomEvent(detail: any) {
-        called = true;
-        expect(detail).toEqual({ test: 123 });
+      // config handler names are ignored for host-callback semantics
+      onCustomEvent(detail: any) {
+        // should not be called by emit fallback
+        throw new Error('config handler should not be invoked');
       },
       render(ctx: any) {
         return html`<div></div>`;
       },
     };
     const el = mount('test-oncustom', config);
+    const spy = vi.fn();
+    el.addEventListener('customEvent', spy);
     await Promise.resolve();
     (el as any).context.emit('customEvent', { test: 123 });
-    expect(called).toBe(true);
+    expect(spy).toHaveBeenCalled();
     document.body.removeChild(el);
   });
 });

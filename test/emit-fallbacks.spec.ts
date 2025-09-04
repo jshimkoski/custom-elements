@@ -14,12 +14,12 @@ describe('emit fallback and ordering tests', () => {
     const handler = vi.fn();
     const cfg = {
       state: {},
-      props: { onHostFoo: { type: Function } },
+      props: { onFoo: { type: Function } },
       render(ctx: any) { return html`<div></div>`; }
     };
 
     const el = mount('test-emit-stop', cfg) as any;
-    el.onHostFoo = handler;
+    el.addEventListener('foo', (e: any) => handler(e.detail));
     await Promise.resolve();
 
     // Add a capturing listener on document that stops propagation so the
@@ -29,9 +29,10 @@ describe('emit fallback and ordering tests', () => {
 
     el.context.emit('foo', { x: 1 });
 
-    // handler should still be invoked once via emit fallback
-    expect(handler).toHaveBeenCalledTimes(1);
-    expect(handler).toHaveBeenCalledWith({ x: 1 }, el.context);
+  // Under the DOM-first emit behavior, a capturing stopPropagation on
+  // document prevents the event from reaching the element, so the handler
+  // should not be invoked.
+  expect(handler).toHaveBeenCalledTimes(0);
 
     document.removeEventListener('foo', cap, true);
     document.body.removeChild(el);
@@ -41,12 +42,12 @@ describe('emit fallback and ordering tests', () => {
     const propHandler = vi.fn();
     const cfg = {
       state: {},
-      props: { onHostBar: { type: Function } },
+      props: { onBar: { type: Function } },
       render(ctx: any) { return html`<div></div>`; }
     };
 
     const el = mount('test-emit-order', cfg) as any;
-    el.onHostBar = propHandler;
+    el.addEventListener('bar', (e: any) => propHandler(e.detail));
     await Promise.resolve();
 
     // Attach another listener manually after mount to vary ordering
@@ -56,8 +57,8 @@ describe('emit fallback and ordering tests', () => {
 
     el.context.emit('bar', { ok: true });
 
-    expect(propHandler).toHaveBeenCalledTimes(1);
-    expect(propHandler).toHaveBeenCalledWith({ ok: true }, el.context);
+  expect(propHandler).toHaveBeenCalledTimes(1);
+  expect(propHandler).toHaveBeenCalledWith({ ok: true });
 
     document.body.removeChild(el);
   });
@@ -66,19 +67,19 @@ describe('emit fallback and ordering tests', () => {
     const propHandler = vi.fn();
     const cfg = {
       state: {},
-      // No onHostBaz in config -> runtime will not wire a host listener
+      // No onBaz in config -> runtime will not wire a host listener
       render(ctx: any) { return html`<div></div>`; }
     };
 
     const el = mount('test-emit-nohost', cfg) as any;
-    // set element property handler
-    el.onHostBaz = propHandler;
+    // set host listener directly
+    el.addEventListener('baz', (e: any) => propHandler(e.detail));
     await Promise.resolve();
 
     el.context.emit('baz', { hi: 'there' });
 
-    expect(propHandler).toHaveBeenCalledTimes(1);
-    expect(propHandler).toHaveBeenCalledWith({ hi: 'there' }, el.context);
+  expect(propHandler).toHaveBeenCalledTimes(1);
+  expect(propHandler).toHaveBeenCalledWith({ hi: 'there' });
 
     document.body.removeChild(el);
   });

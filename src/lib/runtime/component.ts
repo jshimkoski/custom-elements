@@ -19,11 +19,6 @@ import { renderComponent, requestRender, applyStyle } from "./render";
 // --- Internal registry ---
 const registry = new Map<string, ComponentConfig<any, any, any>>();
 
-// Symbol used to mark events that were handled by a host listener.
-// Track events handled by host listeners without mutating the Event object.
-// WeakSet avoids leaks and prevents accidental collisions or tampering.
-const HOST_HANDLED = new WeakSet<Event>();
-
 // --- Hot Module Replacement (HMR) ---
 if (
   typeof import.meta !== 'undefined' &&
@@ -193,85 +188,36 @@ export function createElementClass<
       this.context = reactiveContext;
       this._applyProps(config);
 
-      // Inject emit helper for custom events
+      // Inject emit helper for custom events (single canonical event API).
+      // Emits a DOM CustomEvent and returns whether it was not defaultPrevented.
       Object.defineProperty(this.context, "emit", {
         value: (eventName: string, detail?: any, options?: CustomEventInit) => {
-          // Create the event so we can inspect whether a host listener handled it.
           const ev = new CustomEvent(eventName, {
             detail,
             bubbles: true,
             composed: true,
             ...(options || {})
           });
-
-          // Dispatch synchronously; host listeners (attached below) can mark the
-          // event with the shared symbol to indicate they ran.
+          // DOM-first: dispatch the event and return whether it was prevented
           this.dispatchEvent(ev);
-
-          // If a host listener handled the event, skip direct handler invocation
-          // to avoid double-calling the same logical handler.
-          if (HOST_HANDLED.has(ev)) return;
-
-          // Otherwise, call handlers in precedence: element prop -> context -> config
-          const handlerName = `onHost${eventName.charAt(0).toUpperCase()}${eventName.slice(1)}`;
-          const propHandler = typeof (this as any)[handlerName] === "function"
-            ? (this as any)[handlerName]
-            : undefined;
-          const contextHandler = typeof (this.context as any)[handlerName] === "function"
-            ? (this.context as any)[handlerName]
-            : undefined;
-          const configHandler = typeof (config as any)[handlerName] === "function"
-            ? (config as any)[handlerName]
-            : undefined;
-          if (propHandler) propHandler(detail, this.context);
-          if (contextHandler && contextHandler !== propHandler) contextHandler(detail, this.context);
-          if (configHandler && configHandler !== propHandler && configHandler !== contextHandler)
-            configHandler(detail, this.context);
+          return !ev.defaultPrevented;
         },
         writable: false,
         enumerable: false,
         configurable: false,
       });
 
-      // --- Inject config methods into state ---
+      // --- Inject config methods into context ---
+      // Expose config functions on the context as callable helpers. Event
+      // handling is DOM-first: use standard DOM event listeners or
+      // `context.emit` (which dispatches a DOM CustomEvent) to communicate
+      // with the host. There is no property-based host-callback dispatch.
       const cfgToUse = (registry.get(tag) as ComponentConfig<S, C, P, T>) || config;
-      const HOST_PREFIX = "onHost";
-      const getHostEventName = (k: string): string | null => {
-        if (!k.startsWith(HOST_PREFIX)) return null;
-        const raw = k.slice(HOST_PREFIX.length); // e.g. "Click"
-        if (!raw) return null;
-        return raw.charAt(0).toLowerCase() + raw.slice(1);
-      };
-
       Object.keys(cfgToUse).forEach((key) => {
         const fn = (cfgToUse as any)[key];
-        const hostEvent = getHostEventName(key);
-        if (typeof fn === "function" && !hostEvent) {
-          (this.context as any)[key] = (...args: any[]) =>
-            fn(...args, this.context);
-          return;
-        }
-        // Listen for host-level custom events (onHostX -> "x")
-        if (hostEvent) {
-          const eventName = hostEvent;
-          this.addEventListener(eventName, (e: Event) => {
-              // Mark the event so emit knows a host listener ran.
-              HOST_HANDLED.add(e as Event);
-
-              // Resolve single handler in precedence: element prop -> context -> config
-              const propHandler = typeof (this as any)[key] === "function"
-                ? (this as any)[key]
-                : undefined;
-              const contextHandler = typeof (this.context as any)[key] === "function"
-                ? (this.context as any)[key]
-                : undefined;
-              const configHandler = typeof (cfgToUse as any)[key] === "function"
-                ? (cfgToUse as any)[key]
-                : undefined;
-
-              const handler = propHandler ?? contextHandler ?? configHandler;
-              if (typeof handler === 'function') handler((e as CustomEvent).detail, this.context);
-          });
+        if (typeof fn === "function") {
+          // Expose as context method: context.fn(...args) => fn(...args, context)
+          (this.context as any)[key] = (...args: any[]) => fn(...args, this.context);
         }
       });
 

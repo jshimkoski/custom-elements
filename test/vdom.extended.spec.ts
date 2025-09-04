@@ -242,7 +242,7 @@ describe('vdom.ts', () => {
     });
     it('adds event listeners', () => {
       const fn = vi.fn();
-      patchProps(el, { props: {}, attrs: {} }, { props: { onHostClick: fn }, attrs: {} });
+  patchProps(el, { props: {}, attrs: {} }, { props: { onClick: fn }, attrs: {} });
       el.dispatchEvent(new Event('click'));
       expect(fn).toHaveBeenCalled();
     });

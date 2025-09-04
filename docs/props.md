@@ -26,14 +26,15 @@ component("user-card", {
 
 ### 🛠️ Function Props (Event Handlers)
 
-Set function props as properties on the element instance (not as attributes):
+Set function props as properties on the element instance (not as attributes).
+In many cases you can attach a DOM listener instead (preferred for cross-framework
+compatibility):
 
 ```typescript
 const el = document.createElement('user-card');
-// assign a host-level callback using the runtime convention
-el.onHostCustomEvent = (detail, ctx) => {
-  // handle event
-};
+el.addEventListener('custom-event', (e) => {
+  // handle e.detail
+});
 document.body.appendChild(el);
 ```
 
