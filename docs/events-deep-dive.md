@@ -104,42 +104,6 @@ function handleOpen(ev: Event) {
 
 Recommendation: avoid reusing native event names (like `click`) for semantic payload events; use descriptive names such as `open`, `save`, or `activate`.
 
-## Event modifiers
-
-The template compiler supports event modifiers on `@` event bindings. These modifiers are parsed at compile-time and emit a small wrapper or descriptor so the resulting listener enforces the modifiers at runtime.
-
-Supported modifiers
-- Behavior modifiers: `.prevent` (calls `event.preventDefault()`), `.stop` (`event.stopPropagation()`), `.self` (only call handler when `event.target === event.currentTarget`).
-- Listener options: `.once`, `.capture`, `.passive` — when available these are forwarded to `addEventListener` as options (or emulated where the environment doesn't support the options API).
-- Mouse buttons: `.left`, `.middle`, `.right` — only invoke the handler when `event.button` matches the requested button.
-- Keyboard keys and modifier keys: named keys such as `.enter`, `.esc`, `.space` and modifier keys `.ctrl`, `.shift`, `.alt`, `.meta` are supported. The compiler maps common key names to `event.key` values and the runtime checks the key/modifier combination before calling your handler.
-
-How it works
-- At compile time the template compiler inspects `@event` attribute modifiers and produces either a listener descriptor (with `options` like `once`, `capture`, `passive`) or a tiny wrapper function that performs runtime checks (key name matching, mouse button check, `.self`) and applies `preventDefault()` / `stopPropagation()` as requested before invoking your handler.
-- This keeps the runtime lightweight: addEventListener gets real options where possible, and any per-event filtering (keys, mouse buttons) happens in a fast guard inside the generated handler.
-- Modifiers that correspond to event-listener options are preferred to be passed as options to `addEventListener` because the browser can optimize them. The wrapper is only used for runtime checks that can't be expressed via `addEventListener` options.
-
-Examples
-
-Inline template syntax:
-
-```html
-<!-- call handler and prevent default + stop propagation -->
-<button @click.prevent.stop="${onClick}">Save</button>
-
-<!-- only trigger on Enter key down -->
-<input @keydown.enter="${onEnter}" />
-
-<!-- handler runs only for left mouse button -->
-<div @mousedown.left="${onMouseDown}">Drag</div>
-```
-
-Notes and guidance
-- These modifiers are available only through the template binding syntax (they're compiled into the listener wiring). If you attach listeners imperatively with `addEventListener` you must implement the same checks yourself.
-- Use `.once`, `.passive`, and `.capture` when they're meaningful — the compiler will leverage native options where supported.
-- Keyboard name matching uses a small canonical map for common keys; if you need exact behavior for exotic or locale-dependent keys, check `event.key` in your handler for full control.
-- Mouse button and keyboard modifiers are disambiguated: e.g., `.left` filters `event.button` while `.enter` filters `event.key` — combining incompatible modifiers is a no-op for the unrelated checks.
-
 ## Interoperability guidance
 
 - Prefer DOM CustomEvents for cross-framework communication.

@@ -43,113 +43,6 @@ export function parseProps(
   const attrs: Record<string, any> = {};
   const directives: Record<string, { value: any; modifiers: string[] }> = {};
 
-  /**
-   * Build an event listener wrapper and optional options object from a raw value and modifiers.
-   * Returns either a plain function (EventListener) or an object { handler, options } when addEventListener options are needed.
-   */
-  function buildEventListener(rawVal: any, modifiers: string[], ctx: Record<string, any>) {
-    const handler =
-      typeof rawVal === "function"
-        ? rawVal
-        : typeof ctx[rawVal] === "function"
-        ? ctx[rawVal]
-        : undefined;
-    if (typeof handler !== "function") return undefined;
-
-    const shouldPrevent = modifiers.includes("prevent");
-    const shouldStop = modifiers.includes("stop");
-    const shouldStopImmediate =
-      modifiers.includes("stopImmediate") || modifiers.includes("stopImmediatePropagation");
-    const shouldSelf = modifiers.includes("self");
-    const onlyLeft = modifiers.includes("left");
-    const onlyMiddle = modifiers.includes("middle");
-    const onlyRight = modifiers.includes("right");
-
-    // Modifier keys (require these modifier keys to be true)
-    const requireCtrl = modifiers.includes("ctrl") || modifiers.includes("control");
-    const requireAlt = modifiers.includes("alt") || modifiers.includes("option");
-    const requireShift = modifiers.includes("shift");
-    const requireMeta = modifiers.includes("meta") || modifiers.includes("cmd") || modifiers.includes("command");
-
-    // Key name mapping (short names -> KeyboardEvent.key values)
-    const keyMap: Record<string, string> = {
-      enter: "Enter",
-      tab: "Tab",
-      space: " ",
-      spacebar: " ",
-      esc: "Escape",
-      escape: "Escape",
-      del: "Delete",
-      delete: "Delete",
-      backspace: "Backspace",
-      up: "ArrowUp",
-      down: "ArrowDown",
-      left: "ArrowLeft",
-      right: "ArrowRight",
-      home: "Home",
-      end: "End",
-      pageup: "PageUp",
-      pagedown: "PageDown",
-      insert: "Insert",
-      pause: "Pause",
-    };
-
-    // Collect any key name modifiers (e.g., .enter, .esc)
-    let keyNameModifiers = modifiers.filter((m) => keyMap[m]);
-    // If mouse-button modifiers are present, prefer them and drop conflicting key-name modifiers
-    if (onlyLeft || onlyMiddle || onlyRight) {
-      keyNameModifiers = keyNameModifiers.filter((m) => m !== 'left' && m !== 'middle' && m !== 'right');
-    }
-
-    const wrapper: EventListener = function (event: Event) {
-      // Mouse button filters
-      if (onlyLeft || onlyMiddle || onlyRight) {
-        if (event instanceof MouseEvent) {
-          if (onlyLeft && event.button !== 0) return;
-          if (onlyMiddle && event.button !== 1) return;
-          if (onlyRight && event.button !== 2) return;
-        }
-      }
-
-      // Modifier key requirements
-      if (requireCtrl && !(event as KeyboardEvent).ctrlKey) return;
-      if (requireAlt && !(event as KeyboardEvent).altKey) return;
-      if (requireShift && !(event as KeyboardEvent).shiftKey) return;
-      if (requireMeta && !(event as KeyboardEvent).metaKey) return;
-
-      // Key name filters (e.g., .enter)
-      if (keyNameModifiers.length > 0) {
-        const evKey = (event as KeyboardEvent).key;
-        // If event doesn't have key or doesn't match any required key, bail
-        if (!evKey) return;
-        const matches = keyNameModifiers.some((km) => keyMap[km] === evKey);
-        if (!matches) return;
-      }
-
-      if (shouldSelf && event.target !== event.currentTarget) return;
-      if (shouldPrevent) event.preventDefault();
-      if (shouldStop) event.stopPropagation();
-      if (shouldStopImmediate) event.stopImmediatePropagation();
-
-      // Call handler: if original was interpolation (function) call as-is, otherwise call with ctx as this
-      try {
-        if (typeof rawVal === "function") return (rawVal as Function).call(undefined, event);
-        return (handler as Function).call(ctx, event);
-      } catch (err) {
-        // Swallow errors here to avoid breaking render loop; let user handle errors inside handler
-        throw err;
-      }
-    };
-
-    const options: AddEventListenerOptions = {};
-    if (modifiers.includes("once")) options.once = true;
-    if (modifiers.includes("capture")) options.capture = true;
-    if (modifiers.includes("passive")) options.passive = true;
-
-    const hasOptions = Object.keys(options).length > 0;
-    return hasOptions ? { handler: wrapper, options } : wrapper;
-  }
-
   // Match attributes with optional prefix and support for single/double quotes
   const attrRegex =
     /([:@#]?)([a-zA-Z0-9-:\.]+)=("([^"\\]*(\\.[^"\\]*)*)"|'([^'\\]*(\\.[^'\\]*)*)')/g;
@@ -189,14 +82,14 @@ export function parseProps(
         attrs[rawName] = value;
       }
     } else if (prefix === "@") {
-      // Map @event to an `on<Event>` prop (DOM-first event listener convention).
-      // Support event modifiers: @click.prevent.stop.once.capture.passive.self.left/right/middle
-      const parts = rawName.split(".");
-      const eventName = parts[0];
-      const modifiers = parts.slice(1);
-      const onName = "on" + eventName.charAt(0).toUpperCase() + eventName.slice(1);
-      const listener = buildEventListener(value, modifiers, context);
-      if (listener !== undefined) props[onName] = listener;
+      // Map @event to an `on<Event>` prop (DOM-first event listener convention)
+      const onName = "on" + rawName.charAt(0).toUpperCase() + rawName.slice(1);
+      props[onName] =
+        typeof value === "function"
+          ? value
+          : typeof context[value] === "function"
+          ? context[value]
+          : undefined;
     } else if (rawName === "ref") {
       props.ref = value;
     } else {

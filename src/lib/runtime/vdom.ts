@@ -356,23 +356,6 @@ function eventNameFromKey(key: string): string {
 }
 
 /**
- * Normalize a listener entry which may be a function or an object { handler, options }.
- * Returns tuple [handlerFunction, options]
- */
-function normalizeListenerEntry(
-  maybe: any,
-): [EventListener | undefined, AddEventListenerOptions | undefined] {
-  if (!maybe) return [undefined, undefined];
-  if (typeof maybe === "function") return [maybe as EventListener, undefined];
-  if (typeof maybe === "object") {
-    if (typeof maybe.handler === "function") return [maybe.handler as EventListener, maybe.options as AddEventListenerOptions];
-    // If object is already like { handler, options } renamed keys
-    if (typeof maybe.fn === "function") return [maybe.fn as EventListener, maybe.options as AddEventListenerOptions];
-  }
-  return [undefined, undefined];
-}
-
-/**
  * Process :bind directive for attribute/property binding
  * @param value 
  * @param props 
@@ -730,14 +713,11 @@ export function patchProps(
         if (el.value !== newVal) el.value = newVal ?? "";
       } else if (key === "checked" && el instanceof HTMLInputElement) {
         el.checked = !!newVal;
-    } else if (key.startsWith("on")) {
+    } else if (key.startsWith("on") && typeof newVal === "function") {
       // DOM-first listener: onClick -> click
       const ev = eventNameFromKey(key);
-      const [newHandler, newOptions] = normalizeListenerEntry(newVal);
-      const [oldHandler, oldOptions] = normalizeListenerEntry(oldVal);
-
-      if (oldHandler) el.removeEventListener(ev, oldHandler, oldOptions);
-      if (newHandler) el.addEventListener(ev, newHandler, newOptions);
+      if (typeof oldVal === "function") el.removeEventListener(ev, oldVal);
+      el.addEventListener(ev, newVal);
       } else if (newVal === undefined || newVal === null || newVal === false) {
         el.removeAttribute(key);
       } else {
@@ -750,8 +730,7 @@ export function patchProps(
   for (const [eventType, listener] of Object.entries(
     processedDirectives.listeners || {},
   )) {
-  const [handler, options] = normalizeListenerEntry(listener);
-  if (handler) el.addEventListener(eventType, handler, options);
+    el.addEventListener(eventType, listener as EventListener);
   }
 
   const oldAttrs = oldProps.attrs ?? {};
@@ -880,9 +859,8 @@ export function createElement(
       el.value = val ?? "";
     } else if (key === "checked" && el instanceof HTMLInputElement) {
       el.checked = !!val;
-    } else if (key.startsWith("on")) {
-      const [handler, options] = normalizeListenerEntry(val);
-      if (handler) el.addEventListener(eventNameFromKey(key), handler, options);
+    } else if (key.startsWith("on") && typeof val === "function") {
+      el.addEventListener(eventNameFromKey(key), val);
     } else if (key.startsWith("on") && val === undefined) {
       continue; // skip undefined event handlers
     } else if (val === undefined || val === null || val === false) {
