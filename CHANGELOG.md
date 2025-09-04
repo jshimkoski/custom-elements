@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v0.2.1] - 2025-09-04
+
+- revert: remove event modifiers implementation and related tests (4e0fbae)
+- feat: add support for event modifiers in template syntax and enhance event listener handling (ef86059)
+
+
 ## [v0.2.0] - 2025-09-04
 
 - feat: add support for event modifiers in template syntax and enhance event listener handling (ef86059)
