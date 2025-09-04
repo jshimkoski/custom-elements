@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v0.2.2] - 2025-09-04
+
+- fix: enhance component typing and add reserved keys warning (d274d2d)
+- revert: remove event modifiers implementation and related tests (4e0fbae)
+
+
 ## [v0.2.1] - 2025-09-04
 
 - revert: remove event modifiers implementation and related tests (4e0fbae)
