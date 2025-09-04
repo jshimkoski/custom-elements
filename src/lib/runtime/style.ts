@@ -260,7 +260,9 @@ export const colors: Record<string, Record<string, string>> = {
     900: "var(--color-rose-900, #881337)",
   },
   white: { DEFAULT: "var(--color-white, #ffffff)" },
-  black: { DEFAULT: "var(--color-black, #000000)" }
+  black: { DEFAULT: "var(--color-black, #000000)" },
+  transparent: { DEFAULT: "var(--color-transparent, transparent)" },
+  current: { DEFAULT: "var(--color-current, currentColor)" }
 };
 
 export const utilityMap: CSSMap = {
@@ -377,13 +379,6 @@ export const utilityMap: CSSMap = {
   "rounded-lg": "border-radius:0.5rem;",
   "rounded-full": "border-radius:9999px;",
 
-  /* Ring (box-shadow for focus) */
-  "ring-0": "box-shadow:none;",
-  "ring-1": "box-shadow:0 0 0 1px rgba(59,130,246,0.5);",
-  "ring-2": "box-shadow:0 0 0 2px rgba(59,130,246,0.5);",
-  "ring-4": "box-shadow:0 0 0 4px rgba(59,130,246,0.5);",
-  "ring-8": "box-shadow:0 0 0 8px rgba(59,130,246,0.5);",
-
   /* Shadow and effects */
   "shadow-none": "box-shadow:0 0 #0000;",
   "shadow-xs": "box-shadow:0 1px 2px 0 rgb(0 0 0 / 0.05);",
@@ -392,9 +387,6 @@ export const utilityMap: CSSMap = {
   "shadow-lg": "box-shadow:0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);",
   "shadow-xl": "box-shadow:0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);",
   "shadow-2xl": "box-shadow:0 25px 50px -12px rgb(0 0 0 / 0.25);",
-
-  /* Transitions */
-  transition: "transition-property:all;transition-duration:150ms;transition-timing-function:cubic-bezier(0.4,0,0.2,1);",
 
   /* Text Overflow & Whitespace */
   truncate: "overflow:hidden;text-overflow:ellipsis;white-space:nowrap;",
@@ -451,10 +443,14 @@ export const utilityMap: CSSMap = {
   "line-clamp-3": "display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;",
   "line-clamp-4": "display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;",
 
-  /* Transition Delay/Property */
+  /* Transitions */
+  transition: "transition-property:all;transition-duration:150ms;transition-timing-function:ease-in-out;",
+  "transition-all": "transition-property:all;",
   "transition-colors": "transition-property:color,background-color,border-color,text-decoration-color,fill,stroke;",
+  "transition-shadow": "transition-property:box-shadow;",
   "transition-opacity": "transition-property:opacity;",
   "transition-transform": "transition-property:transform;",
+  "transition-none": "transition-property:none;",
 
   /* Z-index */
   "z-0": "z-index:0;",
@@ -700,6 +696,7 @@ export function parseArbitrary(className: string): string | null {
     const propMap: Record<string, string> = {
       bg: "background-color",
       text: "color",
+      shadow: "box-shadow",
       p: "padding",
       px: "padding-inline",
       py: "padding-block",
@@ -718,7 +715,9 @@ export function parseArbitrary(className: string): string | null {
       "border-r": "border-right",
       "border-x": "border-inline",
       "border-y": "border-block",
-      shadow: "box-shadow",
+      transition: "transition-property",
+      ease: "transition-timing-function",
+      delay: "transition-delay",
       duration: "transition-duration",
       list: "list-style",
       break: "word-break",
@@ -732,7 +731,6 @@ export function parseArbitrary(className: string): string | null {
       basis: "flex-basis",
       tracking: "letter-spacing",
       scroll: "scroll-behavior",
-      delay: "transition-delay",
       weight: "font-weight",
       leading: "line-height",
       z: "z-index",
@@ -886,7 +884,7 @@ export function jitCSS(html: string): string {
 
     // Find base utility
     let important = false;
-    let basePart = parts.find(p => {
+    const basePart = parts.find(p => {
       if (p.startsWith("!")) {
         important = true;
         p = p.slice(1);

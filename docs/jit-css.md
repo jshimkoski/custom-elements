@@ -43,9 +43,6 @@ Custom Elements Runtime provides a high-performance, zero-dependency JIT CSS eng
 **Borders & Radius:**
 `border`, `rounded-none`, `rounded-xs`, `rounded` (alias `rounded-md`), `rounded-sm`, `rounded-md`, `rounded-lg`, `rounded-full`
 
-**Ring (Focus):**
-`ring-0`, `ring-1`, `ring-2`, `ring-4`, `ring-8`
-
 **Shadow & Effects:**
 `shadow-none`, `shadow-xs`, `shadow-sm`, `shadow-md`, `shadow-lg`, `shadow-xl`, `shadow-2xl`
 
@@ -71,7 +68,7 @@ Custom Elements Runtime provides a high-performance, zero-dependency JIT CSS eng
 `line-clamp-1`, `line-clamp-2`, `line-clamp-3`, `line-clamp-4`
 
 **Transition Delay/Property:**
-`transition-colors`, `transition-opacity`, `transition-transform`
+`transition`, `transition-all`, `transition-colors`, `transition-shadow`, `transition-opacity`, `transition-transform`, `transition-none`
 
 **Colors:**
 `bg-gray-100`, `text-blue-500`, `border-red-500`, `shadow-blue-500`, etc. (full palette, semantic, and arbitrary)
@@ -94,7 +91,7 @@ For a complete list, see the `utilityMap` in [`src/lib/runtime/style.ts`](../src
 
 **Example:**
 ```html
-<button class="bg-blue-500 hover:bg-blue-600 focus:ring-2">Hover & Focus</button>
+<button class="bg-blue-500 hover:bg-blue-600 focus:shadow-sm">Hover & Focus</button>
 <div class="group">
   <span class="group-hover:text-blue-500">Group Hover</span>
 </div>
@@ -190,6 +187,8 @@ JIT CSS provides a rich set of built-in color palettes, all accessible via utili
 - `rose` (50-900)
 - `white` (DEFAULT)
 - `black` (DEFAULT)
+- `transparent` (DEFAULT)
+- `current` (DEFAULT, maps to `currentColor`)
 
 **Opacity Modifiers:**
 

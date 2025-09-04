@@ -50,10 +50,10 @@ describe('jitCSS', () => {
   });
 
   it('supports variants', () => {
-    const html = '<button class="hover:bg-blue-500 focus:ring-2"></button>';
+    const html = '<button class="hover:bg-blue-500 focus:shadow-xl"></button>';
     const css = jitCSS(html);
     expect(css).toContain('.hover\\:bg-blue-500:hover');
-    expect(css).toContain('.focus\\:ring-2:focus');
+    expect(css).toContain('.focus\\:shadow-xl:focus');
   });
 
   it('supports responsive variants', () => {
