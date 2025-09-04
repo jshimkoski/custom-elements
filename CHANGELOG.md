@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v0.2.3] - 2025-09-04
+
+- fix: remove ring utility, add transition utilities and arbitrary helpers, add transparent and currentColor (4cd9e23)
+- fix: enhance component typing and add reserved keys warning (d274d2d)
+
+
 ## [v0.2.2] - 2025-09-04
 
 - fix: enhance component typing and add reserved keys warning (d274d2d)
