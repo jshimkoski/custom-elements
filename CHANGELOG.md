@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v0.1.25] - 2025-09-04
+
+- refactor: transition to DOM-first events API and remove host-level handler conventions (3b5f98c)
+- fix: Introduce host-level event handling with `onHost<Event>` convention (996be52)
+
+
 ## [v0.1.24] - 2025-09-03
 
 - fix: Introduce host-level event handling with `onHost<Event>` convention (996be52)
