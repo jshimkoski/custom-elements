@@ -2,9 +2,25 @@
  * FormInputValidation: A form with input validation and error handling.
  * Demonstrates ctx, validation, and error feedback.
  */
-import { component, html, when } from '../../lib';
+import { component, html, when, type ComponentContext } from '../../lib';
 
-component('form-input-validation', (ctx) => html`
+type State = {
+  email: string;
+  username: string;
+  bio: string;
+  gender: string;
+  subscribe: boolean;
+  fruits: string[];
+  country: string;
+  errorMessage: string;
+  successMessage: string;
+};
+
+type Methods = {
+  submit: (event: Event, ctx: ComponentContext<State, {}, Methods>) => void;
+};
+
+component<State, {}, {}, Methods>('form-input-validation', (ctx) => html`
   <form
     class="max-w-128 mx-auto p-8 rounded-lg shadow bg-white dark:bg-black text-black dark:text-white shadow-lg border border-neutral-100 dark:border-neutral-900"
     @submit="${ctx.submit}"
@@ -71,15 +87,15 @@ component('form-input-validation', (ctx) => html`
           <option value="uk">United Kingdom</option>
         </select>
       </label>
-      ${when(ctx.error !== '', html`
-        <div class="mb-6 text-sm text-red-600 dark:text-red-400">${ctx.error}</div>
+      ${when(ctx.errorMessage !== '', html`
+        <div class="mb-6 text-sm text-red-600 dark:text-red-400">${ctx.errorMessage}</div>
       `)}
       <button
         type="submit"
         class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:bg-blue-700"
       >Submit</button>
-      ${when(ctx.success !== '', html`
-        <div class="mt-4 text-sm text-green-600 dark:text-green-400">${ctx.success}</div>
+      ${when(ctx.successMessage !== '', html`
+        <div class="mt-4 text-sm text-green-600 dark:text-green-400">${ctx.successMessage}</div>
       `)}
     </fieldset>
   </form>
@@ -92,8 +108,8 @@ component('form-input-validation', (ctx) => html`
     subscribe: false,
     fruits: [],
     country: '',
-    error: '',
-    success: '',
+    errorMessage: '',
+    successMessage: '',
   },
   async onConnected(ctx) {
     console.log("Verifying refs", ctx.refs);
@@ -101,39 +117,39 @@ component('form-input-validation', (ctx) => html`
   },
   async submit(event, ctx) {
     event.preventDefault();
-    ctx.error = '';
-    ctx.success = '';
+    ctx.errorMessage = '';
+    ctx.successMessage = '';
     // Email validation
     if (!ctx.email.match(/^[^@\s]+@[^@\s]+\.[^@\s]+$/)) {
-      ctx.error = 'Please enter a valid email address.';
+    ctx.errorMessage = 'Please enter a valid email address.';
       return;
     }
     // Username validation
     if (!ctx.username || ctx.username.length < 3) {
-      ctx.error = 'Username must be at least 3 characters.';
+    ctx.errorMessage = 'Username must be at least 3 characters.';
       return;
     }
     // Bio validation
     if (!ctx.bio || ctx.bio.length < 10) {
-      ctx.error = 'Bio must be at least 10 characters.';
+    ctx.errorMessage = 'Bio must be at least 10 characters.';
       return;
     }
     // Gender validation
     if (!ctx.gender) {
-      ctx.error = 'Please select a gender.';
+    ctx.errorMessage = 'Please select a gender.';
       return;
     }
     // Country validation
     if (!ctx.country) {
-      ctx.error = 'Please select a country.';
+    ctx.errorMessage = 'Please select a country.';
       return;
     }
     // Fruits validation (at least one)
     if (!Array.isArray(ctx.fruits) || ctx.fruits.length === 0) {
-      ctx.error = 'Please select at least one favorite fruit.';
+    ctx.errorMessage = 'Please select at least one favorite fruit.';
       return;
     }
-    ctx.success = 'Form submitted successfully!';
+    ctx.successMessage = 'Form submitted successMessagefully!';
     // Reset form fields
     ctx.email = '';
     ctx.username = '';
@@ -144,7 +160,7 @@ component('form-input-validation', (ctx) => html`
     ctx.country = '';
 
     await setTimeout(() => {
-      ctx.success = '';
+      ctx.successMessage = '';
     }, 3000);
   },
 });

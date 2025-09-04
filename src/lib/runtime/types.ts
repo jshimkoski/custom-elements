@@ -62,9 +62,17 @@ export type WatchConfig<S> =
     }
   | Record<string, WatchCallback | [WatchCallback, WatchOptions?]>;
 
+// Drop the last element from a tuple type
+type DropLast<T extends any[]> = T extends [...infer Rest, any] ? Rest : T;
+
+// Wrap a function type by removing its last parameter (the injected ctx)
+type WrapMethod<F> = F extends (...args: infer A) => infer R
+  ? (...args: DropLast<A>) => R
+  : never;
+
 export type InferMethods<T> = {
-  [K in keyof T as K extends LifecycleKeys ? never : K]: T[K] extends Function
-    ? T[K]
+  [K in keyof T as K extends LifecycleKeys ? never : K]: T[K] extends (...args: any[]) => any
+    ? WrapMethod<T[K]>
     : never;
 };
 
@@ -76,20 +84,25 @@ export type ComponentContext<
   S extends object,
   C extends object,
   P extends object,
-  T extends object = any,
+  T extends object = {},
 > = S & C & P & InferMethods<T> & Refs & {
   requestRender?: () => void;
   error?: Error | null;
   hasError?: boolean;
   isLoading?: boolean;
+  /**
+   * Dispatch a DOM CustomEvent from the host element.
+   * Returns true when the event was not defaultPrevented.
+   */
+  emit: <D = any>(eventName: string, detail?: D, options?: CustomEventInit) => boolean;
 };
 
-export interface ComponentConfig<
+export type ComponentConfig<
   S extends object,
   C extends object = {},
   P extends object = {},
-  T extends object = any,
-> {
+  T extends object = {},
+> = {
   state?: S;
   computed?: { [K in keyof C]: (context: ComponentContext<S, C, P, T>) => C[K] };
   props?: Record<
@@ -127,5 +140,10 @@ export interface ComponentConfig<
     error: Error | null,
     context: ComponentContext<S, C, P, T>,
   ) => string;
-  [key: string]: any;
-}
+} & {
+  // Map injected methods from the T generic onto the config object so
+  // function properties keep their parameter types when a caller supplies
+  // the fourth generic. Lifecycle keys are excluded because they're
+  // declared above with explicit signatures.
+  [K in keyof T as K extends LifecycleKeys ? never : K]: T[K] extends Function ? T[K] : never;
+};

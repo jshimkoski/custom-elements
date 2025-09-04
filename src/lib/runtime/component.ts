@@ -76,6 +76,48 @@ export function component<
     };
   }
 
+  // Developer-time warning: detect when component authors use keys that
+  // collide with runtime-injected context helpers (refs, error, etc.).
+  // This is a non-fatal console warning to help avoid confusing TS errors
+  // and runtime shadowing.
+  try {
+    const RESERVED_KEYS = new Set([
+      "refs",
+      "requestRender",
+      "error",
+      "hasError",
+      "isLoading",
+      "emit",
+    ]);
+
+    const collisions: string[] = [];
+    if (finalConfig.state && typeof finalConfig.state === "object") {
+      Object.keys(finalConfig.state).forEach((k) => {
+        if (RESERVED_KEYS.has(k)) collisions.push(k);
+      });
+    }
+    if (finalConfig.props && typeof finalConfig.props === "object") {
+      Object.keys(finalConfig.props).forEach((k) => {
+        if (RESERVED_KEYS.has(k)) collisions.push(k);
+      });
+    }
+    if (finalConfig.computed && typeof finalConfig.computed === "object") {
+      Object.keys(finalConfig.computed).forEach((k) => {
+        if (RESERVED_KEYS.has(k)) collisions.push(k);
+      });
+    }
+    if (collisions.length > 0) {
+      const unique = Array.from(new Set(collisions));
+      console.warn(
+        `[${normalizedTag}] Reserved runtime context keys used in component config: ${unique.join(", ")}. ` +
+          `These names are provided by the runtime (for example: refs, error, emit). ` +
+          `Rename your state/prop/computed keys (e.g. 'error' -> 'errorMessage') to avoid collisions and TypeScript type conflicts.`
+      );
+    }
+  } catch (e) {
+    // swallow any check-time errors; this is purely a dev convenience
+  }
+
   registry.set(normalizedTag, finalConfig);
   if (typeof window !== "undefined") {
     // If the custom element is not defined yet, define it.
@@ -279,7 +321,7 @@ export function createElementClass<
       return config.props ? Object.keys(config.props).map(toKebab) : [];
     }
 
-    private _applyComputed(cfg: ComponentConfig<S, C, P>) {
+    private _applyComputed(cfg: ComponentConfig<S, C, P, T>) {
       this._runLogicWithinErrorBoundary(config, () => {
         if (!cfg.computed) return;
         Object.entries(cfg.computed).forEach(([key, fn]) => {
@@ -295,7 +337,7 @@ export function createElementClass<
     }
 
     // --- Render ---
-    private _render(cfg: ComponentConfig<S, C, P>) {
+    private _render(cfg: ComponentConfig<S, C, P, T>) {
       this._runLogicWithinErrorBoundary(cfg, () => {
         renderComponent(
           this.shadowRoot,
@@ -362,7 +404,7 @@ export function createElementClass<
 
     // --- Error Boundary function ---
     private _runLogicWithinErrorBoundary(
-      cfg: ComponentConfig<S, C, P>,
+      cfg: ComponentConfig<S, C, P, T>,
       fn: () => void,
     ) {
       if (this._hasError) this._hasError = false;
@@ -385,7 +427,7 @@ export function createElementClass<
     }
 
     // --- State, props, computed ---
-    private _initContext(cfg: ComponentConfig<S, C, P>): ComponentContext<S, C, P, T> {
+    private _initContext(cfg: ComponentConfig<S, C, P, T>): ComponentContext<S, C, P, T> {
       try {
         const self = this;
         function createReactive(obj: any, path = ""): any {
@@ -480,7 +522,7 @@ export function createElementClass<
       }
     }
 
-    private _initWatchers(cfg: ComponentConfig<S, C, P>): void {
+    private _initWatchers(cfg: ComponentConfig<S, C, P, T>): void {
       this._runLogicWithinErrorBoundary(cfg, () => {
         initWatchers(
           this.context,
@@ -494,7 +536,7 @@ export function createElementClass<
       triggerWatchers(this.context, this._watchers, path, newValue);
     }
 
-    private _applyProps(cfg: ComponentConfig<S, C, P>): void {
+    private _applyProps(cfg: ComponentConfig<S, C, P, T>): void {
       this._runLogicWithinErrorBoundary(cfg, () => {
         try {
           applyProps(this, cfg, this.context);

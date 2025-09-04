@@ -61,6 +61,7 @@ Explore the full documentation for every runtime feature:
 - [Bindings](./docs/bindings.md)
 - [Events](./docs/events-deep-dive.md)
 - [Slot](./docs/slot.md)
+- [Typing Components](./docs/typing-components.md)
 - [Advanced Usage Patterns](./docs/advanced-usage-patterns.md)
 - [Cross-Component Communication](./docs/cross-component-communication.md)
 

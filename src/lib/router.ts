@@ -67,6 +67,7 @@ export interface RouterLinkProps {
   ariaCurrentValue: string;
   disabled: boolean;
   external: boolean;
+  class?: string;
   style: string;
 }
 
