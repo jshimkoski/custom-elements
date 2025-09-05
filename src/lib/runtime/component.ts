@@ -16,8 +16,23 @@ import {
 } from "./lifecycle";
 import { renderComponent, requestRender, applyStyle } from "./render";
 
-// --- Internal registry ---
-const registry = new Map<string, ComponentConfig<any, any, any>>();
+/**
+ * @internal
+ * Runtime registry of component configs.
+ * NOTE: This is an internal implementation detail. Do not import from the
+ * published package in consumer code — it is intended for runtime/HMR and
+ * internal tests only. Consumers should use the public `component` API.
+ */
+export const registry = new Map<string, ComponentConfig<any, any, any>>();
+
+// Expose the registry for browser/HMR use without overwriting existing globals
+// (avoid cross-request mutation in SSR and preserve HMR behavior).
+const GLOBAL_REG_KEY = Symbol.for('cer.registry');
+if (typeof window !== 'undefined') {
+  const g = globalThis as any;
+  // Authoritative, collision-safe slot for programmatic access
+  if (!g[GLOBAL_REG_KEY]) g[GLOBAL_REG_KEY] = registry;
+}
 
 // --- Hot Module Replacement (HMR) ---
 if (
@@ -228,7 +243,11 @@ export function createElementClass<
 
       // --- Apply props BEFORE wiring listeners and emit ---
       this.context = reactiveContext;
-      this._applyProps(config);
+      // Defer applying props until connectedCallback so attributes that are
+      // set by the parent renderer (after element construction) are available.
+      // applyProps will still be invoked from attributeChangedCallback when
+      // attributes are set; connectedCallback will call it as a final step to
+      // ensure defaults are applied when no attributes are present.
 
       // Inject emit helper for custom events (single canonical event API).
       // Emits a DOM CustomEvent and returns whether it was not defaultPrevented.
@@ -276,6 +295,9 @@ export function createElementClass<
 
     connectedCallback() {
       this._runLogicWithinErrorBoundary(config, () => {
+        // Ensure props reflect attributes set by the parent renderer before
+        // invoking lifecycle hooks.
+        this._applyProps(config);
         handleConnected(
           config,
           this.context,

@@ -1,7 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
-  getNestedValue,
-  setNestedValue,
+  
   processBindDirective,
   processStyleDirective,
   processClassDirective,
@@ -11,6 +10,7 @@ import {
   processDirectives,
   patchProps,
 } from '../src/lib/runtime/vdom';
+import { getNestedValue, setNestedValue } from '../src/lib/runtime/helpers';
 
 describe('vdom additional helpers', () => {
   it('getNestedValue and setNestedValue work for dot paths', () => {

@@ -38,6 +38,90 @@ component("ssr-demo", {
 - On the server: `render` returns a VNode, which is converted to HTML.
 - On the client: The runtime hydrates the markup and enables interactivity.
 
+## ✉️ Rendering to string with `renderToString`
+
+The runtime exports `renderToString` (see `src/lib/index.ts`) which serializes VNode trees to HTML for server output. Use `html` to build VNodes on the server and `renderToString` to produce markup.
+
+Basic usage
+
+```typescript
+import { html, renderToString } from "@jasonshimmy/custom-elements-runtime";
+
+const vnode = html`<div>Hello ${"world"}</div>`;
+const htmlString = renderToString(vnode);
+// -> '<div>Hello world</div>'
+```
+
+Rendering a component render function
+
+```typescript
+// components/hello.ts
+export function renderHello(ctx: { name: string }) {
+  return html`<div>Hello ${ctx.name}</div>`;
+}
+
+// server.js
+import { renderToString } from "@jasonshimmy/custom-elements-runtime";
+import { renderHello } from "./components/hello";
+
+const vnode = renderHello({ name: "Alice" });
+const html = renderToString(vnode);
+```
+
+Async renders
+
+If `render` returns a Promise, await it before stringifying:
+
+```ts
+const vnode = await maybeAsyncRender(ctx);
+const html = renderToString(vnode);
+```
+
+Minimal server example
+
+```js
+import http from "node:http";
+import { renderToString } from "@jasonshimmy/custom-elements-runtime";
+import { renderHello } from "./components/hello";
+
+http.createServer((req, res) => {
+  const vnode = renderHello({ name: "Server" });
+  const body = renderToString(vnode);
+  res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+  res.end(`<!doctype html><html><head></head><body>${body}</body></html>`);
+}).listen(3000);
+```
+
+Client-side hydration example
+
+On the client register the same component and let the runtime hydrate existing server markup. The runtime attaches listeners and enables bindings without re-rendering the initial content.
+
+```html
+<!doctype html>
+<html>
+  <head></head>
+  <body>
+    <!-- server rendered -->
+    <ssr-demo><div>Hello SSR!</div></ssr-demo>
+    <script type="module">
+      import { component, html } from "@jasonshimmy/custom-elements-runtime";
+
+      component('ssr-demo', {
+        state: { message: 'Hello SSR!' },
+        render: (ctx) => html`<div>${ctx.message}</div>`
+      });
+
+      // Runtime will hydrate the existing <ssr-demo> node.
+    </script>
+  </body>
+</html>
+```
+
+Notes
+- `renderToString` serializes HTML only; Adopted StyleSheets / JIT CSS are not automatically included server-side — collect and inline styles if needed.
+- Server rendering does not execute client lifecycle hooks.
+- Ensure server and client render shapes match to avoid hydration mismatches.
+
 ## 🛠️ SSR Fallback Logic
 
 - In SSR mode, `createElementClass` returns a minimal class with no DOM or lifecycle logic.
@@ -56,7 +140,7 @@ if (typeof window === "undefined") {
 
 - **Server:** Renders HTML from VNode trees
 - **Client:** Attaches event listeners, bindings, and styles
-- **No double rendering:** Hydration avoids re-rendering the initial markup
+- **Attachment:** On the client the runtime will re-run the render to attach interactivity. The renderer will reconcile VNodes and apply listeners/styles; currently this re-render may replace the server DOM rather than perform a DOM-preserving hydration pass — ensure server and client render output match to avoid visual/hydration mismatch.
 - **Error handling:** Any hydration errors are caught by error boundaries
 
 ## 🚀 SSR Best Practices
@@ -87,7 +171,7 @@ A: SSR is automatic when `window` is undefined (e.g., in Node.js or serverless e
 A: No, lifecycle hooks are ignored in SSR mode. Use them only for client-side logic.
 
 **Q: How do I hydrate server-rendered markup?**
-A: The runtime automatically hydrates markup when loaded on the client.
+A: The runtime runs client render to attach interactivity; this will reconcile the DOM but may replace server nodes on initial render. To ensure smooth transition, keep markup identical and avoid browser-only side effects during server render.
 
 **Q: Is SSR secure?**
 A: Yes, the runtime escapes HTML and sanitizes styles to prevent XSS and injection attacks.

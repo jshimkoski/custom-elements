@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { initWatchers, getNestedValue, triggerWatchers } from '../src/lib/runtime/watchers';
+import { initWatchers, triggerWatchers } from '../src/lib/runtime/watchers';
+import { getNestedValue } from '../src/lib/runtime/helpers';
 
 interface Ctx {
   foo?: string;

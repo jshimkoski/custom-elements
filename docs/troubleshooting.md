@@ -58,7 +58,10 @@ A guide to diagnosing and resolving common issues in the custom elements runtime
 
 - **HMR not updating:**
   - Ensure development mode and `import.meta.hot` is available.
-  - Check that configs are updated in the registry.
+  - Check that configs are updated in the runtime (internal) registry. In
+    browser dev you can inspect the registry via the Symbol slot Symbol.for('cer.registry')
+    for debugging, but do not rely on it in
+    production code.
 - **SSR output incorrect:**
   - Avoid browser-only APIs in SSR mode.
   - Use pure functions for render and style.

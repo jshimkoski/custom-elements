@@ -1,56 +1,102 @@
 # ⚛️ React Integration Guide
 
-Use Custom Elements Runtime components in React projects:
+Quick guide for using Custom Elements Runtime components inside React.
 
-## Usage
+## Quickstart
 
-1. **Register your custom element:**
-  ```ts
-  import { component, html } from '@jasonshimmy/custom-elements-runtime';
-  component('my-counter', ctx => html`<button @click="${() => ctx.count++}">Count: ${ctx.count}</button>`, { state: { count: 0 } });
-  ```
+1. Register a component:
 
-2. **Use in React JSX:**
-  ```jsx
-  function App() {
-    return <my-counter />;
-  }
-  ```
+```ts
+import { component, html } from '@jasonshimmy/custom-elements-runtime';
+component('my-counter', (ctx) => html`<button @click="${() => ctx.count++}">Count: ${ctx.count}</button>`, { state: { count: 0 } });
+```
 
-3. **Props and events:**
-  - Pass props as attributes: `<my-counter count={5} />` (kebab-case will be mapped automatically).
-  - Idiomatic (DOM) event listeners — use `addEventListener` on a ref to listen for CustomEvents emitted by the component:
-    ```jsx
-    const elRef = useRef();
-    useEffect(() => {
-      function handler(e) {
-        // e.detail
-      }
-      elRef.current.addEventListener('customEvent', handler);
-      return () => elRef.current.removeEventListener('customEvent', handler);
-    }, []);
-    <my-counter ref={elRef} />
-    ```
+2. Use in JSX:
 
-  - If you need closure capture in React, assign a programmatic listener via ref and
-    `addEventListener`. Prefer the `addEventListener` + ref approach since React
-    doesn't map custom events to props:
-    ```jsx
-    useEffect(() => {
-      function handler(e) { /* e.detail */ }
-      elRef.current.addEventListener('customEvent', handler);
-      return () => elRef.current.removeEventListener('customEvent', handler);
-    }, []);
-    ```
+```jsx
+function App() {
+  return <my-counter />;
+}
+```
 
+## Props & events
 
-## Notes
+- JSX attributes may render as HTML attributes; for primitives (strings/numbers) this often works, but React does not automatically set complex objects or function props on custom element instances. For objects/functions, set the property explicitly on the element via a `ref`.
+- React does not map CustomEvents to JSX props; attach listeners to the element instance via `ref` + `addEventListener`:
 
-- React supports custom elements natively.
-- For custom events, use refs and `addEventListener` as React does not natively map custom events to props.
-- For function props, always set them as properties on the element instance via ref.
-- For two-way binding, use refs and event handlers. Use `context.emit` in your component to emit events.
-- See [Events Deep Dive](./events-deep-dive.md) for recommended event emission options (`bubbles: true, composed: true`) and integration tips.
-- Works with React 16.8+.
+```jsx
+const elRef = useRef();
+useEffect(() => {
+  function onCustom(e) { /* e.detail */ }
+  const el = elRef.current;
+  el.addEventListener('custom-event', onCustom);
+  // example: set a function prop imperatively
+  el.someCallback = () => console.log('called from element');
+  return () => el.removeEventListener('custom-event', onCustom);
+}, []);
+return <my-counter ref={elRef} />;
+```
+
+## Two-way binding
+
+- For `v-model`-style behavior, emit `update:<prop>` events from your element and have the host update the property/state. In React, consume the update via `addEventListener` on a ref.
+- When using our compiler, `:model:prop` is compiled into prop + update-handler wiring. For uncompiled hosts (React), use the manual pattern:
+
+```jsx
+// host:
+<my-custom modelValue={value} ref={elRef} />
+// listen for 'update:model-value' to set value
+```
+
+### Examples
+
+- Compiler output (when you author with the runtime compiler):
+
+```html
+<!-- source template -->
+<my-custom :model:value="value" />
+```
+
+Compiles to runtime wiring; in React you would consume it manually:
+
+```jsx
+// host (React)
+const elRef = useRef();
+useEffect(() => {
+  const el = elRef.current;
+  function onUpdate(e) { setValue(e.detail); }
+  el.addEventListener('update:value', onUpdate);
+  return () => el.removeEventListener('update:value', onUpdate);
+}, []);
+return <my-custom ref={elRef} value={value} />;
+```
+
+- Manual (no compiler):
+
+// React functional component that consumes a runtime-registered custom element
+function MyWrapper() {
+  const ref = React.useRef();
+  const [value, setValue] = React.useState('hello');
+
+  React.useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    // listen for updates emitted by the custom element
+    function onUpdate(e) { setValue(e.detail); }
+    el.addEventListener('update:value', onUpdate);
+    // set initial prop for non-string/complex values imperatively
+    el.value = value;
+    return () => el.removeEventListener('update:value', onUpdate);
+  }, []);
+
+  return (
+    <div>
+      <my-custom ref={ref}></my-custom>
+      <div>Value: {value}</div>
+    </div>
+  );
+}
+
+See [Events Deep Dive](./events-deep-dive.md) for best practices. Works with React 16.8+.
 
 Build modern UIs with zero config! ✨

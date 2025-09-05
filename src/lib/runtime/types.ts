@@ -9,8 +9,10 @@ export interface VNode {
     key?: string;
     props?: any;
     attrs?: Record<string, any>;
-    directives?: Record<string, { value: string; modifiers: string[] }>;
-    ref?: string;
+  directives?: Record<string, { value: string; modifiers: string[]; arg?: string }>;
+  ref?: string;
+  /** Compiler-provided hint: whether this VNode represents a custom element (contains a dash) */
+  isCustomElement?: boolean;
   };
   children?: VNode[] | string;
 }
@@ -45,11 +47,11 @@ export interface WatchOptions {
 export type WatchCallback<T = any, S = any> = (
   newValue: T,
   oldValue: T,
-  context?: S,
+  context: S,
 ) => void;
 
 export interface WatcherState {
-  callback: WatchCallback;
+  callback: WatchCallback<any, any>;
   options: WatchOptions;
   oldValue: any;
 }
@@ -57,10 +59,10 @@ export interface WatcherState {
 export type WatchConfig<S> =
   | {
       [K in keyof S]?:
-        | WatchCallback<S[K]>
-        | [WatchCallback<S[K]>, WatchOptions?];
+        | WatchCallback<S[K], S>
+        | [WatchCallback<S[K], S>, WatchOptions?];
     }
-  | Record<string, WatchCallback | [WatchCallback, WatchOptions?]>;
+  | Record<string, WatchCallback<any, S> | [WatchCallback<any, S>, WatchOptions?]>;
 
 // Drop the last element from a tuple type
 type DropLast<T extends any[]> = T extends [...infer Rest, any] ? Rest : T;

@@ -29,7 +29,6 @@ export class GlobalEventBus extends EventTarget {
     return GlobalEventBus.instance;
   }
 
-  // Enhanced emit method with better typing and event storm protection
   /**
    * Emit a global event with optional data. Includes event storm protection.
    * @param eventName - Name of the event
@@ -47,12 +46,8 @@ export class GlobalEventBus extends EventTarget {
       counter.count++;
       
       if (counter.count > 50) {
-        // Too many events of the same type in one second
-        console.error(`Event storm detected for "${eventName}": ${counter.count} events in 1 second. Throttling...`);
-        
-        // Throttle this event type for a short period
+        // Throttle excessive events to avoid event storms (silent in runtime)
         if (counter.count > 100) {
-          console.warn(`Blocking further "${eventName}" events to prevent infinite loop`);
           return;
         }
       }

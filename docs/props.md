@@ -42,6 +42,7 @@ document.body.appendChild(el);
 
 - Use kebab-case for attribute names
 - Only use attributes for string, number, boolean props
+- Boolean attribute values need explicit "true"/"false" strings (or set the function prop as a property on the element).
 - Always set function props as properties, not attributes
 - For custom events, use `context.emit` in your component and listen using framework-native event binding or `addEventListener`
 

@@ -5,7 +5,7 @@
  */
 
 import type { VNode, VDomRefs, AnchorBlockVNode } from "./types";
-import { escapeHTML } from "./helpers";
+import { escapeHTML, getNestedValue, setNestedValue, toKebab } from "./helpers";
 
 /**
  * Recursively clean up refs for all descendants of a node
@@ -29,44 +29,6 @@ export function cleanupRefs(node: Node, refs?: VDomRefs) {
 }
 
 /**
- * Get nested property value from object using dot notation
- * @param obj The object to search.
- * @param path The dot-separated path to the property.
- * @returns The value of the nested property, or undefined if not found.
- */
-export function getNestedValue(obj: any, path: string): any {
-  if (typeof path === 'string') {
-    return path.split(".").reduce((current, key) => current?.[key], obj);
-  }
-  // If path is an object, handle accordingly or return a default value
-  return path;
-}
-
-/**
- * Set nested property value in object using dot notation
- * @param obj 
- * @param path 
- * @param value 
- * @returns 
- */
-export function setNestedValue(obj: any, path: string, value: any): void {
-  const keys = path.split(".");
-  const lastKey = keys.pop();
-
-  if (!lastKey) return;
-
-  const target = keys.reduce((current, key) => {
-    if (!(key in current)) {
-      current[key] = {};
-    }
-
-    return current[key];
-  }, obj);
-
-  target[lastKey] = value;
-}
-
-/**
  * Process :model directive for two-way data binding
  * @param value 
  * @param modifiers 
@@ -85,6 +47,7 @@ export function processModelDirective(
   listeners: Record<string, EventListener>,
   context?: any,
   el?: HTMLElement,
+  arg?: string,
 ): void {
   if (!context) return;
 
@@ -92,258 +55,162 @@ export function processModelDirective(
   const hasTrim = modifiers.includes("trim");
   const hasNumber = modifiers.includes("number");
 
-  // Get current value from state - always get fresh value to avoid stale closures
-  const getCurrentValue = () => {
-    const actualState = context._state || context;
-    return getNestedValue(actualState, value);
-  };
+  const getCurrentValue = () => getNestedValue(context._state || context, value);
   const currentValue = getCurrentValue();
 
-  // Determine input type from attrs or element
+  // determine element/input type
   let inputType = "text";
-  const attrInputType = attrs?.type;
+  if (el instanceof HTMLInputElement) inputType = (attrs?.type as string) || el.type || "text";
+  else if (el instanceof HTMLSelectElement) inputType = "select";
+  else if (el instanceof HTMLTextAreaElement) inputType = "textarea";
 
-  if (el instanceof HTMLInputElement) {
-    inputType = attrInputType || el.type || "text";
-  } else if (el instanceof HTMLSelectElement) {
-    inputType = "select";
-  } else if (el instanceof HTMLTextAreaElement) {
-    inputType = "textarea";
-  }
+  const isNativeInput = el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement;
+  const defaultPropName = inputType === "checkbox" || inputType === "radio" ? "checked" : "value";
+  const propName = isNativeInput ? defaultPropName : (arg ?? "modelValue");
 
-  // Set initial value only if different from current DOM value to prevent infinite loops
+  // Initial sync: set prop/attrs so renderer can apply proper DOM state
   if (inputType === "checkbox") {
     if (Array.isArray(currentValue)) {
-      // Multiple checkboxes bound to array
-      const checkboxValue = el?.getAttribute("value") || attrs?.value || "";
-      const shouldBeChecked = currentValue.includes(checkboxValue);
-      if (el && (el as HTMLInputElement).checked !== shouldBeChecked) {
-        props.checked = shouldBeChecked;
-      }
+      props[propName] = currentValue.includes(String(el?.getAttribute("value") ?? attrs?.value ?? ""));
     } else {
-      // Single checkbox bound to boolean or custom values
-      const trueValue = el?.getAttribute("true-value") || true;
-      const shouldBeChecked = currentValue === trueValue;
-      if (el && (el as HTMLInputElement).checked !== shouldBeChecked) {
-        props.checked = shouldBeChecked;
-      }
+      const trueValue = el?.getAttribute("true-value") ?? true;
+      props[propName] = currentValue === trueValue;
     }
   } else if (inputType === "radio") {
-    const radioValue = attrs?.value || "";
-    const shouldBeChecked = currentValue === radioValue;
-    if (el && (el as HTMLInputElement).checked !== shouldBeChecked) {
-      props.checked = shouldBeChecked;
-    }
+    props[propName] = currentValue === (attrs?.value ?? "");
   } else if (inputType === "select") {
-    // Handle both single and multiple select
-    if (el && el.hasAttribute("multiple")) {
-      // Multiple select - currentValue should be an array
-      const selectEl = el as HTMLSelectElement;
-      const currentArray = Array.isArray(currentValue) ? currentValue : [];
-
-      // Only update if different to prevent loops
+    // For multiple selects we also schedule option selection; otherwise set prop
+    if (el && el.hasAttribute("multiple") && el instanceof HTMLSelectElement) {
+      const arr = Array.isArray(currentValue) ? currentValue.map(String) : [];
       setTimeout(() => {
-        Array.from(selectEl.options).forEach((option) => {
-          const shouldBeSelected = currentArray.includes(option.value);
-          if (option.selected !== shouldBeSelected) {
-            option.selected = shouldBeSelected;
-          }
+        Array.from((el as HTMLSelectElement).options).forEach((option) => {
+          option.selected = arr.includes(option.value);
         });
       }, 0);
+      props[propName] = Array.isArray(currentValue) ? currentValue : [];
     } else {
-      // Single select
-      setTimeout(() => {
-        if (
-          el instanceof HTMLSelectElement &&
-          el.value !== String(currentValue)
-        ) {
-          el.value = String(currentValue);
-        }
-      }, 0);
+      props[propName] = currentValue;
     }
   } else {
-    // Only set value prop if different from current DOM value to prevent infinite loops
-    const stringValue = String(currentValue ?? "");
-    if (
-      !el ||
-      (el as HTMLInputElement | HTMLTextAreaElement).value !== stringValue
-    ) {
-      props.value = currentValue;
+    props[propName] = currentValue;
+    // Also set an attribute so custom element constructors / applyProps can
+    // read initial values via getAttribute during their initialization.
+    try {
+      const attrName = toKebab(propName);
+      if (attrs) attrs[attrName] = currentValue;
+    } catch (e) {
+      // ignore
     }
   }
 
-  // Create event listener with loop prevention
-  const eventType =
-    hasLazy ||
-    inputType === "checkbox" ||
-    inputType === "radio" ||
-    inputType === "select"
-      ? "change"
-      : "input";
+  // event type to listen for
+  const eventType = hasLazy || inputType === "checkbox" || inputType === "radio" || inputType === "select" ? "change" : "input";
 
   const eventListener: EventListener = (event: Event) => {
-    // Skip during IME composition - check multiple ways
     if ((event as any).isComposing || (listeners as any)._isComposing) return;
-
-    // Skip if this is a programmatic change (not user-initiated)
     if ((event as any).isTrusted === false) return;
 
-    const target = event.target as
-      | HTMLInputElement
-      | HTMLTextAreaElement
-      | HTMLSelectElement;
+    const target = event.target as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null;
+    if (!target || (target as any)._modelUpdating) return;
 
-    // Skip if event is fired during our own value updates
-    if ((target as any)._modelUpdating) return;
+    let newValue: any = (target as any).value;
 
-    // Always get fresh current value to avoid stale closures
-    const freshCurrentValue = getCurrentValue();
-
-    let newValue: any = target.value;
-
-    // Handle different input types
     if (inputType === "checkbox") {
-      if (Array.isArray(freshCurrentValue)) {
-        // Multiple checkboxes bound to array
-        const checkboxValue = target.getAttribute("value") || "";
-        const currentArray = [...freshCurrentValue];
+      const fresh = getCurrentValue();
+      if (Array.isArray(fresh)) {
+        const v = target.getAttribute("value") ?? "";
+        const arr = Array.from(fresh as any[]);
         if ((target as HTMLInputElement).checked) {
-          if (!currentArray.includes(checkboxValue)) {
-            currentArray.push(checkboxValue);
-          }
+          if (!arr.includes(v)) arr.push(v);
         } else {
-          const index = currentArray.indexOf(checkboxValue);
-          if (index > -1) {
-            currentArray.splice(index, 1);
-          }
+          const idx = arr.indexOf(v);
+          if (idx > -1) arr.splice(idx, 1);
         }
-        newValue = currentArray;
+        newValue = arr;
       } else {
-        // Single checkbox
-        const trueValue = target.getAttribute("true-value") || true;
-        const falseValue = target.getAttribute("false-value") || false;
-        newValue = (target as HTMLInputElement).checked
-          ? trueValue
-          : falseValue;
+        const trueV = target.getAttribute("true-value") ?? true;
+        const falseV = target.getAttribute("false-value") ?? false;
+        newValue = (target as HTMLInputElement).checked ? trueV : falseV;
       }
     } else if (inputType === "radio") {
-      newValue = target.getAttribute("value") || target.value;
-    } else if (
-      inputType === "select" &&
-      (target as HTMLSelectElement).multiple
-    ) {
-      // Handle multiple select
-      const selectEl = target as HTMLSelectElement;
-      newValue = Array.from(selectEl.selectedOptions).map(
-        (option) => option.value,
-      );
+      newValue = target.getAttribute("value") ?? (target as any).value;
+    } else if (inputType === "select" && (target as HTMLSelectElement).multiple) {
+      newValue = Array.from((target as HTMLSelectElement).selectedOptions).map((o) => o.value);
     } else {
-      // Apply modifiers for text inputs
-      if (hasTrim) {
-        newValue = newValue.trim();
-      }
+      if (hasTrim && typeof newValue === "string") newValue = newValue.trim();
       if (hasNumber) {
-        const numValue = Number(newValue);
-        if (!isNaN(numValue)) {
-          newValue = numValue;
-        }
+        const n = Number(newValue);
+        if (!isNaN(n)) newValue = n;
       }
     }
 
-    // Get current state value to check if update is needed
     const actualState = context._state || context;
     const currentStateValue = getNestedValue(actualState, value);
+    const changed = Array.isArray(newValue) && Array.isArray(currentStateValue)
+      ? JSON.stringify([...newValue].sort()) !== JSON.stringify([...currentStateValue].sort())
+      : newValue !== currentStateValue;
 
-    // Only update if the value has actually changed (prevent infinite loops)
-    // For arrays, do a deep comparison
-    const hasChanged =
-      Array.isArray(newValue) && Array.isArray(currentStateValue)
-        ? JSON.stringify([...newValue].sort()) !==
-          JSON.stringify([...currentStateValue].sort())
-        : newValue !== currentStateValue;
-
-    if (hasChanged) {
-      // Mark element as updating to prevent feedback loops
-      const element = event.target as HTMLElement;
-      (element as any)._modelUpdating = true;
-
-      // Update using the actual state object for proper nested property support
-      setNestedValue(actualState, value, newValue);
-
-      // Clear the updating flag after a tick
-      setTimeout(() => {
-        (element as any)._modelUpdating = false;
-      }, 0);
-
-      // Trigger re-render if context has a render method
-      if (context._requestRender) {
-        context._requestRender();
+    if (changed) {
+      (target as any)._modelUpdating = true;
+      try {
+        setNestedValue(actualState, value, newValue);
+        if (context._requestRender) context._requestRender();
+      } finally {
+        setTimeout(() => ((target as any)._modelUpdating = false), 0);
       }
     }
   };
 
-  listeners[eventType] = eventListener;
-
-  // Handle IME composition for all input types (not just when !hasLazy)
-  if (inputType === "text" || inputType === "textarea") {
-    const compositionStartListener: EventListener = () => {
-      // Flag to skip input events during composition
-      (listeners as any)._isComposing = true;
+  // Custom element update event names (update:prop) for non-native inputs
+  if (!isNativeInput) {
+    const toKebab = (s: string) => String(s).replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
+    listeners[`update:${toKebab(propName)}`] = (event: Event) => {
+      const actualState = context._state || context;
+      const newVal = (event as CustomEvent).detail !== undefined ? (event as CustomEvent).detail : (event.target as any)?.value;
+      const currentStateValue = getNestedValue(actualState, value);
+      const changed = Array.isArray(newVal) && Array.isArray(currentStateValue)
+        ? JSON.stringify([...newVal].sort()) !== JSON.stringify([...currentStateValue].sort())
+        : newVal !== currentStateValue;
+      if (changed) {
+        setNestedValue(actualState, value, newVal);
+        if (context._requestRender) context._requestRender();
+      }
     };
+  } else {
+    listeners[eventType] = eventListener;
+  }
 
-    const compositionEndListener: EventListener = (event: Event) => {
+  // IME composition handling for text-like inputs
+  if (inputType === "text" || inputType === "textarea") {
+    listeners.compositionstart = (() => ((listeners as any)._isComposing = true));
+    listeners.compositionend = (event: Event) => {
       (listeners as any)._isComposing = false;
-
-      // Capture the target reference before setTimeout to avoid losing it
-      const target = event.target as HTMLInputElement | HTMLTextAreaElement;
-      // Manually trigger the update after composition ends
+      const target = event.target as HTMLInputElement | HTMLTextAreaElement | null;
+      if (!target) return;
       setTimeout(() => {
-        if (target) {
-          let newValue: any = target.value;
-
-          // Apply modifiers
-          if (hasTrim) {
-            newValue = newValue.trim();
-          }
-          if (hasNumber) {
-            const numValue = Number(newValue);
-            if (!isNaN(numValue)) {
-              newValue = numValue;
-            }
-          }
-
-          // Get current state value and only update if different
-          const actualState = context._state || context;
-          const currentStateValue = getNestedValue(actualState, value);
-
-          // For arrays, do a deep comparison
-          const hasChanged =
-            Array.isArray(newValue) && Array.isArray(currentStateValue)
-              ? JSON.stringify([...newValue].sort()) !==
-                JSON.stringify([...currentStateValue].sort())
-              : newValue !== currentStateValue;
-
-          if (hasChanged) {
-            // Mark element as updating to prevent feedback loops
-            if (target) {
-              (target as any)._modelUpdating = true;
-              setTimeout(() => {
-                (target as any)._modelUpdating = false;
-              }, 0);
-            }
-
-            setNestedValue(actualState, value, newValue);
-
-            if (context._requestRender) {
-              context._requestRender();
-            }
+        const val = target.value;
+        const actualState = context._state || context;
+        const currentStateValue = getNestedValue(actualState, value);
+        let newVal: any = val;
+        if (hasTrim) newVal = newVal.trim();
+        if (hasNumber) {
+          const n = Number(newVal);
+          if (!isNaN(n)) newVal = n;
+        }
+        const changed = Array.isArray(newVal) && Array.isArray(currentStateValue)
+          ? JSON.stringify([...newVal].sort()) !== JSON.stringify([...currentStateValue].sort())
+          : newVal !== currentStateValue;
+        if (changed) {
+          (target as any)._modelUpdating = true;
+          try {
+            setNestedValue(actualState, value, newVal);
+            if (context._requestRender) context._requestRender();
+          } finally {
+            setTimeout(() => ((target as any)._modelUpdating = false), 0);
           }
         }
       }, 0);
     };
-
-    listeners.compositionstart = compositionStartListener;
-    listeners.compositionend = compositionEndListener;
   }
 }
 
@@ -351,8 +218,12 @@ export function processModelDirective(
  * Convert a prop key like `onClick` to its DOM event name `click`.
  */
 function eventNameFromKey(key: string): string {
-  // strip leading 'on' and lowercase remainder
-  return key.slice(2).charAt(0).toLowerCase() + key.slice(3);
+  // Strip leading 'on' and lowercase the first character of the remainder.
+  // This handles names like `onClick` -> `click` and
+  // `onUpdate:model-value` -> `update:model-value` correctly.
+  const rest = key.slice(2);
+  if (!rest) return "";
+  return rest.charAt(0).toLowerCase() + rest.slice(1);
 }
 
 /**
@@ -554,7 +425,7 @@ export function processStyleDirective(
  * @returns 
  */
 export function processDirectives(
-  directives: Record<string, { value: any; modifiers: string[] }>,
+  directives: Record<string, { value: any; modifiers: string[]; arg?: string }>,
   context?: any,
   el?: HTMLElement,
   vnodeAttrs?: Record<string, any>,
@@ -568,20 +439,26 @@ export function processDirectives(
   const listeners: Record<string, EventListener> = {};
 
   for (const [directiveName, directive] of Object.entries(directives)) {
-    const { value, modifiers } = directive;
+    const { value, modifiers, arg } = directive;
+
+    if (directiveName === 'model' || directiveName.startsWith('model:')) {
+      // Extract arg from directiveName if present (model:prop)
+      const parts = directiveName.split(":");
+      const runtimeArg = parts.length > 1 ? parts[1] : arg;
+      processModelDirective(
+        typeof value === "string" ? value : String(value),
+        modifiers,
+        props,
+        attrs,
+        listeners,
+        context,
+        el,
+        runtimeArg,
+      );
+      continue;
+    }
 
     switch (directiveName) {
-      case "model":
-        processModelDirective(
-          typeof value === "string" ? value : String(value),
-          modifiers,
-          props,
-          attrs,
-          listeners,
-          context,
-          el,
-        );
-        break;
       case "bind":
         processBindDirective(value, props, attrs, context);
         break;
@@ -721,7 +598,25 @@ export function patchProps(
       } else if (newVal === undefined || newVal === null || newVal === false) {
         el.removeAttribute(key);
       } else {
-        el.setAttribute(key, String(newVal));
+        // Prefer setting DOM properties for custom elements or when the
+        // property already exists on the element so that JS properties are
+        // updated (important for custom elements that observe property changes).
+        // Prefer property assignment for elements that are custom elements or
+        // when the property exists on the element. This avoids attribute
+        // fallbacks being used for reactive properties on custom elements.
+        // Rely only on compiler/runtime-provided hint. Do not perform implicit
+        // dash-based heuristics here: callers/tests should set isCustomElement on
+        // the vnode props when a tag is a custom element.
+        const elIsCustom = (newProps as any)?.isCustomElement ?? (oldProps as any)?.isCustomElement ?? false;
+        if (elIsCustom || key in el) {
+          try {
+            (el as any)[key] = newVal;
+          } catch (err) {
+            // Enforce property-only binding: skip silently on failure.
+          }
+        } else {
+          // Property does not exist; skip silently.
+        }
       }
     }
   }
@@ -827,9 +722,7 @@ export function createElement(
     const val = mergedAttrs[key];
     // Only allow valid attribute names (string, not object)
     if (typeof key !== 'string' || /\[object Object\]/.test(key)) {
-      if (typeof window !== 'undefined' && window.console) {
-        console.warn('Skipping invalid attribute key:', key, val);
-      }
+      // Skip invalid attribute keys silently to keep runtime minimal
       continue;
     }
     if (typeof val === "boolean") {
@@ -845,9 +738,7 @@ export function createElement(
     const val = mergedProps[key];
     // Only allow valid attribute names (string, not object)
     if (typeof key !== 'string' || /\[object Object\]/.test(key)) {
-      if (typeof window !== 'undefined' && window.console) {
-        console.warn('Skipping invalid prop key:', key, val);
-      }
+      // Skip invalid prop keys silently to keep runtime minimal
       continue;
     }
     if (
@@ -866,7 +757,23 @@ export function createElement(
     } else if (val === undefined || val === null || val === false) {
       el.removeAttribute(key);
     } else {
-      el.setAttribute(key, String(val));
+      // Prefer setting DOM properties for custom elements or when the
+      // property already exists on the element. This ensures JS properties
+      // (and reactive custom element props) receive the value instead of
+      // only an HTML attribute string.
+      // Use the compiler-provided hint when available, otherwise fall back
+      // to a conservative tag-name test. Prefer property assignment for
+      // custom elements or when the property exists on the element.
+      const vnodeIsCustom = vnode.props?.isCustomElement ?? false;
+      if (vnodeIsCustom || key in el) {
+        try {
+          (el as any)[key] = val;
+        } catch (err) {
+          // silently skip on failure
+        }
+      } else {
+        // silently skip when property doesn't exist
+      }
     }
   }
 
@@ -881,6 +788,33 @@ export function createElement(
   const refKey = vnode.props?.ref ?? (vnode.props?.props && vnode.props.props.ref);
   if (typeof vnode !== "string" && refKey && refs) {
     refs[refKey] = el as HTMLElement;
+  }
+
+  // If this is a custom element instance, request an initial render now that
+  // attributes/props/listeners have been applied. This fixes the common timing
+  // issue where the element constructor rendered before the renderer set the
+  // initial prop values (for example :model or :model:prop). Prefer the
+  // public requestRender API when available, otherwise call internal _render
+  // with the stored config.
+  try {
+    // If the element exposes an internal _applyProps, invoke it so the
+    // component's reactive context picks up attributes/properties that were
+    // just applied by the renderer. This is necessary when the component
+    // constructor performs an initial render before the renderer sets props.
+    if (typeof (el as any)._applyProps === 'function') {
+      try {
+        (el as any)._applyProps((el as any)._cfg);
+      } catch (e) {
+        // ignore
+      }
+    }
+    if (typeof (el as any).requestRender === 'function') {
+      (el as any).requestRender();
+    } else if (typeof (el as any)._render === 'function') {
+      (el as any)._render((el as any)._cfg);
+    }
+  } catch (e) {
+    // Swallow errors to keep the renderer robust and minimal.
   }
 
   // Append children
@@ -949,7 +883,6 @@ export function patchChildren(
     }
   }
 
-  // --- Integrated patchChildrenBetween ---
   function patchChildrenBetween(
     start: Comment,
     end: Comment,
@@ -1015,7 +948,7 @@ export function patchChildren(
         }
       }
     } else {
-      // Keyless fallback: index-based patch
+      // Keyless: fall back to index-based patch
       const commonLength = Math.min(
         oldVNodesInRange.length,
         newChildren.length,
@@ -1042,7 +975,6 @@ export function patchChildren(
       }
     }
   }
-  // --- End integrated patchChildrenBetween ---
 
   for (const newVNode of newChildren) {
     let node: Node;

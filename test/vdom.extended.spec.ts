@@ -1,8 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   cleanupRefs,
-  getNestedValue,
-  setNestedValue,
   processModelDirective,
   processBindDirective,
   processShowDirective,
@@ -17,6 +15,7 @@ import {
   vdomRenderer,
   renderToString,
 } from '../src/lib/runtime/vdom';
+import { getNestedValue, setNestedValue } from '../src/lib/runtime/helpers';
 import type { VNode, VDomRefs, AnchorBlockVNode } from '../src/lib/runtime/types';
 
 describe('vdom.ts', () => {

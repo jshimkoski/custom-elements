@@ -2,6 +2,7 @@ import './style.css';
 import { component, html, when, each, match, eventBus } from "./lib";
 
 // Import example components so they register themselves
+import './components/examples/DesignSystem';
 import './components/examples/MinimalExample';
 import './components/examples/ShoppingCart';
 import './components/examples/TodoApp';
@@ -265,6 +266,7 @@ component("my-greeting", {
 
 document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
   <div>
+    <design-system></design-system>
     <minimal-example></minimal-example>
     <shopping-cart></shopping-cart>
     <todo-app></todo-app>

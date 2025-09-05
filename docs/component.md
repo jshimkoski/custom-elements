@@ -8,7 +8,7 @@ The `component` function is the entry point for defining custom elements using t
 
 Custom element tags must follow web standards:
 
-- **Kebab-case required:** Tags must contain at least one dash (e.g., `my-widget`).
+- **Kebab-case required:** Tags must contain at least one dash (e.g., `my-widget`) — hyphenated (kebab-case) tags are treated as custom elements.
 - **Automatic normalization:**
   - The runtime converts any tag to kebab-case.
   - If you use a single word (e.g., `profile`), it is normalized to `cer-profile`.
@@ -99,10 +99,17 @@ component('profile-card', {
 
 ## 🧠 How Component Registration Works Internally
 
-- The runtime stores configs in a registry keyed by tag name.
+- The runtime stores configs in an internal registry keyed by tag name.
 - If the tag is not already registered, it defines a new custom element using the config.
 - The element class is generated with all features: state, props, computed, render, style, lifecycle, error handling, and more.
 - SSR fallback: If `window` is undefined, a minimal class is returned for server-side rendering.
+
+**Note:** the internal `registry` is part of the runtime implementation and intended
+for HMR and internal tooling. Consumer code (including npm package consumers)
+should not rely on the registry or any global. In browser development the
+registry may be reachable by dev tooling via the Symbol slot Symbol.for('cer.registry')
+— this is a dev-only escape hatch. For server-side needs, import the internal
+runtime module directly; do not treat the registry as a supported public API.
 
 ## 🔄 Hot Module Replacement (HMR)
 

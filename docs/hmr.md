@@ -11,7 +11,7 @@ Hot Module Replacement (HMR) allows you to update modules in a running applicati
 
 ## 🏗️ HMR Architecture in the Runtime
 
-- **Registry:** All component configs are stored in an internal registry
+- **Registry:** All component configs are stored in an internal registry (internal API)
 - **HMR Detection:** Checks for `import.meta.hot` to enable HMR logic
 - **Config Updates:** On module update, new configs are merged into the registry
 - **Instance Refresh:** All live component instances are updated with the new config and re-rendered
@@ -20,7 +20,7 @@ Hot Module Replacement (HMR) allows you to update modules in a running applicati
 
 1. **HMR enabled:** The runtime detects `import.meta.hot` in development
 2. **Module update:** When a module changes, HMR triggers an update
-3. **Registry update:** The new component configs are merged into the registry
+3. **Registry update:** The new component configs are merged into the internal registry
 4. **Instance update:** All matching custom elements in the DOM are updated with the new config
 5. **Re-render:** Each instance calls its internal render method to reflect changes instantly
 
@@ -32,7 +32,10 @@ if (
   import.meta && import.meta.hot
 ) {
   import.meta.hot.accept((newModule) => {
-    // Update registry and live instances
+    // Update internal registry and refresh live instances. The registry is
+    // an internal runtime structure; in the browser it is available for
+    // dev tools via the Symbol slot Symbol.for('cer.registry') but should
+    // not be relied on as a public API.
   });
 }
 ```
@@ -60,7 +63,7 @@ component("hmr-demo", {
 ## 🛠️ Internal HMR Logic
 
 - **Registry update:**
-  - New configs replace old ones in the registry
+  - New configs replace old ones in the internal registry (dev-only visibility)
 - **Instance refresh:**
   - All DOM elements matching the tag are updated
   - Internal `_cfg` and `_render` are called for each instance

@@ -92,7 +92,7 @@ component('directive-demo', {
 ## 📝 Tips & Best Practices
 
 - Use `when` for concise conditional logic.
-- Use `each` for lists; always provide a unique key if possible.
+- Use `each` for lists; always provide a unique key, if possible. `each` will use value for primitives or prefer `item.key` or `item.id` for objects.
 - Use `match` for readable multi-case logic.
 - Keep directive usage declarative and avoid side effects.
 

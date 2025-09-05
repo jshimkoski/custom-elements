@@ -1,4 +1,5 @@
 import type { ComponentContext, WatchCallback, WatchOptions, WatcherState } from "./types";
+import { getNestedValue } from "./helpers";
 
 /**
  * Initializes watchers for a component.
@@ -36,13 +37,6 @@ export function initWatchers(
       }
     }
   }
-}
-
-/**
- * Gets a nested value from context by path.
- */
-export function getNestedValue(context: any, path: string): any {
-  return path.split(".").reduce((obj: any, key: string) => obj?.[key], context);
 }
 
 /**

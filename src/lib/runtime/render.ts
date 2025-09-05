@@ -105,7 +105,7 @@ export function requestRender(
   if (now - lastRenderTime < 16) {
     setRenderCount(renderCount + 1);
     if (renderCount > 10) {
-      console.warn("Potential infinite render loop detected. Skipping render.");
+      // Skip render to avoid tight loop; no logging to keep runtime slim
       setRenderTimeoutId(null);
       return;
     }

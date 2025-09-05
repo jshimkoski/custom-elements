@@ -1,5 +1,6 @@
 import type { VNode } from "./types";
 import { contextStack } from "./render";
+import { toKebab, getNestedValue, setNestedValue } from "./helpers";
 
 export function h(
   tag: string,
@@ -37,11 +38,11 @@ export function parseProps(
 ): {
   props: Record<string, any>;
   attrs: Record<string, any>;
-  directives: Record<string, { value: string; modifiers: string[] }>;
+  directives: Record<string, { value: string; modifiers: string[]; arg?: string }>;
 } {
   const props: Record<string, any> = {};
   const attrs: Record<string, any> = {};
-  const directives: Record<string, { value: any; modifiers: string[] }> = {};
+  const directives: Record<string, { value: any; modifiers: string[]; arg?: string }> = {};
 
   // Match attributes with optional prefix and support for single/double quotes
   const attrRegex =
@@ -71,12 +72,19 @@ export function parseProps(
     // Known directive names
     const knownDirectives = ["model", "bind", "show", "class", "style"];
     if (prefix === ":") {
-      const [maybeDirective, ...modifierParts] = rawName.split(".");
+      // Support :model:checked (directive with argument) and :class.foo (modifiers)
+      const [nameAndModifiers, argPart] = rawName.split(":");
+      const [maybeDirective, ...modifierParts] = nameAndModifiers.split(".");
       if (knownDirectives.includes(maybeDirective)) {
         const modifiers = [...modifierParts];
-        directives[maybeDirective] = {
+        // Allow multiple :model directives on the same tag by keying them with
+        // their argument when present (e.g. 'model:test'). This preserves both
+        // plain :model and :model:prop simultaneously.
+        const directiveKey = maybeDirective === 'model' && argPart ? `model:${argPart}` : maybeDirective;
+        directives[directiveKey] = {
           value,
           modifiers,
+          arg: argPart,
         };
       } else {
         attrs[rawName] = value;
@@ -285,15 +293,99 @@ export function htmlImpl(
         directives,
       } = parseProps(match[2] || "", values, effectiveContext);
 
+      // No runtime registration here; compiler will set `isCustomElement`
+      // on vnodeProps where appropriate. Runtime will consult that flag or
+      // the strict registry if consumers register tags at runtime.
+
       // Shape props into { props, attrs, directives } expected by VDOM
       const vnodeProps: {
         props: Record<string, unknown>;
         attrs: Record<string, unknown>;
         directives?: Record<string, { value: any, modifiers: string[] }>;
+        isCustomElement?: boolean;
       } = { props: {}, attrs: {} };
 
       for (const k in rawProps) vnodeProps.props[k] = rawProps[k];
       for (const k in rawAttrs) vnodeProps.attrs[k] = rawAttrs[k];
+
+      // Compiler-side canonical transform: convert :model and :model:prop on
+      // custom elements into explicit prop + event handler so runtime hosts
+      // that don't process directives can still work. Support multiple
+      // :model variants on the same tag by iterating directive keys.
+      if (directives && Object.keys(directives).some(k => k === 'model' || k.startsWith('model:'))) {
+        try {
+          const GLOBAL_REG_KEY = Symbol.for('cer.registry');
+          const globalRegistry = (globalThis as any)[GLOBAL_REG_KEY] as Set<string> | Map<string, any> | undefined;
+          const isInGlobalRegistry = Boolean(globalRegistry && typeof globalRegistry.has === 'function' && globalRegistry.has(tagName));
+
+          const isInContext = Boolean(
+            effectiveContext && (
+              ((effectiveContext as any).__customElements instanceof Set && (effectiveContext as any).__customElements.has(tagName)) ||
+              (Array.isArray((effectiveContext as any).__isCustomElements) && (effectiveContext as any).__isCustomElements.includes(tagName))
+            )
+          );
+
+          const isHyphenated = tagName.includes('-');
+
+          const isCustomFromContext = Boolean(isHyphenated || isInContext || isInGlobalRegistry);
+
+          if (isCustomFromContext) {
+            for (const dk of Object.keys(directives)) {
+              if (dk !== 'model' && !dk.startsWith('model:')) continue;
+              const model = directives[dk] as { value: any; modifiers: string[]; arg?: string };
+              const arg = model.arg ?? (dk.includes(':') ? dk.split(':', 2)[1] : undefined);
+              const modelVal = model.value;
+
+              const argToUse = arg ?? 'modelValue';
+
+              const getNested = getNestedValue;
+              const setNested = setNestedValue;
+
+              const actualState = effectiveContext ? ((effectiveContext as any)._state || effectiveContext) : undefined;
+
+              let initial: any = undefined;
+              if (typeof modelVal === 'string' && effectiveContext) {
+                initial = getNested(actualState, modelVal);
+              } else {
+                initial = modelVal;
+              }
+
+              vnodeProps.props[argToUse] = initial;
+
+              try {
+                const attrName = toKebab(argToUse);
+                if (!vnodeProps.attrs) vnodeProps.attrs = {} as any;
+                if (initial !== undefined) vnodeProps.attrs[attrName] = initial;
+              } catch (e) {
+                /* best-effort */
+              }
+
+              vnodeProps.isCustomElement = true;
+
+              const eventName = `update:${toKebab(argToUse)}`;
+              const handlerKey = 'on' + eventName.charAt(0).toUpperCase() + eventName.slice(1);
+
+              vnodeProps.props[handlerKey] = function (ev: Event & { detail?: any }) {
+                const newVal = (ev as any).detail !== undefined ? (ev as any).detail : (ev.target ? (ev.target as any).value : undefined);
+                if (!actualState) return;
+                const current = getNested(actualState, typeof modelVal === 'string' ? modelVal : String(modelVal));
+                const changed = Array.isArray(newVal) && Array.isArray(current)
+                  ? JSON.stringify([...newVal].sort()) !== JSON.stringify([...current].sort())
+                  : newVal !== current;
+                if (changed) {
+                  setNested(actualState, typeof modelVal === 'string' ? modelVal : String(modelVal), newVal);
+                  if ((effectiveContext as any)?.requestRender) (effectiveContext as any).requestRender();
+                  else if ((effectiveContext as any)?._requestRender) (effectiveContext as any)._requestRender();
+                }
+              };
+
+              delete directives[dk];
+            }
+          }
+        } catch (e) {
+          // ignore transform errors and fall back to runtime directive handling
+        }
+      }
 
       // Process built-in directives that should be converted to props/attrs
       // Only attach directives to VNode; normalization/merging is handled in vdom.ts

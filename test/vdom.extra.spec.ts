@@ -6,12 +6,11 @@ import {
   processShowDirective,
   processDirectives,
   patchProps,
-  getNestedValue,
-  setNestedValue,
   renderToString,
   cleanupRefs,
   createElement
 } from '../src/lib/runtime/vdom';
+import { getNestedValue, setNestedValue } from '../src/lib/runtime/helpers';
 
 describe('vdom.extra', () => {
   it('processStyleDirective handles object and numbers (adds px) and merges with existing style', () => {

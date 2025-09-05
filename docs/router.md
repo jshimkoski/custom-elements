@@ -162,7 +162,7 @@ Behavior notes:
 
 - Async `load` behavior: `load()` is supported and cached, but the built-in `router-view` expects `loaded.default` to be a string tag name to render. If you need the `load()` result to be a class/function/element, update the `router-view` render to use `resolveRouteComponent` and handle non-string results.
 
-- Async `load` behavior: `load()` is supported and cached. `router-view` now accepts module defaults that are either a string tag name or a function component (sync or async). Function components should return a VNode or VNode[] (or a string tag). If you return another type, `router-view` will render the "Invalid route component" fallback. Use `resolveRouteComponent` if you need to handle module results manually.
+- Async `load` behavior: `load()` is supported and cached. `router-view` accepts module defaults that are either a string tag name or a function component (sync or async). Function components should return a VNode or VNode[] (or a string tag). If you return another type, `router-view` will render the "Invalid route component" fallback. Use `resolveRouteComponent` if you need to handle module results manually.
 
 - SSR `initialUrl`: for server-side or static rendering, pass `initialUrl` into `initRouter`/`useRouter` so the router can derive the initial `path` and `query` server-side. The router uses `initialUrl` only in non-browser mode.
 

@@ -1,54 +1,58 @@
 # 🦄 Svelte Integration Guide
 
-Use Custom Elements Runtime components in Svelte apps:
+Quick guide for using Custom Elements Runtime components inside Svelte.
 
-## Usage
+## Quickstart
 
-1. **Register your custom element:**
-   ```ts
-   import { component, html } from '@jasonshimmy/custom-elements-runtime';
-   component('my-counter', ctx => html`<button @click="${() => ctx.count++}">Count: ${ctx.count}</button>`, { state: { count: 0 } });
-   ```
+1. Register a component:
 
-2. **Use in Svelte markup:**
-   ```svelte
-   <my-counter />
-   ```
+```ts
+import { component, html } from '@jasonshimmy/custom-elements-runtime';
+component('my-counter', (ctx) => html`<button @click="${() => ctx.count++}">Count: ${ctx.count}</button>`, { state: { count: 0 } });
+```
 
-3. **Props and events:**
-   - Pass props as attributes (kebab-case).
-   - Idiomatic (DOM) event listeners — use `on:eventname` in Svelte markup to listen for CustomEvents emitted by the component:
-      ```svelte
-      <my-counter on:custom-event={handle} />
-      <script>
-         function handle(e) {
-            // e.detail
-         }
-      </script>
-      ```
+2. Use in markup:
 
-   - If you need to attach a handler programmatically (to capture local
-      closures), use `bind:this` and add a DOM listener on the element
-      instance. Prefer `on:event` template bindings where possible:
-      ```svelte
-      <my-counter bind:this={counterEl} />
-      <script>
-         import { onMount } from 'svelte';
-         let counterEl;
-         onMount(() => {
-            counterEl.addEventListener('custom-event', (e) => {
-               // handle e.detail
-            });
-         });
-      </script>
-      ```
+```svelte
+<my-counter />
+```
 
-## Notes
+## Props & events
 
-- Svelte recognizes custom elements automatically.
-- For two-way binding, use `bind:this` and custom events. Use `context.emit` in your component to emit events.
-- See [Events Deep Dive](./events-deep-dive.md) for recommended event emission options (`bubbles: true, composed: true`) and interoperability tips.
-- Works with Svelte 3.x and above.
+- For simple values you can use attributes; prefer using property bindings when you need reactive values or non-string types. Svelte's `bind:prop` behavior is for Svelte components and may not automatically wire to arbitrary custom elements — use `on:update:<prop>` or `bind:this` + set the property if you need deterministic behavior.
+- Listen to CustomEvents declaratively with `on:event` (preferred). If you need closure capture, use `bind:this` and `addEventListener`.
+
+## Two-way binding
+
+- Emit `update:<prop>` events from your element to support host-side updates. In Svelte you can handle them declaratively:
+
+```svelte
+<my-custom bind:value on:update:value={(e) => value = e.detail} />
+```
+
+- When using our compiler, `:model:prop` is compiled into explicit prop + onUpdate:<prop> wiring.
+
+### Examples
+
+- Compiler shorthand (source):
+
+- Svelte component consuming a runtime custom element (declarative on:update):
+
+```svelte
+<script>
+	import { onMount } from 'svelte';
+	let value = 'hello';
+	let el;
+	onMount(() => {
+		// optional: imperative wiring or props
+		if (el) el.value = value;
+	});
+</script>
+
+<my-custom bind:this={el} on:update:value={(e) => value = e.detail} />
+<p>{value}</p>
+```
+
+See [Events Deep Dive](./events-deep-dive.md). Works with Svelte 3.x+.
 
 Mix and match with Svelte power! 🌈
-

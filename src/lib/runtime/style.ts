@@ -876,12 +876,6 @@ export function jitCSS(html: string): string {
   function generateRule(cls: string, stripDark = false): string | null {
     const parts = splitVariants(cls);
 
-    // DEBUG: log parsing for specific tricky classes during test runs
-    if (cls.includes("mask-image") || cls.includes("sm: hover") || cls.includes("sm:hover") || cls.includes("mask.svg")) {
-      // eslint-disable-next-line no-console
-      console.error("DEBUG generateRule:", cls, parts);
-    }
-
     // Find base utility
     let important = false;
     const basePart = parts.find(p => {
