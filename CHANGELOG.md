@@ -1,6 +1,13 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v0.2.5] - 2025-09-05
+
+- fix: Remove internal registry note from component documentation for clarity (f51e43b)
+- fix: Enhance bindings documentation and examples. Fix typo in success message. (06b0153)
+- feat: Improve :model binding and introduce :model:prop binding. Refactor watchers. Improve typing. Export renderToString for SSR. (12a4759)
+
+
 ## [v0.2.4] - 2025-09-05
 
 - fix: Enhance bindings documentation and examples. Fix typo in success message. (06b0153)
