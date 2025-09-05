@@ -149,7 +149,7 @@ component<State, {}, {}, Methods>('form-input-validation', (ctx) => html`
     ctx.errorMessage = 'Please select at least one favorite fruit.';
       return;
     }
-    ctx.successMessage = 'Form submitted successMessagefully!';
+    ctx.successMessage = 'Form submitted successfully!';
     // Reset form fields
     ctx.email = '';
     ctx.username = '';

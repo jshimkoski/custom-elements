@@ -8,12 +8,14 @@ Bindings allow you to connect your component's state, props, and events directly
 
 - `:attr` / `:prop` — Attribute/property binding
 - `@event` — Event binding
+- `:class` — Class binding
+- `:style` — Style binding
 - `:model` — Two-way binding for form elements (native + custom elements)
 - `ref` — Ref binding
 
 ## 🏷️ Attribute / Property Binding (`:prop` / `:attr`)
 
-Bind state or props to element attributes or DOM properties. The template syntax `:name` will set the DOM property when supported (preferred for numbers, objects and functions); use bare attributes for string literals only.
+Bind state or props to element attributes or DOM properties. The template syntax `:name` creates a binding; by default the compiler places it on vnode attrs (an HTML attribute). To guarantee a JS property assignment use the `:bind` object form or rely on specific directives (for example `:model` for inputs or the compiler transform for custom elements).
 
 ```html
 <input :value="name" />
@@ -21,6 +23,17 @@ Bind state or props to element attributes or DOM properties. The template syntax
 
 - Use `:name` to bind a value to an element property (where supported). This updates automatically when the value changes.
 - For custom elements prefer property binding to target element properties (e.g. `:someProp="obj"`). HTML attributes are string-only and should be used for literal text.
+
+### Object form — `:bind` (guaranteed JS property assignment)
+
+If you need to ensure values are set as JavaScript properties (not HTML attributes), use the `:bind` object form. This is useful for numbers, objects, functions, or when targeting custom element properties explicitly.
+
+```html
+<my-el :bind="{ someProp: obj, count: 42, onAction: handleAction }" />
+```
+
+- The compiler/runtime will assign the entries on the `props` object so the renderer performs JS property assignment when possible.
+- Use this when `:name` (attribute form) would otherwise produce an HTML attribute string instead of setting the element's property.
 
 ## 🖱️ Event Binding (`@event`)
 
@@ -159,10 +172,6 @@ Behavior: when the host receives `update:active`, the runtime reads `event.detai
 
 - The `arg` (the `prop` in `:model:prop`) must be a simple identifier (no dot-paths). The host binding (RHS) may be a nested path such as `user.name`.
 - The runtime expects the new value in `event.detail`. If your component uses a different shape (for example `event.detail = { value: ... }`), adapt the component or emit a plain value.
- - The `arg` (the `prop` in `:model:prop`) must be a simple identifier (no dot-paths). The host binding (RHS) may be a nested path such as `user.name`.
- - The runtime expects the new value in `event.detail`. If your component uses a different shape (for example `event.detail = { value: ... }`), adapt the component or emit a plain value.
-
-Note: The compiler/runtime may consult an internal runtime registry when compile-time information is insufficient. The registry is an implementation detail; in the browser dev environment it is available to tooling via the Symbol slot Symbol.for('cer.registry') for HMR/debugging only. Consumers should use the public runtime API (`component`, `html`, etc.) and avoid depending on the registry or any global. Server-side code that truly requires access to registrations should import the internal runtime module directly (not recommended for public packages).
 
 Plain `:model` on custom elements → model-value
 
@@ -175,7 +184,7 @@ Example shorthand and equivalent manual wiring:
 <my-custom :model="value" />
 
 <!-- Equivalent explicit wiring -->
-<my-custom :modelValue="value" @update:model-value="val => value = val" />
+<my-custom :modelValue="value" @update:model-value="${val => value = val}" />
 ```
 
 ### Important: inside custom elements do not rely on `:model` to mutate host props
@@ -185,18 +194,34 @@ If a custom element receives a prop from a host, the element should not directly
 Compact pattern inside a custom element that maintains local state and notifies the host:
 
 ```ts
-component('baby', {
-  props: { babyText: { type: String } },
+component('child', {
+  props: { childText: { type: String } },
   state: { localText: '' },
   onConnected(ctx) {
     // initialize local state from prop
-    ctx.localText = ctx.babyText ?? '';
+    ctx.localText = ctx.childText ?? '';
   },
   render: (ctx) => html`
-    <input :model="localText" @input="${(e: Event) => ctx.emit('update:baby-text', (e.target as HTMLInputElement).value)}" />
+    <input
+      :model="localText"
+      @input="${(e: Event) => {
+        // Always emit kebab-case event for host
+        ctx.emit('update:child-text', (e.target as HTMLInputElement).value)
+      }}"
+    >
+  `,
+});
+
+component("parent", {
+  state: { text: "child text" },
+  render: (ctx) => html`
+    <cer-child :model:childText="text"></cer-child>
+    <p>Child text: ${ctx.text}</p>
   `,
 });
 ```
+
+**Note:** The above example uses `:model:childText` in the parent and emits `update:child-text` from the child. The runtime automatically converts camelCase to kebab-case for event names.
 
 ### Examples summary
 
@@ -260,7 +285,7 @@ component('binding-demo', {
 
 - Bindings are parsed by the template compiler and connected to the reactive state.
 - Attribute and event bindings update automatically on state changes.
-- Two-way bindings use proxies to keep state and DOM in sync.
+- Two-way bindings use directive handlers that read/write host state via getNested/setNested and trigger a render.
 - Supports nested properties and arrays for deep reactivity.
 
 ## 📝 Tips & Best Practices

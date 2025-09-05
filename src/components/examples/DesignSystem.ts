@@ -23,7 +23,7 @@ component("child", {
       <button @click="onClick">Model Value Update - Click me</button>
       <button @click="onPropClick">Prop Value Update - ${ctx.test}</button>
       <div>
-        <cer-baby :model:baby-text="text"></cer-baby>
+        <cer-baby :model:babyText="text"></cer-baby>
         Baby text is (in child): ${ctx.text}
       </div>
     </div>

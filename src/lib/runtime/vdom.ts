@@ -163,7 +163,6 @@ export function processModelDirective(
 
   // Custom element update event names (update:prop) for non-native inputs
   if (!isNativeInput) {
-    const toKebab = (s: string) => String(s).replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
     listeners[`update:${toKebab(propName)}`] = (event: Event) => {
       const actualState = context._state || context;
       const newVal = (event as CustomEvent).detail !== undefined ? (event as CustomEvent).detail : (event.target as any)?.value;
