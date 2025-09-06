@@ -41,7 +41,7 @@ Custom Elements Runtime provides a high-performance, zero-dependency JIT CSS eng
 `font-bold`, `font-semibold`, `font-medium`, `font-light`, `underline`, `overline`, `line-through`, `no-underline`, `italic`, `not-italic`, `uppercase`, `lowercase`, `capitalize`, `normal-case`, `text-left`, `text-center`, `text-right`, `text-xs` to `text-8xl`, `truncate`, `line-clamp-1` to `line-clamp-4`
 
 **Borders & Radius:**
-`border`, `rounded-none`, `rounded-xs`, `rounded` (alias `rounded-md`), `rounded-sm`, `rounded-md`, `rounded-lg`, `rounded-full`
+`border`, `border-2`, `border-4`, `border-6`, `border-8`, `rounded-none`, `rounded-xs`, `rounded-sm`, `rounded-md`, `rounded-lg`, `rounded-full`
 
 **Shadow & Effects:**
 `shadow-none`, `shadow-xs`, `shadow-sm`, `shadow-md`, `shadow-lg`, `shadow-xl`, `shadow-2xl`
@@ -71,7 +71,7 @@ Custom Elements Runtime provides a high-performance, zero-dependency JIT CSS eng
 `transition`, `transition-all`, `transition-colors`, `transition-shadow`, `transition-opacity`, `transition-transform`, `transition-none`
 
 **Colors:**
-`bg-gray-100`, `text-blue-500`, `border-red-500`, `shadow-blue-500`, etc. (full palette, semantic, and arbitrary)
+`bg-neutral-100`, `text-primary-500`, `border-error-500`, `shadow-primary-500`, etc. (full palette, semantic, and arbitrary)
 
 For a complete list, see the `utilityMap` in [`src/lib/runtime/style.ts`](../src/lib/runtime/style.ts).
 
@@ -91,14 +91,14 @@ For a complete list, see the `utilityMap` in [`src/lib/runtime/style.ts`](../src
 
 **Example:**
 ```html
-<button class="bg-blue-500 hover:bg-blue-600 focus:shadow-sm">Hover & Focus</button>
+<button class="bg-primary-500 hover:bg-primary-600 focus:shadow-sm">Hover & Focus</button>
 <div class="group">
-  <span class="group-hover:text-blue-500">Group Hover</span>
+  <span class="group-hover:text-primary-500">Group Hover</span>
 </div>
 <input type="checkbox" class="peer" />
-<label class="peer-checked:text-green-600">Checked!</label>
+<label class="peer-checked:text-success-600">Checked!</label>
 <div class="p-2 md:p-4 lg:p-8">Responsive Padding</div>
-<div class="dark:bg-gray-900">Dark Mode</div>
+<div class="dark:bg-neutral-900">Dark Mode</div>
 ```
 
 ## 🚀 Arbitrary Values
@@ -140,14 +140,14 @@ Arbitrary variants allow you to target custom selectors, attributes, or states d
 **Examples:**
 ```html
 <!-- Attribute variant: style when aria-selected is true -->
-<div class="[aria-selected=true]:bg-blue-500"></div>
+<div class="[aria-selected=true]:bg-primary-500"></div>
 
 <!-- Custom selector variant: style when .foo-[bar] matches -->
-<div class="foo-[bar]:text-red-500"></div>
+<div class="foo-[bar]:text-error-500"></div>
 
 <!-- Multiple variants: combine arbitrary with state or responsive -->
 <button class="hover:[box-shadow:0_0_0_2px_#09f]"></button>
-<div class="md:[data-open=true]:bg-green-100"></div>
+<div class="md:[data-open=true]:bg-success-100"></div>
 ```
 
 - **How It Works:**
@@ -174,17 +174,13 @@ JIT CSS provides a rich set of built-in color palettes, all accessible via utili
 
 **Available Palettes:**
 
-- `gray` (50-900)
-- `neutral` (50-900)
-- `slate` (50-900)
-- `zinc` (50-900)
-- `red` (50-900)
-- `blue` (50-900)
-- `green` (50-900)
-- `amber` (50-900)
-- `indigo` (50-900)
-- `emerald` (50-900)
-- `rose` (50-900)
+- `neutral` (50-950)
+- `primary` (50-950)
+- `secondary` (50-950)
+- `success` (50-950)
+- `info` (50-950)
+- `warning` (50-950)
+- `error` (50-950)
 - `white` (DEFAULT)
 - `black` (DEFAULT)
 - `transparent` (DEFAULT)
@@ -192,52 +188,49 @@ JIT CSS provides a rich set of built-in color palettes, all accessible via utili
 
 **Opacity Modifiers:**
 
-`bg-blue-500/50`, `text-red-500/80`, etc. (any palette color supports `/[0-100]` for opacity)
+`bg-primary-500/50`, `text-error-500/80`, etc. (any palette color supports `/[0-100]` for opacity)
 
 **Usage Examples:**
 
 ```html
 <!-- Background colors -->
-<div class="bg-gray-100"></div>
 <div class="bg-neutral-100"></div>
-<div class="bg-slate-700"></div>
-<div class="bg-zinc-900"></div>
-<div class="bg-red-500"></div>
-<div class="bg-blue-300"></div>
-<div class="bg-green-800"></div>
-<div class="bg-amber-400"></div>
-<div class="bg-indigo-600"></div>
-<div class="bg-emerald-200"></div>
-<div class="bg-rose-900"></div>
+<div class="bg-primary-300"></div>
+<div class="bg-secondary-200"></div>
+<div class="bg-success-800"></div>
+<div class="bg-info-600"></div>
+<div class="bg-warning-400"></div>
+<div class="bg-error-500"></div>
 <div class="bg-white"></div>
 <div class="bg-black"></div>
 
 <!-- Text colors -->
-<span class="text-gray-700">Gray text</span>
-<span class="text-blue-500">Blue text</span>
-<span class="text-emerald-600">Emerald text</span>
+<span class="text-neutral-700">Neutral text</span>
+<span class="text-primary-500">Primary text</span>
+<span class="text-secondary-600">Secondary text</span>
 
 <!-- Border colors -->
-<div class="border border-red-400"></div>
-<div class="border border-slate-900"></div>
+<div class="border border-error-400"></div>
+<div class="border border-neutral-900"></div>
 
 <!-- Shadow colors (with palette) -->
-<div class="shadow shadow-blue-500"></div>
+<div class="shadow shadow-primary-500"></div>
 
 <!-- Arbitrary color values -->
 <div class="bg-[#ff00ff]"></div>
 <span class="text-[rgba(0,0,0,0.5)]">Custom RGBA</span>
+<span class="text-[var(--color-primary-500)]">CSS Variable</span>
 
 <!-- Color with opacity modifier -->
-<div class="bg-blue-500/50"></div>
-<span class="text-red-500/80">Semi-transparent red</span>
+<div class="bg-primary-500/50"></div>
+<span class="text-error-500/80">Semi-transparent red</span>
 ```
 
 **How to Override Colors:**
 ```css
 :root {
-  --color-blue-500: #007bff;
-  --color-gray-100: #f0f0f0;
+  --color-primary-500: #007bff;
+  --color-neutral-100: #f0f0f0;
 }
 ```
 
@@ -257,7 +250,7 @@ JIT CSS provides a rich set of built-in color palettes, all accessible via utili
 - `minifyCSS(css: string): string`
 - `baseReset: string`
 - `jitCSS(html: string): string`
-- Utility classes: see `utilityMap` in `style-utils.ts`
+- Utility classes: see `utilityMap` in `style.ts`
 - Variants: see `selectorVariants` and `mediaVariants`
 
 For full details, see the source in [`src/lib/runtime/style.ts`](../src/lib/runtime/style.ts).

@@ -32,13 +32,13 @@ export const TodoApp = component<State, {}, {}, Methods>('todo-app', (ctx) => ht
     >
       <input
         :model="input"
-        class="grow px-2 py-1 border border-neutral-300 dark:border-neutral-700 rounded"
+        class="grow px-2 py-1 border border-neutral-300 dark:border-neutral-700 rounded-sm"
         type="text"
         placeholder="Add todo"
       >
       <button
         type="submit"
-        class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:bg-blue-700"
+        class="px-4 py-2 bg-primary-600 text-white rounded-sm hover:bg-primary-700 focus:bg-primary-700"
       >Add</button>
     </form>
     <ul>
@@ -50,13 +50,13 @@ export const TodoApp = component<State, {}, {}, Methods>('todo-app', (ctx) => ht
           >
           <span
             :class="${{
-              'grow text-left ': true,
-              'line-through text-gray-500': todo.done
+              'grow text-left': true,
+              'line-through text-neutral-500': todo.done
             }}"
             class="grow text-left"
           >${todo.text}</span>
           <button
-            class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 focus:bg-red-700 disabled:pointer-events-none disabled:opacity-50"
+            class="px-4 py-2 bg-error-600 text-white rounded-sm hover:bg-error-700 focus:bg-error-700 disabled:pointer-events-none disabled:opacity-50"
             :disabled="${!todo.done}"
             @click="${() => ctx.removeTodo(todo.id)}"
           >Remove</button>

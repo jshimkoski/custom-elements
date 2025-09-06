@@ -22,7 +22,7 @@ type Methods = {
 
 component<State, {}, {}, Methods>('form-input-validation', (ctx) => html`
   <form
-    class="max-w-128 mx-auto p-8 rounded-lg shadow bg-white dark:bg-black text-black dark:text-white shadow-lg border border-neutral-100 dark:border-neutral-900"
+    class="max-w-128 mx-auto p-8 rounded-lg bg-white dark:bg-black text-black dark:text-white shadow-lg border border-neutral-100 dark:border-neutral-900"
     @submit="${ctx.submit}"
   >
     <fieldset>
@@ -34,7 +34,7 @@ component<State, {}, {}, Methods>('form-input-validation', (ctx) => html`
           ref="emailInput"
           type="email"
           required
-          class="w-full px-2 py-1 rounded border border-neutral-300 dark:border-neutral-800 hover:bg-neutral-50 focus:bg-white dark:hover:bg-neutral-900 dark:focus:bg-black"
+          class="w-full px-2 py-1 rounded-sm border border-neutral-300 dark:border-neutral-800 hover:bg-neutral-50 focus:bg-white dark:hover:bg-neutral-900 dark:focus:bg-black"
         >
       </label>
       <label class="flex flex-col items-start gap-2 w-full mb-6">
@@ -44,7 +44,7 @@ component<State, {}, {}, Methods>('form-input-validation', (ctx) => html`
           type="text"
           minlength="3"
           required
-          class="w-full px-2 py-1 rounded border border-neutral-300 dark:border-neutral-800 hover:bg-neutral-50 focus:bg-white dark:hover:bg-neutral-900 dark:focus:bg-black"
+          class="w-full px-2 py-1 rounded-sm border border-neutral-300 dark:border-neutral-800 hover:bg-neutral-50 focus:bg-white dark:hover:bg-neutral-900 dark:focus:bg-black"
         >
       </label>
       <label class="flex flex-col items-start gap-2 w-full mb-6">
@@ -54,7 +54,7 @@ component<State, {}, {}, Methods>('form-input-validation', (ctx) => html`
           rows="3"
           minlength="10"
           required
-          class="w-full px-2 py-1 rounded border border-neutral-300 dark:border-neutral-800 hover:bg-neutral-50 focus:bg-white dark:hover:bg-neutral-900 dark:focus:bg-black"
+          class="w-full px-2 py-1 rounded-sm border border-neutral-300 dark:border-neutral-800 hover:bg-neutral-50 focus:bg-white dark:hover:bg-neutral-900 dark:focus:bg-black"
         ></textarea>
       </label>
       <div class="flex flex-col items-start gap-2 w-full mb-6">
@@ -79,7 +79,7 @@ component<State, {}, {}, Methods>('form-input-validation', (ctx) => html`
         <span class="font-semibold">Country:</span>
         <select
           :model="country"
-          class="w-full px-2 py-1 rounded border border-neutral-300 dark:border-neutral-800 hover:bg-neutral-50 focus:bg-white dark:hover:bg-neutral-900 dark:focus:bg-black"
+          class="w-full px-2 py-1 rounded-sm border border-neutral-300 dark:border-neutral-800 hover:bg-neutral-50 focus:bg-white dark:hover:bg-neutral-900 dark:focus:bg-black"
         >
           <option value="">Select...</option>
           <option value="us">United States</option>
@@ -88,14 +88,14 @@ component<State, {}, {}, Methods>('form-input-validation', (ctx) => html`
         </select>
       </label>
       ${when(ctx.errorMessage !== '', html`
-        <div class="mb-6 text-sm text-red-600 dark:text-red-400">${ctx.errorMessage}</div>
+        <div class="mb-6 text-sm text-error-600 dark:text-error-400">${ctx.errorMessage}</div>
       `)}
       <button
         type="submit"
-        class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:bg-blue-700"
+        class="px-4 py-2 bg-primary-600 text-white rounded-sm hover:bg-primary-500 focus:bg-primary-500"
       >Submit</button>
       ${when(ctx.successMessage !== '', html`
-        <div class="mt-4 text-sm text-green-600 dark:text-green-400">${ctx.successMessage}</div>
+        <div class="mt-4 text-sm text-success-600 dark:text-success-400">${ctx.successMessage}</div>
       `)}
     </fieldset>
   </form>

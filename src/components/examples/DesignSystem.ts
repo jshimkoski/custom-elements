@@ -5,7 +5,7 @@ component("baby", {
   render: (ctx) => html`
     <input
       type="text"
-      class="border p-2 rounded"
+      class="border p-2 rounded-sm"
       :value="${ctx.babyText}"
       @input="onInput"
     />
@@ -38,12 +38,12 @@ component("child", {
 
 component("design-system", {
   render: (ctx) => html`
-    <div class="p-4 border rounded space-y-4">
+    <div class="p-4 border rounded-sm space-y-4">
       <h2 class="text-xl font-bold">Design System Example</h2>
       <cer-child :model="value" :model:test="anotherValue"></cer-child>
       <p>Value: ${ctx.value}</p>
       <button
-        class="bg-green-600 hover:bg-green-500 text-white py-2 px-4 rounded"
+        class="bg-success-600 hover:bg-success-500 text-white py-2 px-4 rounded-sm"
         @click="resetValue"
       >
         Reset Value

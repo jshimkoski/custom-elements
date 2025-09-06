@@ -50,9 +50,9 @@ describe('jitCSS', () => {
   });
 
   it('supports variants', () => {
-    const html = '<button class="hover:bg-blue-500 focus:shadow-xl"></button>';
+    const html = '<button class="hover:bg-primary-500 focus:shadow-xl"></button>';
     const css = jitCSS(html);
-    expect(css).toContain('.hover\\:bg-blue-500:hover');
+    expect(css).toContain('.hover\\:bg-primary-500:hover');
     expect(css).toContain('.focus\\:shadow-xl:focus');
   });
 
@@ -130,21 +130,21 @@ describe('additional style tests', () => {
   });
 
   it('parseColorClass returns CSS rule', () => {
-    expect(parseColorClass('bg-red-500')).toContain('background-color');
-    expect(parseColorClass('text-gray-200')).toContain('color');
-    expect(parseColorClass('border-blue-600')).toContain('border-color');
+    expect(parseColorClass('bg-error-500')).toContain('background-color');
+    expect(parseColorClass('text-neutral-200')).toContain('color');
+    expect(parseColorClass('border-primary-600')).toContain('border-color');
     expect(parseColorClass('foo-bar')).toBeNull();
   });
 
   it('parseOpacityModifier parses opacity', () => {
-    expect(parseOpacityModifier('bg-red-500/50')).toEqual({ base: 'bg-red-500', opacity: 0.5 });
-    expect(parseOpacityModifier('bg-red-500')).toEqual({ base: 'bg-red-500' });
-    expect(parseOpacityModifier('bg-red-500/x')).toEqual({ base: 'bg-red-500' });
+    expect(parseOpacityModifier('bg-error-500/50')).toEqual({ base: 'bg-error-500', opacity: 0.5 });
+    expect(parseOpacityModifier('bg-error-500')).toEqual({ base: 'bg-error-500' });
+    expect(parseOpacityModifier('bg-error-500/x')).toEqual({ base: 'bg-error-500' });
   });
 
   it('parseColorWithOpacity returns CSS with opacity', () => {
-    expect(parseColorWithOpacity('bg-red-500/50')).toContain('rgb(');
-    expect(parseColorWithOpacity('bg-red-500')).toContain('background-color');
+    expect(parseColorWithOpacity('bg-error-500/50')).toContain('rgb(');
+    expect(parseColorWithOpacity('bg-error-500')).toContain('background-color');
     expect(parseColorWithOpacity('foo-bar/50')).toBeNull();
   });
 
@@ -165,7 +165,7 @@ describe('additional style tests', () => {
   });
 
   it('jitCSS generates CSS for HTML', () => {
-    const html = '<div class="block mx-2 bg-red-500/50">';
+    const html = '<div class="block mx-2 bg-error-500/50">';
     const cssOut = jitCSS(html);
     expect(cssOut).toContain('display:block');
     expect(cssOut).toContain('margin-inline');
@@ -178,8 +178,8 @@ describe('additional style tests', () => {
   });
 
   it('colors contains expected palettes', () => {
-    expect(colors.red[500]).toContain('#ef4444');
-    expect(colors.blue[500]).toContain('#3b82f6');
+    expect(colors.error[500]).toContain('#ef4444');
+    expect(colors.primary[500]).toContain('#3b82f6');
   });
 
   it('selectorVariants and mediaVariants work', () => {
@@ -193,9 +193,9 @@ describe('additional style tests', () => {
  */
 describe('jitCSS - Arbitrary Variants', () => {
   it('should generate CSS for attribute selector variant', () => {
-    const html = `<div class="[aria-selected=true]:bg-blue-500"></div>`;
+    const html = `<div class="[aria-selected=true]:bg-primary-500"></div>`;
     const css = minifyCSS(jitCSS(html));
-    expect(css).toContain('[aria-selected=true].\\[aria-selected\\=true\\]\\:bg-blue-500{background-color:var(--color-blue-500,#3b82f6)}');
+    expect(css).toContain('[aria-selected=true].\\[aria-selected\\=true\\]\\:bg-primary-500{background-color:var(--color-primary-500,#3b82f6)}');
   });
 
   it('should combine arbitrary variant with arbitrary value', () => {
@@ -205,9 +205,9 @@ describe('jitCSS - Arbitrary Variants', () => {
   });
 
   it('should support responsive + arbitrary variant', () => {
-    const html = `<div class="md:[data-open=true]:bg-green-100"></div>`;
+    const html = `<div class="md:[data-open=true]:bg-success-100"></div>`;
     const css = minifyCSS(jitCSS(html));
-    expect(css).toContain('@media (min-width:768px){[data-open=true].md\\:\\[data-open\\=true\\]\\:bg-green-100{background-color:var(--color-green-100,#dcfce7)}}');
+    expect(css).toContain('@media (min-width:768px){[data-open=true].md\\:\\[data-open\\=true\\]\\:bg-success-100{background-color:var(--color-success-100,#dcfce7)}}');
   });
 
   it('should support dark + responsive + arbitrary variant + arbitrary value', () => {
@@ -265,15 +265,21 @@ describe('jitCSS - Arbitrary Variants', () => {
   });
 
   it('should not generate CSS for invalid arbitrary variant', () => {
-    const html = `<div class="[invalid]:bg-blue-500"></div>`;
+    const html = `<div class="[invalid]:bg-primary-500"></div>`;
     const css = minifyCSS(jitCSS(html));
     // Should still generate, but selector may be invalid; test for presence
-    expect(css).toContain('[invalid].\\[invalid\\]\\:bg-blue-500{background-color:var(--color-blue-500,#3b82f6)}');
+    expect(css).toContain('[invalid].\\[invalid\\]\\:bg-primary-500{background-color:var(--color-primary-500,#3b82f6)}');
   });
 
   it('should combine multiple variants with arbitrary', () => {
     const html = `<div class="dark:md:[data-state=active]:text-[rgba(255,255,255,0.8)]"></div>`;
     const css = minifyCSS(jitCSS(html));
     expect(css).toContain('@media (prefers-color-scheme:dark) and (min-width:768px){[data-state=active].dark\\:md\\:\\[data-state\\=active\\]\\:text-\\[rgba\\(255\\,255\\,255\\,0\\.8\\)\\]{color:rgba(255,255,255,0.8)}}');
+  });
+
+  it('should combine multiple variants with arbitrary custom property', () => {
+    const html = `<div class="dark:md:[data-state=active]:text-[var(--color-error-500)]"></div>`;
+    const css = minifyCSS(jitCSS(html));
+    expect(css).toContain('@media (prefers-color-scheme:dark) and (min-width:768px){[data-state=active].dark\\:md\\:\\[data-state\\=active\\]\\:text-\\[var\\(--color-error-500\\)\\]{color:var(--color-error-500)}}');
   });
 });

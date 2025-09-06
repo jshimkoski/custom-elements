@@ -14,7 +14,7 @@ type Methods = {
 
 export const MinimalExample = component<State, {}, {}, Methods>('minimal-example', (ctx) => html`
   <button
-    class="bg-blue-600 hover:bg-blue-500 transition-colors text-white rounded py-2 px-4 dark:bg-blue-700 dark:hover:bg-blue-600"
+    class="bg-primary-600 hover:bg-primary-500 transition-colors text-white rounded-sm py-2 px-4 dark:bg-primary-700 dark:hover:bg-primary-600"
     @click="increase"
   >Count: ${ctx.count}</button>
 `, {

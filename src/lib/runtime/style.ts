@@ -101,8 +101,8 @@ export const baseReset = css`
   ::-webkit-input-placeholder, ::placeholder {
     color: inherit; opacity: .5;
   }
-  *:focus {
-    outline: 2px solid var(--color-blue-500, #3b82f6);
+  *:focus-visible {
+    outline: 2px solid var(--color-primary-500, #3b82f6);
     outline-offset: 2px;
   }
   ol, ul { list-style: none }
@@ -126,144 +126,119 @@ type CSSMap = Record<string, string>;
 type SelectorVariantMap = Record<string, (selector: string, body: string) => string>;
 type MediaVariantMap = Record<string, string>;
 
-export const colors: Record<string, Record<string, string>> = {
-  gray: {
-    50:  "var(--color-gray-50, #f9fafb)",
-    100: "var(--color-gray-100, #f3f4f6)",
-    200: "var(--color-gray-200, #e5e7eb)",
-    300: "var(--color-gray-300, #d1d5db)",
-    400: "var(--color-gray-400, #9ca3af)",
-    500: "var(--color-gray-500, #6b7280)",
-    600: "var(--color-gray-600, #4b5563)",
-    700: "var(--color-gray-700, #374151)",
-    800: "var(--color-gray-800, #1f2937)",
-    900: "var(--color-gray-900, #111827)",
-  },
+type Shade = 50|100|200|300|400|500|600|700|800|900|950;
+type ColorShades = Partial<Record<Shade, string>> & { DEFAULT?: string };
+
+const fallbackHex: Record<string, ColorShades> = {
   neutral: {
-    50:  "var(--color-neutral-50, #fafafa)",
-    100: "var(--color-neutral-100, #f5f5f5)",
-    200: "var(--color-neutral-200, #e5e5e5)",
-    300: "var(--color-neutral-300, #d4d4d4)",
-    400: "var(--color-neutral-400, #a3a3a3)",
-    500: "var(--color-neutral-500, #737373)",
-    600: "var(--color-neutral-600, #525252)",
-    700: "var(--color-neutral-700, #404040)",
-    800: "var(--color-neutral-800, #262626)",
-    900: "var(--color-neutral-900, #171717)",
+    50:  "#fafafa",
+    100: "#f4f4f5",
+    200: "#e4e4e7",
+    300: "#d4d4d8",
+    400: "#9f9fa9",
+    500: "#71717b",
+    600: "#52525c",
+    700: "#3f3f46",
+    800: "#27272a",
+    900: "#18181b",
+    950: "#09090b"
   },
-  slate: {
-    50:  "var(--color-slate-50, #f8fafc)",
-    100: "var(--color-slate-100, #f1f5f9)",
-    200: "var(--color-slate-200, #e2e8f0)",
-    300: "var(--color-slate-300, #cbd5e1)",
-    400: "var(--color-slate-400, #94a3b8)",
-    500: "var(--color-slate-500, #64748b)",
-    600: "var(--color-slate-600, #475569)",
-    700: "var(--color-slate-700, #334155)",
-    800: "var(--color-slate-800, #1e293b)",
-    900: "var(--color-slate-900, #0f172a)",
+  primary: {
+    50:  "#eff6ff",
+    100: "#dbeafe",
+    200: "#bfdbfe",
+    300: "#93c5fd",
+    400: "#60a5fa",
+    500: "#3b82f6",
+    600: "#2563eb",
+    700: "#1d4ed8",
+    800: "#1e40af",
+    900: "#1e3a8a",
+    950: "#172554"
   },
-  zinc: {
-    50:  "var(--color-zinc-50, #fafafa)",
-    100: "var(--color-zinc-100, #f4f4f5)",
-    200: "var(--color-zinc-200, #e4e4e7)",
-    300: "var(--color-zinc-300, #d4d4d8)",
-    400: "var(--color-zinc-400, #a1a1aa)",
-    500: "var(--color-zinc-500, #71717a)",
-    600: "var(--color-zinc-600, #52525b)",
-    700: "var(--color-zinc-700, #3f3f46)",
-    800: "var(--color-zinc-800, #27272a)",
-    900: "var(--color-zinc-900, #18181b)",
+  secondary: {
+    50:  "#eef2ff",
+    100: "#e0e7ff",
+    200: "#c7d2fe",
+    300: "#a5b4fc",
+    400: "#818cf8",
+    500: "#6366f1",
+    600: "#4f46e5",
+    700: "#4338ca",
+    800: "#3730a3",
+    900: "#312e81",
+    950: "#1e1b4b"
   },
-  red: {
-    50:  "var(--color-red-50, #fef2f2)",
-    100: "var(--color-red-100, #fee2e2)",
-    200: "var(--color-red-200, #fecaca)",
-    300: "var(--color-red-300, #fca5a5)",
-    400: "var(--color-red-400, #f87171)",
-    500: "var(--color-red-500, #ef4444)",
-    600: "var(--color-red-600, #dc2626)",
-    700: "var(--color-red-700, #b91c1c)",
-    800: "var(--color-red-800, #991b1b)",
-    900: "var(--color-red-900, #7f1d1d)",
+  success: {
+    50:  "#f0fdf4",
+    100: "#dcfce7",
+    200: "#bbf7d0",
+    300: "#86efac",
+    400: "#4ade80",
+    500: "#22c55e",
+    600: "#16a34a",
+    700: "#15803d",
+    800: "#166534",
+    900: "#14532d",
+    950: "#052e16"
   },
-  blue: {
-    50:  "var(--color-blue-50, #eff6ff)",
-    100: "var(--color-blue-100, #dbeafe)",
-    200: "var(--color-blue-200, #bfdbfe)",
-    300: "var(--color-blue-300, #93c5fd)",
-    400: "var(--color-blue-400, #60a5fa)",
-    500: "var(--color-blue-500, #3b82f6)",
-    600: "var(--color-blue-600, #2563eb)",
-    700: "var(--color-blue-700, #1d4ed8)",
-    800: "var(--color-blue-800, #1e40af)",
-    900: "var(--color-blue-900, #1e3a8a)",
+  info: {
+    50:  "#f0f9ff",
+    100: "#e0f2fe",
+    200: "#bae6fd",
+    300: "#7dd3fc",
+    400: "#38bdf8",
+    500: "#0ea5e9",
+    600: "#0284c7",
+    700: "#0369a1",
+    800: "#075985",
+    900: "#0c4a6e",
+    950: "#082f49"
   },
-  green: {
-    50:  "var(--color-green-50, #f0fdf4)",
-    100: "var(--color-green-100, #dcfce7)",
-    200: "var(--color-green-200, #bbf7d0)",
-    300: "var(--color-green-300, #86efac)",
-    400: "var(--color-green-400, #4ade80)",
-    500: "var(--color-green-500, #22c55e)",
-    600: "var(--color-green-600, #16a34a)",
-    700: "var(--color-green-700, #15803d)",
-    800: "var(--color-green-800, #166534)",
-    900: "var(--color-green-900, #14532d)",
+  warning: {
+    50:  "#fffbeb",
+    100: "#fef3c7",
+    200: "#fde68a",
+    300: "#fcd34d",
+    400: "#fbbf24",
+    500: "#f59e0b",
+    600: "#d97706",
+    700: "#b45309",
+    800: "#92400e",
+    900: "#78350f",
+    950: "#451a03"
   },
-  amber: {
-    50:  "var(--color-amber-50, #fffbeb)",
-    100: "var(--color-amber-100, #fef3c7)",
-    200: "var(--color-amber-200, #fde68a)",
-    300: "var(--color-amber-300, #fcd34d)",
-    400: "var(--color-amber-400, #fbbf24)",
-    500: "var(--color-amber-500, #f59e0b)",
-    600: "var(--color-amber-600, #d97706)",
-    700: "var(--color-amber-700, #b45309)",
-    800: "var(--color-amber-800, #92400e)",
-    900: "var(--color-amber-900, #78350f)",
+  error: {
+    50:  "#fef2f2",
+    100: "#fee2e2",
+    200: "#fecaca",
+    300: "#fca5a5",
+    400: "#f87171",
+    500: "#ef4444",
+    600: "#dc2626",
+    700: "#b91c1c",
+    800: "#991b1b",
+    900: "#7f1d1d",
+    950: "#450a0a"
   },
-  indigo: {
-    50:  "var(--color-indigo-50, #eef2ff)",
-    100: "var(--color-indigo-100, #e0e7ff)",
-    200: "var(--color-indigo-200, #c7d2fe)",
-    300: "var(--color-indigo-300, #a5b4fc)",
-    400: "var(--color-indigo-400, #818cf8)",
-    500: "var(--color-indigo-500, #6366f1)",
-    600: "var(--color-indigo-600, #4f46e5)",
-    700: "var(--color-indigo-700, #4338ca)",
-    800: "var(--color-indigo-800, #3730a3)",
-    900: "var(--color-indigo-900, #312e81)",
-  },
-  emerald: {
-    50:  "var(--color-emerald-50, #ecfdf5)",
-    100: "var(--color-emerald-100, #d1fae5)",
-    200: "var(--color-emerald-200, #a7f3d0)",
-    300: "var(--color-emerald-300, #6ee7b7)",
-    400: "var(--color-emerald-400, #34d399)",
-    500: "var(--color-emerald-500, #10b981)",
-    600: "var(--color-emerald-600, #059669)",
-    700: "var(--color-emerald-700, #047857)",
-    800: "var(--color-emerald-800, #065f46)",
-    900: "var(--color-emerald-900, #064e3b)",
-  },
-  rose: {
-    50:  "var(--color-rose-50, #fff1f2)",
-    100: "var(--color-rose-100, #ffe4e6)",
-    200: "var(--color-rose-200, #fecdd3)",
-    300: "var(--color-rose-300, #fda4af)",
-    400: "var(--color-rose-400, #fb7185)",
-    500: "var(--color-rose-500, #f43f5e)",
-    600: "var(--color-rose-600, #e11d48)",
-    700: "var(--color-rose-700, #be123c)",
-    800: "var(--color-rose-800, #9f1239)",
-    900: "var(--color-rose-900, #881337)",
-  },
-  white: { DEFAULT: "var(--color-white, #ffffff)" },
-  black: { DEFAULT: "var(--color-black, #000000)" },
-  transparent: { DEFAULT: "var(--color-transparent, transparent)" },
-  current: { DEFAULT: "var(--color-current, currentColor)" }
+  white: { DEFAULT: "#ffffff" },
+  black: { DEFAULT: "#000000" },
+  transparent: { DEFAULT: "transparent" },
+  current: { DEFAULT: "currentColor" }
 };
+
+export const colors: Record<string, Record<string, string>> =
+  Object.fromEntries(
+    Object.entries(fallbackHex).map(([name, shades]) => [
+      name,
+      Object.fromEntries(
+        Object.entries(shades).map(([shade, hex]) => [
+          shade,
+          `var(--color-${name}${shade === "DEFAULT" ? "" : `-${shade}`}, ${hex})`
+        ])
+      )
+    ])
+  );
 
 export const utilityMap: CSSMap = {
   /* Display */
@@ -309,12 +284,23 @@ export const utilityMap: CSSMap = {
   "grid-cols-4": "grid-template-columns:repeat(4,minmax(0,1fr));",
   "grid-cols-5": "grid-template-columns:repeat(5,minmax(0,1fr));",
   "grid-cols-6": "grid-template-columns:repeat(6,minmax(0,1fr));",
+  "grid-cols-7": "grid-template-columns:repeat(7,minmax(0,1fr));",
+  "grid-cols-8": "grid-template-columns:repeat(8,minmax(0,1fr));",
+  "grid-cols-9": "grid-template-columns:repeat(9,minmax(0,1fr));",
+  "grid-cols-10": "grid-template-columns:repeat(10,minmax(0,1fr));",
+  "grid-cols-11": "grid-template-columns:repeat(11,minmax(0,1fr));",
   "grid-cols-12": "grid-template-columns:repeat(12,minmax(0,1fr));",
   "grid-rows-1": "grid-template-rows:repeat(1,minmax(0,1fr));",
   "grid-rows-2": "grid-template-rows:repeat(2,minmax(0,1fr));",
   "grid-rows-3": "grid-template-rows:repeat(3,minmax(0,1fr));",
   "grid-rows-4": "grid-template-rows:repeat(4,minmax(0,1fr));",
+  "grid-rows-5": "grid-template-rows:repeat(5,minmax(0,1fr));",
   "grid-rows-6": "grid-template-rows:repeat(6,minmax(0,1fr));",
+  "grid-rows-7": "grid-template-rows:repeat(7,minmax(0,1fr));",
+  "grid-rows-8": "grid-template-rows:repeat(8,minmax(0,1fr));",
+  "grid-rows-9": "grid-template-rows:repeat(9,minmax(0,1fr));",
+  "grid-rows-10": "grid-template-rows:repeat(10,minmax(0,1fr));",
+  "grid-rows-11": "grid-template-rows:repeat(11,minmax(0,1fr));",
   "grid-rows-12": "grid-template-rows:repeat(12,minmax(0,1fr));",
 
   /* Grid Placement */
@@ -324,12 +310,22 @@ export const utilityMap: CSSMap = {
   "col-span-4": "grid-column:span 4 / span 4;",
   "col-span-5": "grid-column:span 5 / span 5;",
   "col-span-6": "grid-column:span 6 / span 6;",
+  "col-span-7": "grid-column:span 7 / span 7;",
+  "col-span-8": "grid-column:span 8 / span 8;",
+  "col-span-9": "grid-column:span 9 / span 9;",
+  "col-span-10": "grid-column:span 10 / span 10;",
+  "col-span-11": "grid-column:span 11 / span 11;",
   "col-span-12": "grid-column:span 12 / span 12;",
   "row-span-1": "grid-row:span 1 / span 1;",
   "row-span-2": "grid-row:span 2 / span 2;",
   "row-span-3": "grid-row:span 3 / span 3;",
   "row-span-4": "grid-row:span 4 / span 4;",
   "row-span-6": "grid-row:span 6 / span 6;",
+  "row-span-7": "grid-row:span 7 / span 7;",
+  "row-span-8": "grid-row:span 8 / span 8;",
+  "row-span-9": "grid-row:span 9 / span 9;",
+  "row-span-10": "grid-row:span 10 / span 10;",
+  "row-span-11": "grid-row:span 11 / span 11;",
   "row-span-12": "grid-row:span 12 / span 12;",
 
   /* Positioning */
@@ -371,22 +367,26 @@ export const utilityMap: CSSMap = {
 
   /* Borders */
   border: "border-width:1px;",
+  "border-2": "border-width:2px;",
+  "border-4": "border-width:4px;",
+  "border-6": "border-width:6px;",
+  "border-8": "border-width:8px;",
   "rounded-none": "border-radius:0;",
   "rounded-xs": "border-radius:0.125rem;",
-  "rounded": "border-radius:0.25rem;",
   "rounded-sm": "border-radius:0.25rem;",
   "rounded-md": "border-radius:0.375rem;",
   "rounded-lg": "border-radius:0.5rem;",
   "rounded-full": "border-radius:9999px;",
 
   /* Shadow and effects */
-  "shadow-none": "box-shadow:0 0 #0000;",
-  "shadow-xs": "box-shadow:0 1px 2px 0 rgb(0 0 0 / 0.05);",
-  "shadow-sm": "box-shadow:0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);",
-  "shadow-md": "box-shadow:0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);",
-  "shadow-lg": "box-shadow:0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);",
-  "shadow-xl": "box-shadow:0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);",
-  "shadow-2xl": "box-shadow:0 25px 50px -12px rgb(0 0 0 / 0.25);",
+  // Shadows use a CSS variable for color so color utilities can modify --ce-shadow-color
+  "shadow-none": "--ce-shadow-color: rgb(0 0 0 / 0);box-shadow:0 0 var(--ce-shadow-color, #0000);",
+  "shadow-xs": "--ce-shadow-color: rgb(0 0 0 / 0.05);box-shadow:0 1px 2px 0 var(--ce-shadow-color, rgb(0 0 0 / 0.05));",
+  "shadow-sm": "--ce-shadow-color: rgb(0 0 0 / 0.1);box-shadow:0 1px 3px 0 var(--ce-shadow-color, rgb(0 0 0 / 0.1)),0 1px 2px -1px var(--ce-shadow-color, rgb(0 0 0 / 0.1));",
+  "shadow-md": "--ce-shadow-color: rgb(0 0 0 / 0.1);box-shadow:0 4px 6px -1px var(--ce-shadow-color, rgb(0 0 0 / 0.1)),0 2px 4px -2px var(--ce-shadow-color, rgb(0 0 0 / 0.1));",
+  "shadow-lg": "--ce-shadow-color: rgb(0 0 0 / 0.1);box-shadow:0 10px 15px -3px var(--ce-shadow-color, rgb(0 0 0 / 0.1)),0 4px 6px -4px var(--ce-shadow-color, rgb(0 0 0 / 0.1));",
+  "shadow-xl": "--ce-shadow-color: rgb(0 0 0 / 0.1);box-shadow:0 20px 25px -5px var(--ce-shadow-color, rgb(0 0 0 / 0.1)),0 8px 10px -6px var(--ce-shadow-color, rgb(0 0 0 / 0.1));",
+  "shadow-2xl": "--ce-shadow-color: rgb(0 0 0 / 0.25);box-shadow:0 25px 50px -12px var(--ce-shadow-color, rgb(0 0 0 / 0.25));",
 
   /* Text Overflow & Whitespace */
   truncate: "overflow:hidden;text-overflow:ellipsis;white-space:nowrap;",
@@ -451,6 +451,16 @@ export const utilityMap: CSSMap = {
   "transition-opacity": "transition-property:opacity;",
   "transition-transform": "transition-property:transform;",
   "transition-none": "transition-property:none;",
+
+  /* Cursor */
+  "cursor-auto": "cursor:auto;",
+  "cursor-default": "cursor:default;",
+  "cursor-pointer": "cursor:pointer;",
+  "cursor-wait": "cursor:wait;",
+  "cursor-text": "cursor:text;",
+  "cursor-move": "cursor:move;",
+  "cursor-help": "cursor:help;",
+  "cursor-not-allowed": "cursor:not-allowed;",
 
   /* Z-index */
   "z-0": "z-index:0;",
@@ -591,21 +601,24 @@ export function parseColorClass(className: string): string | null {
   const colorValue = colors[colorName]?.[shade];
   if (!colorValue) return null;
 
+  // Special-case shadow: we set a CSS variable so shadow-size utilities can compose with color
+  if (type === 'shadow') return `--ce-shadow-color:${colorValue};`;
+
   const propMap: Record<string, string> = {
     bg: "background-color",
     decoration: "text-decoration-color",
     text: "color",
     border: "border-color",
-    shadow: "box-shadow",
     outline: "outline-color",
     caret: "caret-color",
     accent: "accent-color",
-    placeholder: "placeholder-color",
-    fill: "fill-color",
-    stroke: "stroke-color",
+    fill: "fill",
+    stroke: "stroke",
   };
 
-  return `${propMap[type]}:${colorValue};`;
+  const prop = propMap[type];
+  if (!prop) return null;
+  return `${prop}:${colorValue};`;
 }
 
 export function parseOpacityModifier(className: string): { base: string; opacity?: number } {
