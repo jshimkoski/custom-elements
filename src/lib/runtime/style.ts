@@ -376,6 +376,10 @@ export const utilityMap: CSSMap = {
   "rounded-sm": "border-radius:0.25rem;",
   "rounded-md": "border-radius:0.375rem;",
   "rounded-lg": "border-radius:0.5rem;",
+  "rounded-xl": "border-radius:0.75rem;",
+  "rounded-2xl": "border-radius:1rem;",
+  "rounded-3xl": "border-radius:1.5rem;",
+  "rounded-4xl": "border-radius:2rem;",
   "rounded-full": "border-radius:9999px;",
 
   /* Shadow and effects */

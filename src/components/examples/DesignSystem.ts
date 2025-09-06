@@ -5,7 +5,7 @@ component("baby", {
   render: (ctx) => html`
     <input
       type="text"
-      class="border p-2 rounded-sm"
+      class="border border-neutral-300 p-2 rounded-sm"
       :value="${ctx.babyText}"
       @input="onInput"
     />
