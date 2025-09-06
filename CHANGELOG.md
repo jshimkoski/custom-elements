@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v0.2.7] - 2025-09-06
+
+- fix: enhance styling for baby component and add additional border-radius utilities (fdcf557)
+- fix: clean up semantic color naming, add tests, update docs fix: update example components to use semantic colors fix: add missing utility classes fix: allow shadow coloring fix: stroke and fill definition (5ef1fb2)
+
+
 ## [v0.2.6] - 2025-09-06
 
 - fix: clean up semantic color naming, add tests, update docs fix: update example components to use semantic colors fix: add missing utility classes fix: allow shadow coloring fix: stroke and fill definition (5ef1fb2)
