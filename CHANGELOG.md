@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v0.3.0] - 2025-09-07
+
+- feat: enhance vdom handling for custom elements and attributes (9dc886a)
+- fix: enhance styling for baby component and add additional border-radius utilities (fdcf557)
+
+
 ## [v0.2.7] - 2025-09-06
 
 - fix: enhance styling for baby component and add additional border-radius utilities (fdcf557)
