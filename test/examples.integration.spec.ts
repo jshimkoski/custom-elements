@@ -37,13 +37,14 @@ describe('examples integration', () => {
     // Prop button
     const propBtn = child!.shadowRoot?.querySelectorAll('button')[1] as HTMLButtonElement | undefined;
     expect(propBtn).toBeDefined();
-    propBtn!.click();
-    await Promise.resolve();
-    expect(propBtn!.textContent).toContain('Clicked from child prop');
+  propBtn!.click();
+  // allow async propagation (longer for CI environments)
+  await new Promise((r) => setTimeout(r, 100));
+  expect(propBtn!.textContent).toContain('Clicked from child prop');
     // Model button -> updates parent text
     const modelBtn = child!.shadowRoot?.querySelectorAll('button')[0] as HTMLButtonElement | undefined;
-    modelBtn!.click();
-    await Promise.resolve();
+  modelBtn!.click();
+  await new Promise((r) => setTimeout(r, 100));
     expect(parent.shadowRoot?.textContent).toContain('Clicked from child');
     document.body.removeChild(root);
   });

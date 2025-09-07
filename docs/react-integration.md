@@ -22,7 +22,7 @@ function App() {
 ## Props & events
 
 - JSX attributes may render as HTML attributes; for primitives (strings/numbers) this often works, but React does not automatically set complex objects or function props on custom element instances. For objects/functions, set the property explicitly on the element via a `ref`.
-- React does not map CustomEvents to JSX props; attach listeners to the element instance via `ref` + `addEventListener`:
+- React's synthetic event system does not capture DOM CustomEvents' `detail` payload in JSX props. Use `addEventListener` on the element instance to receive CustomEvents and read `event.detail`.
 
 ```jsx
 const elRef = useRef();
@@ -96,6 +96,8 @@ function MyWrapper() {
     </div>
   );
 }
+
+Runtime note: the renderer will only notify custom elements when a prop or attribute actually changes; parent updates that don't change a child's props/attrs won't retrigger the child's apply/update lifecycle.
 
 See [Events Deep Dive](./events-deep-dive.md) for best practices. Works with React 16.8+.
 

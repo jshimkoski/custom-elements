@@ -46,6 +46,10 @@ document.body.appendChild(el);
 - Always set function props as properties, not attributes
 - For custom events, use `context.emit` in your component and listen using framework-native event binding or `addEventListener`
 
+Runtime behavior notes:
+- The renderer prefers JS property assignment for promoted bindings. For native elements a curated promotable list (value, checked, disabled, etc.) will be set as properties when bound. For custom elements any bound attribute is promoted to a JS property and kebab-case attribute names are converted to camelCase property names. This ensures non-string values (objects, functions) and reactive updates reach the element instance immediately.
+- For two-way binding the runtime expects custom elements to emit kebab-cased `update:<prop-name>` CustomEvents carrying the new value in `event.detail`. Emit events with `bubbles: true` and `composed: true` to ensure they cross shadow DOM boundaries and are observed by the host.
+
 ## ⚠️ Edge Cases
 
 - If you set a function prop as an attribute, it will be a string, not a function

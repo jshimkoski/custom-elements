@@ -38,6 +38,6 @@ describe('template-compiler event and prop binding', () => {
     expect(btn.props).toBeDefined();
     const props = btn.props as Record<string, any>;
     // Accept both true and 'disabled' as valid output
-    expect([true, 'disabled']).toContain(props.attrs.disabled);
+    expect([true, 'disabled']).toContain(props.props.disabled);
   });
 });

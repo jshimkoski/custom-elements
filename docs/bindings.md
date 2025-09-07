@@ -24,9 +24,15 @@ Bind state or props to element attributes or DOM properties. The template syntax
 - Use `:name` to bind a value to an element property (where supported). This updates automatically when the value changes.
 - For custom elements prefer property binding to target element properties (e.g. `:someProp="obj"`). HTML attributes are string-only and should be used for literal text.
 
+Note: the compiler/runtime will promote many bound values into JS properties so they are observed by the element immediately. For native elements a curated promotable list exists (value, checked, disabled, etc.); for custom elements any bound attribute is promoted and kebab-case is converted to camelCase when applied to the instance.
+
+Runtime note: the renderer optimizes updates and will only notify a custom element (call its internal update hooks such as _applyProps/requestRender) when a prop or attribute actually changes. Re-rendering a parent without prop/attr differences will not retrigger the child's apply/update lifecycle.
+
 ### Object form — `:bind` (guaranteed JS property assignment)
 
 If you need to ensure values are set as JavaScript properties (not HTML attributes), use the `:bind` object form. This is useful for numbers, objects, functions, or when targeting custom element properties explicitly.
+
+Example: passing a function via `:bind` sets the function on the element instance as a property (e.g. `(el as any).someCallback = () => {}`), which is not possible when using plain HTML attributes.
 
 ```html
 <my-el :bind="{ someProp: obj, count: 42, onAction: handleAction }" />
@@ -34,6 +40,8 @@ If you need to ensure values are set as JavaScript properties (not HTML attribut
 
 - The compiler/runtime will assign the entries on the `props` object so the renderer performs JS property assignment when possible.
 - Use this when `:name` (attribute form) would otherwise produce an HTML attribute string instead of setting the element's property.
+
+Tip: prefer `:bind` or compiler transforms when you need deterministic property assignment (for example passing objects, functions, or non-string values to custom elements).
 
 ## 🖱️ Event Binding (`@event`)
 
@@ -133,6 +141,10 @@ Basic native usage
   - checkbox/radio → `checked` (checkboxes can also be bound to arrays for multiple selections)
 - Supports nested state paths: `:model="user.name"`.
 - Modifiers supported on native controls: `lazy` (use change instead of input), `trim`, and `number`.
+
+Compiler/runtime notes for custom elements:
+- `:model:prop` (argument form) compiles to an explicit prop on the child and the runtime wires an `update:<prop>` listener that updates the host's bound path when the child emits the kebab-cased `update:<prop>` CustomEvent with the new value in `event.detail`.
+- Plain `:model` (no arg) on custom elements maps to `modelValue` + `update:model-value` for Vue parity.
 
 Native examples
 

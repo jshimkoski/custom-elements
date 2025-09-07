@@ -499,11 +499,22 @@ export function assignKeysDeep(
       if (!key) {
         // Build a stable identity from tag + stable attributes
         const tagPart = child.tag || "node";
-        const idPart =
-          child.props?.attrs?.id ??
-          child.props?.attrs?.name ??
-          child.props?.attrs?.["data-key"] ??
-          "";
+        // Look for stable identity attributes in both attrs and promoted
+        // props (props.props) because the compiler may have promoted bound
+        // attributes to JS properties for custom elements and converted
+        // kebab-case to camelCase (e.g. data-key -> dataKey).
+        const idAttrCandidates = [
+          // attrs (kebab-case)
+          child.props?.attrs?.id,
+          child.props?.attrs?.name,
+          child.props?.attrs?.["data-key"],
+          // promoted JS props (camelCase or original)
+          child.props?.props?.id,
+          child.props?.props?.name,
+          child.props?.props?.dataKey,
+          child.props?.props?.["data-key"],
+        ];
+        const idPart = idAttrCandidates.find((v) => v !== undefined && v !== null) ?? "";
         key = idPart
           ? `${baseKey}:${tagPart}:${idPart}`
           : `${baseKey}:${tagPart}`;
@@ -576,10 +587,15 @@ export function patchProps(
 
   const oldPropProps = oldProps.props ?? {};
   const newPropProps = mergedProps;
+  // Detect whether this vnode represents a custom element so we can
+  // trigger its internal prop application lifecycle after patching.
+  const elIsCustom = (newProps as any)?.isCustomElement ?? (oldProps as any)?.isCustomElement ?? false;
+  let anyChange = false;
   for (const key in { ...oldPropProps, ...newPropProps }) {
     const oldVal = oldPropProps[key];
     const newVal = newPropProps[key];
     if (oldVal !== newVal) {
+      anyChange = true;
       if (
         key === "value" &&
         (el instanceof HTMLInputElement ||
@@ -633,12 +649,73 @@ export function patchProps(
     const oldVal = oldAttrs[key];
     const newVal = newAttrs[key];
     if (oldVal !== newVal) {
-      if (
-        newVal === undefined ||
-        newVal === null ||
-        newVal === false
-      ) el.removeAttribute(key);
-      else el.setAttribute(key, String(newVal));
+      anyChange = true;
+      // Handle removal/null/false: remove attribute and clear corresponding
+      // DOM property for native controls where Vue treats null/undefined as ''
+      if (newVal === undefined || newVal === null || newVal === false) {
+        el.removeAttribute(key);
+        if (key === 'value') {
+          if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+            try { (el as any).value = ""; } catch (e) {}
+          } else if (el instanceof HTMLSelectElement) {
+            try { (el as any).value = ""; } catch (e) {}
+          } else if (el instanceof HTMLProgressElement) {
+            try { (el as any).value = 0; } catch (e) {}
+          }
+        }
+        if (key === 'checked' && el instanceof HTMLInputElement) {
+          try { el.checked = false; } catch (e) {}
+        }
+        if (key === 'disabled') {
+          try { (el as any).disabled = false; } catch (e) {}
+        }
+      } else {
+        // New value present: for native controls prefer assigning .value/.checked
+        if (key === 'value') {
+          if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+            try { (el as any).value = newVal ?? ""; } catch (e) { el.setAttribute(key, String(newVal)); }
+            continue;
+          } else if (el instanceof HTMLSelectElement) {
+            try { (el as any).value = newVal ?? ""; } catch (e) { /* ignore */ }
+            continue;
+          } else if (el instanceof HTMLProgressElement) {
+            try { (el as any).value = Number(newVal); } catch (e) { /* ignore */ }
+            continue;
+          }
+        }
+        if (key === 'checked' && el instanceof HTMLInputElement) {
+          try { el.checked = !!newVal; } catch (e) { /* ignore */ }
+          continue;
+        }
+
+        // Non-native or generic attributes: prefer property when available
+        const isSVG = (el as any).namespaceURI === 'http://www.w3.org/2000/svg';
+        if (!isSVG && key in el) {
+          try { (el as any)[key] = newVal; }
+          catch (e) { el.setAttribute(key, String(newVal)); }
+        } else {
+          el.setAttribute(key, String(newVal));
+        }
+      }
+    }
+  }
+
+  // If this is a custom element, attempt to notify it that props/attrs
+  // were updated so it can re-run its internal applyProps logic and
+  // schedule a render. This mirrors the behavior in createElement where
+  // newly created custom elements are told to apply props and render.
+  if (elIsCustom && anyChange) {
+    try {
+      if (typeof (el as any)._applyProps === 'function') {
+        try { (el as any)._applyProps((el as any)._cfg); } catch (e) { /* ignore */ }
+      }
+      if (typeof (el as any).requestRender === 'function') {
+        (el as any).requestRender();
+      } else if (typeof (el as any)._render === 'function') {
+        (el as any)._render((el as any)._cfg);
+      }
+    } catch (e) {
+      // swallow to keep renderer robust
     }
   }
 }
@@ -717,18 +794,44 @@ export function createElement(
   };
 
   // Set attributes
+  // Prefer property assignment for certain attributes (value/checked) and
+  // when the element exposes a corresponding property. SVG elements should
+  // keep attributes only.
+  const isSVG = (el as any).namespaceURI === 'http://www.w3.org/2000/svg';
   for (const key in mergedAttrs) {
     const val = mergedAttrs[key];
     // Only allow valid attribute names (string, not object)
     if (typeof key !== 'string' || /\[object Object\]/.test(key)) {
-      // Skip invalid attribute keys silently to keep runtime minimal
       continue;
     }
     if (typeof val === "boolean") {
       if (val) el.setAttribute(key, "");
       // If false, do not set attribute
     } else if (val !== undefined && val !== null) {
-      el.setAttribute(key, val);
+      // Special-case value/checked for native inputs so .value/.checked are set
+      if (!isSVG && key === 'value' && (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement || el instanceof HTMLProgressElement)) {
+        try {
+          // Progress expects numeric value
+          if (el instanceof HTMLProgressElement) (el as any).value = Number(val);
+          else el.value = val ?? "";
+        } catch (e) {
+          el.setAttribute(key, String(val));
+        }
+      } else if (!isSVG && key === 'checked' && el instanceof HTMLInputElement) {
+        try {
+          el.checked = !!val;
+        } catch (e) {
+          el.setAttribute(key, String(val));
+        }
+      } else if (!isSVG && key in el) {
+        try {
+          (el as any)[key] = val;
+        } catch (e) {
+          el.setAttribute(key, String(val));
+        }
+      } else {
+        el.setAttribute(key, String(val));
+      }
     }
   }
 
@@ -823,6 +926,19 @@ export function createElement(
     }
   } else if (typeof vnode.children === "string") {
     el.textContent = vnode.children;
+  }
+
+  // After children are appended, reapply select value selection if necessary.
+  try {
+    if (el instanceof HTMLSelectElement && mergedAttrs && mergedAttrs.hasOwnProperty('value')) {
+      try {
+        el.value = mergedAttrs['value'] ?? "";
+      } catch (e) {
+        // ignore
+      }
+    }
+  } catch (e) {
+    // ignore
   }
 
   return el;
@@ -1170,6 +1286,32 @@ export function patch(
       refs[newVNode.props.ref] = el; // Assign ref
     }
     return el;
+  }
+
+  // If the tag matches but the key changed, prefer to patch in-place for
+  // custom elements to avoid remounting their internals. This handles cases
+  // where compiler promotion or key churn causes vnode keys to differ even
+  // though the DOM element should remain the same instance.
+  if (
+    typeof oldVNode !== "string" &&
+    typeof newVNode !== "string" &&
+    oldVNode.tag === newVNode.tag
+  ) {
+    const isCustomTag = (oldVNode.tag && String(oldVNode.tag).includes('-')) || (newVNode.props && (newVNode.props as any).isCustomElement) || (oldVNode.props && (oldVNode.props as any).isCustomElement);
+    if (isCustomTag) {
+      try {
+        const el = dom as HTMLElement;
+        patchProps(el, oldVNode.props || {}, newVNode.props || {}, context);
+        // For custom elements, their internal rendering is managed by the
+        // element itself; do not touch children here.
+        if (typeof newVNode !== "string" && newVNode.props?.ref && refs) {
+          refs[newVNode.props.ref] = el;
+        }
+        return el;
+      } catch (e) {
+        // fall through to full replace on error
+      }
+    }
   }
 
   cleanupRefs(dom, refs);

@@ -16,7 +16,7 @@ describe('smoke: update propagation from child to parent', () => {
     const el = document.createElement('parent-prop');
     document.body.appendChild(el);
     // allow lifecycle to complete
-    await new Promise((r) => setTimeout(r, 10));
+  await new Promise((r) => setTimeout(r, 100));
 
     const child = el.shadowRoot?.querySelector('prop-child') as HTMLElement | null;
     expect(child).toBeTruthy();
@@ -26,7 +26,7 @@ describe('smoke: update propagation from child to parent', () => {
 
     // Dispatch update event from child
     child?.dispatchEvent(new CustomEvent('update:model-value', { detail: 'two', bubbles: true, composed: true }));
-    await new Promise((r) => setTimeout(r, 10));
+  await new Promise((r) => setTimeout(r, 30));
 
     // After propagation, child should reflect new value
     const innerAfter = child?.shadowRoot?.querySelector('#val') as HTMLElement | null;

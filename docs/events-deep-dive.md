@@ -29,6 +29,8 @@ this.dispatchEvent(new CustomEvent('save', {
 }));
 ```
 
+API note: `ctx.emit(name, detail?, options?)` forwards `options` to the underlying CustomEvent constructor (for example `{ cancelable: true, bubbles: true, composed: true }`) and returns a boolean indicating whether the event was not prevented (i.e., `true` == not defaultPrevented).
+
 Recommendation: always use `bubbles: true` and `composed: true` for events that
 need to reach host pages or framework templates.
 
@@ -70,6 +72,12 @@ Notes and best practices:
 - The runtime helper `ctx.emit` returns `true` when the event was not prevented
   (convenient for immediate checks). Always check this return value before
   continuing with an action that the host can veto.
+- Parser caveat: some host framework template parsers (or strict linters) may
+  have difficulty with event attribute names that include `:` characters (for
+  example `(update:model-value)` or `@update:model-value`) in certain syntaxes.
+- If you encounter parse/compile errors in a host framework, prefer using plain
+  `addEventListener` on a ref or use hyphenated event names and listen
+  imperatively.
 - Avoid making every event cancelable — prefer explicit cancelable events for
   clear intent and fewer accidental interactions.
 
@@ -111,6 +119,12 @@ Recommendation: avoid reusing native event names (like `click`) for semantic pay
   for CustomEvents dispatched by components.
 - Avoid coupling component internals to host implementation details; expose a clear,
   event-driven interface instead.
+
+### :model / update:<prop> events
+
+- For two-way binding compatibility (:model and our compiler transforms), components should emit kebab-cased `update:<prop-name>` CustomEvents (for example `update:model-value` or `update:some-prop`).
+- The runtime and framework adapters expect the new value to be the event payload (the raw value) available on `event.detail`.
+- Emit events with `bubbles: true` and `composed: true` so they traverse Shadow DOM boundaries and are discoverable by host templates and framework bindings.
 
 ## Best practices checklist
 

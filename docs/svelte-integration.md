@@ -20,6 +20,7 @@ component('my-counter', (ctx) => html`<button @click="${() => ctx.count++}">Coun
 ## Props & events
 
 - For simple values you can use attributes; prefer using property bindings when you need reactive values or non-string types. Svelte's `bind:prop` behavior is for Svelte components and may not automatically wire to arbitrary custom elements — use `on:update:<prop>` or `bind:this` + set the property if you need deterministic behavior.
+- When using our compiler the `:model` and `:model:prop` shorthands will be compiled to explicit prop + `update:<prop>` wiring. The runtime promotes bound attributes into JS properties for custom elements (mapping kebab-case attributes to camelCase properties) so property bindings and compiler-emitted wiring are the recommended pattern for non-string values and reactive flows.
 - Listen to CustomEvents declaratively with `on:event` (preferred). If you need closure capture, use `bind:this` and `addEventListener`.
 
 ## Two-way binding
@@ -30,7 +31,11 @@ component('my-counter', (ctx) => html`<button @click="${() => ctx.count++}">Coun
 <my-custom bind:value on:update:value={(e) => value = e.detail} />
 ```
 
-- When using our compiler, `:model:prop` is compiled into explicit prop + onUpdate:<prop> wiring.
+- When using our compiler, `:model:prop` is compiled into explicit prop + onUpdate:<prop> wiring. Emitted events are kebab-cased (for example `update:model-value`) and should carry the new value in `event.detail` (use `bubbles: true, composed: true`).
+
+Parser caveat: if your host tooling or linter complains about `on:update:...` or colon-containing event names, use `bind:this` + `addEventListener` as an alternative.
+
+Runtime note: the renderer optimizes updates and will only notify custom elements when a prop or attribute actually changes; parent renders that don't change a child's props/attrs won't re-trigger the child's apply/update lifecycle.
 
 ### Examples
 

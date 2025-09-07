@@ -31,18 +31,22 @@ export function ensureKey(v: VNode, k: string): VNode {
   return v.key != null ? v : { ...v, key: k };
 }
 
+export interface ParsePropsResult {
+  props: Record<string, any>;
+  attrs: Record<string, any>;
+  directives: Record<string, { value: any; modifiers: string[]; arg?: string }>;
+  bound: string[];
+}
+
 export function parseProps(
   str: string,
   values: unknown[] = [],
   context: Record<string, any> = {}
-): {
-  props: Record<string, any>;
-  attrs: Record<string, any>;
-  directives: Record<string, { value: string; modifiers: string[]; arg?: string }>;
-} {
+): ParsePropsResult {
   const props: Record<string, any> = {};
   const attrs: Record<string, any> = {};
   const directives: Record<string, { value: any; modifiers: string[]; arg?: string }> = {};
+  const bound: string[] = [];
 
   // Match attributes with optional prefix and support for single/double quotes
   const attrRegex =
@@ -88,6 +92,7 @@ export function parseProps(
         };
       } else {
         attrs[rawName] = value;
+        bound.push(rawName);
       }
     } else if (prefix === "@") {
       // Map @event to an `on<Event>` prop (DOM-first event listener convention)
@@ -105,7 +110,7 @@ export function parseProps(
     }
   }
 
-  return { props, attrs, directives };
+  return { props, attrs, directives, bound };
 }
 
 /**
@@ -291,7 +296,8 @@ export function htmlImpl(
         props: rawProps,
         attrs: rawAttrs,
         directives,
-      } = parseProps(match[2] || "", values, effectiveContext);
+        bound: boundList,
+      } = parseProps(match[2] || "", values, effectiveContext) as ParsePropsResult;
 
       // No runtime registration here; compiler will set `isCustomElement`
       // on vnodeProps where appropriate. Runtime will consult that flag or
@@ -307,6 +313,73 @@ export function htmlImpl(
 
       for (const k in rawProps) vnodeProps.props[k] = rawProps[k];
       for (const k in rawAttrs) vnodeProps.attrs[k] = rawAttrs[k];
+
+      // If a `key` attribute was provided, surface it as a vnode prop so the
+      // renderer/assignKeysDeep can use it as the vnode's key and avoid
+      // unnecessary remounts when children order/state changes.
+      if (
+        vnodeProps.attrs &&
+        Object.prototype.hasOwnProperty.call(vnodeProps.attrs, 'key') &&
+        !(vnodeProps.props && Object.prototype.hasOwnProperty.call(vnodeProps.props, 'key'))
+      ) {
+        try {
+          vnodeProps.props.key = vnodeProps.attrs['key'];
+        } catch (e) {
+          // best-effort; ignore
+        }
+      }
+
+      // Ensure native form control properties are set as JS props when the
+      // template used `:value` or `:checked` (the parser places plain
+      // `:value` into attrs). Textareas and inputs show their content from
+      // the element property (el.value / el.checked), not the HTML attribute.
+      // Only promote when the attribute was a bound attribute (e.g. used
+      // with `:value`), otherwise leave static attributes in attrs for
+      // tests and expected behavior.
+      try {
+        const nativePromoteMap: Record<string, string[]> = {
+          input: ['value', 'checked', 'disabled', 'readonly', 'required', 'placeholder', 'maxlength', 'minlength'],
+          textarea: ['value', 'disabled', 'readonly', 'required', 'placeholder', 'maxlength', 'minlength'],
+          select: ['value', 'disabled', 'required', 'multiple'],
+          option: ['selected', 'disabled', 'value'],
+          video: ['muted', 'autoplay', 'controls', 'loop', 'playsinline'],
+          audio: ['muted', 'autoplay', 'controls', 'loop'],
+          img: ['src', 'alt', 'width', 'height'],
+          button: ['type', 'name', 'value', 'disabled', 'autofocus', 'form'],
+        };
+
+        const lname = tagName.toLowerCase();
+        const promotable = nativePromoteMap[lname] ?? [];
+
+        if (vnodeProps.attrs) {
+          for (const propName of promotable) {
+            if (boundList && boundList.includes(propName) && propName in vnodeProps.attrs && !(vnodeProps.props && propName in vnodeProps.props)) {
+              vnodeProps.props[propName] = vnodeProps.attrs[propName];
+              delete vnodeProps.attrs[propName];
+            }
+          }
+        }
+        // If this looks like a custom element (hyphenated tag), promote all bound attrs to props
+        const isCustom = tagName.includes('-') || Boolean((effectiveContext as any)?.__customElements?.has?.(tagName));
+        if (isCustom && boundList && vnodeProps.attrs) {
+          // Preserve attributes that may be used for stable key generation
+          const keyAttrs = new Set(['id', 'name', 'data-key', 'key']);
+          for (const b of boundList) {
+            if (b in vnodeProps.attrs && !(vnodeProps.props && b in vnodeProps.props)) {
+              // Convert kebab-case to camelCase for JS property names on custom elements
+              const camel = b.includes('-') ? b.split('-').map((s, i) => i === 0 ? s : s.charAt(0).toUpperCase() + s.slice(1)).join('') : b;
+              vnodeProps.props[camel] = vnodeProps.attrs[b];
+              // Preserve potential key attributes in attrs to avoid unstable keys
+              if (!keyAttrs.has(b)) {
+                delete vnodeProps.attrs[b];
+              }
+            }
+          }
+          vnodeProps.isCustomElement = true;
+        }
+      } catch (e) {
+        // Best-effort; ignore failures to keep runtime robust.
+      }
 
       // Compiler-side canonical transform: convert :model and :model:prop on
       // custom elements into explicit prop + event handler so runtime hosts

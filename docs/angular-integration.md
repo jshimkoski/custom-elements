@@ -35,6 +35,8 @@ export class AppModule {}
 - Listen for CustomEvents in templates with `(event)="handler($event)"`. CustomEvent payloads are available on `$event.detail`.
 - For programmatic access or attaching listeners, use `@ViewChild` to get the element reference and call `addEventListener`.
 
+Note: the runtime's compiler and renderer prefer JS property assignment for bound values in many cases. For native elements a curated list of promotable attributes (for example `value`, `checked`, `disabled`) will be set as properties when bound; for custom elements any bound attribute is promoted to a JS property on the instance and kebab-case attribute names are converted to camelCase property names. This ensures non-string values (objects, functions) and reactivity reach the element immediately.
+
 Example:
 
 ```html
@@ -51,6 +53,8 @@ Example:
 
 - Compiler note: if you author templates with our `html` compiler, `:model:prop` is compiled to an explicit prop + `update:<prop>` wiring so compiled output works in frameworks like Angular.
 - If you want Angular's `[(ngModel)]` compatibility, implement ControlValueAccessor on the host wrapper or emit the standard `input` event from your custom element (the runtime doesn't add ngModel hooks automatically).
+
+Compiler behavior: when using the runtime's `html` compiler, `:model` (argument-less) on a custom element compiles to a `modelValue` prop plus `update:model-value` wiring. `:model:prop` compiles to an explicit prop plus `update:<prop>` event wiring. The emitted events are kebab-cased (for example `update:model-value`) and the runtime expects the new value in `event.detail`.
 
 - Note: the compiler produces kebab-cased `update:<prop-name>` events (for example `update:model-value` or `update:some-prop`). When handling updates in Angular templates use `$event.detail` to read the payload: `(update:some-prop)="value = $event.detail"`.
 - Reminder: `:model:prop` is a compiler feature — in raw Angular templates you must bind the property and listen for the `update:<prop>` CustomEvent manually.
@@ -78,6 +82,10 @@ export class MyWrapperComponent {
 ```
 
 Notes: ensure `CUSTOM_ELEMENTS_SCHEMA` is added to your module so Angular accepts the unknown element.
+
+Parser caveat: some template parsers or linters may have trouble with event names that include `:` characters (for example `(update:model-value)`). If you encounter parse errors, attach listeners imperatively via `@ViewChild` + `addEventListener` or use hyphenated event names and listen programmatically.
+
+Runtime note: the renderer optimizes updates and will only notify custom elements when a prop or attribute actually changes; parent re-renders without prop/attr changes won't re-trigger the child's apply/update lifecycle.
 
 ## Notes & links
 

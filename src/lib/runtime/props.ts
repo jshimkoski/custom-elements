@@ -25,8 +25,18 @@ export function applyProps<S extends object, C extends object, P extends object,
     if (def.type === Function && typeof (element as any)[key] === "function") {
       (context as any)[key] = (element as any)[key];
     } else {
-      const attr = element.getAttribute(toKebab(key));
-      if (attr !== null) {
+      const kebab = toKebab(key);
+      const attr = element.getAttribute(kebab);
+      // Prefer JS property value when present on the instance (important
+      // for runtime updates where the renderer assigns element properties
+      // instead of HTML attributes). Check property first, then attribute.
+      if (typeof (element as any)[key] !== 'undefined') {
+        try {
+          (context as any)[key] = escapeHTML(parseProp((element as any)[key], def.type));
+        } catch (e) {
+          (context as any)[key] = (element as any)[key];
+        }
+      } else if (attr !== null) {
         (context as any)[key] = escapeHTML(parseProp(attr, def.type));
       } else if ("default" in def && def.default !== undefined) {
         (context as any)[key] = escapeHTML(def.default);
