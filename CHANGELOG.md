@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v0.3.1] - 2025-09-09
+
+- - fix: :model, :model:prop, :prop binding - fix: enhance test suite - fix: add enhanced directives - fix: improve dev logging (7d89209)
+- feat: enhance vdom handling for custom elements and attributes (9dc886a)
+
+
 ## [v0.3.0] - 2025-09-07
 
 - feat: enhance vdom handling for custom elements and attributes (9dc886a)
