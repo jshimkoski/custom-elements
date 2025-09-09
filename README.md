@@ -58,6 +58,7 @@ Explore the full documentation for every runtime feature:
 
 ### 🧩 Reactivity & Patterns
 - [Directives](./docs/directives.md)
+- [Directive Enhancements Guide](./docs/directive-enhancements.md)
 - [Bindings](./docs/bindings.md)
 - [Events](./docs/events-deep-dive.md)
 - [Slot](./docs/slot.md)

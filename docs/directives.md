@@ -98,6 +98,7 @@ component('directive-demo', {
 
 ## 📚 Learn More
 
+- [Directive Enhancements Guide](./directive-enhancements.md)
 - [Render Guide](./render.md)
 - [Component Guide](./component.md)
 

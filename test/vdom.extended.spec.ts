@@ -145,9 +145,9 @@ describe('vdom.ts', () => {
       expect(attrs.style).toContain('display: none');
     });
     it('removes display:none when visible', () => {
-      const attrs: any = { style: 'color: red;' };
+      const attrs: any = { style: 'color: red; display: none;' };
       processShowDirective('foo', attrs, { foo: true });
-      expect(attrs.style).toContain('display: ');
+      expect(attrs.style).toBe('color: red;');
     });
   });
 

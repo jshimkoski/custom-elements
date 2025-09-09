@@ -44,8 +44,6 @@ export function getBaseResetSheet(): CSSStyleSheet {
   return baseResetSheet;
 }
 
-  // (debug logging via console.error is used above when needed)
-
 export function sanitizeCSS(css: string): string {
   // Remove any url(javascript:...) and <script> tags
   return css
@@ -53,7 +51,6 @@ export function sanitizeCSS(css: string): string {
     .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, "")
     .replace(/expression\s*\([^)]*\)/gi, "");
 }
-
 
 /**
  * Minimal Shadow DOM reset

@@ -10,6 +10,7 @@ import { component } from './runtime/component';
 import { html } from './runtime/template-compiler';
 import { css } from './runtime/style';
 import { match } from './directives';
+import { devError } from './runtime/logger';
 
 export interface RouteComponent {
   // Can be any renderable type — adjust as needed for your framework
@@ -168,7 +169,7 @@ export function useRouter(config: RouterConfig) {
         }
         return result !== false;
       } catch (err) {
-        console.error('beforeEnter error', err);
+        devError('beforeEnter error', err);
         return false;
       }
     }
@@ -186,7 +187,7 @@ export function useRouter(config: RouterConfig) {
         }
         return result !== false;
       } catch (err) {
-        console.error('onEnter error', err);
+        devError('onEnter error', err);
         return false;
       }
     }
@@ -199,7 +200,7 @@ export function useRouter(config: RouterConfig) {
       try {
         matched.afterEnter(to, from);
       } catch (err) {
-        console.error('afterEnter error', err);
+        devError('afterEnter error', err);
       }
     }
   };
@@ -242,7 +243,7 @@ export function useRouter(config: RouterConfig) {
       runAfterEnter(to, from);
 
     } catch (err) {
-      console.error('Navigation error:', err);
+      devError('Navigation error:', err);
     }
   };
 

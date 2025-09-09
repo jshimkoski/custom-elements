@@ -43,7 +43,7 @@ describe('design-system example integration', () => {
 
   it('cer-child: updates local model when cer-baby emits update', async () => {
     const { root, el } = mount('cer-child');
-    await Promise.resolve();
+    await new Promise(resolve => setTimeout(resolve, 50)); // Wait for component initialization
 
     const parent = el as HTMLElement;
     // find baby inside child
@@ -53,10 +53,26 @@ describe('design-system example integration', () => {
     const input = baby!.shadowRoot?.querySelector('input') as HTMLInputElement | null;
     expect(input).toBeTruthy();
 
+    // Set up event listener to track what's happening
+    const events: any[] = [];
+    baby!.addEventListener('update:baby-text', (e: any) => {
+      console.log('Caught update:baby-text event with detail:', e.detail);
+      events.push(e.detail);
+    });
+
     // type into baby input and ensure child state updates (render reflects new text)
     input!.value = 'child typed';
     input!.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
-    await Promise.resolve();
+    
+    // Wait for all async updates to complete
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    console.log('Number of events caught:', events.length);
+    console.log('Child shadow DOM content:', parent.shadowRoot?.textContent);
+
+    // Check if the event was emitted first
+    expect(events.length).toBeGreaterThan(0);
+    expect(events[0]).toBe('child typed');
 
     // the child displays `Baby text is (in child): ${ctx.text}` in its shadowRoot
     const childText = parent.shadowRoot?.textContent || '';
@@ -67,7 +83,7 @@ describe('design-system example integration', () => {
 
   it('design-system: parent model and reset button work end-to-end', async () => {
     const { root, el } = mount('design-system');
-    await Promise.resolve();
+    await new Promise(resolve => setTimeout(resolve, 50)); // Wait for component initialization
 
     const parent = el as HTMLElement;
     // initial value shown
@@ -79,8 +95,24 @@ describe('design-system example integration', () => {
     const modelButton = child!.shadowRoot?.querySelectorAll('button')[0] as HTMLButtonElement | undefined;
     expect(modelButton).toBeDefined();
 
+    // Set up event listener to track what's happening
+    const events: any[] = [];
+    child!.addEventListener('update:model-value', (e: any) => {
+      console.log('Caught update:model-value event with detail:', e.detail);
+      events.push(e.detail);
+    });
+
     modelButton!.click();
-    await Promise.resolve();
+    
+    // Wait for all async updates to complete
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    console.log('Number of events caught:', events.length);
+    console.log('Parent shadow DOM content:', parent.shadowRoot?.textContent);
+
+    // Check if the event was emitted first
+    expect(events.length).toBeGreaterThan(0);
+    expect(events[0]).toBe('Clicked from child');
 
     // parent should reflect the updated model value
     expect(parent.shadowRoot?.textContent).toContain('Clicked from child');
@@ -89,7 +121,7 @@ describe('design-system example integration', () => {
     const reset = parent.shadowRoot?.querySelector('button') as HTMLButtonElement | null;
     expect(reset).toBeTruthy();
     reset!.click();
-    await Promise.resolve();
+    await new Promise(resolve => setTimeout(resolve, 50));
     expect(parent.shadowRoot?.textContent).toContain('Initial Value');
 
     document.body.removeChild(root);

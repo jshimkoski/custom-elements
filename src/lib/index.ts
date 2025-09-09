@@ -7,6 +7,7 @@
 
 export * from "./runtime/types";
 export * from "./directives";
+export * from "./directive-enhancements";
 export * from "./event-bus";
 export * from "./store";
 export * from "./router";

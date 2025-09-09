@@ -64,9 +64,10 @@ describe('vdom.extra', () => {
     const ctx = { showMe: false };
     processShowDirective('showMe', attrs, ctx);
     expect(attrs.style).toContain('display: none');
-    const attrs2: any = {};
+    
+    const attrs2: any = { style: 'color: red; display: none;' };
     processShowDirective('showMe', attrs2, { showMe: true });
-    expect(attrs2.style).toContain('display: ');
+    expect(attrs2.style).toBe('color: red;');
   });
 
   it('processDirectives composes results and attaches listeners (without context no ops)', () => {

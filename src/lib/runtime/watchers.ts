@@ -1,5 +1,6 @@
 import type { ComponentContext, WatchCallback, WatchOptions, WatcherState } from "./types";
 import { getNestedValue } from "./helpers";
+import { devError } from "./logger";
 
 /**
  * Initializes watchers for a component.
@@ -33,7 +34,7 @@ export function initWatchers(
         const currentValue = getNestedValue(context, key);
         callback(currentValue, undefined, context);
       } catch (error) {
-        console.error(`Error in immediate watcher for "${key}":`, error);
+        devError(`Error in immediate watcher for "${key}":`, error);
       }
     }
   }
@@ -68,7 +69,7 @@ export function triggerWatchers(
       watcher.callback(newValue, watcher.oldValue, context);
       watcher.oldValue = newValue;
     } catch (error) {
-      console.error(`Error in watcher for "${path}":`, error);
+      devError(`Error in watcher for "${path}":`, error);
     }
   }
 
@@ -81,7 +82,7 @@ export function triggerWatchers(
           watcherConfig.oldValue = currentValue;
         }
       } catch (error) {
-        console.error(`Error in deep watcher for "${watchPath}":`, error);
+        devError(`Error in deep watcher for "${watchPath}":`, error);
       }
     }
   }

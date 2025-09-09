@@ -95,14 +95,43 @@ export function parseProps(
         bound.push(rawName);
       }
     } else if (prefix === "@") {
-      // Map @event to an `on<Event>` prop (DOM-first event listener convention)
-      const onName = "on" + rawName.charAt(0).toUpperCase() + rawName.slice(1);
-      props[onName] =
-        typeof value === "function"
-          ? value
-          : typeof context[value] === "function"
-          ? context[value]
-          : undefined;
+      // Parse event modifiers: @click.prevent.stop
+      const [eventName, ...modifierParts] = rawName.split(".");
+      const modifiers = modifierParts;
+      
+      // Create wrapped event handler that applies modifiers
+      const originalHandler = typeof value === "function"
+        ? value
+        : typeof context[value] === "function"
+        ? context[value]
+        : undefined;
+        
+      if (originalHandler) {
+        const wrappedHandler = (event: Event) => {
+          // Apply event modifiers
+          if (modifiers.includes("prevent")) {
+            event.preventDefault();
+          }
+          if (modifiers.includes("stop")) {
+            event.stopPropagation();
+          }
+          if (modifiers.includes("self") && event.target !== event.currentTarget) {
+            return;
+          }
+          
+          // For .once modifier, we need to remove the listener after first call
+          if (modifiers.includes("once")) {
+            (event.currentTarget as Element)?.removeEventListener(eventName, wrappedHandler);
+          }
+          
+          // Call the original handler
+          return originalHandler(event);
+        };
+        
+        // Map @event to an `on<Event>` prop (DOM-first event listener convention)
+        const onName = "on" + eventName.charAt(0).toUpperCase() + eventName.slice(1);
+        props[onName] = wrappedHandler;
+      }
     } else if (rawName === "ref") {
       props.ref = value;
     } else {
@@ -143,10 +172,11 @@ export function htmlImpl(
     if (i < values.length) template += `{{${i}}}`;
   }
 
-  // Matches: tags (open/close/self), standalone interpolation markers, or any other text
+  // Matches: comments, tags (open/close/self), standalone interpolation markers, or any other text
   // How this works:
   // const tagRegex =
-  //   /<\/?([a-zA-Z0-9-]+)                            # tag name
+  //   /<!--[\s\S]*?-->                                 # HTML comments
+  //   |<\/?([a-zA-Z0-9-]+)                            # tag name
   //   (                                               # start attributes group
   //     (?:\s+                                        # whitespace before attribute
   //       [^\s=>/]+                                   # attribute name
@@ -166,8 +196,9 @@ export function htmlImpl(
   // Handles both ' and " quotes.
   // Matches unquoted attributes like disabled or checked.
   // Keeps {{(\d+)}} and text node capture groups intact.
+  // Added support for HTML comments which are ignored during parsing.
   const tagRegex =
-    /<\/?([a-zA-Z0-9-]+)((?:\s+[^\s=>/]+(?:\s*=\s*(?:"(?:\\.|[^"])*"|'(?:\\.|[^'])*'|[^\s>]+))?)*)\s*\/?>|{{(\d+)}}|([^<]+)/g;
+    /<!--[\s\S]*?-->|<\/?([a-zA-Z0-9-]+)((?:\s+[^\s=>/]+(?:\s*=\s*(?:"(?:\\.|[^"])*"|'(?:\\.|[^'])*'|[^\s>]+))?)*)\s*\/?>|{{(\d+)}}|([^<]+)/g;
 
   const stack: Array<{
     tag: string;
@@ -286,6 +317,11 @@ export function htmlImpl(
   ]);
 
   while ((match = tagRegex.exec(template))) {
+    // Skip HTML comments (they are matched by the regex but ignored)
+    if (match[0].startsWith('<!--') && match[0].endsWith('-->')) {
+      continue;
+    }
+
     if (match[1]) {
       // Tag token
       const tagName = match[1];

@@ -4,6 +4,8 @@
  */
 export type EventHandler<T = any> = (data: T) => void;
 
+import { devError } from "./runtime/logger";
+
 /**
  * Event map type using Set for efficient handler management
  */
@@ -67,7 +69,7 @@ export class GlobalEventBus extends EventTarget {
         try {
           handler(data);
         } catch (error) {
-          console.error(`Error in global event handler for "${eventName}":`, error);
+          devError(`Error in global event handler for "${eventName}":`, error);
         }
       });
     }

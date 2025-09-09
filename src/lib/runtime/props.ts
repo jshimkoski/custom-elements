@@ -32,7 +32,18 @@ export function applyProps<S extends object, C extends object, P extends object,
       // instead of HTML attributes). Check property first, then attribute.
       if (typeof (element as any)[key] !== 'undefined') {
         try {
-          (context as any)[key] = escapeHTML(parseProp((element as any)[key], def.type));
+          const propValue = (element as any)[key];
+          // If the property value is already the correct type, use it directly
+          if (def.type === Boolean && typeof propValue === 'boolean') {
+            (context as any)[key] = propValue;
+          } else if (def.type === Number && typeof propValue === 'number') {
+            (context as any)[key] = propValue;
+          } else if (def.type === Function && typeof propValue === 'function') {
+            (context as any)[key] = propValue;
+          } else {
+            // Convert to string first, then parse
+            (context as any)[key] = escapeHTML(parseProp(String(propValue), def.type));
+          }
         } catch (e) {
           (context as any)[key] = (element as any)[key];
         }

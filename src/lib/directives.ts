@@ -53,7 +53,7 @@ function whenChain(...branches: Branch[]): VNode[] {
  * Create a stable anchor block with consistent boundaries.
  * Always has start/end boundaries.
  */
-function anchorBlock(
+export function anchorBlock(
   children: VNode | VNode[] | null | undefined,
   anchorKey: string,
 ): VNode {

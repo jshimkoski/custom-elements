@@ -8,8 +8,104 @@ import './components/examples/ShoppingCart';
 import './components/examples/TodoApp';
 import './components/examples/FormInputValidation';
 
+// Import design system components
+import './components/design-system';
+
 // The new runtime is completely self-contained
 // Components automatically register themselves when imported
+
+interface SwitchProps {
+  label?: string;
+  modelValue?: boolean;
+}
+
+// Simple test component to debug model binding
+component('simple-switch', {
+  props: {
+    modelValue: { type: Boolean, default: false },
+  },
+
+  watch: {
+    modelValue: [
+      (newVal: any, oldVal: any, ctx: any) => {
+        console.log('simple-switch modelValue changed from', oldVal, 'to', newVal);
+      },
+      { immediate: true },
+    ],
+  },
+
+  render: (ctx: any) => html`
+    <div>
+      <p>ModelValue: ${ctx.modelValue}</p>
+      <input
+        type="checkbox"
+        :checked="${ctx.modelValue}"
+        @change="${(e: Event) => {
+          const input = e.target as HTMLInputElement;
+          const isChecked = input.checked;
+          console.log('simple-switch emitting update:model-value with value:', isChecked);
+          ctx.emit('update:model-value', isChecked);
+        }}"
+      />
+      <label>Simple Switch</label>
+    </div>
+  `,
+});
+
+component<{}, {}, SwitchProps>('cer-switch', {
+  props: {
+    label: { type: String, default: '' },
+    modelValue: { type: Boolean, default: false },
+  },
+
+  watch: {
+    modelValue: [
+      (newVal: any, oldVal: any, ctx: any) => {
+        console.log('cer-switch modelValue changed from', oldVal, 'to', newVal);
+        // Force re-render to ensure UI updates
+        if (ctx._requestRender) {
+          ctx._requestRender();
+        }
+      },
+      { immediate: true },
+    ],
+  },
+
+  render: (ctx: any) => html`
+    <label
+      class="inline-flex items-center gap-3 cursor-[pointer]"
+      role="switch"
+      :aria-checked="${ctx.modelValue}"
+    >
+      ${ctx.modelValue}
+      <div class="relative">
+        <input
+          class="sr-only"
+          type="checkbox"
+          :checked="${ctx.modelValue}"
+          @change="${(e: Event) => {
+            const input = e.target as HTMLInputElement;
+            const isChecked = input.checked;
+            console.log('cer-switch emitting update:model-value with value:', isChecked);
+            ctx.emit('update:model-value', isChecked);
+          }}"
+        />
+
+        <div
+          class="w-9 h-5 rounded-full shadow-inner transition"
+          :class="${{ 'bg-primary-600': ctx.modelValue, 'bg-neutral-200': !ctx.modelValue }}"
+        ></div>
+
+        <div
+          class="absolute left-0.5 transition top-0 w-4 h-4 mt-0.5 bg-white rounded-full shadow"
+          :class="${[ ctx.modelValue ? 'transform-[translateX(1rem)]' : 'transform-[translateX(0)]' ]}"
+        ></div>
+      </div>
+
+      ${ctx.label ? html`<span class="text-sm text-neutral-700">${ctx.label}</span>` : ''}
+    </label>
+  `,
+});
 
 component("stateless-component", () => html`
   <div>
@@ -123,6 +219,7 @@ component("my-greeting", {
     age: 25,
     isActive: true,
     color: "red",
+    featureEnabled: false,
   },
   onConnected(state) {
     console.log("Component connected:", state);
@@ -146,6 +243,11 @@ component("my-greeting", {
         `Watcher called: Email changed from ${oldValue} to ${newValue}`,
       );
     },
+    featureEnabled(newValue, oldValue) {
+      console.log(
+        `Watcher called: featureEnabled changed from ${oldValue} to ${newValue}`,
+      );
+    },
   },
   style: (state) => `
     div {
@@ -166,6 +268,16 @@ component("my-greeting", {
   render(state) {
     return html`
       <div>
+        <section>
+          <h2>Switch</h2>
+          <simple-switch
+            :model="featureEnabled"
+          />
+          <cer-switch
+            label="Enable feature"
+            :model="featureEnabled"
+          />
+        </section>
         <async-greeting></async-greeting>
         <child-component test="${state.name}">
           <stateless-component></stateless-component>
@@ -264,8 +376,187 @@ component("my-greeting", {
   },
 });
 
+// Create a component to test model binding
+component('switch-test', {
+  state: {
+    featureEnabled: false,
+  },
+
+  render: (ctx: any) => html`
+    <div style="padding: 20px; border: 1px solid #ccc; margin: 20px;">
+      <h3>Model Binding Test</h3>
+      <p>Current value: ${ctx.featureEnabled}</p>
+      
+      <div style="margin: 10px 0;">
+        <label>Simple Switch:</label>
+        <simple-switch :model="featureEnabled"></simple-switch>
+      </div>
+      
+      <div style="margin: 10px 0;">
+        <label>Custom Switch:</label>
+        <cer-switch :model="featureEnabled" label="Enable Feature"></cer-switch>
+      </div>
+      
+      <button @click="${() => { ctx.featureEnabled = !ctx.featureEnabled; }}">
+        Toggle Programmatically
+      </button>
+    </div>
+  `,
+});
+
+// Create comprehensive design system test component
+component('design-system-test', {
+  state: {
+    // Text inputs
+    textInput: 'Hello World',
+    textareaContent: 'This is a multi-line\ntext area example',
+    
+    // Boolean inputs
+    checkboxValue: true,
+    radioValue: 'option2',
+    
+    // Selection inputs
+    selectValue: 'blue',
+    
+    // Numeric inputs
+    numberValue: 42,
+    rangeValue: 75,
+    progressValue: 60,
+    
+    // Validation
+    lastAction: 'None',
+  },
+
+  render: (ctx: any) => html`
+    <div style="padding: 20px; border: 2px solid #007acc; margin: 20px; border-radius: 8px;">
+      <h2>🧪 Design System Comprehensive Test</h2>
+      
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0;">
+        
+        <!-- Text Inputs Section -->
+        <div style="border: 1px solid #ddd; padding: 15px; border-radius: 4px;">
+          <h3>📝 Text Inputs</h3>
+          
+          <div style="margin: 10px 0;">
+            <label>Text Input (model):</label>
+            <ds-input :model="textInput" placeholder="Type something..."></ds-input>
+            <small>Value: "${ctx.textInput}"</small>
+          </div>
+          
+          <div style="margin: 10px 0;">
+            <label>Text Input (bind):</label>
+            <ds-input :model-value="${ctx.textInput}" placeholder="Bound value"></ds-input>
+          </div>
+          
+          <div style="margin: 10px 0;">
+            <label>Textarea (model):</label>
+            <ds-textarea :model="textareaContent" rows="3"></ds-textarea>
+            <small>Value: "${ctx.textareaContent.replace(/\n/g, '\\n')}"</small>
+          </div>
+        </div>
+        
+        <!-- Boolean Inputs Section -->
+        <div style="border: 1px solid #ddd; padding: 15px; border-radius: 4px;">
+          <h3>✅ Boolean Inputs</h3>
+          
+          <div style="margin: 10px 0;">
+            <label>Checkbox (model):</label>
+            <ds-checkbox :model="checkboxValue" label="Enable notifications"></ds-checkbox>
+            <small>Value: ${ctx.checkboxValue}</small>
+          </div>
+          
+          <div style="margin: 10px 0;">
+            <label>Radio Group (model):</label>
+            <ds-radio-group :model="radioValue" name="test-radio"></ds-radio-group>
+            <small>Value: "${ctx.radioValue}"</small>
+          </div>
+        </div>
+        
+        <!-- Selection Inputs Section -->
+        <div style="border: 1px solid #ddd; padding: 15px; border-radius: 4px;">
+          <h3>🎯 Selection Inputs</h3>
+          
+          <div style="margin: 10px 0;">
+            <label>Select (model):</label>
+            <ds-select :model="selectValue"></ds-select>
+            <small>Value: "${ctx.selectValue}"</small>
+          </div>
+          
+          <div style="margin: 10px 0;">
+            <label>Select (bind):</label>
+            <ds-select :model-value="${ctx.selectValue}"></ds-select>
+          </div>
+        </div>
+        
+        <!-- Numeric Inputs Section -->
+        <div style="border: 1px solid #ddd; padding: 15px; border-radius: 4px;">
+          <h3>🔢 Numeric Inputs</h3>
+          
+          <div style="margin: 10px 0;">
+            <label>Number Input (model):</label>
+            <ds-number :model="numberValue" min="0" max="100"></ds-number>
+            <small>Value: ${ctx.numberValue}</small>
+          </div>
+          
+          <div style="margin: 10px 0;">
+            <label>Range Slider (model):</label>
+            <ds-range :model="rangeValue" min="0" max="100"></ds-range>
+            <small>Value: ${ctx.rangeValue}</small>
+          </div>
+          
+          <div style="margin: 10px 0;">
+            <label>Progress Bar:</label>
+            <ds-progress :model="progressValue" max="100"></ds-progress>
+            <small>Progress: ${ctx.progressValue}%</small>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Action Buttons Section -->
+      <div style="border: 1px solid #ddd; padding: 15px; border-radius: 4px; margin: 20px 0;">
+        <h3>🎬 Actions & Validation</h3>
+        
+        <div style="margin: 10px 0;">
+          <ds-button @click="${() => {
+            ctx.textInput = 'Reset Text';
+            ctx.textareaContent = 'Reset Content';
+            ctx.lastAction = 'Text Reset';
+          }}">Reset Text Inputs</ds-button>
+          
+          <ds-button @click="${() => {
+            ctx.checkboxValue = !ctx.checkboxValue;
+            ctx.radioValue = ctx.radioValue === 'option1' ? 'option2' : 'option1';
+            ctx.lastAction = 'Boolean Toggle';
+          }}">Toggle Booleans</ds-button>
+          
+          <ds-button @click="${() => {
+            ctx.numberValue = Math.floor(Math.random() * 100);
+            ctx.rangeValue = Math.floor(Math.random() * 100);
+            ctx.progressValue = Math.floor(Math.random() * 100);
+            ctx.lastAction = 'Numbers Randomized';
+          }}">Randomize Numbers</ds-button>
+        </div>
+        
+        <div style="margin: 15px 0; padding: 10px; background: #f5f5f5; border-radius: 4px;">
+          <strong>Last Action:</strong> ${ctx.lastAction}
+        </div>
+      </div>
+      
+      <!-- State Dump Section -->
+      <details style="margin: 20px 0;">
+        <summary style="cursor: pointer; font-weight: bold;">🔍 Full State Dump</summary>
+        <pre style="background: #f0f0f0; padding: 10px; margin: 10px 0; overflow: auto; max-height: 200px;">
+${JSON.stringify(ctx, null, 2)}
+        </pre>
+      </details>
+    </div>
+  `,
+});
+
 document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
   <div>
+    <switch-test></switch-test>
+    <design-system-test></design-system-test>
     <design-system></design-system>
     <minimal-example></minimal-example>
     <shopping-cart></shopping-cart>

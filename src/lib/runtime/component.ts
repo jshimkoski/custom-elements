@@ -15,6 +15,8 @@ import {
   handleAttributeChanged
 } from "./lifecycle";
 import { renderComponent, requestRender, applyStyle } from "./render";
+import { devError, devWarn } from "./logger";
+import { scheduleDOMUpdate } from "./scheduler";
 
 /**
  * @internal
@@ -87,7 +89,7 @@ export function component<
   if (typeof finalConfig.onError !== "function") {
     finalConfig.onError = (error, state) => {
       // Lightweight, developer-friendly default
-      console.error(`[${normalizedTag}] Error:`, error, state);
+      devError(`[${normalizedTag}] Error:`, error, state);
     };
   }
 
@@ -123,7 +125,7 @@ export function component<
     }
     if (collisions.length > 0) {
       const unique = Array.from(new Set(collisions));
-      console.warn(
+      devWarn(
         `[${normalizedTag}] Reserved runtime context keys used in component config: ${unique.join(", ")}. ` +
           `These names are provided by the runtime (for example: refs, error, emit). ` +
           `Rename your state/prop/computed keys (e.g. 'error' -> 'errorMessage') to avoid collisions and TypeScript type conflicts.`
@@ -184,6 +186,8 @@ export function createElementClass<
     private _mounted = false;
     private _hasError = false;
     private _initializing = true;
+    
+    private _componentId: string;
 
     private _styleSheet: CSSStyleSheet | null = null;
 
@@ -222,6 +226,9 @@ export function createElementClass<
       // Always read the latest config from the registry so re-registration
       // (HMR / tests) updates future instances.
       this._cfg = (registry.get(tag) as ComponentConfig<S, C, P, T>) || config;
+      
+      // Generate unique component ID for render deduplication
+      this._componentId = `${tag}-${Math.random().toString(36).substr(2, 9)}`;
 
       const reactiveContext = this._initContext(config);
 
@@ -236,6 +243,22 @@ export function createElementClass<
       // Inject requestRender into context (non-enumerable to avoid proxy traps)
       Object.defineProperty(reactiveContext, 'requestRender', {
         value: () => this.requestRender(),
+        writable: false,
+        enumerable: false,
+        configurable: false,
+      });
+
+      // Inject _requestRender for backward compatibility (used by model directive)
+      Object.defineProperty(reactiveContext, '_requestRender', {
+        value: () => this._requestRender(),
+        writable: false,
+        enumerable: false,
+        configurable: false,
+      });
+
+      // Inject _triggerWatchers for model directive to trigger watchers
+      Object.defineProperty(reactiveContext, '_triggerWatchers', {
+        value: (path: string, newValue: any) => this._triggerWatchers(path, newValue),
         writable: false,
         enumerable: false,
         configurable: false,
@@ -283,6 +306,37 @@ export function createElementClass<
       });
 
       this._applyComputed(cfgToUse);
+
+      // Set up reactive property setters for all props to detect external changes
+      if (cfgToUse.props) {
+        Object.keys(cfgToUse.props).forEach((propName) => {
+          let internalValue = (this as any)[propName];
+          
+          Object.defineProperty(this, propName, {
+            get() {
+              return internalValue;
+            },
+            set(newValue) {
+              const oldValue = internalValue;
+              internalValue = newValue;
+              
+              // Update the context to trigger watchers
+              (this.context as any)[propName] = newValue;
+              
+              // Apply props to sync with context
+              if (!this._initializing) {
+                this._applyProps(cfgToUse);
+                // Trigger re-render if the value actually changed
+                if (oldValue !== newValue) {
+                  this._requestRender();
+                }
+              }
+            },
+            enumerable: true,
+            configurable: true
+          });
+        });
+      }
 
       this._initializing = false;
 
@@ -398,15 +452,18 @@ export function createElementClass<
 
     _requestRender() {
       this._runLogicWithinErrorBoundary(this._cfg, () => {
-        requestRender(
-          () => this._render(this._cfg),
-          this._lastRenderTime,
-          this._renderCount,
-          (t) => { this._lastRenderTime = t; },
-          (c) => { this._renderCount = c; },
-          this._renderTimeoutId,
-          (id) => { this._renderTimeoutId = id; }
-        );
+        // Use scheduler to batch render requests
+        scheduleDOMUpdate(() => {
+          requestRender(
+            () => this._render(this._cfg),
+            this._lastRenderTime,
+            this._renderCount,
+            (t) => { this._lastRenderTime = t; },
+            (c) => { this._renderCount = c; },
+            this._renderTimeoutId,
+            (id) => { this._renderTimeoutId = id; }
+          );
+        }, this._componentId);
       })
     }
 
@@ -477,7 +534,7 @@ export function createElementClass<
                       if (!self._initializing) {
                         const fullPath = path || "root";
                         self._triggerWatchers(fullPath, target);
-                        self._render(cfg);
+                        scheduleDOMUpdate(() => self._render(cfg), self._componentId);
                       }
 
                       return result;
@@ -494,7 +551,7 @@ export function createElementClass<
                     ? `${path}.${String(prop)}`
                     : String(prop);
                   self._triggerWatchers(fullPath, value);
-                  self._render(cfg);
+                  scheduleDOMUpdate(() => self._render(cfg), self._componentId);
                 }
                 return true;
               },
@@ -505,7 +562,7 @@ export function createElementClass<
                     ? `${path}.${String(prop)}`
                     : String(prop);
                   self._triggerWatchers(fullPath, undefined);
-                  self._render(cfg);
+                  scheduleDOMUpdate(() => self._render(cfg), self._componentId);
                 }
                 return true;
               },
@@ -527,7 +584,7 @@ export function createElementClass<
                     fullPath,
                     target[prop as any]
                   );
-                  self._render(cfg);
+                  scheduleDOMUpdate(() => self._render(cfg), self._componentId);
                 }
                 return true;
               },
