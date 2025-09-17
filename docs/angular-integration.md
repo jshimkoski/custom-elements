@@ -7,8 +7,23 @@ Quick guide for using Custom Elements Runtime components inside Angular.
 1. Register a component (same runtime API):
 
 ```ts
-import { component, html } from '@jasonshimmy/custom-elements-runtime';
-component('my-counter', (ctx) => html`<button @click="${() => ctx.count++}">Count: ${ctx.count}</button>`, { state: { count: 0 } });
+import { component, ref, html, useEmit } from '@jasonshimmy/custom-elements-runtime';
+
+component('my-counter', ({ initialCount = 0 }: { initialCount?: number }) => {
+  const count = ref(initialCount);
+  const emit = useEmit();
+  
+  const handleClick = () => {
+    count.value++;
+    emit('count-changed', { count: count.value });
+  };
+  
+  return html`
+    <button @click="${handleClick}">
+      Count: ${count.value}
+    </button>
+  `;
+});
 ```
 
 2. Add the schema to your module so Angular accepts unknown elements:
@@ -23,7 +38,7 @@ export class AppModule {}
 
 ```html
 <!-- prefer property binding for non-string values -->
-<my-counter [count]="count"></my-counter>
+<my-counter [initialCount]="count" (count-changed)="onCountChange($event)"></my-counter>
 <!-- plain usage for simple/standalone elements -->
 <my-counter></my-counter>
 ```

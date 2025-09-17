@@ -1,32 +1,38 @@
 import { toKebab, escapeHTML } from "./helpers";
 import type { ComponentConfig, ComponentContext } from "./types";
 
+export type PropDefinition = {
+  type: StringConstructor | NumberConstructor | BooleanConstructor | FunctionConstructor;
+  default?: string | number | boolean;
+};
+
+function parseProp(val: string, type: any) {
+  if (type === Boolean) return val === "true";
+  if (type === Number) return Number(val);
+  return val;
+}
+
 /**
- * Applies props to the component context.
+ * Applies props to the component context using a direct prop definitions object.
  * @param element - The custom element instance.
- * @param cfg - The component config.
+ * @param propDefinitions - Object mapping prop names to their definitions.
  * @param context - The component context.
  */
-export function applyProps<S extends object, C extends object, P extends object, T extends object>(
+export function applyPropsFromDefinitions(
   element: HTMLElement,
-  cfg: ComponentConfig<S, C, P, T>,
-  context: ComponentContext<S, C, P, T>
+  propDefinitions: Record<string, PropDefinition>,
+  context: any
 ): void {
-  if (!cfg.props) return;
+  if (!propDefinitions) return;
 
-  function parseProp(val: string, type: any) {
-    if (type === Boolean) return val === "true";
-    if (type === Number) return Number(val);
-    return val;
-  }
-
-  Object.entries(cfg.props).forEach(([key, def]) => {
+  Object.entries(propDefinitions).forEach(([key, def]) => {
+    const kebab = toKebab(key);
+    const attr = element.getAttribute(kebab);
+    
     // Prefer function prop on the element instance
     if (def.type === Function && typeof (element as any)[key] === "function") {
       (context as any)[key] = (element as any)[key];
     } else {
-      const kebab = toKebab(key);
-      const attr = element.getAttribute(kebab);
       // Prefer JS property value when present on the instance (important
       // for runtime updates where the renderer assigns element properties
       // instead of HTML attributes). Check property first, then attribute.
@@ -55,4 +61,20 @@ export function applyProps<S extends object, C extends object, P extends object,
       // else: leave undefined if no default
     }
   });
+}
+
+/**
+ * Legacy function for ComponentConfig compatibility.
+ * Applies props to the component context using a ComponentConfig.
+ * @param element - The custom element instance.
+ * @param cfg - The component config.
+ * @param context - The component context.
+ */
+export function applyProps<S extends object, C extends object, P extends object, T extends object>(
+  element: HTMLElement,
+  cfg: ComponentConfig<S, C, P, T>,
+  context: ComponentContext<S, C, P, T>
+): void {
+  if (!cfg.props) return;
+  applyPropsFromDefinitions(element, cfg.props, context);
 }

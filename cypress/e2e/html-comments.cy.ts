@@ -1,3 +1,5 @@
+/// <reference types="cypress" />
+
 /**
  * Test to verify HTML comments are handled correctly
  */

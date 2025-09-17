@@ -4,13 +4,11 @@
  * - Integrates with createStore and lib/index.ts
  */
 
-import type { ComponentContext } from './runtime/types';
-import { createStore, type Store } from './store';
-import { component } from './runtime/component';
 import { html } from './runtime/template-compiler';
-import { css } from './runtime/style';
-import { match } from './directives';
+import { component } from './runtime/component';
+import { createStore, type Store } from './store';
 import { devError } from './runtime/logger';
+import { match } from './directives';
 
 export interface RouteComponent {
   // Can be any renderable type — adjust as needed for your framework
@@ -386,153 +384,152 @@ export function matchRouteSSR(routes: Route[], path: string) {
 
 export function initRouter(config: RouterConfig) {
   const router = useRouter(config);
-  component('router-view', {
-    async render() {
-      if (!router) return html`<div>Router not initialized.</div>`;
-      const current = router.getCurrent();
-      const { path } = current;
-      const match = router.matchRoute(path);
-      if (!match.route) return html`<div>Not found</div>`;
-
-      // Resolve the component (supports cached async loaders)
-      try {
-        const comp = await router.resolveRouteComponent(match.route);
-
-        // String tag (custom element) -> render as VNode
-        if (typeof comp === 'string') {
-          return { tag: comp, props: {}, children: [] };
+  
+  component('router-view', (_props = {}, hooks: any = {}) => {
+    const { onConnected } = hooks;
+    // Set up router subscription on component connection
+    if (onConnected) {
+      onConnected(() => {
+        if (router && typeof router.subscribe === 'function') {
+          router.subscribe(() => {
+            // The component will auto-rerender when router state changes
+          });
         }
+      });
+    }
 
-        // Function component (sync or async) -> call and return its VNode(s)
-        if (typeof comp === 'function') {
-          const out = comp();
-          const resolved = out instanceof Promise ? await out : out;
-          // If the function returned a string tag, render that element
-          if (typeof resolved === 'string') return { tag: resolved, props: {}, children: [] };
-          // Otherwise assume it's a VNode or VNode[] and return it directly
-          return resolved as any;
-        }
+    if (!router) return html`<div>Router not initialized.</div>`;
+    const current = router.getCurrent();
+    const { path } = current;
+    const match = router.matchRoute(path);
+    if (!match.route) return html`<div>Not found</div>`;
 
-        // Unknown component type
-        return html`<div>Invalid route component</div>`;
-      } catch (err) {
-        // Propagate as an invalid route component to show a clear message in the view
-        return html`<div>Invalid route component</div>`;
+    // Resolve the component (supports cached async loaders)
+    return router.resolveRouteComponent(match.route).then((comp: any) => {
+      // String tag (custom element) -> render as VNode
+      if (typeof comp === 'string') {
+        return { tag: comp, props: {}, children: [] };
       }
-    },
-    onConnected(ctx) {
-      if (router && typeof router.subscribe === 'function') {
-        router.subscribe(() => {
-          if (typeof ctx.requestRender === 'function') {
-            ctx.requestRender();
-          }
+
+      // Function component (sync or async) -> call and return its VNode(s)
+      if (typeof comp === 'function') {
+        const out = comp();
+        const resolved = out instanceof Promise ? out : Promise.resolve(out);
+        return resolved.then((resolvedComp: any) => {
+          // If the function returned a string tag, render that element
+          if (typeof resolvedComp === 'string') return { tag: resolvedComp, props: {}, children: [] };
+          // Otherwise assume it's a VNode or VNode[] and return it directly
+          return resolvedComp as any;
         });
       }
-    }
+
+      // Unknown component type
+      return html`<div>Invalid route component</div>`;
+    }).catch(() => {
+      // Propagate as an invalid route component to show a clear message in the view
+      return html`<div>Invalid route component</div>`;
+    });
   });
 
-  component<{}, RouterLinkComputed, RouterLinkProps>('router-link', {
-    state: {},
-    props: {
-      to: { type: String, default: '' },
-      tag: { type: String, default: 'a' },
-      replace: { type: Boolean, default: false },
-      exact: { type: Boolean, default: false },
-      activeClass: { type: String, default: 'active' },
-      exactActiveClass: { type: String, default: 'exact-active' },
-      ariaCurrentValue: { type: String, default: 'page' },
-      disabled: { type: Boolean, default: false },
-      external: { type: Boolean, default: false },
-      class: { type: String, default: '' },
-      style: { type: String, default: css`
-        [aria-disabled="true"] {
-          pointer-events: none;
-          opacity: 0.5;
-        }
-      ` },
-    },
-    style: (ctx) => ctx.style,
-    render: (ctx) => {
-      // Recalculate computed values in render
-      const current = router.getCurrent();
-      const to = ctx.to;
-      const exact = ctx.exact;
-      const exactActiveClass = ctx.exactActiveClass;
-      const activeClass = ctx.activeClass;
-      const ariaCurrentValue = ctx.ariaCurrentValue;
-      const tag = ctx.tag;
-      const disabled = ctx.disabled;
-      const external = ctx.external;
-      // Computed
-      const isExactActive = current.path === to;
-      const isActive = exact
-        ? isExactActive
-        : current && typeof current.path === 'string'
-          ? current.path.startsWith(to)
-          : false;
-      const ariaCurrent = isExactActive ? `aria-current="${ariaCurrentValue}"` : '';
-      // Build class object so JIT CSS can see the literal class names.
-      // Include user-provided classes (may be multiple space-separated) and
-      // static keys for active/exact-active so a JIT scanner can pick them up.
-      const userClassList = (ctx.class || '').split(/\s+/).filter(Boolean);
-      const userClasses: Record<string, boolean> = {};
-      for (const c of userClassList) userClasses[c] = true;
-      const classObject = {
-        ...userClasses,
-        // Also include the configurable names (may duplicate the above)
-        [activeClass]: isActive,
-        [exactActiveClass]: isExactActive,
-      };
-      const isButton = tag === 'button';
-      const disabledAttr = disabled
-        ? isButton
-          ? 'disabled aria-disabled="true" tabindex="-1"'
-          : 'aria-disabled="true" tabindex="-1"'
-        : '';
-      const externalAttr = external && (tag === 'a' || !tag)
-        ? 'target="_blank" rel="noopener noreferrer"'
-        : '';
-      return html`
-        ${match()
-          .when(isButton, html`
-            <button
-              part="button"
-              :class="${classObject}"
-              ${ariaCurrent}
-              ${disabledAttr}
-              ${externalAttr}
-              @click="navigate"
-            ><slot></slot></button>
-          `)
-          .otherwise(html`
-            <a
-              part="link"
-              href="${to}"
-              :class="${classObject}"
-              ${ariaCurrent}
-              ${disabledAttr}
-              ${externalAttr}
-              @click="navigate"
-            ><slot></slot></a>
-          `)
-          .done()}
-      `;
-    },
-    navigate: (e: MouseEvent, ctx: ComponentContext<{}, RouterLinkComputed, RouterLinkProps, any>) => {
-      if (ctx.disabled) {
+  component('router-link', (props: {
+    to?: string;
+    tag?: string;
+    replace?: boolean;
+    exact?: boolean;
+    activeClass?: string;
+    exactActiveClass?: string;
+    ariaCurrentValue?: string;
+    disabled?: boolean;
+    external?: boolean;
+    class?: string;
+  } = {}, _hooks = {}) => {
+    const {
+      to = '',
+      tag = 'a',
+      replace = false,
+      exact = false,
+      activeClass = 'active',
+      exactActiveClass = 'exact-active',
+      ariaCurrentValue = 'page',
+      disabled = false,
+      external = false,
+      class: userClass = ''
+    } = props;
+    // Recalculate computed values in render
+    const current = router.getCurrent();
+    
+    // Computed
+    const isExactActive = current.path === to;
+    const isActive = exact
+      ? isExactActive
+      : current && typeof current.path === 'string'
+        ? current.path.startsWith(to)
+        : false;
+    const ariaCurrent = isExactActive ? `aria-current="${ariaCurrentValue}"` : '';
+    
+    // Build class object so JIT CSS can see the literal class names.
+    const userClassList = (userClass || '').split(/\s+/).filter(Boolean);
+    const userClasses: Record<string, boolean> = {};
+    for (const c of userClassList) userClasses[c] = true;
+    const classObject = {
+      ...userClasses,
+      // Also include the configurable names (may duplicate the above)
+      [activeClass]: isActive,
+      [exactActiveClass]: isExactActive,
+    };
+    
+    const isButton = tag === 'button';
+    const disabledAttr = disabled
+      ? isButton
+        ? 'disabled aria-disabled="true" tabindex="-1"'
+        : 'aria-disabled="true" tabindex="-1"'
+      : '';
+    const externalAttr = external && (tag === 'a' || !tag)
+      ? 'target="_blank" rel="noopener noreferrer"'
+      : '';
+
+    const navigate = (e: MouseEvent) => {
+      if (disabled) {
         e.preventDefault();
         return;
       }
-      if (ctx.external && (ctx.tag === 'a' || !ctx.tag)) {
+      if (external && (tag === 'a' || !tag)) {
         return;
       }
       e.preventDefault();
-      if (ctx.replace) {
-        router.replace(ctx.to);
+      if (replace) {
+        router.replace(to);
       } else {
-        router.push(ctx.to);
+        router.push(to);
       }
-    }
+    };
+      
+    return html`
+      ${match()
+        .when(isButton, html`
+          <button
+            part="button"
+            :class="${classObject}"
+            ${ariaCurrent}
+            ${disabledAttr}
+            ${externalAttr}
+            @click="${navigate}"
+          ><slot></slot></button>
+        `)
+        .otherwise(html`
+          <a
+            part="link"
+            href="${to}"
+            :class="${classObject}"
+            ${ariaCurrent}
+            ${disabledAttr}
+            ${externalAttr}
+            @click="${navigate}"
+          ><slot></slot></a>
+        `)
+        .done()}
+    `;
   });
+  
   return router;
 }

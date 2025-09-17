@@ -1,8 +1,8 @@
 import './style.css';
-import { component, html, when, each, match, eventBus } from "./lib";
+import { component, html, when, each, match, eventBus, watch, ref, css, computed, useEmit, useOnConnected, useOnError, useStyle } from "./lib";
 
 // Import example components so they register themselves
-import './components/examples/DesignSystem';
+import './components/examples/BabyChildParent';
 import './components/examples/MinimalExample';
 import './components/examples/ShoppingCart';
 import './components/examples/TodoApp';
@@ -11,155 +11,104 @@ import './components/examples/FormInputValidation';
 // Import design system components
 import './components/design-system';
 
-// The new runtime is completely self-contained
-// Components automatically register themselves when imported
 
-interface SwitchProps {
-  label?: string;
-  modelValue?: boolean;
-}
+// --- Simple Switch ---
 
-// Simple test component to debug model binding
-component('simple-switch', {
-  props: {
-    modelValue: { type: Boolean, default: false },
-  },
 
-  watch: {
-    modelValue: [
-      (newVal: any, oldVal: any, ctx: any) => {
-        console.log('simple-switch modelValue changed from', oldVal, 'to', newVal);
-      },
-      { immediate: true },
-    ],
-  },
-
-  render: (ctx: any) => html`
+component('simple-switch', ({ modelValue = false }) => {
+  const emit = useEmit();
+  return html`
     <div>
-      <p>ModelValue: ${ctx.modelValue}</p>
+      <p>ModelValue: ${modelValue}</p>
       <input
         type="checkbox"
-        :checked="${ctx.modelValue}"
+        :checked="${modelValue}"
         @change="${(e: Event) => {
           const input = e.target as HTMLInputElement;
           const isChecked = input.checked;
-          console.log('simple-switch emitting update:model-value with value:', isChecked);
-          ctx.emit('update:model-value', isChecked);
+          emit('update:modelValue', isChecked);
         }}"
       />
       <label>Simple Switch</label>
     </div>
-  `,
+  `;
 });
 
-component<{}, {}, SwitchProps>('cer-switch', {
-  props: {
-    label: { type: String, default: '' },
-    modelValue: { type: Boolean, default: false },
-  },
 
-  watch: {
-    modelValue: [
-      (newVal: any, oldVal: any, ctx: any) => {
-        console.log('cer-switch modelValue changed from', oldVal, 'to', newVal);
-        // Force re-render to ensure UI updates
-        if (ctx._requestRender) {
-          ctx._requestRender();
-        }
-      },
-      { immediate: true },
-    ],
-  },
+// --- Cer Switch ---
 
-  render: (ctx: any) => html`
+component('cer-switch', ({
+  label = '',
+  modelValue = false
+}) => {
+  const emit = useEmit();
+  return html`
     <label
       class="inline-flex items-center gap-3 cursor-[pointer]"
       role="switch"
-      :aria-checked="${ctx.modelValue}"
+      :aria-checked="${modelValue}"
     >
-      ${ctx.modelValue}
+      ${modelValue}
       <div class="relative">
         <input
           class="sr-only"
           type="checkbox"
-          :checked="${ctx.modelValue}"
+          :checked="${modelValue}"
           @change="${(e: Event) => {
             const input = e.target as HTMLInputElement;
             const isChecked = input.checked;
-            console.log('cer-switch emitting update:model-value with value:', isChecked);
-            ctx.emit('update:model-value', isChecked);
+            emit('update:modelValue', isChecked);
           }}"
         />
 
         <div
           class="w-9 h-5 rounded-full shadow-inner transition"
-          :class="${{ 'bg-primary-600': ctx.modelValue, 'bg-neutral-200': !ctx.modelValue }}"
+          :class="${{ 'bg-primary-600': modelValue, 'bg-neutral-200': !modelValue }}"
         ></div>
 
         <div
           class="absolute left-0.5 transition top-0 w-4 h-4 mt-0.5 bg-white rounded-full shadow"
-          :class="${[ ctx.modelValue ? 'transform-[translateX(1rem)]' : 'transform-[translateX(0)]' ]}"
+          :class="${[ modelValue ? 'transform-[translateX(1rem)]' : 'transform-[translateX(0)]' ]}"
         ></div>
       </div>
 
-      ${ctx.label ? html`<span class="text-sm text-neutral-700">${ctx.label}</span>` : ''}
+      ${label ? html`<span class="text-sm text-neutral-700">${label}</span>` : ''}
     </label>
-  `,
+  `;
 });
 
-component("stateless-component", () => html`
-  <div>
-    <p>This is a stateless component!</p>
-  </div>
-`, {
-  style: `
+
+// --- Stateless Component ---
+
+
+component("stateless-component", () => {
+  useStyle(() => css`
     div {
       background: lightblue;
       padding: 10px;
     }
-  `
+  `);
+  return html`
+    <div>
+      <p>This is a stateless component!</p>
+    </div>
+  `;
 });
 
-component('async-greeting', {
-  state: { name: 'World' },
 
-  reload: async (e: Event, state) => {
-    state.name = 'Dude';
-  },
+// --- Async Component ---
 
-  render: async (state) => {
-    // Simulate API call or dynamic import
-    await new Promise(resolve => setTimeout(resolve, 1000));
 
-    return html`
-      <div class="greeting">
-        <h1>Hello, ${state.name}!</h1>
-        <p>This content loaded asynchronously after 1 seconds.</p>
-        <small>Loaded at: ${new Date().toLocaleTimeString()}</small>
-        <button @click="${state.reload}">Reload</button>
-      </div>
-    `;
-  },
+component('async-greeting', async () => {
+  const name = ref('World');
 
-  loadingTemplate: (state) => html`
-    <div class="loading">
-      <p>Loading greeting for ${state.name}...</p>
-      <div class="spinner">⏳</div>
-    </div>
-  `,
+  const loading = ref(false);
+  const error = ref<Error | null>(null);
 
-  errorTemplate: (error, state) => html`
-    <div class="error">
-      <h3>Failed to load greeting</h3>
-      <p>Error: ${error.message}</p>
-      <button @click="${() => location.reload()}">Retry</button>
-    </div>
-  `,
-
-  style: `
+  useStyle(() => css`
     .greeting {
       padding: 20px;
-      border: 2px solid #4CAF50;
+      border: 2px solid ${name.value === 'World' ? '#4CAF50' : '#5722FF'};
       border-radius: 8px;
     }
     .loading {
@@ -180,254 +129,296 @@ component('async-greeting', {
       0% { transform: rotate(0deg); }
       100% { transform: rotate(360deg); }
     }
-  `
+  `);
+
+  const fetchData = async (newName: string) => {
+    try {
+      loading.value = true;
+      error.value = null;
+      // Simulate API call or dynamic import
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      name.value = newName;
+    } catch (e) {
+      error.value = e as Error;
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  return html`
+    <h3 class="text-lg font-semibold">Async Greeting Component</h3>
+    ${match()
+      .when(error.value, html`
+        <div class="error">
+          <h3>Failed to load greeting</h3>
+          <p>Error: ${error.value?.message}</p>
+          <button @click="${() => location.reload()}">Retry</button>
+        </div>
+      `)
+      .when(loading.value, html`
+        <div class="loading">
+          <p>Loading greeting for ${name.value}...</p>
+          <div class="spinner">⏳</div>
+        </div>
+      `)
+      .otherwise(html`
+        <div class="greeting">
+          <h1>Hello, ${name.value}!</h1>
+          <p>This content loaded asynchronously after 1 seconds.</p>
+          <small>Loaded at: ${new Date().toLocaleTimeString()}</small>
+          <button @click="${() => fetchData('Dude')}">Reload</button>
+        </div>
+      `)
+      .done()}
+  `;
 });
 
-component("child-component", {
-  props: { test: { type: String } },
-  state: { message: "Hello from Child Component" },
-  render(state) {
-    return html`
-      <div>
-        <p>From parent: ${state.test}</p>
-        <slot></slot>
-        <p>Slot is right above me</p>
-        <p>${state.message}</p>
-        <button @click="${state.handleSomething}">Click Me (handleSomething)</button>
-        <button @click="${() => (state.message = "cool")}">
-          Change Message
-        </button>
-      </div>
-    `;
-  },
-  watch: {
-    message(newValue, oldValue, _state) {
-      console.log(`Watcher called: message changed from ${oldValue} to ${newValue}`);
-      eventBus.emit("messageChanged", { newValue, oldValue });
-    },
-  },
-  handleSomething(event: Event, state: any) {
-    console.log("component did something", event, state);
-  },
+
+// --- Main Component with Child and Parent Interaction ---
+
+
+const message = ref("Hello from Child Component");
+
+watch(() => message.value, (newValue, oldValue) => {
+  console.log(`Watcher called: message changed from ${oldValue} to ${newValue}`);
 });
 
-component("my-greeting", {
-  state: {
-    name: "World",
-    array: ["A", "B", "C"],
-    email: "test@me.com",
-    age: 25,
-    isActive: true,
-    color: "red",
-    featureEnabled: false,
-  },
-  onConnected(state) {
-    console.log("Component connected:", state);
+const handleSomething = (event: Event) => {
+  console.log("component did something", event, message.value);
+}
+
+component("child-component", ({ test = '' }) => {
+  return html`
+    <div>
+      <p>From parent: ${test}</p>
+      <slot></slot>
+      <p>Slot is right above me</p>
+      <p>${message.value}</p>
+      <button @click="${handleSomething}">Click Me (handleSomething)</button>
+      <button @click="${() => (message.value = "cool")}">
+        Change Message
+      </button>
+    </div>
+  `;
+});
+
+const myGreetingState = ref({
+  name: "World",
+  array: ["A", "B", "C"],
+  email: "test@me.com",
+  age: 25,
+  isActive: true,
+  color: "red",
+  featureEnabled: false,
+});
+
+const funnyName = computed(() => `Funny ${myGreetingState.value.name}`);
+
+watch(() => myGreetingState.value.name, (newName, oldName) => {
+  console.log(`Watcher called: Name changed from ${oldName} to ${newName}`);
+});
+
+watch(() => myGreetingState.value.email, (newEmail, oldEmail) => {
+  console.log(`Watcher called: Email changed from ${oldEmail} to ${newEmail}`);
+});
+
+watch(() => myGreetingState.value.featureEnabled, (newVal, oldVal) => {
+  console.log(`Watcher called: featureEnabled changed from ${oldVal} to ${newVal}`);
+});
+
+const handleSomethingMyGreeting = (event: Event) =>{
+  myGreetingState.value.name = "Updated Name";
+  myGreetingState.value.array.push("New Item");
+  console.log("component did something, event, state", event, myGreetingState.value);
+}
+
+component("my-greeting", () => {
+  useOnConnected(() => {
+    console.log("Component connected:", myGreetingState.value);
+    console.log("Feature enabled:", myGreetingState.value.featureEnabled);
     eventBus.on("messageChanged", (detail) => {
       console.log("Message changed event received in my-greeting", detail);
     });
-  },
-  computed: {
-    funnyName(state) {
-      return `Funny ${state.name}`;
-    },
-  },
-  watch: {
-    name(newValue, oldValue) {
-      console.log(
-        `Watcher called: Name changed from ${oldValue} to ${newValue}`,
-      );
-    },
-    email(newValue, oldValue) {
-      console.log(
-        `Watcher called: Email changed from ${oldValue} to ${newValue}`,
-      );
-    },
-    featureEnabled(newValue, oldValue) {
-      console.log(
-        `Watcher called: featureEnabled changed from ${oldValue} to ${newValue}`,
-      );
-    },
-  },
-  style: (state) => `
+  });
+
+  useOnError((error) => {
+    console.error("Component error:", error, myGreetingState.value);
+  });
+
+  useStyle(() => css`
     div {
-      color: ${state.color};
+      color: ${myGreetingState.value.color};
       padding: 20px;
     }
     .form-group {
       margin: 10px 0;
     }
     .form-control {
-      border: 1px solid ${state.color};
+      border: 1px solid ${myGreetingState.value.color};
     }
     label {
       display: inline-block;
       width: 100px;
     }
-  `,
-  render(state) {
-    return html`
-      <div>
-        <section>
-          <h2>Switch</h2>
-          <simple-switch
-            :model="featureEnabled"
+  `);
+
+  return html`
+    <div>
+      <section>
+        <h2>Switch</h2>
+        <simple-switch
+          :model="featureEnabled"
+        />
+        <cer-switch
+          label="Enable feature"
+          :model="featureEnabled"
+        />
+      </section>
+      <async-greeting></async-greeting>
+      <child-component test="${myGreetingState.value.name}">
+        <stateless-component></stateless-component>
+      </child-component>
+      <h2>Hello, <span>${myGreetingState.value.name}</span></h2>
+      <h3>You have a funny name: ${funnyName.value}</h3>
+      ${when(myGreetingState.value.name === "World", html`<span>Welcome to the world!</span>`)}
+
+      <div class="form-group">
+        <label>Name:</label>
+        <input type="text" :model="name.name" :show="${myGreetingState.value.isActive}" />
+
+        <div class="form-group">
+          <label>Name (:model):</label>
+          <input
+            type="text"
+            :model="name.name"
+            :class="${ ['form-control', { 'active': myGreetingState.value.isActive }] }"
+            :style="${ { color: myGreetingState.value.isActive ? 'green' : 'red' } }"
           />
-          <cer-switch
-            label="Enable feature"
-            :model="featureEnabled"
-          />
-        </section>
-        <async-greeting></async-greeting>
-        <child-component test="${state.name}">
-          <stateless-component></stateless-component>
-        </child-component>
-        <h2>Hello, <span>${state.name}</span></h2>
-        <h3>You have a funny name: ${state.funnyName}</h3>
-        ${when(state.name === "World", html`<span>Welcome to the world!</span>`)}
-
-        <div class="form-group">
-          <label>Name:</label>
-          <input type="text" :model="name" :show="${state.isActive}" />
-
-          <div class="form-group">
-            <label>Name (:model):</label>
-            <input
-              type="text"
-              :model="name"
-              :class="${ ['form-control', { 'active': state.isActive }] }"
-              :style="${ { color: state.isActive ? 'green' : 'red' } }"
-            />
-            <button :bind="${ { disabled: state.isActive } }">Submit</button>
-            <button :disabled="${state.isActive}">Submit</button>
-          </div>
+          <button :bind="${ { disabled: myGreetingState.value.isActive } }">Submit</button>
+          <button :disabled="${myGreetingState.value.isActive}">Submit</button>
         </div>
-
-        <div class="form-group">
-          <label>Email:</label>
-          <input type="email" :model="email" />
-        </div>
-
-        <div class="form-group">
-          <label>Age:</label>
-          <input type="number" :model="age" />
-        </div>
-
-        <div class="form-group">
-          <label>Active:</label>
-          <input type="checkbox" :model="isActive" />
-        </div>
-
-        <div class="form-group">
-          <label>Color:</label>
-          <select :model="color">
-            <option value="red">Red</option>
-            <option value="green">Green</option>
-            <option value="blue">Blue</option>
-          </select>
-        </div>
-
-        <div class="form-group">
-          <label>Active group:</label>
-          ${each(
-            state.array,
-            (item) => html`
-              ${item}:
-              <input
-                type="checkbox"
-                key="checkbox-${item}"
-                value="${item}"
-                :model="array"
-                :class="['item', item === 'A' ? 'active' : '']"
-              />
-            `,
-          )}
-        </div>
-
-        <div class="form-group">
-          <p>State: ${JSON.stringify(state, null, 2)}</p>
-        </div>
-
-        <button
-          @click="${() => {
-            state.name = "Custom Element";
-            state.array = ["D", "E", "F"];
-          }}"
-        >
-          Change Name
-        </button>
-        <button @click="${state.handleSomething}">Click Me</button>
-        ${each(state.array, (item) => html`<span>${item}</span>`)}
-        ${match()
-          .when(state.name === "World", html`<span>Welcome to the world!</span>`)
-          .when(state.name === "Custom Element", html`<span>Welcome to the custom element!</span>`)
-          .otherwise(html`<span>In otherwise statement</span>`)
-          .done()}
       </div>
-    `;
-  },
-  onError(error, state) {
-    console.error("Component error:", error, state);
-  },
-  handleSomething(event: Event, state: any) {
-    state.name = "Updated Name";
-    state.array.push("New Item");
-    console.log("component did something, event, state", event, state);
-  },
+
+      <div class="form-group">
+        <label>Email:</label>
+        <input type="email" :model="email.email" />
+      </div>
+
+      <div class="form-group">
+        <label>Age:</label>
+        <input type="number" :model="age.age" />
+      </div>
+
+      <div class="form-group">
+        <label>Active:</label>
+        <input type="checkbox" :model="isActive.isActive" />
+      </div>
+
+      <div class="form-group">
+        <label>Color:</label>
+        <select :model="color.color">
+          <option value="red">Red</option>
+          <option value="green">Green</option>
+          <option value="blue">Blue</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Active group:</label>
+        ${each(
+          myGreetingState.value.array,
+          (item) => html`
+            ${item}:
+            <input
+              type="checkbox"
+              key="checkbox-${item}"
+              value="${item}"
+              :model="array.array"
+              :class="['item', item === 'A' ? 'active' : '']"
+            />
+          `,
+        )}
+      </div>
+
+      <div class="form-group">
+        <p>State: ${JSON.stringify(myGreetingState.value, null, 2)}</p>
+      </div>
+
+      <button
+        @click="${() => {
+          myGreetingState.value.name = "Custom Element";
+          myGreetingState.value.array = ["D", "E", "F"];
+        }}"
+      >
+        Change Name
+      </button>
+      <button @click="${handleSomethingMyGreeting}">Click Me</button>
+      ${each(myGreetingState.value.array, (item) => html`<span>${item}</span>`)}
+      ${match()
+        .when(myGreetingState.value.name === "World", html`<span>Welcome to the world!</span>`)
+        .when(myGreetingState.value.name === "Custom Element", html`<span>Welcome to the custom element!</span>`)
+        .otherwise(html`<span>In otherwise statement</span>`)
+        .done()}
+    </div>
+  `;
 });
 
-// Create a component to test model binding
-component('switch-test', {
-  state: {
-    featureEnabled: false,
-  },
 
-  render: (ctx: any) => html`
+// --- Switch Test ---
+
+
+component('switch-test', () => {
+  const featureEnabled = ref(false);
+
+  return html`
     <div style="padding: 20px; border: 1px solid #ccc; margin: 20px;">
+      <h2 class="text-lg font-semibold">Switch Component Test</h2>
       <h3>Model Binding Test</h3>
-      <p>Current value: ${ctx.featureEnabled}</p>
-      
+      <p>Current value: ${featureEnabled.value}</p>
+
       <div style="margin: 10px 0;">
         <label>Simple Switch:</label>
-        <simple-switch :model="featureEnabled"></simple-switch>
+        <simple-switch :model="${featureEnabled}"></simple-switch>
       </div>
-      
+
       <div style="margin: 10px 0;">
         <label>Custom Switch:</label>
-        <cer-switch :model="featureEnabled" label="Enable Feature"></cer-switch>
+        <cer-switch :model="${featureEnabled}" label="Enable Feature"></cer-switch>
       </div>
-      
-      <button @click="${() => { ctx.featureEnabled = !ctx.featureEnabled; }}">
+
+      <button @click="${() => { featureEnabled.value = !featureEnabled.value; }}">
         Toggle Programmatically
       </button>
     </div>
-  `,
+  `;
 });
 
-// Create comprehensive design system test component
-component('design-system-test', {
-  state: {
-    // Text inputs
-    textInput: 'Hello World',
-    textareaContent: 'This is a multi-line\ntext area example',
-    
-    // Boolean inputs
-    checkboxValue: true,
-    radioValue: 'option2',
-    
-    // Selection inputs
-    selectValue: 'blue',
-    
-    // Numeric inputs
-    numberValue: 42,
-    rangeValue: 75,
-    progressValue: 60,
-    
-    // Validation
-    lastAction: 'None',
-  },
 
-  render: (ctx: any) => html`
+// --- Design System Comprehensive Test ---
+
+
+// Create comprehensive design system test component
+component('design-system-test', () => {
+  // Text inputs
+  const textInput = ref('Hello World');
+  const textareaContent = ref('This is a multi-line\ntext area example');
+
+  // Boolean inputs
+  const checkboxValue = ref(true);
+  const radioValue = ref('option2');
+  
+  // Selection inputs
+  const selectValue = ref('blue');
+
+  // Numeric inputs
+  const numberValue = ref(42);
+  const rangeValue = ref(75);
+  const progressValue = ref(60);
+
+  // Validation
+  const lastAction = ref('None');
+
+  return html`
     <div style="padding: 20px; border: 2px solid #007acc; margin: 20px; border-radius: 8px;">
       <h2>🧪 Design System Comprehensive Test</h2>
       
@@ -439,19 +430,19 @@ component('design-system-test', {
           
           <div style="margin: 10px 0;">
             <label>Text Input (model):</label>
-            <ds-input :model="textInput" placeholder="Type something..."></ds-input>
-            <small>Value: "${ctx.textInput}"</small>
+            <ds-input :model="${textInput}" placeholder="Type something..."></ds-input>
+            <small>Value: "${textInput.value}"</small>
           </div>
           
           <div style="margin: 10px 0;">
             <label>Text Input (bind):</label>
-            <ds-input :model-value="${ctx.textInput}" placeholder="Bound value"></ds-input>
+            <ds-input :model-value="${textInput.value}" placeholder="Bound value"></ds-input>
           </div>
           
           <div style="margin: 10px 0;">
             <label>Textarea (model):</label>
-            <ds-textarea :model="textareaContent" rows="3"></ds-textarea>
-            <small>Value: "${ctx.textareaContent.replace(/\n/g, '\\n')}"</small>
+            <ds-textarea :model="${textareaContent}" rows="3"></ds-textarea>
+            <small>Value: "${textareaContent.value.replace(/\n/g, '\\n')}"</small>
           </div>
         </div>
         
@@ -461,14 +452,14 @@ component('design-system-test', {
           
           <div style="margin: 10px 0;">
             <label>Checkbox (model):</label>
-            <ds-checkbox :model="checkboxValue" label="Enable notifications"></ds-checkbox>
-            <small>Value: ${ctx.checkboxValue}</small>
+            <ds-checkbox :model="${checkboxValue}" label="Enable notifications"></ds-checkbox>
+            <small>Value: ${checkboxValue.value}</small>
           </div>
           
           <div style="margin: 10px 0;">
             <label>Radio Group (model):</label>
-            <ds-radio-group :model="radioValue" name="test-radio"></ds-radio-group>
-            <small>Value: "${ctx.radioValue}"</small>
+            <ds-radio-group :model="${radioValue}" name="test-radio"></ds-radio-group>
+            <small>Value: "${radioValue.value}"</small>
           </div>
         </div>
         
@@ -478,13 +469,13 @@ component('design-system-test', {
           
           <div style="margin: 10px 0;">
             <label>Select (model):</label>
-            <ds-select :model="selectValue"></ds-select>
-            <small>Value: "${ctx.selectValue}"</small>
+            <ds-select :model="${selectValue}"></ds-select>
+            <small>Value: "${selectValue.value}"</small>
           </div>
           
           <div style="margin: 10px 0;">
             <label>Select (bind):</label>
-            <ds-select :model-value="${ctx.selectValue}"></ds-select>
+            <ds-select :model-value="${selectValue.value}"></ds-select>
           </div>
         </div>
         
@@ -494,20 +485,20 @@ component('design-system-test', {
           
           <div style="margin: 10px 0;">
             <label>Number Input (model):</label>
-            <ds-number :model="numberValue" min="0" max="100"></ds-number>
-            <small>Value: ${ctx.numberValue}</small>
+            <ds-number :model="${numberValue}" min="0" max="100"></ds-number>
+            <small>Value: ${numberValue.value}</small>
           </div>
           
           <div style="margin: 10px 0;">
             <label>Range Slider (model):</label>
-            <ds-range :model="rangeValue" min="0" max="100"></ds-range>
-            <small>Value: ${ctx.rangeValue}</small>
+            <ds-range :model="${rangeValue}" min="0" max="100"></ds-range>
+            <small>Value: ${rangeValue.value}</small>
           </div>
           
           <div style="margin: 10px 0;">
             <label>Progress Bar:</label>
-            <ds-progress :model="progressValue" max="100"></ds-progress>
-            <small>Progress: ${ctx.progressValue}%</small>
+            <ds-progress :model="${progressValue}" max="100"></ds-progress>
+            <small>Progress: ${progressValue.value}%</small>
           </div>
         </div>
       </div>
@@ -518,27 +509,27 @@ component('design-system-test', {
         
         <div style="margin: 10px 0;">
           <ds-button @click="${() => {
-            ctx.textInput = 'Reset Text';
-            ctx.textareaContent = 'Reset Content';
-            ctx.lastAction = 'Text Reset';
+            textInput.value = 'Reset Text';
+            textareaContent.value = 'Reset Content';
+            lastAction.value = 'Text Reset';
           }}">Reset Text Inputs</ds-button>
           
           <ds-button @click="${() => {
-            ctx.checkboxValue = !ctx.checkboxValue;
-            ctx.radioValue = ctx.radioValue === 'option1' ? 'option2' : 'option1';
-            ctx.lastAction = 'Boolean Toggle';
+            checkboxValue.value = !checkboxValue.value;
+            radioValue.value = radioValue.value === 'option1' ? 'option2' : 'option1';
+            lastAction.value = 'Boolean Toggle';
           }}">Toggle Booleans</ds-button>
           
           <ds-button @click="${() => {
-            ctx.numberValue = Math.floor(Math.random() * 100);
-            ctx.rangeValue = Math.floor(Math.random() * 100);
-            ctx.progressValue = Math.floor(Math.random() * 100);
-            ctx.lastAction = 'Numbers Randomized';
+            numberValue.value = Math.floor(Math.random() * 100);
+            rangeValue.value = Math.floor(Math.random() * 100);
+            progressValue.value = Math.floor(Math.random() * 100);
+            lastAction.value = 'Numbers Randomized';
           }}">Randomize Numbers</ds-button>
         </div>
         
         <div style="margin: 15px 0; padding: 10px; background: #f5f5f5; border-radius: 4px;">
-          <strong>Last Action:</strong> ${ctx.lastAction}
+          <strong>Last Action:</strong> ${lastAction.value}
         </div>
       </div>
       
@@ -546,18 +537,19 @@ component('design-system-test', {
       <details style="margin: 20px 0;">
         <summary style="cursor: pointer; font-weight: bold;">🔍 Full State Dump</summary>
         <pre style="background: #f0f0f0; padding: 10px; margin: 10px 0; overflow: auto; max-height: 200px;">
-${JSON.stringify(ctx, null, 2)}
+${JSON.stringify({ textInput, textareaContent, lastAction, checkboxValue, radioValue, selectValue, numberValue, rangeValue, progressValue }, null, 2)}
         </pre>
       </details>
     </div>
-  `,
+  `;
 });
 
 document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
   <div>
+    <test-app></test-app>
     <switch-test></switch-test>
     <design-system-test></design-system-test>
-    <design-system></design-system>
+    <cer-parent></cer-parent>
     <minimal-example></minimal-example>
     <shopping-cart></shopping-cart>
     <todo-app></todo-app>

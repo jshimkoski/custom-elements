@@ -168,8 +168,7 @@ Behavior notes:
 
 ## 📚 See Also
 
-- [component.md](./component.md)
-- [state.md](./state.md)
+- [streamlined-functional-api.md](./streamlined-functional-api.md)
 - [store.md](./store.md)
 
 # 🏁 Summary

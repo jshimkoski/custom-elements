@@ -1,3 +1,6 @@
+
+/// <reference types="cypress" />
+
 /**
  * 🎯 Design System - Final Comprehensive Test Suite
  * 

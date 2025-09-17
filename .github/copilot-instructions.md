@@ -84,6 +84,8 @@ All documentation written in the docs directory should be:
 
 ## Key Conventions
 
+- NEVER GUESS! Always be 100% certain.
+- Always use strongly typed TypeScript.
 - Keep code lightweight and modular.
 - Do not use external dependencies.
 - Keep code performant.

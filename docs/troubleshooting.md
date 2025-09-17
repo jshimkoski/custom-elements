@@ -1,6 +1,6 @@
 # 🛠️ Troubleshooting Deep Dive
 
-A guide to diagnosing and resolving common issues in the custom elements runtime. Find solutions for rendering, state, style, events, and more—with friendly tips and best practices.
+A guide to diagnosing and resolving common issues in the custom elements runtime. Find solutions for rendering, ref, style, events, and more—with friendly tips and best practices.
 
 ## 🚦 Rendering Issues
 
@@ -18,12 +18,12 @@ A guide to diagnosing and resolving common issues in the custom elements runtime
   - For arrays/objects, use supported mutating methods.
 - **Props not received:**
   - Check attribute spelling and casing (use kebab-case in HTML).
-  - Ensure `props` config matches expected types.
+  - Ensure your component function parameters have proper default values.
 
 ## 🎨 Style Issues
 
 - **Styles not applied:**
-  - Confirm your `style` config is a string, function, or valid object.
+  - Confirm your component options include a valid `style` string or function.
   - Check for missing dependencies in dynamic styles.
 - **Unsafe CSS warning:**
   - Avoid `url(javascript:...)`, `<script>`, or `expression()` in styles.
@@ -32,7 +32,7 @@ A guide to diagnosing and resolving common issues in the custom elements runtime
 
 - **Events not firing:**
   - Use `@event` syntax in templates (e.g., `@click`).
-  - Ensure event handler is a function in state/config.
+  - Ensure event handler is a function accessible in the component scope.
 - **Two-way binding not working:**
   - Use `:model` for supported input elements.
   - Check that state property exists and is reactive.
@@ -40,8 +40,8 @@ A guide to diagnosing and resolving common issues in the custom elements runtime
 ## 🧩 Lifecycle & Watchers
 
 - **Lifecycle hooks not called:**
-  - Use correct hook names (`onConnected`, `onDisconnected`, etc.).
-  - Hooks must be functions in config.
+  - Use correct hook names (`onConnected`, `onDisconnected`, etc.) from the hooks object.
+  - Ensure hooks are properly destructured from the second parameter.
 - **Watchers not triggering:**
   - Use correct path for nested state (e.g., `user.profile.age`).
   - Set `{ deep: true }` for deep watchers.

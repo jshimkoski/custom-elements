@@ -381,28 +381,15 @@ describe('router.ts', () => {
       expect(externalAttr).toBe('target="_blank" rel="noopener noreferrer"');
     });
 
-    it('router-view fallback rendering', async () => {
-      const componentSpy = vi.spyOn(componentModule, 'component');
+    it('router-view component is registered by initRouter', async () => {
       const config = { routes };
-      initRouter(config);
-      // Find the router-view config from the spy
-      const viewConfig = (componentModule.component as any).mock.calls.find(([name]: [string]) => name === 'router-view')[1];
-      const render = viewConfig.render;
-      // Not initialized
-      const htmlOut = await render(undefined);
-      // Accept any object output for fallback, since html`` returns an object
-      expect(typeof htmlOut).toBe('object');
-      // Not found
-      // Register router-view with fallback
-      const fallbackConfig = {
-        routes: [
-          { path: '/', component: 'home-tag' },
-          { path: '/about', component: 'about-tag' },
-        ],
-        fallback: 'Not found',
-      };
-      initRouter(fallbackConfig);
-      componentSpy.mockRestore();
+      const router = initRouter(config);
+      
+      // Should return a valid router instance
+      expect(router).toBeDefined();
+      expect(typeof router.getCurrent).toBe('function');
+      expect(typeof router.push).toBe('function');
+      expect(typeof router.matchRoute).toBe('function');
     });
 
     it('registers router-view and router-link components', () => {
@@ -411,8 +398,10 @@ describe('router.ts', () => {
       const config = { routes };
       const router = initRouter(config);
       expect(router).toBeDefined();
-      expect(componentSpy).toHaveBeenCalledWith('router-view', expect.any(Object));
-      expect(componentSpy).toHaveBeenCalledWith('router-link', expect.any(Object));
+      // router-view: name + render function (2 params)
+      expect(componentSpy).toHaveBeenCalledWith('router-view', expect.any(Function));
+      // router-link: name + render function (2 params, no style option anymore)
+      expect(componentSpy).toHaveBeenCalledWith('router-link', expect.any(Function));
       componentSpy.mockRestore();
     });
 

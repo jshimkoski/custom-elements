@@ -5,11 +5,12 @@
  */
 
 import type { VNode, VDomRefs, AnchorBlockVNode } from "./types";
-import { escapeHTML, getNestedValue, setNestedValue, toKebab } from "./helpers";
-import { devWarn } from "./logger";
+import { escapeHTML, getNestedValue, setNestedValue, toKebab, toCamel } from "./helpers";
+import { SecureExpressionEvaluator } from "./secure-expression-evaluator";
+import { EventManager } from "./event-manager";
 
 /**
- * Recursively clean up refs for all descendants of a node
+ * Recursively clean up refs and event listeners for all descendants of a node
  * @param node The node to clean up.
  * @param refs The refs to clean up.
  * @returns 
@@ -17,6 +18,9 @@ import { devWarn } from "./logger";
 export function cleanupRefs(node: Node, refs?: VDomRefs) {
   if (!refs) return;
   if (node instanceof HTMLElement) {
+    // Clean up event listeners for this element
+    EventManager.cleanup(node);
+    
     for (const refKey in refs) {
       if (refs[refKey] === node) {
         delete refs[refKey];
@@ -26,6 +30,28 @@ export function cleanupRefs(node: Node, refs?: VDomRefs) {
     for (const child of Array.from(node.childNodes)) {
       cleanupRefs(child, refs);
     }
+  }
+}
+
+/**
+ * Assign a ref to an element, supporting both string refs and reactive state objects
+ */
+function assignRef(
+  vnode: VNode,
+  element: HTMLElement,
+  refs?: VDomRefs
+): void {
+  if (typeof vnode === "string") return;
+  
+  const reactiveRef = vnode.props?.reactiveRef ?? (vnode.props?.props && vnode.props.props.reactiveRef);
+  const refKey = vnode.props?.ref ?? (vnode.props?.props && vnode.props.props.ref);
+  
+  if (reactiveRef) {
+    // For reactive state objects, assign the element to the .value property
+    reactiveRef.value = element;
+  } else if (refKey && refs) {
+    // Legacy string-based ref
+    refs[refKey] = element;
   }
 }
 
@@ -41,7 +67,7 @@ export function cleanupRefs(node: Node, refs?: VDomRefs) {
  * @returns 
  */
 export function processModelDirective(
-  value: string,
+  value: string | any,
   modifiers: string[],
   props: Record<string, any>,
   attrs: Record<string, any>,
@@ -56,7 +82,22 @@ export function processModelDirective(
   const hasTrim = modifiers.includes("trim");
   const hasNumber = modifiers.includes("number");
 
-  const getCurrentValue = () => getNestedValue(context._state || context, value);
+  // Enhanced support for reactive state objects (functional API)
+  const isReactiveState = value && typeof value === 'object' && 'value' in value && typeof value.value !== 'undefined';
+  
+  const getCurrentValue = () => {
+    if (isReactiveState) {
+      const unwrapped = value.value;
+      // If we have an argument (like :model:name), access that property
+      if (arg && typeof unwrapped === 'object' && unwrapped !== null) {
+        return unwrapped[arg];
+      }
+      return unwrapped;
+    }
+    // Fallback to string-based lookup (legacy config API)
+    return getNestedValue(context._state || context, value as string);
+  };
+  
   const currentValue = getCurrentValue();
 
   // determine element/input type
@@ -151,7 +192,7 @@ export function processModelDirective(
     }
 
     const actualState = context._state || context;
-    const currentStateValue = getNestedValue(actualState, value);
+    const currentStateValue = getCurrentValue();
     const changed = Array.isArray(newValue) && Array.isArray(currentStateValue)
       ? JSON.stringify([...newValue].sort()) !== JSON.stringify([...currentStateValue].sort())
       : newValue !== currentStateValue;
@@ -159,12 +200,28 @@ export function processModelDirective(
     if (changed) {
       (target as any)._modelUpdating = true;
       try {
-        setNestedValue(actualState, value, newValue);
+        // Enhanced support for reactive state objects (functional API)
+        if (isReactiveState) {
+          if (arg && typeof value.value === 'object' && value.value !== null) {
+            // For :model:prop, update the specific property
+            const updated = { ...value.value };
+            updated[arg] = newValue;
+            value.value = updated;
+          } else {
+            // For plain :model, update the entire value
+            value.value = newValue;
+          }
+        } else {
+          // Fallback to string-based update (legacy config API)
+          setNestedValue(actualState, value as string, newValue);
+        }
+        
         if (context._requestRender) context._requestRender();
         
         // Trigger watchers for state changes
         if (context._triggerWatchers) {
-          context._triggerWatchers(value, newValue);
+          const watchKey = isReactiveState ? 'reactiveState' : value as string;
+          context._triggerWatchers(watchKey, newValue);
         }
         
         // Emit custom event for update:* listeners (e.g., @update:model-value)
@@ -190,7 +247,7 @@ export function processModelDirective(
     if (listeners[eventName]) {
       const oldListener = listeners[eventName];
       if (el) {
-        el.removeEventListener(eventName, oldListener);
+        EventManager.removeListener(el, eventName, oldListener);
       }
     }
     
@@ -250,7 +307,7 @@ export function processModelDirective(
     if (listeners[eventType]) {
       const oldListener = listeners[eventType];
       if (el) {
-        el.removeEventListener(eventType, oldListener);
+        EventManager.removeListener(el, eventType, oldListener);
       }
     }
     listeners[eventType] = eventListener;
@@ -445,63 +502,13 @@ export function processShowDirective(
  */
 /**
  * Evaluate a JavaScript-like object literal string in the given context
+ * Uses secure AST-based evaluation instead of Function() constructor
  * @param expression 
  * @param context 
  * @returns 
  */
 function evaluateExpression(expression: string, context: any): any {
-  // Security check: prevent potentially dangerous expressions
-  const dangerousPatterns = [
-    /constructor/i,
-    /prototype/i,
-    /__proto__/i,
-    /function/i,
-    /eval/i,
-    /import/i,
-    /require/i,
-    /window/i,
-    /document/i,
-    /global/i,
-    /process/i
-  ];
-  
-  if (dangerousPatterns.some(pattern => pattern.test(expression))) {
-    devWarn('Potentially dangerous expression blocked:', expression);
-    return undefined;
-  }
-
-  // Handle object literals like "{ active: ctx.isActive, disabled: ctx.isDisabled }"
-  if (expression.trim().startsWith('{') && expression.trim().endsWith('}')) {
-    try {
-      // Create a safer eval by building a function with the context
-      const keys = Object.keys(context);
-      const values = keys.map(key => context[key]);
-      
-      // Replace ctx. references with direct property access
-      const cleanExpression = expression.replace(/ctx\./g, '');
-      
-      // Additional security: limit expression size
-      if (cleanExpression.length > 1000) {
-        devWarn('Expression too long, blocked for security:', expression);
-        return undefined;
-      }
-      
-      const func = new Function(...keys, `return ${cleanExpression}`);
-      return func(...values);
-    } catch (error) {
-      devWarn('Failed to evaluate expression:', expression, error);
-      return undefined;
-    }
-  }
-  
-  // Handle simple ctx.property references
-  if (expression.startsWith('ctx.')) {
-    const propertyPath = expression.slice(4); // Remove 'ctx.' prefix
-    return getNestedValue(context, propertyPath);
-  }
-  
-  // Fallback to regular nested value lookup
-  return getNestedValue(context, expression);
+  return SecureExpressionEvaluator.evaluate(expression, context);
 }
 
 export function processClassDirective(
@@ -619,6 +626,36 @@ export function processStyleDirective(
 }
 
 /**
+ * Process :ref directive for element references
+ * @param value 
+ * @param props 
+ * @param context 
+ * @returns 
+ */
+export function processRefDirective(
+  value: any,
+  props: Record<string, any>,
+  context?: any,
+): void {
+  let resolvedValue = value;
+  
+  // If value is a string, evaluate it in the context to resolve variables
+  if (typeof value === 'string' && context) {
+    resolvedValue = evaluateExpression(value, context);
+  }
+  
+  // Support both reactive state objects (functional API) and string refs (legacy)
+  if (resolvedValue && typeof resolvedValue === 'object' && resolvedValue.constructor?.name === 'ReactiveState') {
+    // For reactive state objects, store the reactive state object itself as the ref
+    // The VDOM renderer will handle setting the value
+    props.reactiveRef = resolvedValue;
+  } else {
+    // Legacy string-based ref or direct object ref
+    props.ref = resolvedValue;
+  }
+}
+
+/**
  * Process directives and return merged props, attrs, and event listeners
  * @param directives 
  * @param context 
@@ -648,7 +685,7 @@ export function processDirectives(
       const parts = directiveName.split(":");
       const runtimeArg = parts.length > 1 ? parts[1] : arg;
       processModelDirective(
-        typeof value === "string" ? value : String(value),
+        value, // Pass the original value (could be string or reactive state object)
         modifiers,
         props,
         attrs,
@@ -672,6 +709,9 @@ export function processDirectives(
         break;
       case "style":
         processStyleDirective(value, attrs, context);
+        break;
+      case "ref":
+        processRefDirective(value, props, context);
         break;
       // Add other directive cases here as needed
     }
@@ -797,6 +837,7 @@ export function patchProps(
   for (const key in { ...oldPropProps, ...newPropProps }) {
     const oldVal = oldPropProps[key];
     const newVal = newPropProps[key];
+    
     if (oldVal !== newVal) {
       anyChange = true;
       if (
@@ -811,8 +852,10 @@ export function patchProps(
     } else if (key.startsWith("on") && typeof newVal === "function") {
       // DOM-first listener: onClick -> click
       const ev = eventNameFromKey(key);
-      if (typeof oldVal === "function") el.removeEventListener(ev, oldVal);
-      el.addEventListener(ev, newVal);
+      if (typeof oldVal === "function") {
+        EventManager.removeListener(el, ev, oldVal);
+      }
+      EventManager.addListener(el, ev, newVal);
       } else if (newVal === undefined || newVal === null) {
         el.removeAttribute(key);
       } else {
@@ -848,7 +891,7 @@ export function patchProps(
   for (const [eventType, listener] of Object.entries(
     processedDirectives.listeners || {},
   )) {
-    el.addEventListener(eventType, listener as EventListener);
+    EventManager.addListener(el, eventType, listener as EventListener);
   }
 
   const oldAttrs = oldProps.attrs ?? {};
@@ -856,11 +899,23 @@ export function patchProps(
   for (const key in { ...oldAttrs, ...newAttrs }) {
     const oldVal = oldAttrs[key];
     const newVal = newAttrs[key];
-    if (oldVal !== newVal) {
+    
+    // For reactive state objects, compare the unwrapped values
+    let oldUnwrapped = oldVal;
+    let newUnwrapped = newVal;
+    
+    if (oldVal && typeof oldVal === 'object' && oldVal.constructor?.name === 'ReactiveState') {
+      oldUnwrapped = oldVal.value; // This triggers dependency tracking
+    }
+    if (newVal && typeof newVal === 'object' && newVal.constructor?.name === 'ReactiveState') {
+      newUnwrapped = newVal.value; // This triggers dependency tracking
+    }
+    
+    if (oldUnwrapped !== newUnwrapped) {
       anyChange = true;
       // Handle removal/null/false: remove attribute and clear corresponding
       // DOM property for native controls where Vue treats null/undefined as ''
-      if (newVal === undefined || newVal === null || newVal === false) {
+      if (newUnwrapped === undefined || newUnwrapped === null || newUnwrapped === false) {
         el.removeAttribute(key);
         if (key === 'value') {
           if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
@@ -881,34 +936,44 @@ export function patchProps(
         // New value present: for native controls prefer assigning .value/.checked
         if (key === 'value') {
           if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
-            try { (el as any).value = newVal ?? ""; } catch (e) { el.setAttribute(key, String(newVal)); }
+            try { (el as any).value = newUnwrapped ?? ""; } catch (e) { el.setAttribute(key, String(newUnwrapped)); }
             continue;
           } else if (el instanceof HTMLSelectElement) {
-            try { (el as any).value = newVal ?? ""; } catch (e) { /* ignore */ }
+            try { (el as any).value = newUnwrapped ?? ""; } catch (e) { /* ignore */ }
             continue;
           } else if (el instanceof HTMLProgressElement) {
-            try { (el as any).value = Number(newVal); } catch (e) { /* ignore */ }
+            try { (el as any).value = Number(newUnwrapped); } catch (e) { /* ignore */ }
             continue;
           }
         }
         if (key === 'checked' && el instanceof HTMLInputElement) {
-          try { el.checked = !!newVal; } catch (e) { /* ignore */ }
+          try { el.checked = !!newUnwrapped; } catch (e) { /* ignore */ }
           continue;
         }
 
         // Special handling for style attribute - always use setAttribute
         if (key === 'style') {
-          el.setAttribute(key, String(newVal));
+          el.setAttribute(key, String(newUnwrapped));
           continue;
         }
 
         // Non-native or generic attributes: prefer property when available
         const isSVG = (el as any).namespaceURI === 'http://www.w3.org/2000/svg';
-        if (!isSVG && key in el) {
-          try { (el as any)[key] = newVal; }
-          catch (e) { el.setAttribute(key, String(newVal)); }
+        
+        // For custom elements, convert kebab-case attributes to camelCase properties
+        if (elIsCustom && !isSVG && key.includes('-')) {
+          const camelKey = toCamel(key);
+          try {
+            (el as any)[camelKey] = newUnwrapped;
+          } catch (e) {
+            // If property assignment fails, fall back to attribute
+            el.setAttribute(key, String(newUnwrapped));
+          }
+        } else if (!isSVG && key in el) {
+          try { (el as any)[key] = newUnwrapped; }
+          catch (e) { el.setAttribute(key, String(newUnwrapped)); }
         } else {
-          el.setAttribute(key, String(newVal));
+          el.setAttribute(key, String(newUnwrapped));
         }
       }
     }
@@ -1044,7 +1109,19 @@ export function createElement(
           el.setAttribute(key, String(val));
         }
       } else {
-        el.setAttribute(key, String(val));
+        // For custom elements, convert kebab-case attributes to camelCase properties
+        const vnodeIsCustom = vnode.props?.isCustomElement ?? false;
+        if (vnodeIsCustom && !isSVG && key.includes('-')) {
+          const camelKey = toCamel(key);
+          try {
+            (el as any)[camelKey] = val;
+          } catch (e) {
+            // If property assignment fails, fall back to attribute
+            el.setAttribute(key, String(val));
+          }
+        } else {
+          el.setAttribute(key, String(val));
+        }
       }
     }
   }
@@ -1063,11 +1140,17 @@ export function createElement(
         el instanceof HTMLTextAreaElement ||
         el instanceof HTMLSelectElement)
     ) {
-      el.value = val ?? "";
+      // Check if val is a reactive state object and extract its value
+      // Use the getter to ensure dependency tracking happens
+      const propValue = (typeof val === "object" && val !== null && typeof val.value !== "undefined") ? val.value : val;
+      el.value = propValue ?? "";
     } else if (key === "checked" && el instanceof HTMLInputElement) {
-      el.checked = !!val;
+      // Check if val is a reactive state object and extract its value
+      // Use the getter to ensure dependency tracking happens
+      const propValue = (typeof val === "object" && val !== null && typeof val.value !== "undefined") ? val.value : val;
+      el.checked = !!propValue;
     } else if (key.startsWith("on") && typeof val === "function") {
-      el.addEventListener(eventNameFromKey(key), val);
+      EventManager.addListener(el, eventNameFromKey(key), val);
     } else if (key.startsWith("on") && val === undefined) {
       continue; // skip undefined event handlers
     } else if (val === undefined || val === null || val === false) {
@@ -1083,7 +1166,10 @@ export function createElement(
       const vnodeIsCustom = vnode.props?.isCustomElement ?? false;
       if (vnodeIsCustom || key in el) {
         try {
-          (el as any)[key] = val;
+          // Check if val is a reactive state object and extract its value
+          // Use the getter to ensure dependency tracking happens
+          const propValue = (typeof val === "object" && val !== null && typeof val.value !== "undefined") ? val.value : val;
+          (el as any)[key] = propValue;
         } catch (err) {
           // silently skip on failure
         }
@@ -1097,14 +1183,18 @@ export function createElement(
   for (const [eventType, listener] of Object.entries(
     processedDirectives.listeners || {},
   )) {
-    el.addEventListener(eventType, listener as EventListener);
+    EventManager.addListener(el, eventType, listener as EventListener);
   }
 
-  // Assign ref if present (support both props.ref and props.props.ref)
-  const refKey = vnode.props?.ref ?? (vnode.props?.props && vnode.props.props.ref);
-  if (typeof vnode !== "string" && refKey && refs) {
-    refs[refKey] = el as HTMLElement;
-  }
+  // Assign ref if present - create a vnode with processed props for ref assignment
+  const vnodeWithProcessedProps = {
+    ...vnode,
+    props: {
+      ...vnode.props,
+      ...processedDirectives.props
+    }
+  };
+  assignRef(vnodeWithProcessedProps, el as HTMLElement, refs);
 
   // If this is a custom element instance, request an initial render now that
   // attributes/props/listeners have been applied. This fixes the common timing
@@ -1457,9 +1547,7 @@ export function patch(
   if (!oldVNode || typeof oldVNode === "string") {
     cleanupRefs(dom, refs);
     const newEl = createElement(newVNode, context, refs);
-    if (typeof newVNode !== "string" && newVNode.props?.ref && refs) {
-      refs[newVNode.props.ref] = newEl as HTMLElement; // Assign new ref
-    }
+    assignRef(newVNode, newEl as HTMLElement, refs);
     dom.parentNode?.replaceChild(newEl, dom);
     return newEl;
   }
@@ -1496,9 +1584,7 @@ export function patch(
     const el = dom as HTMLElement;
     patchProps(el, oldVNode.props || {}, newVNode.props || {}, context);
     patchChildren(el, oldVNode.children, newVNode.children, context, refs); // <-- Pass refs
-    if (typeof newVNode !== "string" && newVNode.props?.ref && refs) {
-      refs[newVNode.props.ref] = el; // Assign ref
-    }
+    assignRef(newVNode, el, refs);
     return el;
   }
 
@@ -1518,9 +1604,7 @@ export function patch(
         patchProps(el, oldVNode.props || {}, newVNode.props || {}, context);
         // For custom elements, their internal rendering is managed by the
         // element itself; do not touch children here.
-        if (typeof newVNode !== "string" && newVNode.props?.ref && refs) {
-          refs[newVNode.props.ref] = el;
-        }
+        assignRef(newVNode, el, refs);
         return el;
       } catch (e) {
         // fall through to full replace on error
@@ -1530,9 +1614,7 @@ export function patch(
 
   cleanupRefs(dom, refs);
   const newEl = createElement(newVNode, context, refs);
-  if (typeof newVNode !== "string" && newVNode.props?.ref && refs) {
-    refs[newVNode.props.ref] = newEl as HTMLElement;
-  }
+  assignRef(newVNode, newEl as HTMLElement, refs);
   dom.parentNode?.replaceChild(newEl, dom);
   return newEl;
 }
