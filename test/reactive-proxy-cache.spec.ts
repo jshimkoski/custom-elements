@@ -50,7 +50,24 @@ describe('ReactiveProxyCache & ProxyOptimizer', () => {
     const plain = {} as any;
     ProxyOptimizer.markAsProxy(plain);
     const desc = Object.getOwnPropertyDescriptor(plain, '__isProxy__');
-    expect(desc).toBeDefined();
-    expect(desc?.enumerable).toBe(false);
+    expect(desc).toBeUndefined();
+  });
+
+  it('returns same proxy instance and recognizes proxies', () => {
+    const obj = { x: 1 };
+    const onUpdate = vi.fn();
+    const makeReactive = (v: any) => v;
+
+    const p = ProxyOptimizer.createReactiveProxy(obj, onUpdate, makeReactive);
+    // creating again returns same proxy
+    const p2 = ProxyOptimizer.createReactiveProxy(p as any, onUpdate, makeReactive);
+    expect(p2).toBe(p);
+
+    // target is recognized as having a cached proxy
+    expect(ReactiveProxyCache.hasProxy(obj)).toBe(true);
+
+    // ensure no legacy flag exists on target or proxy
+    expect((obj as any)['__isProxy__']).toBeUndefined();
+    expect((p as any)['__isProxy__']).toBeUndefined();
   });
 });

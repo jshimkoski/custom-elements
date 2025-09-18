@@ -125,7 +125,7 @@ component('directive-demo', ({
 ## 📚 Learn More
 
 - [Directive Enhancements Guide](./directive-enhancements.md)
-- [Streamlined Functional API](./streamlined-functional-api.md)
+- [Functional API](./functional-api.md)
 - [Template Guide](./template.md)
 
 ## 🏁 Summary

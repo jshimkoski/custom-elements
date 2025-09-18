@@ -6,6 +6,11 @@
 /**
  * Cache for reactive proxies to avoid creating multiple proxies for the same object
  */
+// legacy symbol marker removed — use WeakSet and non-enumerable flag instead
+// Track actual proxy instances with a WeakSet for robust detection
+const proxiedObjects = new WeakSet<object>();
+// No legacy flag: rely solely on WeakSet and WeakMap for proxy detection
+
 class ReactiveProxyCache {
   private static cache = new WeakMap<object, object>();
   private static arrayHandlerCache = new WeakMap<object, ProxyHandler<any>>();
@@ -32,8 +37,11 @@ class ReactiveProxyCache {
     
     // Create proxy
     const proxy = new Proxy(obj, handler);
-    
-    // Cache the proxy
+
+    // Mark and track the proxy instance (do this via the optimizer helper)
+    try { ProxyOptimizer.markAsProxy(proxy as any); } catch {}
+
+    // Cache the proxy by the original target object
     this.cache.set(obj, proxy);
     
     return proxy as T;
@@ -145,6 +153,11 @@ class ReactiveProxyCache {
  * Optimized proxy creation utilities
  */
 class ProxyOptimizer {
+  // Cache a stable reactiveContext object keyed by onUpdate -> makeReactive
+  // This allows handler caches in ReactiveProxyCache to reuse handlers
+  // for identical reactive contexts instead of creating a new context object
+  // on each createReactiveProxy call.
+  private static contextCache = new WeakMap<Function, WeakMap<Function, { triggerUpdate: Function; makeReactiveValue: Function }>>();
   /**
    * Create an optimized reactive proxy with minimal overhead
    */
@@ -153,49 +166,46 @@ class ProxyOptimizer {
     onUpdate: () => void,
     makeReactive: (value: any) => any
   ): T {
-    // Skip proxy creation for already proxied objects
-    if (this.isProxy(obj)) {
-      return obj;
+    // If the argument is already a proxy instance, return it directly.
+    try {
+      if (proxiedObjects.has(obj)) return obj;
+    } catch {
+      // ignore
     }
     
     const isArray = Array.isArray(obj);
-    
-    // Create reactive state context for handler caching
-    const reactiveContext = {
-      triggerUpdate: onUpdate,
-      makeReactiveValue: makeReactive
-    };
-    
-    return ReactiveProxyCache.getOrCreateProxy(obj, reactiveContext, isArray);
-  }
-  
-  /**
-   * Check if an object is already a proxy
-   */
-  private static isProxy(obj: any): boolean {
-    try {
-      // Try to access a non-existent property to trigger proxy traps
-      // This is a heuristic, not foolproof
-      const descriptor = Object.getOwnPropertyDescriptor(obj, '__isProxy__');
-      return descriptor !== undefined;
-    } catch {
-      return false;
+
+    // Reuse a stable reactiveContext object per (onUpdate, makeReactive) pair.
+    let inner = this.contextCache.get(onUpdate as any);
+    if (!inner) {
+      inner = new WeakMap();
+      this.contextCache.set(onUpdate as any, inner);
     }
+    let reactiveContext = inner.get(makeReactive as any);
+    if (!reactiveContext) {
+      reactiveContext = {
+        triggerUpdate: onUpdate,
+        makeReactiveValue: makeReactive
+      };
+      inner.set(makeReactive as any, reactiveContext);
+    }
+    
+    // Delegate to the cache which will return an existing proxy for the target
+    // or create one if it doesn't exist yet.
+    return ReactiveProxyCache.getOrCreateProxy(obj, reactiveContext, isArray);
   }
   
   /**
    * Mark an object as a proxy (for optimization)
    */
   static markAsProxy(obj: any): void {
+    if (!obj) return;
+
+    // Prefer adding the actual proxy instance to the WeakSet which does not trigger proxy traps
     try {
-      Object.defineProperty(obj, '__isProxy__', {
-        value: true,
-        enumerable: false,
-        writable: false,
-        configurable: false
-      });
+      proxiedObjects.add(obj);
     } catch {
-      // Ignore if we can't mark it
+      // ignore
     }
   }
 }

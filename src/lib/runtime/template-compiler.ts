@@ -2,6 +2,36 @@ import type { VNode } from "./types";
 import { contextStack } from "./render";
 import { toKebab, getNestedValue, setNestedValue } from "./helpers";
 
+// Strict LRU cache helper for fully static templates (no interpolations, no context)
+class LRUCache<K, V> {
+  private map = new Map<K, V>();
+  private maxSize: number;
+  constructor(maxSize: number) { this.maxSize = maxSize; }
+  get(key: K): V | undefined {
+    const v = this.map.get(key);
+    if (v === undefined) return undefined;
+    // move to end
+    this.map.delete(key);
+    this.map.set(key, v);
+    return v;
+  }
+  set(key: K, value: V) {
+    if (this.map.has(key)) {
+      this.map.delete(key);
+    }
+    this.map.set(key, value);
+    if (this.map.size > this.maxSize) {
+      // remove oldest
+      const first = this.map.keys().next().value;
+      if (first !== undefined) this.map.delete(first);
+    }
+  }
+  has(key: K): boolean { return this.map.has(key); }
+  clear() { this.map.clear(); }
+}
+
+const TEMPLATE_COMPILE_CACHE = new LRUCache<string, VNode | VNode[]>(500);
+
 /**
  * Validates event handlers to prevent common mistakes that lead to infinite loops
  */
@@ -201,6 +231,16 @@ export function htmlImpl(
   
   // Use injected context if no explicit context provided
   const effectiveContext = context ?? injectedContext;
+
+  // Conservative caching: only cache templates that have no interpolations
+  // (values.length === 0) and no explicit context. This avoids incorrectly
+  // reusing parsed structures that depend on runtime values or context.
+  const canCache = (!context && values.length === 0);
+  const cacheKey = canCache ? strings.join('<!--TEMPLATE_DELIM-->') : null;
+  if (canCache && cacheKey) {
+    const cached = TEMPLATE_COMPILE_CACHE.get(cacheKey);
+    if (cached) return cached;
+  }
 
   function textVNode(text: string, key: string): VNode {
     return h("#text", {}, text, key);
@@ -680,14 +720,27 @@ export function htmlImpl(
 
   if (cleanedFragments.length === 1) {
     // Single non-empty root node
-    return cleanedFragments[0];
+    const out = cleanedFragments[0];
+      if (canCache && cacheKey) TEMPLATE_COMPILE_CACHE.set(cacheKey, out);
+    return out;
   } else if (cleanedFragments.length > 1) {
     // True multi-root: return array
-    return cleanedFragments;
+    const out = cleanedFragments;
+    if (canCache && cacheKey) {
+      TEMPLATE_COMPILE_CACHE.set(cacheKey, out);
+    }
+    return out;
   }
 
   // Fallback for empty content
   return h("div", {}, "", "fallback-root");
+}
+
+/**
+ * Clear the template compile cache (useful for tests)
+ */
+export function clearTemplateCompileCache(): void {
+  TEMPLATE_COMPILE_CACHE.clear();
 }
 
 /**

@@ -164,12 +164,12 @@ Behavior notes:
 
 - Async `load` behavior: `load()` is supported and cached. `router-view` accepts module defaults that are either a string tag name or a function component (sync or async). Function components should return a VNode or VNode[] (or a string tag). If you return another type, `router-view` will render the "Invalid route component" fallback. Use `resolveRouteComponent` if you need to handle module results manually.
 
-- SSR `initialUrl`: for server-side or static rendering, pass `initialUrl` into `initRouter`/`useRouter` so the router can derive the initial `path` and `query` server-side. The router uses `initialUrl` only in non-browser mode.
+- SSR `initialUrl`: for server-side or static rendering, pass `initialUrl` into `initRouter`/`useRouter` so the router can derive the initial `path` and `query server-side. If you explicitly pass `initialUrl` the runtime will honor it and initialize from that URL even when a `window` object exists (this is useful for SSR hydration and deterministic tests). If you omit `initialUrl` the router operates in normal browser mode and derives its initial state from `window.location`.
 
 ## 📚 See Also
 
-- [streamlined-functional-api.md](./streamlined-functional-api.md)
-- [store.md](./store.md)
+- [Functional API](./functional-api.md)
+- [Store](./store.md)
 
 # 🏁 Summary
 

@@ -8,9 +8,12 @@ class ReactiveSystem {
   private currentComponent: string | null = null;
   private componentDependencies = new Map<string, Set<ReactiveState<any>>>();
   private componentRenderFunctions = new Map<string, () => void>();
-  private componentStateStorage = new Map<string, Map<string, ReactiveState<any>>>();
+  // Flat storage: compound key `${componentId}:${stateIndex}` -> ReactiveState
+  private stateStorage = new Map<string, ReactiveState<any>>();
   private stateIndexCounter = new Map<string, number>();
   private trackingDisabled = false;
+  // Per-component last warning timestamp to throttle repeated warnings
+  private lastWarningTime = new Map<string, number>();
 
   /**
    * Set the current component being rendered for dependency tracking
@@ -21,9 +24,8 @@ class ReactiveSystem {
     if (!this.componentDependencies.has(componentId)) {
       this.componentDependencies.set(componentId, new Set());
     }
-    if (!this.componentStateStorage.has(componentId)) {
-      this.componentStateStorage.set(componentId, new Map());
-    }
+    // reset index; state instances will be stored in `stateStorage`
+    // under compound keys when created
     // Reset state index for this render
     this.stateIndexCounter.set(componentId, 0);
   }
@@ -57,6 +59,21 @@ class ReactiveSystem {
   }
 
   /**
+   * Return whether we should emit a render-time warning for the current component.
+   * This throttles warnings to avoid spamming the console for legitimate rapid updates.
+   */
+  shouldEmitRenderWarning(): boolean {
+    if (!this.currentComponent) return true;
+    const id = this.currentComponent;
+    const last = this.lastWarningTime.get(id) || 0;
+    const now = Date.now();
+    const THROTTLE_MS = 1000; // 1 second per component
+    if (now - last < THROTTLE_MS) return false;
+    this.lastWarningTime.set(id, now);
+    return true;
+  }
+
+  /**
    * Execute a function with tracking disabled
    */
   withoutTracking<T>(fn: () => T): T {
@@ -79,22 +96,19 @@ class ReactiveSystem {
     }
     
     const componentId = this.currentComponent;
-    const stateStorage = this.componentStateStorage.get(componentId)!;
     const currentIndex = this.stateIndexCounter.get(componentId) || 0;
-    const stateKey = `state-${currentIndex}`;
-    
+    const stateKey = `${componentId}:${currentIndex}`;
+
     // Increment state index for next state call
     this.stateIndexCounter.set(componentId, currentIndex + 1);
-    
-    if (stateStorage.has(stateKey)) {
-      // Return existing state instance
-      return stateStorage.get(stateKey)! as ReactiveState<T>;
-    } else {
-      // Create new state instance
-      const stateInstance = new ReactiveState(initialValue);
-      stateStorage.set(stateKey, stateInstance);
-      return stateInstance;
+
+    if (this.stateStorage.has(stateKey)) {
+      return this.stateStorage.get(stateKey)! as ReactiveState<T>;
     }
+
+    const stateInstance = new ReactiveState(initialValue);
+    this.stateStorage.set(stateKey, stateInstance);
+    return stateInstance;
   }
 
   /**
@@ -131,7 +145,10 @@ class ReactiveSystem {
       this.componentDependencies.delete(componentId);
     }
     this.componentRenderFunctions.delete(componentId);
-    this.componentStateStorage.delete(componentId);
+    // Remove any flat-stored state keys for this component
+    for (const key of Array.from(this.stateStorage.keys())) {
+      if (key.startsWith(componentId + ':')) this.stateStorage.delete(key);
+    }
     this.stateIndexCounter.delete(componentId);
   }
 }
@@ -161,12 +178,14 @@ export class ReactiveState<T> {
   set value(newValue: T) {
     // Check for state modifications during render (potential infinite loop)
     if (reactiveSystem.isRenderingComponent()) {
-      console.warn(
-        '🚨 State modification detected during render! This can cause infinite loops.\n' +
-        '  • Move state updates to event handlers\n' +
-        '  • Use useEffect/watch for side effects\n' +
-        '  • Ensure computed properties don\'t modify state'
-      );
+      if (reactiveSystem.shouldEmitRenderWarning()) {
+        console.warn(
+          '🚨 State modification detected during render! This can cause infinite loops.\n' +
+          '  • Move state updates to event handlers\n' +
+          '  • Use useEffect/watch for side effects\n' +
+          '  • Ensure computed properties don\'t modify state'
+        );
+      }
     }
     
     this._value = this.makeReactive(newValue);

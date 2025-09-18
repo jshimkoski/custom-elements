@@ -89,6 +89,7 @@ Explore the complete documentation for every runtime feature:
 - [🌐 SSR](./docs/ssr.md) - Server-side rendering support
 - [♻️ HMR](./docs/hmr.md) - Hot module replacement
 - [🛡️ Infinite Loop Protection](./docs/infinite-loop-protection.md) - Runtime safeguards against infinite loops
+- [🔒 Secure Expression Evaluator](./docs/secure-expression-evaluator.md) - Safe evaluation of dynamic expressions in templates
 
 ### 🔧 **Integration Guides**
 - [⚛️ React Integration](./docs/react-integration.md) - Using components in React apps

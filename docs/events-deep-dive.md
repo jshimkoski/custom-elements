@@ -168,5 +168,5 @@ Recommendation: avoid reusing native event names (like `click`) for semantic pay
   - When you need closure capture or imperative wiring, use refs and `addEventListener`.
 
 ## See also
-- `streamlined-functional-api.md`, `cross-component-communication.md`, and
+- `functional-api.md`, `cross-component-communication.md`, and
   framework integration guides for concrete examples.

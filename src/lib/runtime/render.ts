@@ -95,27 +95,24 @@ export function requestRender(
   
   if (isRapidRender) {
     setRenderCount(renderCount + 1);
-    
     // Progressive warnings and limits
-    if (renderCount === 5) {
+    if (renderCount === 15) {
       console.warn(
         '⚠️ Component is re-rendering rapidly. This might indicate:\n' +
+        '  Common causes:\n' +
         '  • Event handler calling a function immediately: @click="${fn()}" should be @click="${fn}"\n' +
         '  • State modification during render\n' +
-        '  • Missing dependencies in computed/watch'
-      );
-    } else if (renderCount === 15) {
-      console.error(
-        '🚨 Infinite render loop detected! Component has rendered 15 times in rapid succession.\n' +
-        '  Common causes:\n' +
-        '  • @click="${handler()}" - should be @click="${handler}"\n' +
-        '  • Modifying reactive state during render\n' +
-        '  • State updates in computed properties without proper dependencies\n' +
+        '  • Missing dependencies in computed/watch\n' +
         '  Component rendering will be throttled to prevent browser freeze.'
       );
     } else if (renderCount > 20) {
       // More aggressive limit for severe infinite loops
-      console.error('🛑 Stopping runaway component render to prevent browser freeze');
+      console.error(
+        '🛑 Infinite loop detected in component render:\n' +
+        '  • This might be caused by state updates during render\n' +
+        '  • Ensure all state modifications are done in event handlers or effects\n' +
+        'Stopping runaway component render to prevent browser freeze'
+      );
       setRenderTimeoutId(null);
       return;
     }

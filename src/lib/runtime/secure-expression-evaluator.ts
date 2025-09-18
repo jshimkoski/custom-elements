@@ -169,23 +169,78 @@ class SecureExpressionEvaluator {
     // For simple expressions, we'll use a basic substitution approach
     return (context: any) => {
       try {
-        // Replace ctx.property with actual values
+        // Work on a copy we can mutate
         let processedExpression = expression;
-        
-        // Find all ctx.property references
-        const ctxMatches = expression.match(/ctx\.[\w.]+/g) || [];
-        
+
+        // First, replace all string literals with placeholders to avoid accidental identifier matches inside strings
+        const stringLiterals: string[] = [];
+        processedExpression = processedExpression.replace(/("[^"\\]*(?:\\.[^"\\]*)*"|'[^'\\]*(?:\\.[^'\\]*)*')/g, (m) => {
+          const idx = stringLiterals.push(m) - 1;
+          // Use numeric-only markers so identifier regex won't match them (they don't start with a letter)
+          return `<<#${idx}#>>`;
+        });
+
+        // Replace ctx.property references with placeholders to avoid creating new string/number
+        // literals that the identifier scanner could accidentally pick up. Use processedExpression
+        // (with string literals already removed) so we don't match ctx occurrences inside strings.
+        const ctxMatches = processedExpression.match(/ctx\.[\w.]+/g) || [];
         for (const match of ctxMatches) {
           const propertyPath = match.slice(4); // Remove 'ctx.'
           const value = getNestedValue(context, propertyPath);
-          
-          // Replace with JSON.stringify to handle strings/objects safely
-          processedExpression = processedExpression.replace(
-            match, 
-            JSON.stringify(value)
-          );
+          if (value === undefined) return undefined; // unknown ctx property => undefined result
+          const placeholderIndex = stringLiterals.push(JSON.stringify(value)) - 1;
+          processedExpression = processedExpression.replace(new RegExp(match.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), `<<#${placeholderIndex}#>>`);
         }
-        
+
+        // Replace dotted plain identifiers (e.g. user.age) before single-token identifiers.
+        // The earlier ident regex uses word boundaries which split dotted identifiers, so
+        // we must handle full dotted sequences first.
+        const dottedRegex = /\b[a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)+\b/g;
+        const dottedMatches = processedExpression.match(dottedRegex) || [];
+        for (const match of dottedMatches) {
+          // Skip ctx.* since those were handled above
+          if (match.startsWith('ctx.')) continue;
+          const value = getNestedValue(context, match);
+          if (value === undefined) return undefined;
+          const placeholderIndex = stringLiterals.push(JSON.stringify(value)) - 1;
+          processedExpression = processedExpression.replace(new RegExp(match.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), `<<#${placeholderIndex}#>>`);
+        }
+
+        // Also support plain identifiers (root-level variables like `a`) when present.
+        // Find identifiers (excluding keywords true/false/null) and replace them with values from context.
+        // Note: dotted identifiers were handled above, so this regex intentionally excludes dots.
+        const identRegex = /\b([a-zA-Z_][a-zA-Z0-9_]*)\b/g;
+        let m: RegExpExecArray | null;
+        const seen: Set<string> = new Set();
+        while ((m = identRegex.exec(processedExpression)) !== null) {
+          const ident = m[1];
+          if (['true','false','null','undefined'].includes(ident)) continue;
+          // skip numeric-like (though regex shouldn't match numbers)
+          if (/^[0-9]+$/.test(ident)) continue;
+          // skip 'ctx' itself
+          if (ident === 'ctx') continue;
+          // Avoid re-processing same identifier
+          if (seen.has(ident)) continue;
+          seen.add(ident);
+
+          // If identifier contains '.' try nested lookup
+          const value = getNestedValue(context, ident);
+          if (value === undefined) return undefined; // unknown identifier => undefined
+          // Use a placeholder for the substituted value so we don't introduce new identifiers inside
+          // quotes that could be matched by the ident regex.
+          const repl = JSON.stringify(value);
+          const placeholderIndex = stringLiterals.push(repl) - 1;
+          if (ident.includes('.')) {
+            // dotted identifiers contain '.' which is non-word; do a plain replace
+            processedExpression = processedExpression.replace(new RegExp(ident.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), `<<#${placeholderIndex}#>>`);
+          } else {
+            processedExpression = processedExpression.replace(new RegExp('\\b' + ident.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'g'), `<<#${placeholderIndex}#>>`);
+          }
+        }
+
+        // Restore string literals
+        processedExpression = processedExpression.replace(/<<#(\d+)#>>/g, (_: string, idx: string) => stringLiterals[Number(idx)]);
+
         // Try to evaluate using the internal parser/evaluator which performs strict token validation.
         try {
           return this.evaluateBasicExpression(processedExpression);
