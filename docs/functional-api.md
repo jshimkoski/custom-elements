@@ -1,5 +1,24 @@
 # 🎯 Functional Component API
 
+## Table of Contents
+
+- [✨ Key Features](#✨-key-features)
+- [🚀 Basic Component Structure](#🚀-basic-component-structure)
+- [🔒 Props and Type Safety](#🔒-props-and-type-safety)
+- [🚀 Event Emission](#🚀-event-emission)
+- [🔁 Lifecycle Hooks](#🔁-lifecycle-hooks)
+- [🧬 Reactive State Management](#🧬-reactive-state-management)
+- [🎛️ Directives and Bindings](#🎛️-directives-and-bindings)
+- [🔀 Conditional Rendering and Lists](#🔀-conditional-rendering-and-lists)
+- [🎨 Styling](#🎨-styling)
+- [🔗 Component Communication](#🔗-component-communication)
+- [⚙️ Advanced Configuration](#⚙️-advanced-configuration)
+- [⏳ Async Components](#⏳-async-components)
+- [🧪 Testing Components](#🧪-testing-components)
+- [🎯 Best Practices](#🎯-best-practices)
+- [🔄 Migration from Old API](#🔄-migration-from-old-api)
+- [🎉 Summary](#🎉-summary)
+
 The Custom Elements Runtime provides a powerful, intuitive functional component API that emphasizes simplicity, type safety, and developer ergonomics. This API automatically handles reactive props, type inference, and event emission without requiring complex configuration objects.
 
 ## ✨ Key Features
@@ -73,7 +92,7 @@ All hooks must be called during component render and provide perfect TypeScript 
 - **`useOnAttributeChanged(callback)`**: Set up lifecycle hook for when attributes change
 - **`useOnError(callback)`**: Set up lifecycle hook for error handling
 
-## 🎯 Props and Type Safety
+## 🔒 Props and Type Safety
 
 ### Destructured Props with Defaults
 
@@ -171,7 +190,7 @@ button.addEventListener('button-clicked', (event) => {
 });
 ```
 
-## 🔄 Lifecycle Hooks
+## 🔁 Lifecycle Hooks
 
 The functional API provides lifecycle hooks through context-based hooks, allowing you to respond to component lifecycle events:
 
@@ -284,7 +303,7 @@ component('api-data', ({
 });
 ```
 
-## 🔄 Reactive State Management
+## 🧬 Reactive State Management
 
 ### External State
 
@@ -373,7 +392,7 @@ component('counter', ({
 });
 ```
 
-## 🎨 Directives and Bindings
+## 🎛️ Directives and Bindings
 
 The streamlined API works seamlessly with all existing directives and bindings:
 
@@ -692,7 +711,7 @@ component('focusable-input', ({
 });
 ```
 
-## 🔄 Conditional Rendering and Lists
+## 🔀 Conditional Rendering and Lists
 
 ### Using `when` for Conditional Rendering
 
@@ -1101,7 +1120,7 @@ component('adaptive-card', ({
 });
 ```
 
-#### 🎯 Best Practices
+#### 👍 Best Practices
 
 1. **Use CSS Custom Properties**: For complex themes and design tokens
 2. **Leverage Template Literals**: For dynamic CSS values
@@ -1367,7 +1386,7 @@ component('advanced-component', ({
 });
 ```
 
-## 🔄 Async Components
+## ⏳ Async Components
 
 Handle asynchronous operations seamlessly:
 
