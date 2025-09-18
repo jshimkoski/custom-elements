@@ -66,7 +66,7 @@ component('my-counter', ({ initialCount = 0 }) => {
 Explore the complete documentation for every runtime feature:
 
 ### 🚀 **Getting Started**
-- [**🎯 Streamlined Functional API**](./docs/streamlined-functional-api.md) - **Start here!** Complete guide to the modern functional component API
+- [**🎯 Functional API**](./docs/functional-api.md) - **Start here!** Complete guide to the modern functional component API
 
 ### 🏗️ **Core Features**
 - [🧩 Template](./docs/template.md) - Template syntax and html function

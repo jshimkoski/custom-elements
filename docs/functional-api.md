@@ -1,12 +1,10 @@
-# 🎯 Streamlined Functional Component API
-
-> **New Simplified API** - This document describes the new streamlined functional component API that replaces the previous complex configuration-based approach.
+# 🎯 Functional Component API
 
 The Custom Elements Runtime provides a powerful, intuitive functional component API that emphasizes simplicity, type safety, and developer ergonomics. This API automatically handles reactive props, type inference, and event emission without requiring complex configuration objects.
 
 ## ✨ Key Features
 
-- **🔧 Zero Configuration** - No `defineProps`, `defineEmits`, or config objects needed
+- **🔧 Zero Configuration** - No complex setup required
 - **⚡ Automatic Reactivity** - All props are automatically reactive
 - **🎯 Type Safety** - Full TypeScript inference from function signatures
 - **📦 Destructured Props** - Clean destructuring syntax with default values
