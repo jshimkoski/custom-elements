@@ -14,7 +14,7 @@ The Custom Elements Runtime provides a powerful, intuitive functional component 
 
 ## 🚀 Basic Component Structure
 
-The new API follows a simple, intuitive pattern using context-based hooks:
+The functional API follows a simple, intuitive pattern using context-based hooks:
 
 ```typescript
 import { 
@@ -173,7 +173,7 @@ button.addEventListener('button-clicked', (event) => {
 
 ## 🔄 Lifecycle Hooks
 
-The new API provides lifecycle hooks through context-based hooks, allowing you to respond to component lifecycle events:
+The functional API provides lifecycle hooks through context-based hooks, allowing you to respond to component lifecycle events:
 
 ```typescript
 component('lifecycle-demo', ({
@@ -1332,7 +1332,7 @@ component('notification-center', ({}, { emit }) => {
 
 ### Component with Lifecycle Hooks and Styling
 
-The new functional API uses hooks for all component features:
+The functional API uses hooks for all component features:
 
 ```typescript
 component('advanced-component', ({
@@ -1605,7 +1605,7 @@ component('data-loader', ({ url = '' }: { url?: string }, { emit }) => {
 
 ## 🔄 Migration from Old API
 
-The old configuration-based API has been completely removed in favor of the new streamlined functional API. Here's how the patterns translate:
+The old configuration-based API has been completely removed in favor of the functional API. Here's how the patterns translate:
 
 ### Before (Old Config-Based API - Removed)
 ```typescript
@@ -1619,7 +1619,7 @@ component('my-component', {
 });
 ```
 
-### After (New Functional API)
+### After (Functional API)
 ```typescript
 // ✅ Current streamlined functional API
 component('my-component', ({
