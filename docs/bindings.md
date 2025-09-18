@@ -2,7 +2,7 @@
 
 ## 🧬 Overview
 
-Bindings allow you to connect your component's state, props, and events directly to the DOM. The runtime supports several core binding types that enable reactive, interactive components.
+Bindings allow you to connect your component's refs, props, and events directly to the DOM. The runtime supports several core binding types that enable reactive, interactive components.
 
 ## 🛠️ Supported Bindings
 
@@ -15,7 +15,7 @@ Bindings allow you to connect your component's state, props, and events directly
 
 ## 🏷️ Attribute / Property Binding (`:prop` / `:attr`)
 
-Bind state or props to element attributes or DOM properties. The template syntax `:name` creates a binding; by default the compiler places it on vnode attrs (an HTML attribute). To guarantee a JS property assignment use the `:bind` object form or rely on specific directives (for example `:model` for inputs or the compiler transform for custom elements).
+Bind refs or props to element attributes or DOM properties. The template syntax `:name` creates a binding; by default the compiler places it on vnode attrs (an HTML attribute). To guarantee a JS property assignment use the `:bind` object form or rely on specific directives (for example `:model` for inputs or the compiler transform for custom elements).
 
 ```html
 <input :value="name" />
@@ -52,7 +52,7 @@ Bind event listeners to DOM events.
 <button @click="${increment}">Increment</button>
 ```
 - Use `@eventName` to bind a handler function.
-- Handler can access and update state, props, or call component methods.
+- Handler can access and update refs, props, or call component methods.
 
 ## 🎨 Class Binding (`:class`)
 
@@ -127,7 +127,7 @@ component('style-binding-demo', () => {
 
 ## 🔄 Two-Way Binding (`:model`)
 
-Two-way binding synchronizes form element values with reactive state. The enhanced `:model` directive supports direct binding to reactive state objects in the functional API.
+Two-way binding synchronizes form element values with reactive refs. The enhanced `:model` directive supports direct binding to reactive refs in the functional API.
 
 ### Enhanced Functional API Usage
 
@@ -178,15 +178,15 @@ For custom elements, `:model` follows Vue.js conventions. For detailed informati
 
 ## 🪝 Ref Binding (`:ref`)
 
-Use `:ref` to get direct access to DOM elements in the functional API. Bind a reactive state object directly to `:ref` for automatic element assignment:
+Use `:ref` to get direct access to DOM elements in the functional API. Bind a reactive ref directly to `:ref` for automatic element assignment:
 
 ```typescript
 import { component, html, ref, useOnConnected } from '@jasonshimmy/custom-elements-runtime';
 
 component('ref-example', () => {
-  const inputRef = state<HTMLInputElement | null>(null);
-  const buttonRef = state<HTMLButtonElement | null>(null);
-  
+  const inputRef = ref<HTMLInputElement | null>(null);
+  const buttonRef = ref<HTMLButtonElement | null>(null);
+
   useOnConnected(() => {
     // Elements are automatically assigned to .value
     inputRef.value?.focus();
@@ -203,7 +203,7 @@ component('ref-example', () => {
 
 ### Best Practices
 
-- Initialize ref state as `null` and use proper TypeScript types (e.g., `HTMLInputElement | null`)
+- Initialize refs as `null` and use proper TypeScript types (e.g., `HTMLInputElement | null`)
 - Access refs in lifecycle hooks (`useOnConnected`) to ensure elements are rendered
 - Avoid direct DOM manipulation when possible; prefer declarative updates
 
@@ -222,7 +222,7 @@ component('binding-demo', ({
 }) => {
   const name = ref(initialName);
   const count = ref(initialCount);
-  const inputRef = state<HTMLInputElement | null>(null);
+  const inputRef = ref<HTMLInputElement | null>(null);
   
   return html`
     <div>
@@ -237,10 +237,10 @@ component('binding-demo', ({
 
 ## 🧠 How Bindings Work Internally
 
-- Bindings are parsed by the template compiler and connected to the reactive state
-- Attribute and event bindings update automatically on state changes
-- Two-way bindings use directive handlers that sync DOM values with reactive state
-- All bindings support reactive state objects for automatic dependency tracking
+- Bindings are parsed by the template compiler and connected to the reactive refs
+- Attribute and event bindings update automatically on ref changes
+- Two-way bindings use directive handlers that sync DOM values with reactive refs
+- All bindings support reactive refs for automatic dependency tracking
 
 ## 📝 Tips & Best Practices
 
@@ -259,4 +259,4 @@ component('binding-demo', ({
 
 ## 🏁 Summary
 
-Bindings make your components interactive and reactive. Use attribute, event, and two-way bindings to connect your state and props to the DOM, enabling seamless user experiences and maintainable code.
+Bindings make your components interactive and reactive. Use attribute, event, and two-way bindings to connect your refs and props to the DOM, enabling seamless user experiences and maintainable code.
