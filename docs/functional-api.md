@@ -1120,7 +1120,7 @@ component('adaptive-card', ({
 });
 ```
 
-#### 👍 Best Practices
+#### Styling Best Practices
 
 1. **Use CSS Custom Properties**: For complex themes and design tokens
 2. **Leverage Template Literals**: For dynamic CSS values
