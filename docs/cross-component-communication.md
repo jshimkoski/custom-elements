@@ -111,12 +111,15 @@ For recommended `bubbles: true, composed: true` options and integration tips, se
 ## ❓ FAQ
 
 **Q: When should I use the event bus?**
+
 A: For decoupled, app-wide events or when components do not have a direct parent-child relationship.
 
 **Q: How do I share state between components?**
+
 A: Use the built-in store or pass props for local state.
 
 **Q: Can I use native DOM events?**
+
 A: Yes, for direct communication or integration with other libraries.
 
 ## 🏁 Summary
