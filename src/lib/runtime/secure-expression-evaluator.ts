@@ -17,21 +17,7 @@ interface ExpressionCache {
 class SecureExpressionEvaluator {
   private static cache = new Map<string, ExpressionCache>();
   private static maxCacheSize = 1000;
-  
-  // Allowed identifiers in expressions
-  private static allowedIdentifiers = new Set([
-    'ctx', 'item', 'index', 'key', 'value', 'this'
-  ]);
-  
-  // Allowed operators
-  private static allowedOperators = new Set([
-    '+', '-', '*', '/', '%',
-    '===', '!==', '==', '!=',
-    '>', '<', '>=', '<=',
-    '&&', '||', '!',
-    '?', ':'
-  ]);
-  
+
   // Dangerous patterns to block
   private static dangerousPatterns = [
     /constructor/i,
@@ -114,18 +100,22 @@ class SecureExpressionEvaluator {
       return this.createObjectEvaluator(expression);
     }
     
-    // Handle simple property access
-    if (expression.startsWith('ctx.')) {
-      const propertyPath = expression.slice(4);
+    // Handle simple property access when the entire expression is a single ctx.path
+    if (/^ctx\.[a-zA-Z0-9_\.]+$/.test(expression.trim())) {
+      const propertyPath = expression.trim().slice(4);
       return (context: any) => getNestedValue(context, propertyPath);
     }
     
-    // Handle simple comparisons and logical operations
-    if (this.isSimpleExpression(expression)) {
+    // If expression references `ctx` or contains operators/array/ternary
+    // route it to the internal parser/evaluator which performs proper
+    // token validation and evaluation. This is safer than over-restrictive
+    // pre-validation and fixes cases like ternary, boolean logic, and arrays.
+    if (expression.includes('ctx') || /[+\-*/%<>=&|?:\[\]]/.test(expression)) {
       return this.createSimpleEvaluator(expression);
     }
-    
-    // Fallback to property lookup
+
+    // Fallback to property lookup for plain property paths that don't
+    // include ctx or operators (e.g. "a.b").
     return (context: any) => getNestedValue(context, expression);
   }
   
@@ -174,40 +164,7 @@ class SecureExpressionEvaluator {
     
     return properties;
   }
-  
-  private static isSimpleExpression(expression: string): boolean {
-    // Check if expression contains only allowed patterns
-    const tokens = expression.split(/\s+/);
-    
-    for (const token of tokens) {
-      if (!token) continue;
-      
-      // Check for allowed operators
-      if (this.allowedOperators.has(token)) continue;
-      
-      // Check for numbers
-      if (!isNaN(Number(token))) continue;
-      
-      // Check for boolean literals
-      if (token === 'true' || token === 'false') continue;
-      
-      // Check for string literals
-      if ((token.startsWith('"') && token.endsWith('"')) ||
-          (token.startsWith("'") && token.endsWith("'"))) continue;
-      
-      // Check for property access
-      if (token.startsWith('ctx.')) continue;
-      
-      // Check for allowed identifiers
-      if (this.allowedIdentifiers.has(token)) continue;
-      
-      // If we get here, the token is not allowed
-      return false;
-    }
-    
-    return true;
-  }
-  
+
   private static createSimpleEvaluator(expression: string): (context: any) => any {
     // For simple expressions, we'll use a basic substitution approach
     return (context: any) => {
@@ -229,24 +186,216 @@ class SecureExpressionEvaluator {
           );
         }
         
-        // Only allow very basic expressions at this point
-        // This is still safer than arbitrary Function() evaluation
-        if (this.isBasicEvalSafe(processedExpression)) {
-          return eval(processedExpression);
+        // Try to evaluate using the internal parser/evaluator which performs strict token validation.
+        try {
+          return this.evaluateBasicExpression(processedExpression);
+        } catch (err) {
+          return undefined;
         }
-        
-        return undefined;
       } catch (error) {
         return undefined;
       }
     };
   }
-  
-  private static isBasicEvalSafe(expression: string): boolean {
-    // Only allow very basic operations after substitution
-    const allowedPattern = /^[\d\s+\-*/%()===!==<>=&|?:'"true false,\[\]{}\.]+$/;
-    return allowedPattern.test(expression) && 
-           !this.hasDangerousPatterns(expression);
+
+  /**
+   * Evaluate a very small, safe expression grammar without using eval/Function.
+   * Supports: numbers, string literals, true/false, null, arrays, unary !,
+   * arithmetic (+ - * / %), comparisons, logical && and ||, parentheses, and ternary `a ? b : c`.
+   */
+  private static evaluateBasicExpression(expr: string): any {
+    const tokens = this.tokenize(expr);
+    let pos = 0;
+
+    function peek(): any {
+      return tokens[pos];
+    }
+    function consume(expected?: string): any {
+      const t = tokens[pos++];
+      if (expected && !t) {
+        throw new Error(`Unexpected token EOF, expected ${expected}`);
+      }
+      if (expected && t) {
+        // Allow matching by token type (e.g. 'OP', 'NUMBER') or by exact token value (e.g. '?', ':')
+        if (t.type !== expected && t.value !== expected) {
+          throw new Error(`Unexpected token ${t.type}/${t.value}, expected ${expected}`);
+        }
+      }
+      return t;
+    }
+
+    // Grammar (precedence):
+    // expression := ternary
+    // ternary := logical_or ( '?' expression ':' expression )?
+    // logical_or := logical_and ( '||' logical_and )*
+    // logical_and := equality ( '&&' equality )*
+    // equality := comparison ( ('==' | '!=' | '===' | '!==') comparison )*
+    // comparison := additive ( ('>' | '<' | '>=' | '<=') additive )*
+    // additive := multiplicative ( ('+'|'-') multiplicative )*
+    // multiplicative := unary ( ('*'|'/'|'%') unary )*
+    // unary := ('!' | '-') unary | primary
+    // primary := number | string | true | false | null | array | '(' expression ')'
+
+    function parseExpression(): any {
+      return parseTernary();
+    }
+
+    function parseTernary(): any {
+      let cond = parseLogicalOr();
+      if (peek() && peek().value === '?') {
+        consume('?');
+        const thenExpr = parseExpression();
+        consume(':');
+        const elseExpr = parseExpression();
+        return cond ? thenExpr : elseExpr;
+      }
+      return cond;
+    }
+
+    function parseLogicalOr(): any {
+      let left = parseLogicalAnd();
+      while (peek() && peek().value === '||') {
+        consume('OP');
+        const right = parseLogicalAnd();
+        left = left || right;
+      }
+      return left;
+    }
+
+    function parseLogicalAnd(): any {
+      let left = parseEquality();
+      while (peek() && peek().value === '&&') {
+        consume('OP');
+        const right = parseEquality();
+        left = left && right;
+      }
+      return left;
+    }
+
+    function parseEquality(): any {
+      let left = parseComparison();
+      while (peek() && ['==','!=','===','!=='].includes(peek().value)) {
+        const op = consume('OP').value;
+        const right = parseComparison();
+        switch (op) {
+          case '==': left = left == right; break;
+          case '!=': left = left != right; break;
+          case '===': left = left === right; break;
+          case '!==': left = left !== right; break;
+        }
+      }
+      return left;
+    }
+
+    function parseComparison(): any {
+      let left = parseAdditive();
+      while (peek() && ['>','<','>=','<='].includes(peek().value)) {
+        const op = consume('OP').value;
+        const right = parseAdditive();
+        switch (op) {
+          case '>': left = left > right; break;
+          case '<': left = left < right; break;
+          case '>=': left = left >= right; break;
+          case '<=': left = left <= right; break;
+        }
+      }
+      return left;
+    }
+
+    function parseAdditive(): any {
+      let left = parseMultiplicative();
+      while (peek() && (peek().value === '+' || peek().value === '-')) {
+        const op = consume('OP').value;
+        const right = parseMultiplicative();
+        left = op === '+' ? left + right : left - right;
+      }
+      return left;
+    }
+
+    function parseMultiplicative(): any {
+      let left = parseUnary();
+      while (peek() && (peek().value === '*' || peek().value === '/' || peek().value === '%')) {
+        const op = consume('OP').value;
+        const right = parseUnary();
+        switch (op) {
+          case '*': left = left * right; break;
+          case '/': left = left / right; break;
+          case '%': left = left % right; break;
+        }
+      }
+      return left;
+    }
+
+    function parseUnary(): any {
+      if (peek() && peek().value === '!') {
+        consume('OP');
+        return !parseUnary();
+      }
+      if (peek() && peek().value === '-') {
+        consume('OP');
+        return -parseUnary();
+      }
+      return parsePrimary();
+    }
+
+    function parsePrimary(): any {
+      const t = peek();
+      if (!t) return undefined;
+      if (t.type === 'NUMBER') {
+        consume('NUMBER');
+        return Number(t.value);
+      }
+      if (t.type === 'STRING') {
+        consume('STRING');
+        // strip quotes
+        return t.value.slice(1, -1);
+      }
+      if (t.type === 'IDENT') {
+        consume('IDENT');
+        if (t.value === 'true') return true;
+        if (t.value === 'false') return false;
+        if (t.value === 'null') return null;
+        // fallback: try parse as JSON-ish literal or undefined
+        return undefined;
+      }
+      if (t.value === '[') {
+        consume('PUNC');
+        const arr: any[] = [];
+        while (peek() && peek().value !== ']') {
+          arr.push(parseExpression());
+          if (peek() && peek().value === ',') consume('PUNC');
+        }
+        consume('PUNC'); // ]
+        return arr;
+      }
+      if (t.value === '(') {
+        consume('PUNC');
+        const v = parseExpression();
+        consume('PUNC'); // )
+        return v;
+      }
+      // Unknown primary
+      throw new Error('Unexpected token in expression');
+    }
+
+    const result = parseExpression();
+    return result;
+  }
+
+  private static tokenize(input: string): Array<{ type: string; value: string }> {
+    const tokens: Array<{ type: string; value: string }> = [];
+    const re = /\s*(=>|===|!==|==|!=|>=|<=|\|\||&&|[()?:,\[\]]|\+|-|\*|\/|%|>|<|!|\d+\.?\d*|"[^"]*"|'[^']*'|[a-zA-Z_][a-zA-Z0-9_]*|\S)\s*/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(input)) !== null) {
+      const raw = m[1];
+      if (!raw) continue;
+      if (/^\d/.test(raw)) tokens.push({ type: 'NUMBER', value: raw });
+      else if (/^"/.test(raw) || /^'/.test(raw)) tokens.push({ type: 'STRING', value: raw });
+      else if (/^[a-zA-Z_]/.test(raw)) tokens.push({ type: 'IDENT', value: raw });
+      else if (/^[()?:,\[\]]$/.test(raw)) tokens.push({ type: 'PUNC', value: raw });
+      else tokens.push({ type: 'OP', value: raw });
+    }
+    return tokens;
   }
   
   private static evaluateSimpleValue(value: string, context: any): any {

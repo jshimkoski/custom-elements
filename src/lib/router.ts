@@ -245,7 +245,10 @@ export function useRouter(config: RouterConfig) {
     }
   };
 
-  if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+  // If an explicit `initialUrl` is provided we treat this as SSR/static rendering
+  // even if a `window` exists (useful for hydration tests). Browser mode only
+  // applies when `initialUrl` is undefined.
+  if (typeof window !== 'undefined' && typeof document !== 'undefined' && typeof initialUrl === 'undefined') {
     // Browser mode
     getLocation = () => {
       const url = new URL(window.location.href);
