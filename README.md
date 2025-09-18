@@ -26,19 +26,20 @@ Build modern components with strict TypeScript, zero dependencies, and a clean f
 ```ts
 import { component, ref, html, useEmit } from '@jasonshimmy/custom-elements-runtime';
 
-component('my-counter', ({ initialCount = 0 }: { initialCount?: number }) => {
+component('my-counter', ({ initialCount = 0 }) => {
   const count = ref(initialCount);
   const emit = useEmit();
-  
+
   const handleClick = () => {
     count.value++;
-    emit('count-changed', { count: count.value });
+    emit('update:initial-count', { count: count.value });
   };
-  
+
   return html`
     <button
+      type="button"
       class="px-4 py-2 bg-blue-500 text-white rounded"
-      @click="${handleClick}"
+      @click.prevent="${handleClick}"
     >
       Count: ${count.value}
     </button>
@@ -47,7 +48,16 @@ component('my-counter', ({ initialCount = 0 }: { initialCount?: number }) => {
 ```
 3. **Use in HTML:**
   ```html
-  <my-counter initial-count="5"></my-counter>
+  <my-counter
+    initial-count="5"
+    @update:initial-count="handleCountUpdate"
+  ></my-counter>
+
+  <script>
+  function handleCountUpdate(event) {
+    console.log('Count updated to:', event.detail.count);
+  }
+  </script>
   ```
 4. **Enjoy instant reactivity and type safety!**
 
