@@ -310,6 +310,8 @@ export const utilityMap: CSSMap = {
   "h-screen": "height:100dvw;",
   "max-w-full": "max-width:100%;",
   "max-h-full": "max-height:100%;",
+  "max-w-screen": "max-width:100dvw;",
+  "max-h-screen": "max-height:100dvh;",
   "min-w-0": "min-width:0;",
   "min-h-0": "min-height:0;",
   ...generateSemanticSizeClasses(),
