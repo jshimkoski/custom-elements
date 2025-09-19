@@ -237,6 +237,62 @@ export const colors: Record<string, Record<string, string>> =
     ])
   );
 
+export const spacing = "0.25rem";
+
+const semanticSizes: Record<string, number> = {
+  // Tailwind container widths
+  // 3xs: 16rem  => 16 / 0.25 = 64
+  "3xs": 64,
+  // 2xs: 18rem => 72
+  "2xs": 72,
+  // xs: 20rem => 80
+  "xs": 80,
+  // sm: 24rem => 96
+  "sm": 96,
+  // md: 28rem => 112
+  "md": 112,
+  // lg: 32rem => 128
+  "lg": 128,
+  // xl: 36rem => 144
+  "xl": 144,
+  // 2xl: 42rem => 168
+  "2xl": 168,
+  // 3xl: 48rem => 192
+  "3xl": 192,
+  // 4xl: 56rem => 224
+  "4xl": 224,
+  // 5xl: 64rem => 256
+  "5xl": 256,
+  // 6xl: 72rem => 288
+  "6xl": 288,
+  // 7xl: 80rem => 320
+  "7xl": 320
+};
+
+const generateSemanticSizeClasses = (): CSSMap => {
+  const classes: CSSMap = {};
+  for (const [key, value] of Object.entries(semanticSizes)) {
+    classes[`max-w-${key}`] = `max-width:calc(${spacing} * ${value});`;
+    classes[`min-w-${key}`] = `min-width:calc(${spacing} * ${value});`;
+    classes[`w-${key}`] = `width:calc(${spacing} * ${value});`;
+    classes[`max-h-${key}`] = `max-height:calc(${spacing} * ${value});`;
+    classes[`min-h-${key}`] = `min-height:calc(${spacing} * ${value});`;
+    classes[`h-${key}`] = `height:calc(${spacing} * ${value});`;
+  }
+  return classes;
+};
+
+const generateGridClasses = (): CSSMap => {
+  const classes: CSSMap = {};
+  for (const key of [1,2,3,4,5,6,7,8,9,10,11,12]) {
+    classes[`grid-cols-${key}`] = `grid-template-columns:repeat(${key},minmax(0,1fr));`;
+    classes[`grid-rows-${key}`] = `grid-template-rows:repeat(${key},minmax(0,1fr));`;
+    classes[`col-span-${key}`] = `grid-column:span ${key} / span ${key};`;
+    classes[`row-span-${key}`] = `grid-row:span ${key} / span ${key};`;
+  }
+  return classes;
+};
+
 export const utilityMap: CSSMap = {
   /* Display */
   block: "display:block;",
@@ -256,6 +312,7 @@ export const utilityMap: CSSMap = {
   "max-h-full": "max-height:100%;",
   "min-w-0": "min-width:0;",
   "min-h-0": "min-height:0;",
+  ...generateSemanticSizeClasses(),
   "m-auto": "margin:auto;",
   "mx-auto": "margin-inline:auto;",
   "my-auto": "margin-block:auto;",
@@ -274,56 +331,8 @@ export const utilityMap: CSSMap = {
   "sr-only": "position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border-width:0;",
   "not-sr-only": "position:static;width:auto;height:auto;padding:0;margin:0;overflow:visible;clip:auto;white-space:normal;",
 
-  /* Grid Layout */
-  "grid-cols-1": "grid-template-columns:repeat(1,minmax(0,1fr));",
-  "grid-cols-2": "grid-template-columns:repeat(2,minmax(0,1fr));",
-  "grid-cols-3": "grid-template-columns:repeat(3,minmax(0,1fr));",
-  "grid-cols-4": "grid-template-columns:repeat(4,minmax(0,1fr));",
-  "grid-cols-5": "grid-template-columns:repeat(5,minmax(0,1fr));",
-  "grid-cols-6": "grid-template-columns:repeat(6,minmax(0,1fr));",
-  "grid-cols-7": "grid-template-columns:repeat(7,minmax(0,1fr));",
-  "grid-cols-8": "grid-template-columns:repeat(8,minmax(0,1fr));",
-  "grid-cols-9": "grid-template-columns:repeat(9,minmax(0,1fr));",
-  "grid-cols-10": "grid-template-columns:repeat(10,minmax(0,1fr));",
-  "grid-cols-11": "grid-template-columns:repeat(11,minmax(0,1fr));",
-  "grid-cols-12": "grid-template-columns:repeat(12,minmax(0,1fr));",
-  "grid-rows-1": "grid-template-rows:repeat(1,minmax(0,1fr));",
-  "grid-rows-2": "grid-template-rows:repeat(2,minmax(0,1fr));",
-  "grid-rows-3": "grid-template-rows:repeat(3,minmax(0,1fr));",
-  "grid-rows-4": "grid-template-rows:repeat(4,minmax(0,1fr));",
-  "grid-rows-5": "grid-template-rows:repeat(5,minmax(0,1fr));",
-  "grid-rows-6": "grid-template-rows:repeat(6,minmax(0,1fr));",
-  "grid-rows-7": "grid-template-rows:repeat(7,minmax(0,1fr));",
-  "grid-rows-8": "grid-template-rows:repeat(8,minmax(0,1fr));",
-  "grid-rows-9": "grid-template-rows:repeat(9,minmax(0,1fr));",
-  "grid-rows-10": "grid-template-rows:repeat(10,minmax(0,1fr));",
-  "grid-rows-11": "grid-template-rows:repeat(11,minmax(0,1fr));",
-  "grid-rows-12": "grid-template-rows:repeat(12,minmax(0,1fr));",
-
-  /* Grid Placement */
-  "col-span-1": "grid-column:span 1 / span 1;",
-  "col-span-2": "grid-column:span 2 / span 2;",
-  "col-span-3": "grid-column:span 3 / span 3;",
-  "col-span-4": "grid-column:span 4 / span 4;",
-  "col-span-5": "grid-column:span 5 / span 5;",
-  "col-span-6": "grid-column:span 6 / span 6;",
-  "col-span-7": "grid-column:span 7 / span 7;",
-  "col-span-8": "grid-column:span 8 / span 8;",
-  "col-span-9": "grid-column:span 9 / span 9;",
-  "col-span-10": "grid-column:span 10 / span 10;",
-  "col-span-11": "grid-column:span 11 / span 11;",
-  "col-span-12": "grid-column:span 12 / span 12;",
-  "row-span-1": "grid-row:span 1 / span 1;",
-  "row-span-2": "grid-row:span 2 / span 2;",
-  "row-span-3": "grid-row:span 3 / span 3;",
-  "row-span-4": "grid-row:span 4 / span 4;",
-  "row-span-6": "grid-row:span 6 / span 6;",
-  "row-span-7": "grid-row:span 7 / span 7;",
-  "row-span-8": "grid-row:span 8 / span 8;",
-  "row-span-9": "grid-row:span 9 / span 9;",
-  "row-span-10": "grid-row:span 10 / span 10;",
-  "row-span-11": "grid-row:span 11 / span 11;",
-  "row-span-12": "grid-row:span 12 / span 12;",
+  /* Grid Layout & Placement */
+  ...generateGridClasses(),
 
   /* Positioning */
   absolute: "position:absolute;",
@@ -471,8 +480,6 @@ export const utilityMap: CSSMap = {
   "z-40": "z-index:40;",
   "z-50": "z-index:50;",
 };
-
-export const spacing = "0.25rem";
 
 export const spacingProps: Record<string, string[]> = {
   m: ["margin"],
@@ -729,6 +736,8 @@ export function parseArbitrary(className: string): string | null {
       "border-r": "border-right",
       "border-x": "border-inline",
       "border-y": "border-block",
+      "grid-cols": "grid-template-columns",
+      "grid-rows": "grid-template-rows",
       transition: "transition-property",
       ease: "transition-timing-function",
       delay: "transition-delay",

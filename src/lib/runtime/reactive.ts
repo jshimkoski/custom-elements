@@ -167,6 +167,16 @@ export class ReactiveState<T> {
 
   constructor(initialValue: T) {
     this._value = this.makeReactive(initialValue);
+    // Mark instances with a stable cross-bundle symbol so other modules
+    // can reliably detect ReactiveState objects even when classes are
+    // renamed/minified or when multiple copies of the package exist.
+    try {
+      // Use a global symbol key to make it resilient across realms/bundles
+      const key = Symbol.for('@cer/ReactiveState');
+      Object.defineProperty(this, key, { value: true, enumerable: false, configurable: false });
+    } catch (e) {
+      // ignore if Symbol.for or defineProperty fails in exotic runtimes
+    }
   }
 
   get value(): T {
@@ -243,6 +253,27 @@ export class ReactiveState<T> {
  */
 export function ref<T = null>(initialValue?: T): ReactiveState<T extends undefined ? null : T> {
   return reactiveSystem.getOrCreateState(initialValue === undefined ? null as any : initialValue);
+}
+
+/**
+ * Type guard to detect ReactiveState instances in a robust way that works
+ * across bundlers, minifiers, and multiple package copies.
+ */
+export function isReactiveState(v: any): v is ReactiveState<any> {
+  if (!v || typeof v !== 'object') return false;
+  try {
+    const key = Symbol.for('@cer/ReactiveState');
+    if (v[key]) return true;
+  } catch (e) {
+    // ignore and fall back
+  }
+
+  // Fallback for test doubles or environments without symbol tagging
+  try {
+    return !!(v.constructor && v.constructor.name === 'ReactiveState');
+  } catch (e) {
+    return false;
+  }
 }
 
 /**

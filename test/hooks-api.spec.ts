@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { component, html, useEmit, useOnConnected, useOnDisconnected, useOnAttributeChanged, useOnError } from '../src/lib';
+import { component, html, useEmit, useOnConnected, useOnDisconnected, useOnAttributeChanged, useOnError, ref, computed, css, useStyle } from '../src/lib';
 
 let container: HTMLElement;
 
@@ -58,6 +58,31 @@ describe('🎣 Context-Based Hooks API', () => {
 
     expect(connectedCalled).toBe(true);
     expect(connectedMessage).toBe('Hi from onConnected!');
+  });
+
+  it('should have :ref available inside useOnConnected', async () => {
+    let seenEl: HTMLElement | null = null;
+
+    component('test-ref-in-connected', () => {
+      const headerEl = ref<HTMLElement | null>(null);
+
+      useOnConnected(() => {
+        // The ref should be assigned by the time onConnected is invoked
+        // according to the expected behavior under test
+        seenEl = headerEl.value;
+      });
+
+      return html`
+        <header :ref="${headerEl}">Header</header>
+      `;
+    });
+
+    container.innerHTML = '<test-ref-in-connected></test-ref-in-connected>';
+    // Allow renderer to run and lifecycle to settle
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(seenEl).toBeTruthy();
+    expect(seenEl!.tagName).toBe('HEADER');
   });
 
   it('should call useOnDisconnected hook when component disconnects', async () => {
@@ -290,5 +315,41 @@ describe('🎣 Context-Based Hooks API', () => {
     await new Promise(resolve => setTimeout(resolve, 50));
 
     expect(simpleConnected).toBe(true);
+  });
+
+  it('docs-layout should have header ref in useOnConnected (computed/useStyle)', async () => {
+    let seen: HTMLElement | null = null;
+
+    component('test-docs-layout', ({ variant = 'margined' }: { variant?: 'fullwidth' | 'margined' }) => {
+      const headerEl = ref<HTMLElement | null>(null);
+      const width = ref(0);
+      const height = ref(0);
+
+      useOnConnected(() => {
+        // capture the ref value inside connected
+        seen = headerEl.value;
+        if (!headerEl.value) return;
+        // dummy observer start (no-op) to simulate useElementSize
+        // In production we'd call useElementSize(headerEl.value, ...)
+      });
+
+      const heightPx = computed(() => `${height.value + 1}px`);
+
+      useStyle(() => css`
+        .sticky-to-header { position: sticky; height: calc(100dvh - ${heightPx.value}); top: ${heightPx.value}; }
+      `);
+
+      return html`
+        <header :ref="${headerEl}">
+          <div :class="{ 'max-w-[80rem]': ${variant !== 'fullwidth'} }">${width.value}px x ${height.value}px</div>
+        </header>
+      `;
+    });
+
+    container.innerHTML = '<test-docs-layout></test-docs-layout>';
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(seen).toBeTruthy();
+    expect(seen!.tagName).toBe('HEADER');
   });
 });

@@ -8,6 +8,7 @@ import type { VNode, VDomRefs, AnchorBlockVNode } from "./types";
 import { escapeHTML, getNestedValue, setNestedValue, toKebab, toCamel } from "./helpers";
 import { SecureExpressionEvaluator } from "./secure-expression-evaluator";
 import { EventManager } from "./event-manager";
+import { isReactiveState } from "./reactive";
 
 /**
  * Recursively clean up refs and event listeners for all descendants of a node
@@ -645,7 +646,7 @@ export function processRefDirective(
   }
   
   // Support both reactive state objects (functional API) and string refs (legacy)
-  if (resolvedValue && typeof resolvedValue === 'object' && resolvedValue.constructor?.name === 'ReactiveState') {
+  if (isReactiveState(resolvedValue)) {
     // For reactive state objects, store the reactive state object itself as the ref
     // The VDOM renderer will handle setting the value
     props.reactiveRef = resolvedValue;
@@ -904,10 +905,10 @@ export function patchProps(
     let oldUnwrapped = oldVal;
     let newUnwrapped = newVal;
     
-    if (oldVal && typeof oldVal === 'object' && oldVal.constructor?.name === 'ReactiveState') {
+    if (isReactiveState(oldVal)) {
       oldUnwrapped = oldVal.value; // This triggers dependency tracking
     }
-    if (newVal && typeof newVal === 'object' && newVal.constructor?.name === 'ReactiveState') {
+    if (isReactiveState(newVal)) {
       newUnwrapped = newVal.value; // This triggers dependency tracking
     }
     
