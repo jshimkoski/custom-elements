@@ -97,11 +97,13 @@ export function escapeHTML(str: string | number | boolean): string | number | bo
 /**
  * Get nested property value from object using dot notation
  */
+import { isReactiveState } from "./reactive";
+
 export function getNestedValue(obj: any, path: string): any {
   if (typeof path === "string") {
     const result = path.split(".").reduce((current, key) => current?.[key], obj);
     // If the result is a ReactiveState object, return its value
-    if (result && typeof result === 'object' && result.constructor && result.constructor.name === 'ReactiveState') {
+    if (isReactiveState(result)) {
       return result.value;
     }
     return result;
@@ -122,8 +124,7 @@ export function setNestedValue(obj: any, path: string, value: any): void {
   }, obj);
   
   // If target[lastKey] is a ReactiveState object, set its value property
-  if (target[lastKey] && typeof target[lastKey] === 'object' && 
-      target[lastKey].constructor && target[lastKey].constructor.name === 'ReactiveState') {
+  if (isReactiveState(target[lastKey])) {
     target[lastKey].value = value;
   } else {
     target[lastKey] = value;

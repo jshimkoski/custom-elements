@@ -1,6 +1,7 @@
 import type { VNode } from "./types";
 import { contextStack } from "./render";
 import { toKebab, getNestedValue, setNestedValue } from "./helpers";
+import { isReactiveState } from "./reactive";
 
 // Strict LRU cache helper for fully static templates (no interpolations, no context)
 class LRUCache<K, V> {
@@ -156,7 +157,7 @@ export function parseProps(
       } else {
         // Unwrap reactive state objects for bound attributes
         let attrValue = value;
-        if (attrValue && typeof attrValue === 'object' && attrValue.constructor?.name === 'ReactiveState') {
+        if (attrValue && isReactiveState(attrValue)) {
           attrValue = (attrValue as any).value; // This triggers dependency tracking
         }
         attrs[rawName] = attrValue;
@@ -473,7 +474,7 @@ export function htmlImpl(
             if (boundList && boundList.includes(propName) && propName in vnodeProps.attrs && !(vnodeProps.props && propName in vnodeProps.props)) {
               let attrValue = vnodeProps.attrs[propName];
               // Unwrap reactive state objects during promotion
-              if (attrValue && typeof attrValue === 'object' && attrValue.constructor?.name === 'ReactiveState') {
+              if (attrValue && isReactiveState(attrValue)) {
                 attrValue = (attrValue as any).value; // This triggers dependency tracking
               }
               vnodeProps.props[propName] = attrValue;
@@ -496,7 +497,7 @@ export function htmlImpl(
                 const camel = b.includes('-') ? b.split('-').map((s, i) => i === 0 ? s : s.charAt(0).toUpperCase() + s.slice(1)).join('') : b;
                 let attrValue = vnodeProps.attrs[b];
                 // Unwrap reactive state objects during promotion
-                if (attrValue && typeof attrValue === 'object' && attrValue.constructor?.name === 'ReactiveState') {
+                if (attrValue && isReactiveState(attrValue)) {
                   attrValue = (attrValue as any).value; // This triggers dependency tracking
                 }
                 vnodeProps.props[camel] = attrValue;
@@ -553,7 +554,7 @@ export function htmlImpl(
               } else {
                 initial = modelVal;
                 // Unwrap reactive state objects
-                if (initial && typeof initial === 'object' && initial.constructor?.name === 'ReactiveState') {
+                if (initial && isReactiveState(initial)) {
                   initial = (initial as any).value; // This triggers dependency tracking
                 }
               }
@@ -580,7 +581,7 @@ export function htmlImpl(
                 if (!actualState) return;
                 
                 // Handle reactive state objects (functional API)
-                if (modelVal && typeof modelVal === 'object' && modelVal.constructor?.name === 'ReactiveState') {
+                if (modelVal && isReactiveState(modelVal)) {
                   const current = modelVal.value;
                   const changed = Array.isArray(newVal) && Array.isArray(current)
                     ? JSON.stringify([...newVal].sort()) !== JSON.stringify([...current].sort())
