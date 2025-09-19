@@ -1,48 +1,37 @@
 import { describe, it, expect } from 'vitest';
-import { component } from '../src/lib/runtime/component';
-import { html } from '../src/lib/runtime/template-compiler';
-import { renderComponent } from '../src/lib/runtime/render';
+import { component, html, ref } from '../src/lib/index';
 
 describe('smoke: VDOM -> custom element mounting', () => {
   it('mounts a canonicalized hyphenated tag and applies props', async () => {
-    // Register a simple child component that declares a prop and renders it
-    component('smoke-child', (ctx: any) => html`<div id="val">${ctx.modelValue}</div>`, {
-      props: { modelValue: { type: String } },
-      state: { modelValue: 'initial' }
+    // Register a simple child component that accepts modelValue prop and renders it
+    component('smoke-child', ({ modelValue = 'initial' } = {}) => {
+      console.log('smoke-child received modelValue:', modelValue);
+      return html`<div id="val">${modelValue}</div>`;
     });
 
-    // Parent component that uses the hyphenated tag with :model
-    const parentCfg = {
-      render(ctx: any) {
-        return html`<smoke-child :model="foo" />`;
-      },
-      state: { foo: 'parent-value' }
-    } as any;
+    // Register parent component that uses the child with prop binding
+    component('smoke-parent', () => {
+      const foo = ref('parent-value');
+      console.log('smoke-parent state value:', foo.value);
+      return html`<smoke-child model-value="${foo.value}" />`;
+    });
 
-    // Create host and shadow root to render parent output
-    const host = document.createElement('div');
-    const shadowRoot = host.attachShadow({ mode: 'open' });
-
-    // Minimal context for renderComponent
-    const context = { _state: parentCfg.state, isLoading: false, hasError: false } as any;
-    const refs: any = {};
-    let htmlString = '';
-    const setHtmlString = (s: string) => (htmlString = s);
-    const setLoading = () => {};
-    const setError = () => {};
-    const applyStyle = () => {};
-
-    // Render the parent which should create the <smoke-child> element in the shadowRoot
-    renderComponent(shadowRoot, parentCfg, context, refs, setHtmlString, setLoading, setError, applyStyle);
-
+    // Create the parent element and wait for it to render
+    const parent = document.createElement('smoke-parent');
+    document.body.appendChild(parent);
+    
     // Wait briefly to allow custom element lifecycle to run
-    await new Promise((r) => setTimeout(r, 10));
+    await new Promise((r) => setTimeout(r, 100));
 
-    const child = shadowRoot.querySelector('smoke-child') as HTMLElement | null;
+    const child = parent.shadowRoot?.querySelector('smoke-child') as HTMLElement | null;
     expect(child).toBeTruthy();
+    
     // Its shadowRoot should contain the div with the parent's state value
     const inner = child?.shadowRoot?.querySelector('#val');
     expect(inner).toBeTruthy();
     expect((inner as HTMLElement).textContent).toBe('parent-value');
+    
+    // Cleanup
+    document.body.removeChild(parent);
   });
 });

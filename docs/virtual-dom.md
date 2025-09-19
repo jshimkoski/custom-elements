@@ -19,7 +19,7 @@ The Virtual DOM (VDOM) is a lightweight, in-memory representation of the real DO
 ## 🧱 VNode Structure
 
 A VNode typically includes:
-- `type`: Element tag name or special type (e.g., text, fragment)
+- `tag`: Element tag name or special type (e.g., text, fragment)
 - `props`: Attributes, event listeners, and bindings
 - `children`: Array of child VNodes
 - `key`: Optional, for efficient list diffing
@@ -27,11 +27,11 @@ A VNode typically includes:
 **Example:**
 ```typescript
 const vnode = {
-  type: "div",
+  tag: "div",
   props: { class: "container" },
   children: [
-    { type: "span", props: {}, children: ["Hello!"] },
-    { type: "button", props: { onClick: handleClick }, children: ["Click"] }
+    { tag: "span", props: {}, children: ["Hello!"] },
+    { tag: "button", props: { onClick: handleClick }, children: ["Click"] }
   ]
 };
 ```
@@ -48,7 +48,8 @@ const vnode = {
 vdomRenderer(
   shadowRoot,
   [vnode],
-  ctx // usually your component state
+  context, // optional context object
+  refs     // optional refs object
 );
 ```
 
@@ -85,16 +86,16 @@ vdomRenderer(
 ```typescript
 const items = ["Apple", "Banana", "Cherry"];
 const vnode = {
-  type: "ul",
+  tag: "ul",
   props: {},
   children: items.map((item, i) => ({
-    type: "li",
+    tag: "li",
     key: item,
     props: {},
     children: [item]
   }))
 };
-vdomRenderer(shadowRoot, [vnode], ctx);
+vdomRenderer(shadowRoot, [vnode], context);
 ```
 
 ## 🧩 Internal API Reference
@@ -118,4 +119,4 @@ A: Error boundaries in the runtime catch and handle rendering errors gracefully.
 
 The Virtual DOM is the backbone of efficient, declarative UI updates in the custom elements runtime. It enables fast rendering, minimal DOM changes, and a developer-friendly API for building modern web components.
 
-For more details, see the source code in `src/lib/vdom.ts` and explore the examples in the documentation.
+For more details, see the source code in `src/lib/runtime/vdom.ts` and explore the examples in the documentation.

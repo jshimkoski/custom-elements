@@ -9,7 +9,7 @@ The `html` template function lets you write declarative, type-safe templates for
 ## 🚀 Importing
 
 ```ts
-import { html } from '@jasonshimmy/custom-elements-runtime';
+import { html, useEmit } from '@jasonshimmy/custom-elements-runtime';
 ```
 
 ## 🏗️ Basic Usage
@@ -17,7 +17,9 @@ import { html } from '@jasonshimmy/custom-elements-runtime';
 Write templates using tagged template literals:
 
 ```ts
-render: (ctx) => html`<h1>Hello, ${ctx.name}!</h1>`
+component('my-component', ({ name = 'World' }) => {
+  return html`<h1>Hello, ${name}!</h1>`;
+});
 ```
 
 ## 🧩 Embedding Directives
@@ -37,10 +39,18 @@ html`
 Bind attributes and events directly in your template:
 
 ```ts
-html`
-  <input :value="count" :disabled="isLoading" />
-  <button @click="${() => ctx.count++}">Increment</button>
-`
+component('interactive-component', ({ count = 0, isLoading = false }) => {
+  const emit = useEmit();
+  
+  const increment = () => {
+    emit('count-changed', count + 1);
+  };
+  
+  return html`
+    <input :value="${count}" :disabled="${isLoading}" />
+    <button @click="${increment}">Increment</button>
+  `;
+});
 ```
 
 ## 🔗 Two-way Binding
@@ -48,9 +58,16 @@ html`
 Sync input values with state using `:model`:
 
 ```ts
-html`
-  <input :model="count" type="number" />
-`
+import { ref } from '@jasonshimmy/custom-elements-runtime';
+
+component('form-component', () => {
+  const inputValue = ref('');
+  
+  return html`
+    <input :model="${inputValue}" type="text" />
+    <p>Current value: ${inputValue.value}</p>
+  `;
+});
 ```
 
 ## 🧬 Dynamic Content
@@ -58,10 +75,16 @@ html`
 Templates can include any dynamic value, including computed properties and store values:
 
 ```ts
-html`
-  <span>${ctx.doubled}</span>
-  <span>${store.theme}</span>
-`
+component('dynamic-component', ({ multiplier = 2 }) => {
+  const baseValue = ref(5);
+  const doubled = computed(() => baseValue.value * multiplier);
+  
+  return html`
+    <span>Base: ${baseValue.value}</span>
+    <span>Doubled: ${doubled.value}</span>
+    <span>Theme: ${store.getState().theme}</span>
+  `;
+});
 ```
 
 ## 🧩 Nesting & Composition

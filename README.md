@@ -24,72 +24,83 @@ Build modern components with strict TypeScript, zero dependencies, and a clean f
 1. **Install:** `npm install @jasonshimmy/custom-elements-runtime`
 2. **Create a Component:**
 ```ts
-import { component, html } from '@jasonshimmy/custom-elements-runtime';
+import { component, ref, html, useEmit } from '@jasonshimmy/custom-elements-runtime';
 
-component('my-counter', (ctx) => html`
-  <button
-    class="px-4 py-2 bg-blue-500 text-white rounded"
-    @click="${() => ctx.count++}"
-  >Count: ${ctx.count}</button>
-`, { state: { count: 0 } });
+component('my-counter', ({ initialCount = 0 }) => {
+  const count = ref(initialCount);
+  const emit = useEmit();
+
+  const handleClick = () => {
+    count.value++;
+    emit('update:initial-count', { count: count.value });
+  };
+
+  return html`
+    <button
+      type="button"
+      class="px-4 py-2 bg-blue-500 text-white rounded"
+      @click.prevent="${handleClick}"
+    >
+      Count: ${count.value}
+    </button>
+  `;
+});
 ```
 3. **Use in HTML:**
   ```html
-  <my-counter></my-counter>
+  <my-counter
+    initial-count="5"
+    @update:initial-count="handleCountUpdate"
+  ></my-counter>
+
+  <script>
+  function handleCountUpdate(event) {
+    console.log('Count updated to:', event.detail.count);
+  }
+  </script>
   ```
 4. **Enjoy instant reactivity and type safety!**
 
 ## 📖 Documentation Index
 
-Explore the full documentation for every runtime feature:
+Explore the complete documentation for every runtime feature:
 
-### 🏗️ Core Concepts
-- [Component Config](./docs/component-config.md)
-- [Component](./docs/component.md)
-- [Render](./docs/render.md)
-- [Props](./docs/props.md)
-- [State](./docs/state.md)
-- [Computed](./docs/computed.md)
-- [Watch](./docs/watch.md)
-- [Store](./docs/store.md)
-- [Router](./docs/router.md)
-- [Event Bus](./docs/event-bus.md)
-- [Template](./docs/template.md)
+### 🚀 **Getting Started**
+- [**🎯 Functional API**](./docs/functional-api.md) - **Start here!** Complete guide to the modern functional component API
 
-### 🧩 Reactivity & Patterns
-- [Directives](./docs/directives.md)
-- [Directive Enhancements Guide](./docs/directive-enhancements.md)
-- [Bindings](./docs/bindings.md)
-- [Events](./docs/events-deep-dive.md)
-- [Slot](./docs/slot.md)
-- [Typing Components](./docs/typing-components.md)
-- [Advanced Usage Patterns](./docs/advanced-usage-patterns.md)
-- [Cross-Component Communication](./docs/cross-component-communication.md)
+### 🏗️ **Core Features**
+- [🧩 Template](./docs/template.md) - Template syntax and html function
+- [🧭 Directives](./docs/directives.md) - Conditional rendering with `when`, `each`, and `match`
+- [🛠️ Directive Enhancements](./docs/directive-enhancements.md) - Advanced directive utilities (`unless`, `whenEmpty`, etc.)
+- [🔗 Bindings](./docs/bindings.md) - Data binding with `:prop`, `@event`, `:model`, `:class`, `:style`
+- [🔔 Events Deep Dive](./docs/events-deep-dive.md) - Custom event emission and handling patterns
 
-### 🎨 Styling
-- [Style](./docs/style.md)
-- [Deep Dive: JIT CSS](./docs/jit-css.md)
+### 🎨 **Styling**
+- [🎨 JIT CSS](./docs/jit-css.md) - On-demand utility-first styling system
 
-### ⚡ Performance & Architecture
-- [Virtual DOM](./docs/virtual-dom.md)
-- [HMR](./docs/hmr.md)
-- [SSR](./docs/ssr.md)
+### 🔗 **Communication & State**
+- [📢 Event Bus](./docs/event-bus.md) - Global event system for cross-component communication
+- [🗄️ Store](./docs/store.md) - Global state management
+- [🚦 Router](./docs/router.md) - Client-side routing
+- [🤝 Cross-Component Communication](./docs/cross-component-communication.md) - Patterns for component interaction
 
-### 🛡️ Error Handling & Lifecycle
-- [Error](./docs/error.md)
-- [Hooks](./docs/hooks.md)
-- [Method Injection](./docs/method-injection.md)
+### ⚡ **Advanced Features**
+- [🔮 Virtual DOM](./docs/virtual-dom.md) - VDOM implementation and performance details
+- [🌐 SSR](./docs/ssr.md) - Server-side rendering support
+- [♻️ HMR](./docs/hmr.md) - Hot module replacement
+- [🛡️ Infinite Loop Protection](./docs/infinite-loop-protection.md) - Runtime safeguards against infinite loops
+- [🔒 Secure Expression Evaluator](./docs/secure-expression-evaluator.md) - Safe evaluation of dynamic expressions in templates
 
-### 🧰 Utilities & Troubleshooting
-- [Troubleshooting](./docs/troubleshooting.md)
+### 🔧 **Integration Guides**
+- [⚛️ React Integration](./docs/react-integration.md) - Using components in React apps
+- [🦊 Vue Integration](./docs/vue-integration.md) - Using components in Vue apps
+- [🅰️ Angular Integration](./docs/angular-integration.md) - Using components in Angular apps
+- [🔥 Svelte Integration](./docs/svelte-integration.md) - Using components in Svelte apps
 
-### 🔗 Framework Integration
-- [Vue Integration](./docs/vue-integration.md)
-- [React Integration](./docs/react-integration.md)
-- [Svelte Integration](./docs/svelte-integration.md)
-- [Angular Integration](./docs/angular-integration.md)
+### 🛠️ **Troubleshooting**
+- [🔧 Troubleshooting](./docs/troubleshooting.md) - Common issues and solutions
 
-For deep dives, see each guide above or browse the source code in `src/lib/`.
+For examples and implementation details, explore the source code in `src/lib/`.
 
 ## 🧑‍🔬 Real-World Examples
 - [Form Input & Validation](./src/components/examples/FormInputValidation.ts)

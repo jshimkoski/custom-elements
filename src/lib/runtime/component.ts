@@ -2,11 +2,11 @@ import type {
   ComponentConfig,
   ComponentContext,
   Refs,
-  WatchCallback,
-  WatchOptions,
   WatcherState,
+  VNode,
 } from "./types";
-import { toKebab, escapeHTML } from "./helpers";
+import { reactiveSystem } from "./reactive";
+import { toKebab } from "./helpers";
 import { initWatchers, triggerWatchers } from "./watchers";
 import { applyProps } from "./props";
 import {
@@ -15,8 +15,11 @@ import {
   handleAttributeChanged
 } from "./lifecycle";
 import { renderComponent, requestRender, applyStyle } from "./render";
-import { devError, devWarn } from "./logger";
 import { scheduleDOMUpdate } from "./scheduler";
+import { 
+  setCurrentComponentContext, 
+  clearCurrentComponentContext 
+} from "./hooks";
 
 /**
  * @internal
@@ -61,103 +64,6 @@ if (
       }
     }
   });
-}
-
-export function component<
-  S extends object = {},
-  C extends object = {},
-  P extends object = {},
-  T extends object = any,
->(
-  tag: string,
-  renderOrConfig: ((context: ComponentContext<S, C, P, T>) => any) | ComponentConfig<S, C, P, T>,
-  config?: Partial<ComponentConfig<S, C, P, T>>
-): void {
-  let normalizedTag = toKebab(tag);
-  if (!normalizedTag.includes("-")) {
-    normalizedTag = `cer-${normalizedTag}`;
-  }
-
-  let finalConfig: ComponentConfig<S, C, P, T>;
-  if (typeof renderOrConfig === "function") {
-    finalConfig = { ...config, render: renderOrConfig } as ComponentConfig<S, C, P, T>;
-  } else {
-    finalConfig = renderOrConfig;
-  }
-
-  // Provide a default onError handler if not defined
-  if (typeof finalConfig.onError !== "function") {
-    finalConfig.onError = (error, state) => {
-      // Lightweight, developer-friendly default
-      devError(`[${normalizedTag}] Error:`, error, state);
-    };
-  }
-
-  // Developer-time warning: detect when component authors use keys that
-  // collide with runtime-injected context helpers (refs, error, etc.).
-  // This is a non-fatal console warning to help avoid confusing TS errors
-  // and runtime shadowing.
-  try {
-    const RESERVED_KEYS = new Set([
-      "refs",
-      "requestRender",
-      "error",
-      "hasError",
-      "isLoading",
-      "emit",
-    ]);
-
-    const collisions: string[] = [];
-    if (finalConfig.state && typeof finalConfig.state === "object") {
-      Object.keys(finalConfig.state).forEach((k) => {
-        if (RESERVED_KEYS.has(k)) collisions.push(k);
-      });
-    }
-    if (finalConfig.props && typeof finalConfig.props === "object") {
-      Object.keys(finalConfig.props).forEach((k) => {
-        if (RESERVED_KEYS.has(k)) collisions.push(k);
-      });
-    }
-    if (finalConfig.computed && typeof finalConfig.computed === "object") {
-      Object.keys(finalConfig.computed).forEach((k) => {
-        if (RESERVED_KEYS.has(k)) collisions.push(k);
-      });
-    }
-    if (collisions.length > 0) {
-      const unique = Array.from(new Set(collisions));
-      devWarn(
-        `[${normalizedTag}] Reserved runtime context keys used in component config: ${unique.join(", ")}. ` +
-          `These names are provided by the runtime (for example: refs, error, emit). ` +
-          `Rename your state/prop/computed keys (e.g. 'error' -> 'errorMessage') to avoid collisions and TypeScript type conflicts.`
-      );
-    }
-  } catch (e) {
-    // swallow any check-time errors; this is purely a dev convenience
-  }
-
-  registry.set(normalizedTag, finalConfig);
-  if (typeof window !== "undefined") {
-    // If the custom element is not defined yet, define it.
-    if (!customElements.get(normalizedTag)) {
-    customElements.define(normalizedTag, createElementClass<S, C, P, T>(normalizedTag, finalConfig) as CustomElementConstructor);
-    } else {
-      // If it is already defined (e.g., re-registration during tests or HMR),
-      // update existing instances to use the new config and request a render.
-      try {
-        document.querySelectorAll(normalizedTag).forEach((el) => {
-          try {
-            // @ts-ignore - internal API used for hot-swap/update
-            if (typeof (el as any)._cfg !== 'undefined') (el as any)._cfg = finalConfig;
-            if (typeof (el as any)._render === 'function') (el as any)._render(finalConfig);
-          } catch (e) {
-            // ignore per-instance errors
-          }
-        });
-      } catch (e) {
-        // document may be unavailable in some environments, ignore
-      }
-    }
-  }
 }
 
 export function createElementClass<
@@ -256,6 +162,14 @@ export function createElementClass<
         configurable: false,
       });
 
+      // Inject component ID for functional component state persistence
+      Object.defineProperty(reactiveContext, '_componentId', {
+        value: this._componentId,
+        writable: false,
+        enumerable: false,
+        configurable: false,
+      });
+
       // Inject _triggerWatchers for model directive to trigger watchers
       Object.defineProperty(reactiveContext, '_triggerWatchers', {
         value: (path: string, newValue: any) => this._triggerWatchers(path, newValue),
@@ -343,6 +257,11 @@ export function createElementClass<
       // Initialize watchers after initialization phase is complete
       this._initWatchers(cfgToUse);
 
+      // Apply props before initial render so they're available immediately
+      // Note: Attributes set by parent renderers may not be available yet,
+      // but connectedCallback will re-apply props and re-render
+      this._applyProps(cfgToUse);
+
       // Initial render (styles are applied within render)
       this._render(cfgToUse);
     }
@@ -352,6 +271,8 @@ export function createElementClass<
         // Ensure props reflect attributes set by the parent renderer before
         // invoking lifecycle hooks.
         this._applyProps(config);
+        // Re-render after applying props to ensure component shows updated values
+        this._requestRender();
         handleConnected(
           config,
           this.context,
@@ -383,6 +304,10 @@ export function createElementClass<
     ) {
       this._runLogicWithinErrorBoundary(config, () => {
         this._applyProps(config);
+        // Re-render after applying props to ensure component shows updated values
+        if (oldValue !== newValue) {
+          this._requestRender();
+        }
         handleAttributeChanged(
           config,
           name,
@@ -397,19 +322,9 @@ export function createElementClass<
       return config.props ? Object.keys(config.props).map(toKebab) : [];
     }
 
-    private _applyComputed(cfg: ComponentConfig<S, C, P, T>) {
-      this._runLogicWithinErrorBoundary(config, () => {
-        if (!cfg.computed) return;
-        Object.entries(cfg.computed).forEach(([key, fn]) => {
-          Object.defineProperty(this.context, key, {
-            get: () => {
-              const val = (fn as (context: ComponentContext<S, C, P, T>) => any)(this.context);
-              return escapeHTML(val);
-            },
-            enumerable: true,
-          });
-        });
-      });
+    private _applyComputed(_cfg: ComponentConfig<S, C, P, T>) {
+      // Computed properties are now handled by the computed() function and reactive system
+      // This method is kept for compatibility but does nothing in the functional API
     }
 
     // --- Render ---
@@ -472,7 +387,6 @@ export function createElementClass<
       this._runLogicWithinErrorBoundary(cfg, () => {
         applyStyle(
           this.shadowRoot,
-          cfg,
           this.context,
           html,
           this._styleSheet,
@@ -494,14 +408,7 @@ export function createElementClass<
         if (cfg.onError) {
           cfg.onError(error as Error | null, this.context);
         }
-        if (cfg.errorFallback) {
-          if (this.shadowRoot) {
-            this.shadowRoot.innerHTML = cfg.errorFallback(
-              error as Error | null,
-              this.context,
-            );
-          }
-        }
+        // Note: errorFallback was removed as it's handled by the functional API directly
       }
     }
 
@@ -569,6 +476,11 @@ export function createElementClass<
             });
           }
           if (obj && typeof obj === "object") {
+            // Skip ReactiveState objects to avoid corrupting their internal structure
+            if (obj.constructor && obj.constructor.name === 'ReactiveState') {
+              return obj;
+            }
+            
             Object.keys(obj).forEach((key) => {
               const newPath = path ? `${path}.${key}` : key;
               obj[key] = createReactive(obj[key], newPath);
@@ -595,7 +507,13 @@ export function createElementClass<
           }
           return obj;
         }
-        return createReactive({ ...cfg.state }) as ComponentContext<S, C, P, T>;
+        return createReactive({ 
+          // For functional components, state is managed by state() function calls
+          // Include prop defaults in initial reactive context so prop updates trigger reactivity
+          ...(cfg.props ? Object.fromEntries(
+            Object.entries(cfg.props).map(([key, def]) => [key, def.default])
+          ) : {})
+        }) as ComponentContext<S, C, P, T>;
       } catch (error) {
         return {} as ComponentContext<S, C, P, T>;
       }
@@ -606,7 +524,7 @@ export function createElementClass<
         initWatchers(
           this.context,
           this._watchers,
-          (cfg.watch || {}) as Record<string, WatchCallback | [WatchCallback, WatchOptions]>
+          {} // Watchers are now handled by the watch() function in functional API
         );
       })
     }
@@ -622,11 +540,235 @@ export function createElementClass<
         } catch (error) {
           this._hasError = true;
           if (cfg.onError) cfg.onError(error as Error | null, this.context);
-          if (cfg.errorFallback && this.shadowRoot) {
-            this.shadowRoot.innerHTML = cfg.errorFallback(error as Error | null, this.context);
-          }
+          // Note: errorFallback was removed as it's handled by the functional API directly
         }
       })
+    }
+  }
+}
+
+/**
+ * Streamlined functional component API with automatic reactive props and lifecycle hooks.
+ * 
+ * @example
+ * ```ts
+ * // Simple component with no parameters
+ * component('simple-header', () => {
+ *   return html`<h1>Hello World</h1>`;
+ * });
+ * 
+ * // With props only
+ * component('with-props', ({ message = 'Hello' }) => {
+ *   return html`<div>${message}</div>`;
+ * });
+ * 
+ * // With props and hooks
+ * component('my-switch', ({
+ *   modelValue = false,
+ *   label = ''
+ * }, { emit, onConnected, onDisconnected }) => {
+ *   onConnected(() => console.log('Switch connected!'));
+ *   onDisconnected(() => console.log('Switch disconnected!'));
+ *   
+ *   return html`
+ *     <label>
+ *       ${label}
+ *       <input 
+ *         type="checkbox" 
+ *         :checked="${modelValue}"
+ *         @change="${(e) => emit('update:modelValue', e.target.checked)}"
+ *       />
+ *     </label>
+ *   `;
+ * });
+ * ```
+ */
+
+// Overload 1: No parameters - simple components
+export function component(
+  tag: string,
+  renderFn: () => VNode | VNode[] | Promise<VNode | VNode[]>
+): void;
+
+// Overload 2: Props only - modern recommended approach with context-based hooks
+export function component<TProps extends Record<string, any> = {}>(
+  tag: string,
+  renderFn: (props: TProps) => VNode | VNode[] | Promise<VNode | VNode[]>
+): void;
+
+// Implementation
+export function component(
+  tag: string,
+  renderFn: (...args: any[]) => VNode | VNode[] | Promise<VNode | VNode[]>
+): void {
+  let normalizedTag = toKebab(tag);
+  if (!normalizedTag.includes("-")) {
+    normalizedTag = `cer-${normalizedTag}`;
+  }
+
+  // We'll parse the function string to extract defaults (dev time only)
+  let propDefaults: Record<string, any> = {};
+  
+  if (typeof window !== "undefined") {
+    try {
+      const fnString = renderFn.toString();
+      
+      // More robust parsing for destructured parameters with defaults
+      const paramsMatch = fnString.match(/\(\s*{\s*([^}]+)\s*}/);
+      if (paramsMatch) {
+        const propsString = paramsMatch[1];
+        
+        // Split by comma but handle nested objects/arrays
+        const propPairs = propsString.split(',').map(p => p.trim());
+        
+        for (const pair of propPairs) {
+          // Handle "prop = defaultValue" pattern
+          const equalIndex = pair.indexOf('=');
+          if (equalIndex !== -1) {
+            const key = pair.substring(0, equalIndex).trim();
+            const defaultValue = pair.substring(equalIndex + 1).trim();
+            
+            try {
+              // Parse simple default values
+              if (defaultValue === 'true') propDefaults[key] = true;
+              else if (defaultValue === 'false') propDefaults[key] = false;
+              else if (defaultValue === '[]') propDefaults[key] = [];
+              else if (defaultValue === '{}') propDefaults[key] = {};
+              else if (/^\d+$/.test(defaultValue)) propDefaults[key] = parseInt(defaultValue);
+              else if (/^'.*'$/.test(defaultValue) || /^".*"$/.test(defaultValue)) {
+                propDefaults[key] = defaultValue.slice(1, -1);
+              } else {
+                propDefaults[key] = defaultValue;
+              }
+            } catch (e) {
+              propDefaults[key] = '';
+            }
+          } else {
+            // No default value, extract just the key name (remove type annotation)
+            const key = pair.split(':')[0].trim();
+            if (key && !key.includes('}')) {
+              propDefaults[key] = '';
+            }
+          }
+        }
+      }
+    } catch (e) {
+      // Fallback: no props parsing
+    }
+  }
+
+  // Store lifecycle hooks from the render function
+  let lifecycleHooks: {
+    onConnected?: () => void;
+    onDisconnected?: () => void;
+    onAttributeChanged?: (name: string, oldValue: string | null, newValue: string | null) => void;
+    onError?: (error: Error) => void;
+  } = {};
+
+  // Create component config
+  const config: ComponentConfig<{}, {}, {}, {}> = {
+    // Generate props config from defaults
+    props: Object.fromEntries(
+      Object.entries(propDefaults).map(([key, defaultValue]) => {
+        const type = typeof defaultValue === 'boolean' ? Boolean
+                   : typeof defaultValue === 'number' ? Number
+                   : typeof defaultValue === 'string' ? String
+                   : Function; // Use Function for complex types
+        return [key, { type, default: defaultValue }];
+      })
+    ),
+    
+    // Add lifecycle hooks from the stored functions
+    onConnected: (_context) => {
+      if (lifecycleHooks.onConnected) {
+        lifecycleHooks.onConnected();
+      }
+    },
+    
+    onDisconnected: (_context) => {
+      if (lifecycleHooks.onDisconnected) {
+        lifecycleHooks.onDisconnected();
+      }
+    },
+    
+    onAttributeChanged: (name, oldValue, newValue, _context) => {
+      if (lifecycleHooks.onAttributeChanged) {
+        lifecycleHooks.onAttributeChanged(name, oldValue, newValue);
+      }
+    },
+    
+    onError: (error, _context) => {
+      if (lifecycleHooks.onError && error) {
+        lifecycleHooks.onError(error);
+      }
+    },
+    
+    render: (context) => {
+      // Track dependencies for rendering
+      // Use stable component ID from context if available, otherwise generate new one
+      const componentId = (context as any)._componentId || `${normalizedTag}-${Math.random().toString(36).substr(2, 9)}`;
+      
+      reactiveSystem.setCurrentComponent(componentId, () => {
+        if (context.requestRender) {
+          context.requestRender();
+        }
+      });
+
+      try {
+        // Set current component context for hooks
+        setCurrentComponentContext(context);
+        
+        // Check if we have prop defaults (indicates destructured parameters)
+        const hasProps = Object.keys(propDefaults).length > 0;
+        
+        let result;
+        if (hasProps) {
+          // Destructured parameters detected - create fresh props object with current context values
+          const freshProps: any = {};
+          Object.keys(propDefaults).forEach(key => {
+            freshProps[key] = (context as any)[key] ?? propDefaults[key];
+          });
+          result = renderFn(freshProps);
+        } else {
+          // No parameters expected - call with no arguments
+          result = renderFn();
+        }
+        
+        // Process hook callbacks that were set during render
+        if ((context as any)._hookCallbacks) {
+          const hookCallbacks = (context as any)._hookCallbacks;
+          if (hookCallbacks.onConnected) {
+            lifecycleHooks.onConnected = hookCallbacks.onConnected;
+          }
+          if (hookCallbacks.onDisconnected) {
+            lifecycleHooks.onDisconnected = hookCallbacks.onDisconnected;
+          }
+          if (hookCallbacks.onAttributeChanged) {
+            lifecycleHooks.onAttributeChanged = hookCallbacks.onAttributeChanged;
+          }
+          if (hookCallbacks.onError) {
+            lifecycleHooks.onError = hookCallbacks.onError;
+          }
+          if (hookCallbacks.style) {
+            // Store the style callback in the context for applyStyle to use
+            (context as any)._styleCallback = hookCallbacks.style;
+          }
+        }
+        
+        return result;
+      } finally {
+        clearCurrentComponentContext();
+        reactiveSystem.clearCurrentComponent();
+      }
+    }
+  };
+
+  // Store in registry
+  registry.set(normalizedTag, config);
+
+  if (typeof window !== "undefined") {
+    if (!customElements.get(normalizedTag)) {
+      customElements.define(normalizedTag, createElementClass(normalizedTag, config) as CustomElementConstructor);
     }
   }
 }

@@ -7,14 +7,29 @@ Quick guide for using Custom Elements Runtime components inside Svelte.
 1. Register a component:
 
 ```ts
-import { component, html } from '@jasonshimmy/custom-elements-runtime';
-component('my-counter', (ctx) => html`<button @click="${() => ctx.count++}">Count: ${ctx.count}</button>`, { state: { count: 0 } });
+import { component, ref, html, useEmit } from '@jasonshimmy/custom-elements-runtime';
+
+component('my-counter', ({ initialCount = 0 }: { initialCount?: number }) => {
+  const count = ref(initialCount);
+  const emit = useEmit();
+  
+  const handleClick = () => {
+    count.value++;
+    emit('count-changed', { count: count.value });
+  };
+  
+  return html`
+    <button @click="${handleClick}">
+      Count: ${count.value}
+    </button>
+  `;
+});
 ```
 
 2. Use in markup:
 
 ```svelte
-<my-counter />
+<my-counter initialCount={5} on:count-changed={handleCountChange} />
 ```
 
 ## Props & events

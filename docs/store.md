@@ -31,10 +31,16 @@ Use the store in your component logic or templates. Access state via `getState()
 ```ts
 const store = createStore({ count: 0 });
 
-component('my-counter', {
-  render: () => html`
-    <button @click="${() => store.setState(prev => ({ count: prev.count + 1 }))}">${store.getState().count}</button>
-  `
+component('my-counter', () => {
+  const handleIncrement = () => {
+    store.setState(prev => ({ count: prev.count + 1 }));
+  };
+  
+  return html`
+    <button @click="${handleIncrement}">
+      Count: ${store.getState().count}
+    </button>
+  `;
 });
 ```
 
@@ -71,10 +77,12 @@ export const store = createStore({ count: 0 });
 // my-counter.ts
 import { store } from './store';
 
-component('my-counter', {
-  render: () => html`
-    <button @click="${() => store.setState(prev => ({ count: prev.count + 1 }))}">${store.getState().count}</button>
-  `
+component('my-counter', () => {
+  return html`
+    <button @click="${() => store.setState(prev => ({ count: prev.count + 1 }))}">
+      ${store.getState().count}
+    </button>
+  `;
 });
 ```
 

@@ -1,3 +1,5 @@
+/// <reference types="cypress" />
+
 describe('Complete Model Binding Test - Vue.js Compatible', () => {
   beforeEach(() => {
     cy.visit('/');

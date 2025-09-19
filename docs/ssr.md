@@ -27,11 +27,11 @@ Server-Side Rendering (SSR) is the process of generating HTML on the server, sen
 ## 🧩 SSR-Friendly Component Example
 
 ```typescript
-import { component, html } from "runtime";
+import { component, ref, html } from "@jasonshimmy/custom-elements-runtime";
 
-component("ssr-demo", {
-  state: { message: "Hello SSR!" },
-  render: (ctx) => html`<div>${ctx.message}</div>`
+component("ssr-demo", ({ message = "Hello SSR!" }, { emit }) => {
+  const msg = ref(message);
+  return html`<div>${msg.value}</div>`;
 });
 ```
 
@@ -104,11 +104,11 @@ On the client register the same component and let the runtime hydrate existing s
     <!-- server rendered -->
     <ssr-demo><div>Hello SSR!</div></ssr-demo>
     <script type="module">
-      import { component, html } from "@jasonshimmy/custom-elements-runtime";
+      import { component, ref, html } from "@jasonshimmy/custom-elements-runtime";
 
-      component('ssr-demo', {
-        state: { message: 'Hello SSR!' },
-        render: (ctx) => html`<div>${ctx.message}</div>`
+      component('ssr-demo', ({ message = 'Hello SSR!' }, { emit }) => {
+        const msg = ref(message);
+        return html`<div>${msg.value}</div>`;
       });
 
       // Runtime will hydrate the existing <ssr-demo> node.
@@ -153,9 +153,9 @@ if (typeof window === "undefined") {
 ## 📚 Example: Universal Component
 
 ```typescript
-component("universal-greeting", {
-  state: { name: "World" },
-  render: (ctx) => html`<h1>Hello, ${ctx.name}!</h1>`
+component("universal-greeting", ({ name = "World" }, { emit }) => {
+  const greeting = ref(name);
+  return html`<h1>Hello, ${greeting.value}!</h1>`;
 });
 ```
 

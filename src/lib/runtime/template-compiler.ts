@@ -2,6 +2,69 @@ import type { VNode } from "./types";
 import { contextStack } from "./render";
 import { toKebab, getNestedValue, setNestedValue } from "./helpers";
 
+// Strict LRU cache helper for fully static templates (no interpolations, no context)
+class LRUCache<K, V> {
+  private map = new Map<K, V>();
+  private maxSize: number;
+  constructor(maxSize: number) { this.maxSize = maxSize; }
+  get(key: K): V | undefined {
+    const v = this.map.get(key);
+    if (v === undefined) return undefined;
+    // move to end
+    this.map.delete(key);
+    this.map.set(key, v);
+    return v;
+  }
+  set(key: K, value: V) {
+    if (this.map.has(key)) {
+      this.map.delete(key);
+    }
+    this.map.set(key, value);
+    if (this.map.size > this.maxSize) {
+      // remove oldest
+      const first = this.map.keys().next().value;
+      if (first !== undefined) this.map.delete(first);
+    }
+  }
+  has(key: K): boolean { return this.map.has(key); }
+  clear() { this.map.clear(); }
+}
+
+const TEMPLATE_COMPILE_CACHE = new LRUCache<string, VNode | VNode[]>(500);
+
+/**
+ * Validates event handlers to prevent common mistakes that lead to infinite loops
+ */
+function validateEventHandler(value: any, eventName: string): void {
+  // Check for null/undefined handlers
+  if (value === null || value === undefined) {
+    console.warn(
+      `⚠️ Event handler for '@${eventName}' is ${value}. ` +
+      `This will prevent the event from working. ` +
+      `Use a function reference instead: @${eventName}="\${functionName}"`
+    );
+    return;
+  }
+
+  // Check for immediate function invocation (most common mistake)
+  if (typeof value !== "function") {
+    console.warn(
+      `🚨 Potential infinite loop detected! Event handler for '@${eventName}' appears to be ` +
+      `the result of a function call (${typeof value}) instead of a function reference. ` +
+      `Change @${eventName}="\${functionName()}" to @${eventName}="\${functionName}" ` +
+      `to pass the function reference instead of calling it immediately.`
+    );
+  }
+
+  // Additional check for common return values of mistaken function calls
+  if (value === undefined && typeof value !== "function") {
+    console.warn(
+      `💡 Tip: If your event handler function returns undefined, make sure you're passing ` +
+      `the function reference, not calling it. Use @${eventName}="\${fn}" not @${eventName}="\${fn()}"`
+    );
+  }
+}
+
 export function h(
   tag: string,
   props: Record<string, any> = {},
@@ -74,7 +137,7 @@ export function parseProps(
     }
 
     // Known directive names
-    const knownDirectives = ["model", "bind", "show", "class", "style"];
+    const knownDirectives = ["model", "bind", "show", "class", "style", "ref"];
     if (prefix === ":") {
       // Support :model:checked (directive with argument) and :class.foo (modifiers)
       const [nameAndModifiers, argPart] = rawName.split(":");
@@ -91,13 +154,21 @@ export function parseProps(
           arg: argPart,
         };
       } else {
-        attrs[rawName] = value;
+        // Unwrap reactive state objects for bound attributes
+        let attrValue = value;
+        if (attrValue && typeof attrValue === 'object' && attrValue.constructor?.name === 'ReactiveState') {
+          attrValue = (attrValue as any).value; // This triggers dependency tracking
+        }
+        attrs[rawName] = attrValue;
         bound.push(rawName);
       }
     } else if (prefix === "@") {
       // Parse event modifiers: @click.prevent.stop
       const [eventName, ...modifierParts] = rawName.split(".");
       const modifiers = modifierParts;
+      
+      // Validate event handler to prevent common mistakes
+      validateEventHandler(value, eventName);
       
       // Create wrapped event handler that applies modifiers
       const originalHandler = typeof value === "function"
@@ -160,6 +231,16 @@ export function htmlImpl(
   
   // Use injected context if no explicit context provided
   const effectiveContext = context ?? injectedContext;
+
+  // Conservative caching: only cache templates that have no interpolations
+  // (values.length === 0) and no explicit context. This avoids incorrectly
+  // reusing parsed structures that depend on runtime values or context.
+  const canCache = (!context && values.length === 0);
+  const cacheKey = canCache ? strings.join('<!--TEMPLATE_DELIM-->') : null;
+  if (canCache && cacheKey) {
+    const cached = TEMPLATE_COMPILE_CACHE.get(cacheKey);
+    if (cached) return cached;
+  }
 
   function textVNode(text: string, key: string): VNode {
     return h("#text", {}, text, key);
@@ -390,28 +471,42 @@ export function htmlImpl(
         if (vnodeProps.attrs) {
           for (const propName of promotable) {
             if (boundList && boundList.includes(propName) && propName in vnodeProps.attrs && !(vnodeProps.props && propName in vnodeProps.props)) {
-              vnodeProps.props[propName] = vnodeProps.attrs[propName];
+              let attrValue = vnodeProps.attrs[propName];
+              // Unwrap reactive state objects during promotion
+              if (attrValue && typeof attrValue === 'object' && attrValue.constructor?.name === 'ReactiveState') {
+                attrValue = (attrValue as any).value; // This triggers dependency tracking
+              }
+              vnodeProps.props[propName] = attrValue;
               delete vnodeProps.attrs[propName];
             }
           }
         }
         // If this looks like a custom element (hyphenated tag), promote all bound attrs to props
         const isCustom = tagName.includes('-') || Boolean((effectiveContext as any)?.__customElements?.has?.(tagName));
-        if (isCustom && boundList && vnodeProps.attrs) {
-          // Preserve attributes that may be used for stable key generation
-          const keyAttrs = new Set(['id', 'name', 'data-key', 'key']);
-          for (const b of boundList) {
-            if (b in vnodeProps.attrs && !(vnodeProps.props && b in vnodeProps.props)) {
-              // Convert kebab-case to camelCase for JS property names on custom elements
-              const camel = b.includes('-') ? b.split('-').map((s, i) => i === 0 ? s : s.charAt(0).toUpperCase() + s.slice(1)).join('') : b;
-              vnodeProps.props[camel] = vnodeProps.attrs[b];
-              // Preserve potential key attributes in attrs to avoid unstable keys
-              if (!keyAttrs.has(b)) {
-                delete vnodeProps.attrs[b];
+        if (isCustom) {
+          // Always mark custom elements, regardless of bound attributes
+          vnodeProps.isCustomElement = true;
+          
+          if (boundList && vnodeProps.attrs) {
+            // Preserve attributes that may be used for stable key generation
+            const keyAttrs = new Set(['id', 'name', 'data-key', 'key']);
+            for (const b of boundList) {
+              if (b in vnodeProps.attrs && !(vnodeProps.props && b in vnodeProps.props)) {
+                // Convert kebab-case to camelCase for JS property names on custom elements
+                const camel = b.includes('-') ? b.split('-').map((s, i) => i === 0 ? s : s.charAt(0).toUpperCase() + s.slice(1)).join('') : b;
+                let attrValue = vnodeProps.attrs[b];
+                // Unwrap reactive state objects during promotion
+                if (attrValue && typeof attrValue === 'object' && attrValue.constructor?.name === 'ReactiveState') {
+                  attrValue = (attrValue as any).value; // This triggers dependency tracking
+                }
+                vnodeProps.props[camel] = attrValue;
+                // Preserve potential key attributes in attrs to avoid unstable keys
+                if (!keyAttrs.has(b)) {
+                  delete vnodeProps.attrs[b];
+                }
               }
             }
           }
-          vnodeProps.isCustomElement = true;
         }
       } catch (e) {
         // Best-effort; ignore failures to keep runtime robust.
@@ -457,6 +552,10 @@ export function htmlImpl(
                 initial = getNested(actualState, modelVal);
               } else {
                 initial = modelVal;
+                // Unwrap reactive state objects
+                if (initial && typeof initial === 'object' && initial.constructor?.name === 'ReactiveState') {
+                  initial = (initial as any).value; // This triggers dependency tracking
+                }
               }
 
               vnodeProps.props[argToUse] = initial;
@@ -472,19 +571,36 @@ export function htmlImpl(
               vnodeProps.isCustomElement = true;
 
               const eventName = `update:${toKebab(argToUse)}`;
-              const handlerKey = 'on' + eventName.charAt(0).toUpperCase() + eventName.slice(1);
+              // Convert kebab-case event name to camelCase handler key
+              const camelEventName = eventName.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
+              const handlerKey = 'on' + camelEventName.charAt(0).toUpperCase() + camelEventName.slice(1);
 
               vnodeProps.props[handlerKey] = function (ev: Event & { detail?: any }) {
                 const newVal = (ev as any).detail !== undefined ? (ev as any).detail : (ev.target ? (ev.target as any).value : undefined);
                 if (!actualState) return;
-                const current = getNested(actualState, typeof modelVal === 'string' ? modelVal : String(modelVal));
-                const changed = Array.isArray(newVal) && Array.isArray(current)
-                  ? JSON.stringify([...newVal].sort()) !== JSON.stringify([...current].sort())
-                  : newVal !== current;
-                if (changed) {
-                  setNested(actualState, typeof modelVal === 'string' ? modelVal : String(modelVal), newVal);
-                  if ((effectiveContext as any)?.requestRender) (effectiveContext as any).requestRender();
-                  else if ((effectiveContext as any)?._requestRender) (effectiveContext as any)._requestRender();
+                
+                // Handle reactive state objects (functional API)
+                if (modelVal && typeof modelVal === 'object' && modelVal.constructor?.name === 'ReactiveState') {
+                  const current = modelVal.value;
+                  const changed = Array.isArray(newVal) && Array.isArray(current)
+                    ? JSON.stringify([...newVal].sort()) !== JSON.stringify([...current].sort())
+                    : newVal !== current;
+                  if (changed) {
+                    modelVal.value = newVal;
+                    if ((effectiveContext as any)?.requestRender) (effectiveContext as any).requestRender();
+                    else if ((effectiveContext as any)?._requestRender) (effectiveContext as any)._requestRender();
+                  }
+                } else {
+                  // Legacy string-based state handling
+                  const current = getNested(actualState, typeof modelVal === 'string' ? modelVal : String(modelVal));
+                  const changed = Array.isArray(newVal) && Array.isArray(current)
+                    ? JSON.stringify([...newVal].sort()) !== JSON.stringify([...current].sort())
+                    : newVal !== current;
+                  if (changed) {
+                    setNested(actualState, typeof modelVal === 'string' ? modelVal : String(modelVal), newVal);
+                    if ((effectiveContext as any)?.requestRender) (effectiveContext as any).requestRender();
+                    else if ((effectiveContext as any)?._requestRender) (effectiveContext as any)._requestRender();
+                  }
                 }
               };
 
@@ -604,14 +720,27 @@ export function htmlImpl(
 
   if (cleanedFragments.length === 1) {
     // Single non-empty root node
-    return cleanedFragments[0];
+    const out = cleanedFragments[0];
+      if (canCache && cacheKey) TEMPLATE_COMPILE_CACHE.set(cacheKey, out);
+    return out;
   } else if (cleanedFragments.length > 1) {
     // True multi-root: return array
-    return cleanedFragments;
+    const out = cleanedFragments;
+    if (canCache && cacheKey) {
+      TEMPLATE_COMPILE_CACHE.set(cacheKey, out);
+    }
+    return out;
   }
 
   // Fallback for empty content
   return h("div", {}, "", "fallback-root");
+}
+
+/**
+ * Clear the template compile cache (useful for tests)
+ */
+export function clearTemplateCompileCache(): void {
+  TEMPLATE_COMPILE_CACHE.clear();
 }
 
 /**

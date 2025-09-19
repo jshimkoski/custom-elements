@@ -1,5 +1,6 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { component } from "../src/lib/runtime/component";
+import { ref } from "../src/lib/runtime/reactive";
 import { html } from "../src/lib/runtime/template-compiler";
 
 describe("test :bind directive static", () => {
@@ -15,17 +16,16 @@ describe("test :bind directive static", () => {
   });
 
   it("should apply object properties with :bind", async () => {
-    component("test-bind-static", {
-      state: { 
-        props: { 
-          class: 'test-class', 
-          'data-test': 'test-value',
-          disabled: true 
-        }
-      },
-      render: (ctx) => html`
-        <input :bind="ctx.props" type="text" />
-      `
+    component("test-bind-static", () => {
+      const props = ref({ 
+        class: 'test-class', 
+        'data-test': 'test-value',
+        disabled: true 
+      });
+      
+      return html`
+        <input :bind="${props.value}" type="text" />
+      `;
     });
 
     container.innerHTML = "<test-bind-static></test-bind-static>";

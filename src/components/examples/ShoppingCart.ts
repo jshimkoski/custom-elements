@@ -2,7 +2,7 @@
  * ShoppingCart: A simple shopping cart demo.
  * Demonstrates ctx, computed, and quantity controls.
  */
-import { component, html, css, each, type ComponentContext } from '../../lib';
+import { component, html, useStyle, css, each, ref, computed } from '../../lib';
 
 interface Item {
   id: number;
@@ -11,87 +11,42 @@ interface Item {
   quantity: number;
 }
 
-type State = {
-  items: Item[];
-};
-
-type Computed = {
-  total: number;
-};
-
-type ShoppingCartContext = ComponentContext<State, Computed, {}, Methods>;
-
-type Methods = {
-  increaseQty: (id: number, ctx: ShoppingCartContext) => void;
-  decreaseQty: (id: number, ctx: ShoppingCartContext) => void;
-  removeItem: (id: number, ctx: ShoppingCartContext) => void;
-  reset: (event: Event, ctx: ShoppingCartContext) => void;
-};
-
 const initialItems: Item[] = [
   { id: 1, name: 'Apple', price: 1.5, quantity: 1 },
   { id: 2, name: 'Banana', price: 1.0, quantity: 1 },
   { id: 3, name: 'Orange', price: 2.0, quantity: 1 }
 ];
 
-export const ShoppingCart = component<State, Computed, {}, Methods>('shopping-cart', (ctx) => html`
-  <div class="cart-container">
-    <h2>Shopping Cart</h2>
-    <ul>
-      ${each(ctx.items, (item) => html`
-        <li>
-          <span class="item-name">${item.name}</span>
-          <span class="item-price">$${item.price.toFixed(2)}</span>
-          <div class="quantity-controls">
-            <button
-              class="qty-btn"
-              aria-label="Decrease quantity"
-              :disabled="${item.quantity <= 1}"
-              @click="${() => ctx.decreaseQty(item.id)}"
-            >-</button>
-            <span class="item-qty">${item.quantity}</span>
-            <button
-              class="qty-btn"
-              aria-label="Increase quantity"
-              :disabled="${item.quantity >= 10}"
-              @click="${() => ctx.increaseQty(item.id)}"
-            >+</button>
-          </div>
-          <button class="remove-btn" @click="${() => ctx.removeItem(item.id)}">Remove</button>
-        </li>
-      `)}
-    </ul>
-    <div class="cart-total">Total: $${ctx.total.toFixed(2)}</div>
-    <button class="reset-btn" @click="${ctx.reset}">Reset Cart</button>
-  </div>
-`, {
-  state: {
-    items: [...initialItems],
-  },
-  computed: {
-    total(ctx) {
-      return ctx.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-    }
-  },
-  increaseQty(id, ctx) {
-    ctx.items = ctx.items.map(item =>
+export const ShoppingCart = component('shopping-cart', () => {
+  const items = ref([...initialItems]);
+
+  const total = computed(() => {
+    return items.value.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  });
+
+  const increaseQty = (id: number) => {
+    items.value = items.value.map(item =>
       item.id === id ? { ...item, quantity: item.quantity + 1 } : item
     );
-  },
-  decreaseQty(id, ctx) {
-    ctx.items = ctx.items.map(item =>
+  };
+
+  const decreaseQty = (id: number) => {
+    items.value = items.value.map(item =>
       item.id === id && item.quantity > 1
         ? { ...item, quantity: item.quantity - 1 }
         : item
     );
-  },
-  removeItem(id, ctx) {
-    ctx.items = ctx.items.filter(item => item.id !== id);
-  },
-  reset(_event, ctx) {
-    ctx.items = [...initialItems];
-  },
-  style: css`
+  };
+
+  const removeItem = (id: number) => {
+    items.value = items.value.filter(item => item.id !== id);
+  };
+
+  const reset = () => {
+    items.value = [...initialItems];
+  };
+
+  useStyle(() => css`
     .cart-container {
       max-width: 420px;
       margin: 2rem auto;
@@ -198,5 +153,37 @@ export const ShoppingCart = component<State, Computed, {}, Methods>('shopping-ca
     .reset-btn:hover {
       background: #005fa3;
     }
-  `
+  `);
+
+  return html`
+    <div class="cart-container">
+      <h2>Shopping Cart</h2>
+      <ul>
+        ${each(items.value, (item) => html`
+          <li>
+            <span class="item-name">${item.name}</span>
+            <span class="item-price">$${item.price.toFixed(2)}</span>
+            <div class="quantity-controls">
+              <button
+                class="qty-btn"
+                aria-label="Decrease quantity"
+                :disabled="${item.quantity <= 1}"
+                @click="${() => decreaseQty(item.id)}"
+              >-</button>
+              <span class="item-qty">${item.quantity}</span>
+              <button
+                class="qty-btn"
+                aria-label="Increase quantity"
+                :disabled="${item.quantity >= 10}"
+                @click="${() => increaseQty(item.id)}"
+              >+</button>
+            </div>
+            <button class="remove-btn" @click="${() => removeItem(item.id)}">Remove</button>
+          </li>
+        `)}
+      </ul>
+      <div class="cart-total">Total: $${total.value.toFixed(2)}</div>
+      <button class="reset-btn" @click="${reset}">Reset Cart</button>
+    </div>
+  `;
 });

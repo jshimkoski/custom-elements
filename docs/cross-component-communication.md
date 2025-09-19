@@ -8,7 +8,7 @@ The built-in event bus enables decoupled communication between components.
 
 - **Publish events:**
   ```typescript
-  import { eventBus } from "runtime";
+  import { eventBus } from "@jasonshimmy/custom-elements-runtime";
   eventBus.emit("cart:add", { id: 123 });
   ```
 - **Subscribe to events:**
@@ -32,9 +32,8 @@ Pass data from parent to child using props and attributes (string, number, boole
   <user-card name="Alice" age="30"></user-card>
   ```
   ```typescript
-  component("user-card", {
-    props: { name: { type: String }, age: { type: Number } },
-    render: (ctx) => html`<div>${ctx.name} (${ctx.age})</div>`
+  component("user-card", ({ name = '', age = 0 }) => {
+    return html`<div>${name} (${age})</div>`;
   });
   ```
 
@@ -55,17 +54,24 @@ Use the built-in store for global or shared state.
 
 - **Create a store:**
   ```typescript
-  import { createStore } from "runtime";
+  import { createStore } from "@jasonshimmy/custom-elements-runtime";
   const store = createStore({ theme: "light" });
   ```
 - **Access in components:**
   ```typescript
-  component("theme-toggle", {
-    render: (ctx) => html`
-      <button @click="${() => store.getState().theme = store.getState().theme === 'light' ? 'dark' : 'light'}">
+  import { component, html } from "@jasonshimmy/custom-elements-runtime";
+  
+  component("theme-toggle", (props, { emit }) => {
+    const toggleTheme = () => {
+      const currentTheme = store.getState().theme;
+      store.getState().theme = currentTheme === 'light' ? 'dark' : 'light';
+    };
+    
+    return html`
+      <button @click="${toggleTheme}">
         Theme: ${store.getState().theme}
       </button>
-    `
+    `;
   });
   ```
 
@@ -75,8 +81,8 @@ Use native DOM events for direct communication.
 
 - **Dispatch custom events (from within runtime component):**
   ```typescript
-  // Use context.emit for custom events
-  ctx.emit('my-event', { foo: 'bar' });
+  // Use emit parameter for custom events
+  emit('my-event', { foo: 'bar' });
   ```
 - **Listen in parent (frameworks):**
   - Vue: `<my-child @my-event="handleEvent" />`
@@ -105,12 +111,15 @@ For recommended `bubbles: true, composed: true` options and integration tips, se
 ## ❓ FAQ
 
 **Q: When should I use the event bus?**
+
 A: For decoupled, app-wide events or when components do not have a direct parent-child relationship.
 
 **Q: How do I share state between components?**
+
 A: Use the built-in store or pass props for local state.
 
 **Q: Can I use native DOM events?**
+
 A: Yes, for direct communication or integration with other libraries.
 
 ## 🏁 Summary

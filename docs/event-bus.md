@@ -51,18 +51,34 @@ You can remove listeners by calling the unsubscribe function returned by `.on()`
 ## 🧩 Example: Component Communication
 
 ```ts
-// In sender component
-html`<button @click="${() => eventBus.emit('notify', 'Hello!')}">Notify</button>`
+// Sender component
+component('notification-sender', () => {
+  return html`
+    <button @click="${() => eventBus.emit('notify', 'Hello!')}">
+      Send Notification
+    </button>
+  `;
+});
 
-// In receiver component
-onConnected: (ctx) => {
-  ctx.unsub = eventBus.on('notify', (msg) => {
-    ctx.message = msg;
+// Receiver component
+component('notification-receiver', () => {
+  const message = ref('');
+  
+  useOnConnected(() => {
+    const unsubscribe = eventBus.on('notify', (msg) => {
+      message.value = msg;
+    });
+    
+    // Return cleanup function
+    return unsubscribe;
   });
-},
-onDisconnected: (ctx) => {
-  ctx.unsub(); // Clean up
-}
+  
+  return html`
+    <div class="notification">
+      ${message.value && html`<p>Received: ${message.value}</p>`}
+    </div>
+  `;
+});
 ```
 
 ## 💡 Tips

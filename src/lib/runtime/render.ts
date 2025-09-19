@@ -24,17 +24,8 @@ export function renderComponent<S extends object, C extends object, P extends ob
   contextStack.push(context);
 
   try {
-    if (cfg.loadingTemplate && context.isLoading) {
-      renderOutput(shadowRoot, cfg.loadingTemplate(context), context, refs, setHtmlString);
-      return;
-    }
-
-    if (cfg.errorTemplate && context.hasError) {
-      if (context.error instanceof Error) {
-        renderOutput(shadowRoot, cfg.errorTemplate(context.error, context), context, refs, setHtmlString);
-      }
-      return;
-    }
+    // Loading and error states are now handled directly in the functional components
+    // rather than through config templates
 
     const outputOrPromise = cfg.render(context);
 
@@ -50,12 +41,10 @@ export function renderComponent<S extends object, C extends object, P extends ob
         .catch((error) => {
           setLoading(false);
           setError(error);
-          if (cfg.errorTemplate)
-            renderOutput(shadowRoot, cfg.errorTemplate(error, context), context, refs, setHtmlString);
+          // Error handling is now done in the functional components directly
         });
 
-      if (cfg.loadingTemplate)
-        renderOutput(shadowRoot, cfg.loadingTemplate(context), context, refs, setHtmlString);
+      // Loading state is now handled in the functional components directly
       return;
     }
 
@@ -88,7 +77,7 @@ export function renderOutput<S extends object, C extends object, P extends objec
 }
 
 /**
- * Debounced render request.
+ * Debounced render request with infinite loop protection.
  */
 export function requestRender(
   renderFn: () => void,
@@ -102,10 +91,28 @@ export function requestRender(
   if (renderTimeoutId !== null) clearTimeout(renderTimeoutId);
 
   const now = Date.now();
-  if (now - lastRenderTime < 16) {
+  const isRapidRender = now - lastRenderTime < 16;
+  
+  if (isRapidRender) {
     setRenderCount(renderCount + 1);
-    if (renderCount > 10) {
-      // Skip render to avoid tight loop; no logging to keep runtime slim
+    // Progressive warnings and limits
+    if (renderCount === 15) {
+      console.warn(
+        '⚠️ Component is re-rendering rapidly. This might indicate:\n' +
+        '  Common causes:\n' +
+        '  • Event handler calling a function immediately: @click="${fn()}" should be @click="${fn}"\n' +
+        '  • State modification during render\n' +
+        '  • Missing dependencies in computed/watch\n' +
+        '  Component rendering will be throttled to prevent browser freeze.'
+      );
+    } else if (renderCount > 20) {
+      // More aggressive limit for severe infinite loops
+      console.error(
+        '🛑 Infinite loop detected in component render:\n' +
+        '  • This might be caused by state updates during render\n' +
+        '  • Ensure all state modifications are done in event handlers or effects\n' +
+        'Stopping runaway component render to prevent browser freeze'
+      );
       setRenderTimeoutId(null);
       return;
     }
@@ -117,7 +124,7 @@ export function requestRender(
     setLastRenderTime(Date.now());
     renderFn();
     setRenderTimeoutId(null);
-  }, 0);
+  }, renderCount > 10 ? 100 : 0); // Add delay for rapid renders
   setRenderTimeoutId(timeoutId);
 }
 
@@ -126,7 +133,6 @@ export function requestRender(
  */
 export function applyStyle<S extends object, C extends object, P extends object, T extends object>(
   shadowRoot: ShadowRoot | null,
-  cfg: ComponentConfig<S, C, P, T>,
   context: ComponentContext<S, C, P, T>,
   htmlString: string,
   styleSheet: CSSStyleSheet | null,
@@ -136,16 +142,17 @@ export function applyStyle<S extends object, C extends object, P extends object,
 
   const jitCss = jitCSS(htmlString);
 
-  if (!cfg.style && (!jitCss || jitCss.trim() === "")) {
+  if ((!jitCss || jitCss.trim() === "") && !(context as any)._computedStyle) {
     setStyleSheet(null);
     shadowRoot.adoptedStyleSheets = [getBaseResetSheet()];
     return;
   }
 
   let userStyle = "";
-  if (cfg.style) {
-    if (typeof cfg.style === "string") userStyle = cfg.style;
-    else if (typeof cfg.style === "function") userStyle = cfg.style(context);
+  
+  // Check for precomputed style from useStyle hook
+  if ((context as any)._computedStyle) {
+    userStyle = (context as any)._computedStyle;
   }
 
   let finalStyle = sanitizeCSS(`${userStyle}\n${jitCss}\n`);

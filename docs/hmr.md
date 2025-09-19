@@ -43,9 +43,14 @@ if (
 ## 🧩 HMR-Friendly Component Example
 
 ```typescript
-component("hmr-demo", {
-  state: { count: 0 },
-  render: (ctx) => html`<button @click="${() => ctx.count++}">${ctx.count}</button>`
+component("hmr-demo", ({ initialCount = 0 }, emit) => {
+  const count = ref(initialCount);
+  
+  const handleClick = () => {
+    count.value++;
+  };
+  
+  return html`<button @click="${handleClick}">${count.value}</button>`;
 });
 ```
 
@@ -55,18 +60,18 @@ component("hmr-demo", {
 
 ## 🚀 HMR Best Practices
 
-- **Keep state outside config:** State is preserved across HMR updates
-- **Avoid side effects in config:** Only pure logic should be in component configs
-- **Use error boundaries:** Catch and display errors during HMR updates
+- **Use functional components:** The streamlined functional API works seamlessly with HMR
+- **Keep state external:** External reactive state is preserved across HMR updates
+- **Avoid side effects in render:** Keep component functions pure for reliable updates
 - **Test with multiple instances:** Ensure all live elements update correctly
 
 ## 🛠️ Internal HMR Logic
 
 - **Registry update:**
-  - New configs replace old ones in the internal registry (dev-only visibility)
+  - New component functions replace old ones in the internal registry
 - **Instance refresh:**
-  - All DOM elements matching the tag are updated
-  - Internal `_cfg` and `_render` are called for each instance
+  - All DOM elements matching the tag are updated with the new component function
+  - Internal render methods are called for each instance
 - **Error handling:**
   - Errors during HMR are caught and displayed using error boundaries
 

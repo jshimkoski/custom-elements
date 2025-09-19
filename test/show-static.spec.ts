@@ -1,5 +1,6 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { component } from "../src/lib/runtime/component";
+import { ref } from "../src/lib/runtime/reactive";
 import { html } from "../src/lib/runtime/template-compiler";
 
 describe("test :show directive static", () => {
@@ -15,11 +16,11 @@ describe("test :show directive static", () => {
   });
 
   it("should set display: none when :show is false", async () => {
-    component("test-show-static", {
-      state: { isVisible: false },
-      render: (ctx) => html`
-        <div :show="${ctx.isVisible}">Should be hidden</div>
-      `
+    component("test-show-static", () => {
+      const isVisible = ref(false);
+      return html`
+        <div :show="${isVisible.value}">Should be hidden</div>
+      `;
     });
 
     container.innerHTML = "<test-show-static></test-show-static>";
@@ -31,11 +32,11 @@ describe("test :show directive static", () => {
   });
 
   it("should not set display style when :show is true", async () => {
-    component("test-show-static-visible", {
-      state: { isVisible: true },
-      render: (ctx) => html`
-        <div :show="${ctx.isVisible}">Should be visible</div>
-      `
+    component("test-show-static-visible", () => {
+      const isVisible = ref(true);
+      return html`
+        <div :show="${isVisible.value}">Should be visible</div>
+      `;
     });
 
     container.innerHTML = "<test-show-static-visible></test-show-static-visible>";

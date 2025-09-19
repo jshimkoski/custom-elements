@@ -9,10 +9,11 @@ export interface VNode {
     key?: string;
     props?: any;
     attrs?: Record<string, any>;
-  directives?: Record<string, { value: string; modifiers: string[]; arg?: string }>;
-  ref?: string;
-  /** Compiler-provided hint: whether this VNode represents a custom element (contains a dash) */
-  isCustomElement?: boolean;
+    directives?: Record<string, { value: string; modifiers: string[]; arg?: string }>;
+    ref?: string;
+    reactiveRef?: any; // For reactive state objects
+    /** Compiler-provided hint: whether this VNode represents a custom element (contains a dash) */
+    isCustomElement?: boolean;
   };
   children?: VNode[] | string;
 }
@@ -35,8 +36,7 @@ export type LifecycleKeys =
   | "onConnected"
   | "onDisconnected"
   | "onAttributeChanged"
-  | "onError"
-  | "errorFallback";
+  | "onError";
 
 
 export interface WatchOptions {
@@ -105,8 +105,6 @@ export type ComponentConfig<
   P extends object = {},
   T extends object = {},
 > = {
-  state?: S;
-  computed?: { [K in keyof C]: (context: ComponentContext<S, C, P, T>) => C[K] };
   props?: Record<
     string,
     {
@@ -114,14 +112,7 @@ export type ComponentConfig<
       default?: string | number | boolean;
     }
   >;
-  watch?: WatchConfig<ComponentContext<S, C, P, T>>;
-  style?: string | ((context: ComponentContext<S, C, P, T>) => string);
   render: (context: ComponentContext<S, C, P, T>) => VNode | VNode[] | Promise<VNode | VNode[]>;
-  loadingTemplate?: (context: ComponentContext<S, C, P, T>) => VNode | VNode[];
-  errorTemplate?: (
-    error: Error,
-    context: ComponentContext<S, C, P, T>,
-  ) => VNode | VNode[];
   onConnected?: (
     context: ComponentContext<S, C, P, T>,
   ) => void;
@@ -138,10 +129,6 @@ export type ComponentConfig<
     error: Error | null,
     context: ComponentContext<S, C, P, T>,
   ) => void;
-  errorFallback?: (
-    error: Error | null,
-    context: ComponentContext<S, C, P, T>,
-  ) => string;
 } & {
   // Map injected methods from the T generic onto the config object so
   // function properties keep their parameter types when a caller supplies

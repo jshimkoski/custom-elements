@@ -5,7 +5,7 @@ emitting and handling events across framework boundaries.
 
 ## Core idea
 
-- Components should emit standard DOM CustomEvents. Use `context.emit(name, detail)`
+- Components should emit standard DOM CustomEvents. Use the `useEmit()` hook
   or dispatch a `CustomEvent` directly from the component. Events should generally
   set `bubbles: true` and `composed: true` so they cross shadow boundaries and are
   discoverable by host frameworks.
@@ -15,21 +15,22 @@ emitting and handling events across framework boundaries.
 
 ## Emitting events from components
 
-Use `context.emit` inside your component to dispatch events:
+Use the `useEmit()` hook inside your component function to get the emit function:
 
 ```ts
-// preferred
-ctx.emit('save', { id: 123 });
-
-// equivalent low-level form
-this.dispatchEvent(new CustomEvent('save', {
-  detail: { id: 123 },
-  bubbles: true,
-  composed: true,
-}));
+// In your component function
+component('my-component', ({ title = 'Save' }) => {
+  const emit = useEmit();
+  
+  const handleSave = () => {
+    emit('save', { id: 123, title });
+  };
+  
+  return html`<button @click="${handleSave}">${title}</button>`;
+});
 ```
 
-API note: `ctx.emit(name, detail?, options?)` forwards `options` to the underlying CustomEvent constructor (for example `{ cancelable: true, bubbles: true, composed: true }`) and returns a boolean indicating whether the event was not prevented (i.e., `true` == not defaultPrevented).
+API note: `emit(name, detail?, options?)` forwards `options` to the underlying CustomEvent constructor (for example `{ cancelable: true, bubbles: true, composed: true }`) and returns a boolean indicating whether the event was not prevented (i.e., `true` == not defaultPrevented).
 
 Recommendation: always use `bubbles: true` and `composed: true` for events that
 need to reach host pages or framework templates.
@@ -44,14 +45,27 @@ How to emit a cancelable event from a component:
 
 ```ts
 // inside component logic
-// emit a cancelable event and get a boolean result indicating whether the
-// event was *not* defaultPrevented (true == allowed)
-const allowed = ctx.emit('close', { reason: 'user' }, { cancelable: true });
-if (!allowed) {
-  // the host prevented the close by calling event.preventDefault()
-  return; // abort closing
-}
-// proceed to close the component
+component('closable-modal', ({ onClose }) => {
+  const emit = useEmit();
+  
+  const handleCloseRequest = () => {
+    // emit a cancelable event and get a boolean result indicating whether the
+    // event was *not* defaultPrevented (true == allowed)
+    const allowed = emit('close', { reason: 'user' }, { cancelable: true });
+    if (!allowed) {
+      // the host prevented the close by calling event.preventDefault()
+      return; // abort closing
+    }
+    // proceed to close the component
+    onClose?.();
+  };
+  
+  return html`
+    <div class="modal">
+      <button @click="${handleCloseRequest}">Close</button>
+    </div>
+  `;
+});
 ```
 
 How a host can prevent the action:
@@ -66,10 +80,10 @@ modal.addEventListener('close', (ev) => {
 ```
 
 Notes and best practices:
-- Call `ctx.emit(name, detail, { cancelable: true })` only when the action is
+- Call `emit(name, detail, { cancelable: true })` only when the action is
   logically a request that the host might legitimately block. Most events are
   simple notifications and shouldn't be cancelable by default.
-- The runtime helper `ctx.emit` returns `true` when the event was not prevented
+- The runtime helper `emit` returns `true` when the event was not prevented
   (convenient for immediate checks). Always check this return value before
   continuing with an action that the host can veto.
 - Parser caveat: some host framework template parsers (or strict linters) may
@@ -95,8 +109,25 @@ get a reference to the element and add/remove listeners using `addEventListener`
 
 ```html
 <!-- child component (emit a semantic event) -->
-<!-- inside the child: -->
-<!-- ctx.emit('open', { id: 42 }) -->
+```
+
+```ts
+component('item-list', ({ items = [] }) => {
+  const emit = useEmit();
+  
+  const handleItemClick = (item) => {
+    emit('item-selected', { item });
+  };
+  
+  return html`
+    ${each(items, item => html`
+      <div @click="${() => handleItemClick(item)}">
+        ${item.name}
+      </div>
+    `)}
+  `;
+});
+```
 
 <!-- parent (runtime template) -->
 <cer-button @open="${ctx.handleOpen}" />
@@ -137,5 +168,5 @@ Recommendation: avoid reusing native event names (like `click`) for semantic pay
   - When you need closure capture or imperative wiring, use refs and `addEventListener`.
 
 ## See also
-- `component.md`, `component-config.md`, `cross-component-communication.md`, and
+- `functional-api.md`, `cross-component-communication.md`, and
   framework integration guides for concrete examples.

@@ -8,6 +8,7 @@ Directive enhancements provide advanced, ergonomic utilities built on top of the
 
 ```typescript
 import {
+  component, html, ref, computed,
   unless, whenEmpty, whenNotEmpty, eachWhere, switchOnLength,
   eachGroup, eachPage, switchOnPromise, whenMedia, responsive,
   whenVariants, responsiveSwitch, switchOn
@@ -21,11 +22,13 @@ import {
 Render content when condition is **false** (opposite of `when`).
 
 ```typescript
-render: (ctx) => html`
-  ${unless(ctx.user.isLoggedIn, html`
-    <login-button></login-button>
-  `)}
-`
+component('auth-component', ({ user }) => {
+  return html`
+    ${unless(user?.isLoggedIn, html`
+      <login-button></login-button>
+    `)}
+  `;
+});
 ```
 
 ### `whenEmpty` - Empty State Rendering
@@ -33,11 +36,13 @@ render: (ctx) => html`
 Render content only when array/collection is empty.
 
 ```typescript
-render: (ctx) => html`
-  ${whenEmpty(ctx.items, html`
-    <div class="empty-state">No items found</div>
-  `)}
-`
+component('items-list', ({ items = [] }) => {
+  return html`
+    ${whenEmpty(items, html`
+      <div class="empty-state">No items found</div>
+    `)}
+  `;
+});
 ```
 
 ### `whenNotEmpty` - Non-Empty State
@@ -45,11 +50,13 @@ render: (ctx) => html`
 Render content only when collection has items.
 
 ```typescript
-render: (ctx) => html`
-  ${whenNotEmpty(ctx.items, html`
-    <div class="item-count">${ctx.items.length} items</div>
-  `)}
-`
+component('items-counter', ({ items = [] }) => {
+  return html`
+    ${whenNotEmpty(items, html`
+      <div class="item-count">${items.length} items</div>
+    `)}
+  `;
+});
 ```
 
 ## 📋 Collection Directives
@@ -59,17 +66,19 @@ render: (ctx) => html`
 Enhanced `each` with built-in filtering capability.
 
 ```typescript
-render: (ctx) => html`
-  <div class="active-users">
-    ${eachWhere(
-      ctx.users,
-      (user) => user.isActive,
-      (user, originalIndex, filteredIndex) => html`
-        <user-card :user="${user}" data-index="${filteredIndex}"></user-card>
-      `
-    )}
-  </div>
-`
+component('filtered-users', ({ users = [] }: { users?: Array<{ isActive: boolean }> }) => {
+  return html`
+    <div class="active-users">
+      ${eachWhere(
+        users,
+        (user) => user.isActive,
+        (user, originalIndex, filteredIndex) => html`
+          <user-card :user="${user}" data-index="${filteredIndex}"></user-card>
+        `
+      )}
+    </div>
+  `;
+});
 ```
 
 ### `eachGroup` - Grouped Rendering
@@ -77,20 +86,22 @@ render: (ctx) => html`
 Group items by a key and render each group with a header.
 
 ```typescript
-render: (ctx) => html`
-  ${eachGroup(
-    ctx.orders,
-    (order) => order.status,
-    (status, orders) => html`
-      <div class="status-group">
-        <h3>${status}</h3>
-        ${orders.map(order => html`
-          <order-item :order="${order}"></order-item>
-        `)}
-      </div>
-    `
-  )}
-`
+component('grouped-orders', ({ orders = [] }: { orders?: Array<{ status: string }> }) => {
+  return html`
+    ${eachGroup(
+      orders,
+      (order) => order.status,
+      (status, orders) => html`
+        <div class="status-group">
+          <h3>${status}</h3>
+          ${orders.map(order => html`
+            <order-item :order="${order}"></order-item>
+          `)}
+        </div>
+      `
+    )}
+  `;
+});
 ```
 
 ### `eachPage` - Paginated Rendering
@@ -98,22 +109,35 @@ render: (ctx) => html`
 Render specific page of items with pagination support.
 
 ```typescript
-render: (ctx) => html`
-  <div class="products-grid">
-    ${eachPage(
-      ctx.products,
-      ctx.pageSize,
-      ctx.currentPage,
-      (product, globalIndex, pageIndex) => html`
-        <product-card 
-          :product="${product}" 
-          data-global="${globalIndex}" 
-          data-page="${pageIndex}"
-        ></product-card>
-      `
-    )}
-  </div>
-`
+component('paginated-products', ({ 
+  products = [],
+  pageSize = 10,
+  currentPage = 1
+}: {
+  products?: any[];
+  pageSize?: number;
+  currentPage?: number;
+}) => {
+  return html`
+    <div class="products-grid">
+      ${eachPage(
+        products,
+        pageSize,
+        currentPage,
+        (product, globalIndex, pageIndex) => html`
+          <product-card 
+            :product="${product}" 
+            data-global="${globalIndex}" 
+            data-page="${pageIndex}"
+          ></product-card>
+        `
+      )}
+    </div>
+  `;
+});
+```
+
+### `switchOnLength` - Length-Based Rendering
 ```
 
 ### `switchOnLength` - Length-Based Rendering
@@ -121,21 +145,23 @@ render: (ctx) => html`
 Render different content based on array length.
 
 ```typescript
-render: (ctx) => html`
-  ${switchOnLength(ctx.notifications, {
-    empty: html`<div class="no-notifications">All caught up!</div>`,
-    one: (notification) => html`
-      <single-notification :notification="${notification}"></single-notification>
-    `,
-    many: (notifications) => html`
-      <notification-list :notifications="${notifications}"></notification-list>
-    `,
-    exactly: {
-      2: (notifications) => html`<twin-notifications :pair="${notifications}"></twin-notifications>`,
-      5: (notifications) => html`<priority-stack :items="${notifications}"></priority-stack>`
-    }
-  })}
-`
+component('notification-manager', ({ notifications = [] }: { notifications?: any[] }) => {
+  return html`
+    ${switchOnLength(notifications, {
+      empty: html`<div class="no-notifications">All caught up!</div>`,
+      one: (notification) => html`
+        <single-notification :notification="${notification}"></single-notification>
+      `,
+      many: (notifications) => html`
+        <notification-list :notifications="${notifications}"></notification-list>
+      `,
+      exactly: {
+        2: (notifications) => html`<twin-notifications :pair="${notifications}"></twin-notifications>`,
+        5: (notifications) => html`<priority-stack :items="${notifications}"></priority-stack>`
+      }
+    })}
+  `;
+});
 ```
 
 ## ⏳ Async State Directives
@@ -145,18 +171,40 @@ render: (ctx) => html`
 Render different content based on promise/async state.
 
 ```typescript
-render: (ctx) => html`
-  ${switchOnPromise(ctx.apiState, {
-    loading: html`<loading-spinner></loading-spinner>`,
-    success: (data) => html`
-      <data-view :data="${data}"></data-view>
-    `,
-    error: (error) => html`
-      <error-message :error="${error}"></error-message>
-    `,
-    idle: html`<button @click="${ctx.loadData}">Load Data</button>`
-  })}
-`
+component('async-data-viewer', ({ 
+  initialState = 'idle' 
+}: {
+  initialState?: 'idle' | 'loading' | 'success' | 'error';
+}) => {
+  const apiState = ref(initialState);
+  const data = ref(null);
+  const error = ref(null);
+  
+  const loadData = async () => {
+    apiState.value = 'loading';
+    try {
+      const response = await fetch('/api/data');
+      data.value = await response.json();
+      apiState.value = 'success';
+    } catch (err) {
+      error.value = err;
+      apiState.value = 'error';
+    }
+  };
+  
+  return html`
+    ${switchOnPromise(apiState.value, {
+      loading: html`<loading-spinner></loading-spinner>`,
+      success: () => html`
+        <data-view :data="${data.value}"></data-view>
+      `,
+      error: () => html`
+        <error-message :error="${error.value}"></error-message>
+      `,
+      idle: html`<button @click="${loadData}">Load Data</button>`
+    })}
+  `;
+});
 ```
 
 ## 📱 Responsive Directives
@@ -166,14 +214,16 @@ render: (ctx) => html`
 Render content when media query matches.
 
 ```typescript
-render: (ctx) => html`
-  ${whenMedia('(min-width: 768px)', html`
-    <desktop-navigation></desktop-navigation>
-  `)}
-  ${whenMedia('(max-width: 767px)', html`
-    <mobile-menu></mobile-menu>
-  `)}
-`
+component('responsive-navigation', () => {
+  return html`
+    ${whenMedia('(min-width: 768px)', html`
+      <desktop-navigation></desktop-navigation>
+    `)}
+    ${whenMedia('(max-width: 767px)', html`
+      <mobile-menu></mobile-menu>
+    `)}
+  `;
+});
 ```
 
 ### `responsive` Object - Breakpoint Utilities
@@ -181,15 +231,17 @@ render: (ctx) => html`
 Pre-built responsive helpers matching the style system.
 
 ```typescript
-render: (ctx) => html`
-  ${responsive.sm(html`<small-screen-content></small-screen-content>`)}
-  ${responsive.md(html`<medium-screen-content></medium-screen-content>`)}
-  ${responsive.lg(html`<large-screen-content></large-screen-content>`)}
-  ${responsive.dark(html`<dark-mode-content></dark-mode-content>`)}
-  ${responsive.light(html`<light-mode-content></light-mode-content>`)}
-  ${responsive.touch(html`<touch-device-content></touch-device-content>`)}
-  ${responsive.portrait(html`<portrait-content></portrait-content>`)}
-`
+component('responsive-content', () => {
+  return html`
+    ${responsive.sm(html`<small-screen-content></small-screen-content>`)}
+    ${responsive.md(html`<medium-screen-content></medium-screen-content>`)}
+    ${responsive.lg(html`<large-screen-content></large-screen-content>`)}
+    ${responsive.dark(html`<dark-mode-content></dark-mode-content>`)}
+    ${responsive.light(html`<light-mode-content></light-mode-content>`)}
+    ${responsive.touch(html`<touch-device-content></touch-device-content>`)}
+    ${responsive.portrait(html`<portrait-content></portrait-content>`)}
+  `;
+});
 ```
 
 **Available responsive helpers:**
@@ -204,14 +256,16 @@ render: (ctx) => html`
 Combine dark mode and responsive conditions (matches style system).
 
 ```typescript
-render: (ctx) => html`
-  ${whenVariants(['dark', 'lg'], html`
-    <dark-large-screen-layout></dark-large-screen-layout>
-  `)}
-  ${whenVariants(['light', 'sm'], html`
-    <light-mobile-layout></light-mobile-layout>
-  `)}
-`
+component('variant-layout', () => {
+  return html`
+    ${whenVariants(['dark', 'lg'], html`
+      <dark-large-screen-layout></dark-large-screen-layout>
+    `)}
+    ${whenVariants(['light', 'sm'], html`
+      <light-mobile-layout></light-mobile-layout>
+    `)}
+  `;
+});
 ```
 
 ### `responsiveSwitch` - Breakpoint Content Switching
@@ -219,13 +273,15 @@ render: (ctx) => html`
 Render different content for different breakpoints and dark mode.
 
 ```typescript
-render: (ctx) => html`
-  ${responsiveSwitch({
-    base: html`<mobile-view></mobile-view>`,
-    md: html`<tablet-view></tablet-view>`,
-    lg: html`<desktop-view></desktop-view>`,
-  })}
-`
+component('responsive-layout', () => {
+  return html`
+    ${responsiveSwitch({
+      base: html`<mobile-view></mobile-view>`,
+      md: html`<tablet-view></tablet-view>`,
+      lg: html`<desktop-view></desktop-view>`,
+    })}
+  `;
+});
 ```
 
 ## 🔀 General Purpose Directives
@@ -235,14 +291,16 @@ render: (ctx) => html`
 Declarative switch/case with fluent API.
 
 ```typescript
-render: (ctx) => html`
-  ${switchOn(ctx.user.role)
-    .case('admin', html`<admin-panel></admin-panel>`)
-    .case('moderator', html`<mod-tools></mod-tools>`)
-    .when(role => role.startsWith('user'), html`<user-dashboard></user-dashboard>`)
-    .otherwise(html`<access-denied></access-denied>`)
-    .done()}
-`
+component('role-based-ui', ({ user = { role: 'guest' } }: { user?: { role: string } }) => {
+  return html`
+    ${switchOn(user.role)
+      .case('admin', html`<admin-panel></admin-panel>`)
+      .case('moderator', html`<mod-tools></mod-tools>`)
+      .when(role => role.startsWith('user'), html`<user-dashboard></user-dashboard>`)
+      .otherwise(html`<access-denied></access-denied>`)
+      .done()}
+  `;
+});
 ```
 
 ## 📐 Breakpoint Values
