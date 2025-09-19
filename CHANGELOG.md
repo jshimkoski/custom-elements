@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v1.0.3] - 2025-09-19
+
+- fix: add min-h-screen, min-w-screen (135f029)
+- fix: add max-w-screen, max-h-screen (aaa1089)
+
+
 ## [v1.0.2] - 2025-09-19
 
 - fix: add max-w-screen, max-h-screen (aaa1089)
