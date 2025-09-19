@@ -1,6 +1,23 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v1.0.0] - 2025-09-19
+
+- fix: improve caching, security, and inifinite loop protection docs: update documentation for secure expression evaluator and improve event manager metadata handling (d414d8c)
+- fix: remove dangerous eval test: improve test coverage (0058f86)
+- docs: fix best practices for styling (3f1ea14)
+- docs: fix toc for github (cf7913f)
+- docs: add table of contents to function api docs (8b38fc9)
+- docs: clean up functional api new wording (794fb38)
+- docs: clean up functional api docs (52d875b)
+- docs: update bindings to reference refs instead of state (db7e8f9)
+- docs: fix cross component communication faq (3cc1c5c)
+- docs: fix troubleshooting (094a1f3)
+- docs: update readme example (7efdd8a)
+- BREAKING CHANGE: migrate to functional API (d62b2ba)
+- - fix: :model, :model:prop, :prop binding - fix: enhance test suite - fix: add enhanced directives - fix: improve dev logging (7d89209)
+
+
 ## [v0.3.1] - 2025-09-09
 
 - - fix: :model, :model:prop, :prop binding - fix: enhance test suite - fix: add enhanced directives - fix: improve dev logging (7d89209)
