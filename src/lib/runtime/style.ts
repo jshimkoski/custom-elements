@@ -314,6 +314,8 @@ export const utilityMap: CSSMap = {
   "max-h-screen": "max-height:100dvh;",
   "min-w-0": "min-width:0;",
   "min-h-0": "min-height:0;",
+  "min-w-screen": "min-width:100dvw;",
+  "min-h-screen": "min-height:100dvh;",
   ...generateSemanticSizeClasses(),
   "m-auto": "margin:auto;",
   "mx-auto": "margin-inline:auto;",
