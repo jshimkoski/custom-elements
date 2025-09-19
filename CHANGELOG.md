@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v1.0.2] - 2025-09-19
+
+- fix: add max-w-screen, max-h-screen (aaa1089)
+- fix reactive state issue that prevented refs from working (5a8244c)
+
+
 ## [v1.0.1] - 2025-09-19
 
 - fix reactive state issue that prevented refs from working (5a8244c)
