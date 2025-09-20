@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v1.0.4] - 2025-09-20
+
+- fix: add missing border and rounded classes fix: reference border with for border related arbitrary values (bf27851)
+- fix: add min-h-screen, min-w-screen (135f029)
+
+
 ## [v1.0.3] - 2025-09-19
 
 - fix: add min-h-screen, min-w-screen (135f029)
