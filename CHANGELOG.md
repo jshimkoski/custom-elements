@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v1.0.6] - 2025-09-21
+
+- fix: expand border, rounded, and grid classes (b1dd1cb)
+- fix: add missing overflow classes (eb6620b)
+
+
 ## [v1.0.5] - 2025-09-21
 
 - fix: add missing overflow classes (eb6620b)
