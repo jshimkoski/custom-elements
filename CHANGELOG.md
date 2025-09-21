@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v1.0.5] - 2025-09-21
+
+- fix: add missing overflow classes (eb6620b)
+- fix: add missing border and rounded classes fix: reference border with for border related arbitrary values (bf27851)
+
+
 ## [v1.0.4] - 2025-09-20
 
 - fix: add missing border and rounded classes fix: reference border with for border related arbitrary values (bf27851)
