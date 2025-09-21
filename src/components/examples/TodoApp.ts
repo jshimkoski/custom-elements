@@ -53,7 +53,7 @@ export const TodoApp = component('todo-app', () => {
       </form>
       <ul>
         ${each(todos.value, (todo) => html`
-          <li class="flex items-center gap-2 py-2 border-b border-neutral-200 dark:border-neutral-800">
+          <li class="flex items-center gap-2 py-2 border-b border-neutral-200 last:border-b-0 dark:border-neutral-800">
             <input
               type="checkbox"
               :checked="${todo.done}"

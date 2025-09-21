@@ -284,12 +284,130 @@ const generateSemanticSizeClasses = (): CSSMap => {
 
 const generateGridClasses = (): CSSMap => {
   const classes: CSSMap = {};
-  for (const key of [1,2,3,4,5,6,7,8,9,10,11,12]) {
+  const gridSizes = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+
+  for (const key of gridSizes) {
+    // Grid template definitions
     classes[`grid-cols-${key}`] = `grid-template-columns:repeat(${key},minmax(0,1fr));`;
     classes[`grid-rows-${key}`] = `grid-template-rows:repeat(${key},minmax(0,1fr));`;
+
+    // Span utilities
     classes[`col-span-${key}`] = `grid-column:span ${key} / span ${key};`;
     classes[`row-span-${key}`] = `grid-row:span ${key} / span ${key};`;
+
+    // Start/end positioning
+    classes[`col-start-${key}`] = `grid-column-start:${key};`;
+    classes[`col-end-${key}`] = `grid-column-end:${key};`;
+    classes[`row-start-${key}`] = `grid-row-start:${key};`;
+    classes[`row-end-${key}`] = `grid-row-end:${key};`;
   }
+
+  // Special utility classes
+  classes["grid-cols-none"] = "grid-template-columns:none;";
+  classes["grid-rows-none"] = "grid-template-rows:none;";
+  classes["col-span-full"] = "grid-column:1 / -1;";
+  classes["row-span-full"] = "grid-row:1 / -1;";
+
+  // Auto columns
+  classes["auto-cols-auto"] = "grid-auto-columns:auto;";
+  classes["auto-cols-min"] = "grid-auto-columns:min-content;";
+  classes["auto-cols-max"] = "grid-auto-columns:max-content;";
+  classes["auto-cols-fr"] = "grid-auto-columns:1fr;";
+
+  // Auto rows
+  classes["auto-rows-auto"] = "grid-auto-rows:auto;";
+  classes["auto-rows-min"] = "grid-auto-rows:min-content;";
+  classes["auto-rows-max"] = "grid-auto-rows:max-content;";
+  classes["auto-rows-fr"] = "grid-auto-rows:1fr;";
+
+  // Grid flow
+  classes["grid-flow-row"] = "grid-auto-flow:row;";
+  classes["grid-flow-col"] = "grid-auto-flow:column;";
+  classes["grid-flow-row-dense"] = "grid-auto-flow:row dense;";
+  classes["grid-flow-col-dense"] = "grid-auto-flow:column dense;";
+
+  return classes;
+};
+
+const generateBorderWidthClasses = (): CSSMap => {
+  const classes: CSSMap = {};
+  const borderWidths = [0, 1, 2, 4, 6, 8];
+
+  for (const key of borderWidths) {
+    const px = `${key}px`;
+
+    // Base border width
+    classes[`border-${key}`] = `border-width:${px};`;
+
+    // Logical directions
+    classes[`border-s-${key}`] = `border-inline-start-width:${px};`;
+    classes[`border-e-${key}`] = `border-inline-end-width:${px};`;
+    classes[`border-bs-${key}`] = `border-block-start-width:${px};`;
+    classes[`border-be-${key}`] = `border-block-end-width:${px};`;
+
+    // Axes
+    classes[`border-x-${key}`] = `border-inline-width:${px};`;
+    classes[`border-y-${key}`] = `border-block-width:${px};`;
+
+    // Physical directions
+    classes[`border-t-${key}`] = `border-top-width:${px};`;
+    classes[`border-r-${key}`] = `border-right-width:${px};`;
+    classes[`border-b-${key}`] = `border-bottom-width:${px};`;
+    classes[`border-l-${key}`] = `border-left-width:${px};`;
+  }
+
+  // Base border classes (no numeric suffix)
+  classes["border"] = "border-width:1px;";
+  classes["border-t"] = "border-top-width:1px;";
+  classes["border-r"] = "border-right-width:1px;";
+  classes["border-b"] = "border-bottom-width:1px;";
+  classes["border-l"] = "border-left-width:1px;";
+  classes["border-x"] = "border-left-width:1px;border-right-width:1px;";
+  classes["border-y"] = "border-top-width:1px;border-bottom-width:1px;";
+  classes["border-s"] = "border-inline-start-width:1px;";
+  classes["border-e"] = "border-inline-end-width:1px;";
+  classes["border-bs"] = "border-block-start-width:1px;";
+  classes["border-be"] = "border-block-end-width:1px;";
+
+  return classes;
+};
+
+const generateRoundedClasses = (): CSSMap => {
+  const classes: CSSMap = {};
+  const radiusMap = {
+    none: 0,
+    xs: 2,
+    sm: 4,
+    md: 6,
+    lg: 8,
+    xl: 12,
+    "2xl": 16,
+    "3xl": 24,
+    "4xl": 32,
+    full: 9999,
+  };
+
+  for (const [key, value] of Object.entries(radiusMap)) {
+    const rem = value === 9999 ? '9999px' : `${value / 16}rem`;
+
+    // Base rounded
+    classes[`rounded-${key}`] = `border-radius:${rem};`;
+
+    // Logical corners
+    classes[`rounded-s-${key}`] = `border-start-start-radius:${rem};border-end-start-radius:${rem};`;
+    classes[`rounded-e-${key}`] = `border-start-end-radius:${rem};border-end-end-radius:${rem};`;
+
+    // Physical corners
+    classes[`rounded-t-${key}`] = `border-top-left-radius:${rem};border-top-right-radius:${rem};`;
+    classes[`rounded-r-${key}`] = `border-top-right-radius:${rem};border-bottom-right-radius:${rem};`;
+    classes[`rounded-b-${key}`] = `border-bottom-left-radius:${rem};border-bottom-right-radius:${rem};`;
+    classes[`rounded-l-${key}`] = `border-top-left-radius:${rem};border-bottom-left-radius:${rem};`;
+
+    // Axes
+    classes[`rounded-x-${key}`] = `border-top-left-radius:${rem};border-bottom-left-radius:${rem};border-top-right-radius:${rem};border-bottom-right-radius:${rem};`;
+    classes[`rounded-y-${key}`] = `border-top-left-radius:${rem};border-top-right-radius:${rem};border-bottom-left-radius:${rem};border-bottom-right-radius:${rem};`;
+  }
+
   return classes;
 };
 
@@ -384,63 +502,8 @@ export const utilityMap: CSSMap = {
   "text-8xl": "font-size:6rem;line-height:1",
 
   /* Borders */
-  border: "border-width:1px;",
-  "border-t": "border-top-width:1px;",
-  "border-r": "border-right-width:1px;",
-  "border-b": "border-bottom-width:1px;",
-  "border-l": "border-left-width:1px;",
-  "border-x": "border-inline-width:1px;",
-  "border-y": "border-block-width:1px;",
-  "border-2": "border-width:2px;",
-  "border-4": "border-width:4px;",
-  "border-6": "border-width:6px;",
-  "border-8": "border-width:8px;",
-  "rounded-none": "border-radius:0;",
-  "rounded-xs": "border-radius:0.125rem;",
-  "rounded-t-xs": "border-top-left-radius:0.125rem;border-top-right-radius:0.125rem;",
-  "rounded-r-xs": "border-top-right-radius:0.125rem;border-bottom-right-radius:0.125rem;",
-  "rounded-b-xs": "border-bottom-left-radius:0.125rem;border-bottom-right-radius:0.125rem;",
-  "rounded-l-xs": "border-top-left-radius:0.125rem;border-bottom-left-radius:0.125rem;",
-  "rounded-sm": "border-radius:0.25rem;",
-  "rounded-t-sm": "border-top-left-radius:0.25rem;border-top-right-radius:0.25rem;",
-  "rounded-r-sm": "border-top-right-radius:0.25rem;border-bottom-right-radius:0.25rem;",
-  "rounded-b-sm": "border-bottom-left-radius:0.25rem;border-bottom-right-radius:0.25rem;",
-  "rounded-l-sm": "border-top-left-radius:0.25rem;border-bottom-left-radius:0.25rem;",
-  "rounded-md": "border-radius:0.375rem;",
-  "rounded-t-md": "border-top-left-radius:0.375rem;border-top-right-radius:0.375rem;",
-  "rounded-r-md": "border-top-right-radius:0.375rem;border-bottom-right-radius:0.375rem;",
-  "rounded-b-md": "border-bottom-left-radius:0.375rem;border-bottom-right-radius:0.375rem;",
-  "rounded-l-md": "border-top-left-radius:0.375rem;border-bottom-left-radius:0.375rem;",
-  "rounded-lg": "border-radius:0.5rem;",
-  "rounded-t-lg": "border-top-left-radius:0.5rem;border-top-right-radius:0.5rem;",
-  "rounded-r-lg": "border-top-right-radius:0.5rem;border-bottom-right-radius:0.5rem;",
-  "rounded-b-lg": "border-bottom-left-radius:0.5rem;border-bottom-right-radius:0.5rem;",
-  "rounded-l-lg": "border-top-left-radius:0.5rem;border-bottom-left-radius:0.5rem;",
-  "rounded-xl": "border-radius:0.75rem;",
-  "rounded-t-xl": "border-top-left-radius:0.75rem;border-top-right-radius:0.75rem;",
-  "rounded-r-xl": "border-top-right-radius:0.75rem;border-bottom-right-radius:0.75rem;",
-  "rounded-b-xl": "border-bottom-left-radius:0.75rem;border-bottom-right-radius:0.75rem;",
-  "rounded-l-xl": "border-top-left-radius:0.75rem;border-bottom-left-radius:0.75rem;",
-  "rounded-2xl": "border-radius:1rem;",
-  "rounded-t-2xl": "border-top-left-radius:1rem;border-top-right-radius:1rem;",
-  "rounded-r-2xl": "border-top-right-radius:1rem;border-bottom-right-radius:1rem;",
-  "rounded-b-2xl": "border-bottom-left-radius:1rem;border-bottom-right-radius:1rem;",
-  "rounded-l-2xl": "border-top-left-radius:1rem;border-bottom-left-radius:1rem;",
-  "rounded-3xl": "border-radius:1.5rem;",
-  "rounded-t-3xl": "border-top-left-radius:1.5rem;border-top-right-radius:1.5rem;",
-  "rounded-r-3xl": "border-top-right-radius:1.5rem;border-bottom-right-radius:1.5rem;",
-  "rounded-b-3xl": "border-bottom-left-radius:1.5rem;border-bottom-right-radius:1.5rem;",
-  "rounded-l-3xl": "border-top-left-radius:1.5rem;border-bottom-left-radius:1.5rem;",
-  "rounded-4xl": "border-radius:2rem;",
-  "rounded-t-4xl": "border-top-left-radius:2rem;border-top-right-radius:2rem;",
-  "rounded-r-4xl": "border-top-right-radius:2rem;border-bottom-right-radius:2rem;",
-  "rounded-b-4xl": "border-bottom-left-radius:2rem;border-bottom-right-radius:2rem;",
-  "rounded-l-4xl": "border-top-left-radius:2rem;border-bottom-left-radius:2rem;",
-  "rounded-full": "border-radius:9999px;",
-  "rounded-t-full": "border-top-left-radius:9999px;border-top-right-radius:9999px;",
-  "rounded-r-full": "border-top-right-radius:9999px;border-bottom-right-radius:9999px;",
-  "rounded-b-full": "border-bottom-left-radius:9999px;border-bottom-right-radius:9999px;",
-  "rounded-l-full": "border-top-left-radius:9999px;border-bottom-left-radius:9999px;",
+  ...generateBorderWidthClasses(),
+  ...generateRoundedClasses(),
 
   /* Shadow and effects */
   // Shadows use a CSS variable for color so color utilities can modify --ce-shadow-color
