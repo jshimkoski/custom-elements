@@ -67,6 +67,13 @@ export const baseReset = css`
     font: 16px/1.5 var(--font-sans, ui-sans-serif, system-ui, sans-serif);
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
+    /* Default gradient variables to avoid undefined var() usage in generated utilities */
+    --tw-gradient-from-position: 0%;
+    --tw-gradient-to-position: 100%;
+    --tw-gradient-via-position: 50%;
+    --tw-gradient-from: rgba(255,255,255,0);
+    --tw-gradient-to: rgba(255,255,255,0);
+    --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
   }
   button,
   input,
@@ -1301,6 +1308,7 @@ export function jitCSS(html: string): string {
         parseSpacing(checkPart) ||
         parseOpacity(checkPart) ||
         parseColorWithOpacity(checkPart) ||
+        parseGradientColorStop(checkPart) ||
         parseArbitrary(checkPart)
       ) {
         basePart = part;
@@ -1563,6 +1571,23 @@ export function jitCSS(html: string): string {
 
     const rule = generateRuleCached(cls);
     if (rule) buckets[bucketNum].push(rule);
+  }
+
+  // Ensure explicit gradient color-stop classes generate rules.
+  // Some gradient utilities emit variable-based bodies that are
+  // picked up via combined selectors; to make the output explicit and
+  // testable we generate standalone rules for any from-*/via-*/to-*
+  // classes so their selectors are present in the CSS output.
+  const gradientStopRegex = /^(from|via|to)-[a-z]+-?\d{2,3}?$/;
+  for (const cls of seen) {
+    if (gradientStopRegex.test(cls)) {
+      // If we already generated a rule for this class, skip. Evaluate
+      // current generated output from buckets instead of `css` var.
+      const generatedBuckets = buckets.flat().join("");
+      if (generatedBuckets.includes(`.${escapeClassName(cls)}`)) continue;
+      const generated = generateRuleCached(cls);
+      if (generated) buckets[0].push(generated);
+    }
   }
 
   const css = buckets.flat().join("");
