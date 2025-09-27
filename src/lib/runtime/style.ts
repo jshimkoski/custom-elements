@@ -70,7 +70,7 @@ export const baseReset = css`
   }
   :host {
     display: contents;
-    font: 16px/1.5 ui-sans-serif, system-ui, sans-serif;
+    font: 16px/1.5 var(--font-sans, ui-sans-serif, system-ui, sans-serif);
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
   }
@@ -560,9 +560,9 @@ export const utilityMap: CSSMap = {
   "shrink-0": "flex-shrink:0;",
 
   /* Font Family */
-  "font-sans": "font-family:ui-sans-serif,system-ui,sans-serif;",
-  "font-serif": "font-family:ui-serif,Georgia,serif;",
-  "font-mono": "font-family:ui-monospace,SFMono-Regular,monospace;",
+  "font-sans": "font-family:var(--font-sans, ui-sans-serif,system-ui,sans-serif);",
+  "font-serif": "font-family:var(--font-serif, ui-serif,Georgia,serif);",
+  "font-mono": "font-family:var(--font-mono, ui-monospace,SFMono-Regular,monospace);",
 
   /* Line Clamp (for webkit) */
   "line-clamp-1": "display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;",
