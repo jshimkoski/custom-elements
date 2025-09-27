@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v1.0.9] - 2025-09-27
+
+- fix: Add classes to jit css such as bg-gradient, container querires, scale, rotate (596d4ed)
+- fix: Refactor component and props handling to improve readability and maintainability (3bca420)
+
+
 ## [v1.0.8] - 2025-09-27
 
 - fix: Refactor component and props handling to improve readability and maintainability (3bca420)
