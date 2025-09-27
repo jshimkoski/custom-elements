@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v1.0.7] - 2025-09-27
+
+- fix: update font family declarations to use CSS variables (9d02820)
+- fix: expand border, rounded, and grid classes (b1dd1cb)
+
+
 ## [v1.0.6] - 2025-09-21
 
 - fix: expand border, rounded, and grid classes (b1dd1cb)
