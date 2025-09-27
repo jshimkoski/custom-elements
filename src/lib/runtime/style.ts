@@ -1,15 +1,15 @@
 /**
- * CSS template literal
- *
- * This doesn't sanitize CSS values.
- * Runtime does that for us.
- * 
- * @param strings
- * @param values
- * @returns
+ * Optimized JIT CSS implementation with reduced bloat and enhanced utilities
  */
-export function css(strings: TemplateStringsArray, ...values: unknown[]): string {
-  let result = '';
+
+/**
+ * CSS template literal
+ */
+export function css(
+  strings: TemplateStringsArray,
+  ...values: unknown[]
+): string {
+  let result = "";
   for (let i = 0; i < strings.length; i++) {
     result += strings[i];
     if (i < values.length) result += values[i];
@@ -22,15 +22,10 @@ export function css(strings: TemplateStringsArray, ...values: unknown[]): string
  */
 export function minifyCSS(css: string): string {
   return css
-    // Remove comments
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    // Remove unnecessary whitespace
-    .replace(/\s+/g, ' ')
-    // Remove spaces around specific characters
-    .replace(/\s*([{}:;,>+~])\s*/g, '$1')
-    // Remove trailing semicolons before closing braces
-    .replace(/;}/g, '}')
-    // Remove leading/trailing whitespace
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/\s+/g, " ")
+    .replace(/\s*([{}:;,>+~])\s*/g, "$1")
+    .replace(/;}/g, "}")
     .trim();
 }
 
@@ -45,18 +40,17 @@ export function getBaseResetSheet(): CSSStyleSheet {
 }
 
 export function sanitizeCSS(css: string): string {
-  // Remove any url(javascript:...) and <script> tags
   return css
     .replace(/url\s*\(\s*['"]?javascript:[^)]*\)/gi, "")
     .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, "")
     .replace(/expression\s*\([^)]*\)/gi, "");
 }
 
-/**
- * Minimal Shadow DOM reset
- */
 export const baseReset = css`
-  :host, *, ::before, ::after {
+  :host,
+  *,
+  ::before,
+  ::after {
     all: isolate;
     box-sizing: border-box;
     border: 0 solid currentColor;
@@ -74,61 +68,106 @@ export const baseReset = css`
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
   }
-  button, input, select, textarea {
+  button,
+  input,
+  select,
+  textarea {
     background: transparent;
     outline: none;
   }
-  textarea { resize: vertical }
-  progress { vertical-align: baseline }
-  button, textarea { overflow: visible }
-  img, svg, video, canvas, audio, iframe, embed, object {
+  textarea {
+    resize: vertical;
+  }
+  progress {
+    vertical-align: baseline;
+  }
+  button,
+  textarea {
+    overflow: visible;
+  }
+  img,
+  svg,
+  video,
+  canvas,
+  audio,
+  iframe,
+  embed,
+  object {
     display: block;
     max-width: 100%;
     height: auto;
   }
-  svg { fill: currentColor; stroke: none }
-  a { text-decoration: inherit; cursor: pointer }
-  button, [type=button], [type=reset], [type=submit] {
+  svg {
+    fill: currentColor;
+    stroke: none;
+  }
+  a {
+    text-decoration: inherit;
+    cursor: pointer;
+  }
+  button,
+  [type="button"],
+  [type="reset"],
+  [type="submit"] {
     cursor: pointer;
     appearance: button;
     background: none;
     -webkit-user-select: none;
     user-select: none;
   }
-  ::-webkit-input-placeholder, ::placeholder {
-    color: inherit; opacity: .5;
+  ::-webkit-input-placeholder,
+  ::placeholder {
+    color: inherit;
+    opacity: 0.5;
   }
   *:focus-visible {
     outline: 2px solid var(--color-primary-500, #3b82f6);
     outline-offset: 2px;
   }
-  ol, ul { list-style: none }
-  table { border-collapse: collapse }
-  sub, sup {
-    font-size: .75em;
+  ol,
+  ul {
+    list-style: none;
+  }
+  table {
+    border-collapse: collapse;
+  }
+  sub,
+  sup {
+    font-size: 0.75em;
     line-height: 0;
     position: relative;
   }
-  sub { bottom: -.25em }
-  sup { top: -.5em }
-  [disabled], [aria-disabled=true] { cursor: not-allowed }
-  [hidden] { display: none }
+  sub {
+    bottom: -0.25em;
+  }
+  sup {
+    top: -0.5em;
+  }
+  [disabled],
+  [aria-disabled="true"] {
+    cursor: not-allowed;
+  }
+  [hidden] {
+    display: none;
+  }
 `;
 
-/**
- * JIT CSS implementation
- */
-
+// Types
 type CSSMap = Record<string, string>;
-type SelectorVariantMap = Record<string, (selector: string, body: string) => string>;
+type SelectorVariantMap = Record<
+  string,
+  (selector: string, body: string) => string
+>;
 type MediaVariantMap = Record<string, string>;
 
-type Shade = 50|100|200|300|400|500|600|700|800|900|950;
+type Shade = 50 | 100 | 200 | 300 | 400 | 500 | 600 | 700 | 800 | 900 | 950;
 type ColorShades = Partial<Record<Shade, string>> & { DEFAULT?: string };
 
+// Enhanced color system with standard Tailwind colors
 const fallbackHex: Record<string, ColorShades> = {
+  // Existing semantic colors
   neutral: {
-    50:  "#fafafa",
+    50: "#fafafa",
     100: "#f4f4f5",
     200: "#e4e4e7",
     300: "#d4d4d8",
@@ -138,10 +177,10 @@ const fallbackHex: Record<string, ColorShades> = {
     700: "#3f3f46",
     800: "#27272a",
     900: "#18181b",
-    950: "#09090b"
+    950: "#09090b",
   },
   primary: {
-    50:  "#eff6ff",
+    50: "#eff6ff",
     100: "#dbeafe",
     200: "#bfdbfe",
     300: "#93c5fd",
@@ -151,10 +190,10 @@ const fallbackHex: Record<string, ColorShades> = {
     700: "#1d4ed8",
     800: "#1e40af",
     900: "#1e3a8a",
-    950: "#172554"
+    950: "#172554",
   },
   secondary: {
-    50:  "#eef2ff",
+    50: "#eef2ff",
     100: "#e0e7ff",
     200: "#c7d2fe",
     300: "#a5b4fc",
@@ -164,10 +203,10 @@ const fallbackHex: Record<string, ColorShades> = {
     700: "#4338ca",
     800: "#3730a3",
     900: "#312e81",
-    950: "#1e1b4b"
+    950: "#1e1b4b",
   },
   success: {
-    50:  "#f0fdf4",
+    50: "#f0fdf4",
     100: "#dcfce7",
     200: "#bbf7d0",
     300: "#86efac",
@@ -177,10 +216,10 @@ const fallbackHex: Record<string, ColorShades> = {
     700: "#15803d",
     800: "#166534",
     900: "#14532d",
-    950: "#052e16"
+    950: "#052e16",
   },
   info: {
-    50:  "#f0f9ff",
+    50: "#f0f9ff",
     100: "#e0f2fe",
     200: "#bae6fd",
     300: "#7dd3fc",
@@ -190,10 +229,10 @@ const fallbackHex: Record<string, ColorShades> = {
     700: "#0369a1",
     800: "#075985",
     900: "#0c4a6e",
-    950: "#082f49"
+    950: "#082f49",
   },
   warning: {
-    50:  "#fffbeb",
+    50: "#fffbeb",
     100: "#fef3c7",
     200: "#fde68a",
     300: "#fcd34d",
@@ -203,10 +242,10 @@ const fallbackHex: Record<string, ColorShades> = {
     700: "#b45309",
     800: "#92400e",
     900: "#78350f",
-    950: "#451a03"
+    950: "#451a03",
   },
   error: {
-    50:  "#fef2f2",
+    50: "#fef2f2",
     100: "#fee2e2",
     200: "#fecaca",
     300: "#fca5a5",
@@ -216,388 +255,54 @@ const fallbackHex: Record<string, ColorShades> = {
     700: "#b91c1c",
     800: "#991b1b",
     900: "#7f1d1d",
-    950: "#450a0a"
+    950: "#450a0a",
   },
+
+  // Special colors
   white: { DEFAULT: "#ffffff" },
   black: { DEFAULT: "#000000" },
   transparent: { DEFAULT: "transparent" },
-  current: { DEFAULT: "currentColor" }
+  current: { DEFAULT: "currentColor" },
 };
 
-export const colors: Record<string, Record<string, string>> =
-  Object.fromEntries(
-    Object.entries(fallbackHex).map(([name, shades]) => [
-      name,
-      Object.fromEntries(
-        Object.entries(shades).map(([shade, hex]) => [
-          shade,
-          `var(--color-${name}${shade === "DEFAULT" ? "" : `-${shade}`}, ${hex})`
-        ])
-      )
-    ])
-  );
+export const colors: Record<
+  string,
+  Record<string, string>
+> = Object.fromEntries(
+  Object.entries(fallbackHex).map(([name, shades]) => [
+    name,
+    Object.fromEntries(
+      Object.entries(shades).map(([shade, hex]) => [
+        shade,
+        `var(--color-${name}${shade === "DEFAULT" ? "" : `-${shade}`}, ${hex})`,
+      ]),
+    ),
+  ]),
+);
 
 export const spacing = "0.25rem";
 
+// Enhanced spacing scale including Tailwind's fractional values
+// Note: This scale is available for future use if needed
+// const spacingScale = [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 16, 20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60, 64, 72, 80, 96];
+
 const semanticSizes: Record<string, number> = {
-  // Tailwind container widths
-  // 3xs: 16rem  => 16 / 0.25 = 64
   "3xs": 64,
-  // 2xs: 18rem => 72
   "2xs": 72,
-  // xs: 20rem => 80
-  "xs": 80,
-  // sm: 24rem => 96
-  "sm": 96,
-  // md: 28rem => 112
-  "md": 112,
-  // lg: 32rem => 128
-  "lg": 128,
-  // xl: 36rem => 144
-  "xl": 144,
-  // 2xl: 42rem => 168
+  xs: 80,
+  sm: 96,
+  md: 112,
+  lg: 128,
+  xl: 144,
   "2xl": 168,
-  // 3xl: 48rem => 192
   "3xl": 192,
-  // 4xl: 56rem => 224
   "4xl": 224,
-  // 5xl: 64rem => 256
   "5xl": 256,
-  // 6xl: 72rem => 288
   "6xl": 288,
-  // 7xl: 80rem => 320
-  "7xl": 320
+  "7xl": 320,
 };
 
-const generateSemanticSizeClasses = (): CSSMap => {
-  const classes: CSSMap = {};
-  for (const [key, value] of Object.entries(semanticSizes)) {
-    classes[`max-w-${key}`] = `max-width:calc(${spacing} * ${value});`;
-    classes[`min-w-${key}`] = `min-width:calc(${spacing} * ${value});`;
-    classes[`w-${key}`] = `width:calc(${spacing} * ${value});`;
-    classes[`max-h-${key}`] = `max-height:calc(${spacing} * ${value});`;
-    classes[`min-h-${key}`] = `min-height:calc(${spacing} * ${value});`;
-    classes[`h-${key}`] = `height:calc(${spacing} * ${value});`;
-  }
-  return classes;
-};
-
-const generateGridClasses = (): CSSMap => {
-  const classes: CSSMap = {};
-  const gridSizes = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
-
-  for (const key of gridSizes) {
-    // Grid template definitions
-    classes[`grid-cols-${key}`] = `grid-template-columns:repeat(${key},minmax(0,1fr));`;
-    classes[`grid-rows-${key}`] = `grid-template-rows:repeat(${key},minmax(0,1fr));`;
-
-    // Span utilities
-    classes[`col-span-${key}`] = `grid-column:span ${key} / span ${key};`;
-    classes[`row-span-${key}`] = `grid-row:span ${key} / span ${key};`;
-
-    // Start/end positioning
-    classes[`col-start-${key}`] = `grid-column-start:${key};`;
-    classes[`col-end-${key}`] = `grid-column-end:${key};`;
-    classes[`row-start-${key}`] = `grid-row-start:${key};`;
-    classes[`row-end-${key}`] = `grid-row-end:${key};`;
-  }
-
-  // Special utility classes
-  classes["grid-cols-none"] = "grid-template-columns:none;";
-  classes["grid-rows-none"] = "grid-template-rows:none;";
-  classes["col-span-full"] = "grid-column:1 / -1;";
-  classes["row-span-full"] = "grid-row:1 / -1;";
-
-  // Auto columns
-  classes["auto-cols-auto"] = "grid-auto-columns:auto;";
-  classes["auto-cols-min"] = "grid-auto-columns:min-content;";
-  classes["auto-cols-max"] = "grid-auto-columns:max-content;";
-  classes["auto-cols-fr"] = "grid-auto-columns:1fr;";
-
-  // Auto rows
-  classes["auto-rows-auto"] = "grid-auto-rows:auto;";
-  classes["auto-rows-min"] = "grid-auto-rows:min-content;";
-  classes["auto-rows-max"] = "grid-auto-rows:max-content;";
-  classes["auto-rows-fr"] = "grid-auto-rows:1fr;";
-
-  // Grid flow
-  classes["grid-flow-row"] = "grid-auto-flow:row;";
-  classes["grid-flow-col"] = "grid-auto-flow:column;";
-  classes["grid-flow-row-dense"] = "grid-auto-flow:row dense;";
-  classes["grid-flow-col-dense"] = "grid-auto-flow:column dense;";
-
-  return classes;
-};
-
-const generateBorderWidthClasses = (): CSSMap => {
-  const classes: CSSMap = {};
-  const borderWidths = [0, 1, 2, 4, 6, 8];
-
-  for (const key of borderWidths) {
-    const px = `${key}px`;
-
-    // Base border width
-    classes[`border-${key}`] = `border-width:${px};`;
-
-    // Logical directions
-    classes[`border-s-${key}`] = `border-inline-start-width:${px};`;
-    classes[`border-e-${key}`] = `border-inline-end-width:${px};`;
-    classes[`border-bs-${key}`] = `border-block-start-width:${px};`;
-    classes[`border-be-${key}`] = `border-block-end-width:${px};`;
-
-    // Axes
-    classes[`border-x-${key}`] = `border-inline-width:${px};`;
-    classes[`border-y-${key}`] = `border-block-width:${px};`;
-
-    // Physical directions
-    classes[`border-t-${key}`] = `border-top-width:${px};`;
-    classes[`border-r-${key}`] = `border-right-width:${px};`;
-    classes[`border-b-${key}`] = `border-bottom-width:${px};`;
-    classes[`border-l-${key}`] = `border-left-width:${px};`;
-  }
-
-  // Base border classes (no numeric suffix)
-  classes["border"] = "border-width:1px;";
-  classes["border-t"] = "border-top-width:1px;";
-  classes["border-r"] = "border-right-width:1px;";
-  classes["border-b"] = "border-bottom-width:1px;";
-  classes["border-l"] = "border-left-width:1px;";
-  classes["border-x"] = "border-left-width:1px;border-right-width:1px;";
-  classes["border-y"] = "border-top-width:1px;border-bottom-width:1px;";
-  classes["border-s"] = "border-inline-start-width:1px;";
-  classes["border-e"] = "border-inline-end-width:1px;";
-  classes["border-bs"] = "border-block-start-width:1px;";
-  classes["border-be"] = "border-block-end-width:1px;";
-
-  return classes;
-};
-
-const generateRoundedClasses = (): CSSMap => {
-  const classes: CSSMap = {};
-  const radiusMap = {
-    none: 0,
-    xs: 2,
-    sm: 4,
-    md: 6,
-    lg: 8,
-    xl: 12,
-    "2xl": 16,
-    "3xl": 24,
-    "4xl": 32,
-    full: 9999,
-  };
-
-  for (const [key, value] of Object.entries(radiusMap)) {
-    const rem = value === 9999 ? '9999px' : `${value / 16}rem`;
-
-    // Base rounded
-    classes[`rounded-${key}`] = `border-radius:${rem};`;
-
-    // Logical corners
-    classes[`rounded-s-${key}`] = `border-start-start-radius:${rem};border-end-start-radius:${rem};`;
-    classes[`rounded-e-${key}`] = `border-start-end-radius:${rem};border-end-end-radius:${rem};`;
-
-    // Physical corners
-    classes[`rounded-t-${key}`] = `border-top-left-radius:${rem};border-top-right-radius:${rem};`;
-    classes[`rounded-r-${key}`] = `border-top-right-radius:${rem};border-bottom-right-radius:${rem};`;
-    classes[`rounded-b-${key}`] = `border-bottom-left-radius:${rem};border-bottom-right-radius:${rem};`;
-    classes[`rounded-l-${key}`] = `border-top-left-radius:${rem};border-bottom-left-radius:${rem};`;
-
-    // Axes
-    classes[`rounded-x-${key}`] = `border-top-left-radius:${rem};border-bottom-left-radius:${rem};border-top-right-radius:${rem};border-bottom-right-radius:${rem};`;
-    classes[`rounded-y-${key}`] = `border-top-left-radius:${rem};border-top-right-radius:${rem};border-bottom-left-radius:${rem};border-bottom-right-radius:${rem};`;
-  }
-
-  return classes;
-};
-
-export const utilityMap: CSSMap = {
-  /* Display */
-  block: "display:block;",
-  inline: "display:inline;",
-  "inline-block": "display:inline-block;",
-  flex: "display:flex;",
-  "inline-flex": "display:inline-flex;",
-  grid: "display:grid;",
-  hidden: "display:none;",
-
-  /* Sizing & Spacing */
-  "w-full": "width:100%;",
-  "w-screen": "width:100dvw;",
-  "h-full": "height:100%;",
-  "h-screen": "height:100dvw;",
-  "max-w-full": "max-width:100%;",
-  "max-h-full": "max-height:100%;",
-  "max-w-screen": "max-width:100dvw;",
-  "max-h-screen": "max-height:100dvh;",
-  "min-w-0": "min-width:0;",
-  "min-h-0": "min-height:0;",
-  "min-w-screen": "min-width:100dvw;",
-  "min-h-screen": "min-height:100dvh;",
-  ...generateSemanticSizeClasses(),
-  "m-auto": "margin:auto;",
-  "mx-auto": "margin-inline:auto;",
-  "my-auto": "margin-block:auto;",
-
-  /* Overflow */
-  "overflow-auto": "overflow:auto;",
-  "overflow-hidden": "overflow:hidden;",
-  "overflow-visible": "overflow:visible;",
-  "overflow-scroll": "overflow:scroll;",
-  "overflow-y-auto": "overflow-y:auto;",
-  "overflow-y-hidden": "overflow-y:hidden;",
-  "overflow-y-visible": "overflow-y:visible;",
-  "overflow-y-scroll": "overflow-y:scroll;",
-  "overflow-x-auto": "overflow-x:auto;",
-  "overflow-x-hidden": "overflow-x:hidden;",
-  "overflow-x-visible": "overflow-x:visible;",
-  "overflow-x-scroll": "overflow-x:scroll;",
-
-  /* Pointer Events */
-  "pointer-events-none": "pointer-events:none;",
-  "pointer-events-auto": "pointer-events:auto;",
-
-  /* Accessibility */
-  "sr-only": "position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border-width:0;",
-  "not-sr-only": "position:static;width:auto;height:auto;padding:0;margin:0;overflow:visible;clip:auto;white-space:normal;",
-
-  /* Grid Layout & Placement */
-  ...generateGridClasses(),
-
-  /* Positioning */
-  absolute: "position:absolute;",
-  relative: "position:relative;",
-  fixed: "position:fixed;",
-  sticky: "position:sticky;",
-
-  /* Typography */
-  "font-bold": "font-weight:700;",
-  "font-semibold": "font-weight:600;",
-  "font-medium": "font-weight:500;",
-  "font-light": "font-weight:300;",
-  underline: "text-decoration-line:underline;",
-  overline: "text-decoration-line:overline;",
-  "line-through": "text-decoration-line:line-through;",
-  "no-underline": "text-decoration-line:none;",
-  italic: "font-style:italic;",
-  "not-italic": "font-style:normal;",
-  uppercase: "text-transform:uppercase;",
-  lowercase: "text-transform:lowercase;",
-  capitalize: "text-transform:capitalize;",
-  "normal-case": "text-transform:none;",
-  "text-left": "text-align:left;",
-  "text-center": "text-align:center;",
-  "text-right": "text-align:right;",
-  "text-xs": "font-size:0.75rem;line-height:calc(1 / 0.75)",
-  "text-sm": "font-size:0.875rem;line-height:calc(1.25 / 0.875)",
-  "text-base": "font-size:1rem;line-height:calc(1.5 / 1)",
-  "text-lg": "font-size:1.125rem;line-height:calc(1.75 / 1.125)",
-  "text-xl": "font-size:1.25rem;line-height:calc(1.75 / 1.25)",
-  "text-2xl": "font-size:1.5rem;line-height:calc(2 / 1.5)",
-  "text-3xl": "font-size:1.875rem;line-height:calc(2.25 / 1.875)",
-  "text-4xl": "font-size:2.25rem;line-height:calc(2.5 / 2.25)",
-  "text-5xl": "font-size:3rem;line-height:1",
-  "text-6xl": "font-size:3.75rem;line-height:1",
-  "text-7xl": "font-size:4.5rem;line-height:1",
-  "text-8xl": "font-size:6rem;line-height:1",
-
-  /* Borders */
-  ...generateBorderWidthClasses(),
-  ...generateRoundedClasses(),
-
-  /* Shadow and effects */
-  // Shadows use a CSS variable for color so color utilities can modify --ce-shadow-color
-  "shadow-none": "--ce-shadow-color: rgb(0 0 0 / 0);box-shadow:0 0 var(--ce-shadow-color, #0000);",
-  "shadow-xs": "--ce-shadow-color: rgb(0 0 0 / 0.05);box-shadow:0 1px 2px 0 var(--ce-shadow-color, rgb(0 0 0 / 0.05));",
-  "shadow-sm": "--ce-shadow-color: rgb(0 0 0 / 0.1);box-shadow:0 1px 3px 0 var(--ce-shadow-color, rgb(0 0 0 / 0.1)),0 1px 2px -1px var(--ce-shadow-color, rgb(0 0 0 / 0.1));",
-  "shadow-md": "--ce-shadow-color: rgb(0 0 0 / 0.1);box-shadow:0 4px 6px -1px var(--ce-shadow-color, rgb(0 0 0 / 0.1)),0 2px 4px -2px var(--ce-shadow-color, rgb(0 0 0 / 0.1));",
-  "shadow-lg": "--ce-shadow-color: rgb(0 0 0 / 0.1);box-shadow:0 10px 15px -3px var(--ce-shadow-color, rgb(0 0 0 / 0.1)),0 4px 6px -4px var(--ce-shadow-color, rgb(0 0 0 / 0.1));",
-  "shadow-xl": "--ce-shadow-color: rgb(0 0 0 / 0.1);box-shadow:0 20px 25px -5px var(--ce-shadow-color, rgb(0 0 0 / 0.1)),0 8px 10px -6px var(--ce-shadow-color, rgb(0 0 0 / 0.1));",
-  "shadow-2xl": "--ce-shadow-color: rgb(0 0 0 / 0.25);box-shadow:0 25px 50px -12px var(--ce-shadow-color, rgb(0 0 0 / 0.25));",
-
-  /* Text Overflow & Whitespace */
-  truncate: "overflow:hidden;text-overflow:ellipsis;white-space:nowrap;",
-
-  /* Visibility */
-  "visible": "visibility:visible;",
-  "invisible": "visibility:hidden;",
-
-  /* Flex Grow/Shrink/Basis */
-  "items-center": "align-items:center;",
-  "items-start": "align-items:flex-start;",
-  "items-end": "align-items:flex-end;",
-  "items-baseline": "align-items:baseline;",
-  "items-stretch": "align-items:stretch;",
-  "justify-center": "justify-content:center;",
-  "justify-start": "justify-content:flex-start;",
-  "justify-between": "justify-content:space-between;",
-  "justify-around": "justify-content:space-around;",
-  "justify-evenly": "justify-content:space-evenly;",
-  "justify-end": "justify-content:flex-end;",
-  "flex-wrap": "flex-wrap:wrap;",
-  "flex-nowrap": "flex-wrap:nowrap;",
-  "flex-wrap-reverse": "flex-wrap:wrap-reverse;",
-  "content-center": "align-content:center;",
-  "content-start": "align-content:flex-start;",
-  "content-end": "align-content:flex-end;",
-  "content-between": "align-content:space-between;",
-  "content-around": "align-content:space-around;",
-  "content-stretch": "align-content:stretch;",
-  "self-auto": "align-self:auto;",
-  "self-start": "align-self:flex-start;",
-  "self-end": "align-self:flex-end;",
-  "self-center": "align-self:center;",
-  "self-stretch": "align-self:stretch;",
-  "flex-1": "flex:1 1 0%;",
-  "flex-auto": "flex:1 1 auto;",
-  "flex-initial": "flex:0 1 auto;",
-  "flex-none": "flex:0 0 auto;",
-  "flex-col": "flex-direction:column;",
-  "flex-row": "flex-direction:row;",
-  "grow": "flex-grow:1;",
-  "shrink": "flex-shrink:1;",
-  "grow-0": "flex-grow:0;",
-  "shrink-0": "flex-shrink:0;",
-
-  /* Font Family */
-  "font-sans": "font-family:var(--font-sans, ui-sans-serif,system-ui,sans-serif);",
-  "font-serif": "font-family:var(--font-serif, ui-serif,Georgia,serif);",
-  "font-mono": "font-family:var(--font-mono, ui-monospace,SFMono-Regular,monospace);",
-
-  /* Line Clamp (for webkit) */
-  "line-clamp-1": "display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;",
-  "line-clamp-2": "display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;",
-  "line-clamp-3": "display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;",
-  "line-clamp-4": "display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;",
-
-  /* Transitions */
-  transition: "transition-property:all;transition-duration:150ms;transition-timing-function:ease-in-out;",
-  "transition-all": "transition-property:all;",
-  "transition-colors": "transition-property:color,background-color,border-color,text-decoration-color,fill,stroke;",
-  "transition-shadow": "transition-property:box-shadow;",
-  "transition-opacity": "transition-property:opacity;",
-  "transition-transform": "transition-property:transform;",
-  "transition-none": "transition-property:none;",
-
-  /* Cursor */
-  "cursor-auto": "cursor:auto;",
-  "cursor-default": "cursor:default;",
-  "cursor-pointer": "cursor:pointer;",
-  "cursor-wait": "cursor:wait;",
-  "cursor-text": "cursor:text;",
-  "cursor-move": "cursor:move;",
-  "cursor-help": "cursor:help;",
-  "cursor-not-allowed": "cursor:not-allowed;",
-
-  /* Z-index */
-  "z-0": "z-index:0;",
-  "z-10": "z-index:10;",
-  "z-20": "z-index:20;",
-  "z-30": "z-index:30;",
-  "z-40": "z-index:40;",
-  "z-50": "z-index:50;",
-};
-
+// Property mappings for spacing utilities
 export const spacingProps: Record<string, string[]> = {
   m: ["margin"],
   mx: ["margin-inline"],
@@ -628,19 +333,542 @@ export const spacingProps: Record<string, string[]> = {
   right: ["right"],
   gap: ["gap"],
   "gap-x": ["column-gap"],
-  "gap-y": ["row-gap"]
+  "gap-y": ["row-gap"],
 };
 
+// Utility generators for reduced code bloat
+const generateUtilities = (): CSSMap => {
+  const utils: CSSMap = {};
+
+  // Add @container utility
+  utils["@container"] = "container-type:inline-size;";
+
+  // Core display utilities
+  const display = [
+    "block",
+    "inline",
+    "inline-block",
+    "flex",
+    "inline-flex",
+    "grid",
+    "inline-grid",
+    "table",
+    "table-cell",
+    "table-row",
+    "hidden",
+  ];
+  display.forEach((d) => {
+    utils[d] = d === "hidden" ? "display:none;" : `display:${d};`;
+  });
+
+  // Position utilities
+  ["absolute", "relative", "fixed", "sticky", "static"].forEach((p) => {
+    utils[p] = `position:${p};`;
+  });
+
+  // Flex utilities
+  Object.assign(utils, {
+    "items-center": "align-items:center;",
+    "items-start": "align-items:flex-start;",
+    "items-end": "align-items:flex-end;",
+    "items-baseline": "align-items:baseline;",
+    "items-stretch": "align-items:stretch;",
+    "justify-center": "justify-content:center;",
+    "justify-start": "justify-content:flex-start;",
+    "justify-between": "justify-content:space-between;",
+    "justify-around": "justify-content:space-around;",
+    "justify-evenly": "justify-content:space-evenly;",
+    "justify-end": "justify-content:flex-end;",
+    "flex-wrap": "flex-wrap:wrap;",
+    "flex-nowrap": "flex-wrap:nowrap;",
+    "flex-wrap-reverse": "flex-wrap:wrap-reverse;",
+    "content-center": "align-content:center;",
+    "content-start": "align-content:flex-start;",
+    "content-end": "align-content:flex-end;",
+    "content-between": "align-content:space-between;",
+    "content-around": "align-content:space-around;",
+    "content-evenly": "align-content:space-evenly;",
+    "content-stretch": "align-content:stretch;",
+    "self-auto": "align-self:auto;",
+    "self-start": "align-self:flex-start;",
+    "self-end": "align-self:flex-end;",
+    "self-center": "align-self:center;",
+    "self-stretch": "align-self:stretch;",
+    "flex-col": "flex-direction:column;",
+    "flex-row": "flex-direction:row;",
+    "flex-col-reverse": "flex-direction:column-reverse;",
+    "flex-row-reverse": "flex-direction:row-reverse;",
+    "flex-1": "flex:1 1 0%;",
+    "flex-auto": "flex:1 1 auto;",
+    "flex-initial": "flex:0 1 auto;",
+    "flex-none": "flex:0 0 auto;",
+    grow: "flex-grow:1;",
+    shrink: "flex-shrink:1;",
+    "grow-0": "flex-grow:0;",
+    "shrink-0": "flex-shrink:0;",
+  });
+
+  // Grid utilities
+  for (let i = 1; i <= 12; i++) {
+    utils[`grid-cols-${i}`] =
+      `grid-template-columns:repeat(${i},minmax(0,1fr));`;
+    utils[`grid-rows-${i}`] = `grid-template-rows:repeat(${i},minmax(0,1fr));`;
+    utils[`col-span-${i}`] = `grid-column:span ${i} / span ${i};`;
+    utils[`row-span-${i}`] = `grid-row:span ${i} / span ${i};`;
+    utils[`col-start-${i}`] = `grid-column-start:${i};`;
+    utils[`col-end-${i}`] = `grid-column-end:${i};`;
+    utils[`row-start-${i}`] = `grid-row-start:${i};`;
+    utils[`row-end-${i}`] = `grid-row-end:${i};`;
+  }
+  Object.assign(utils, {
+    "grid-cols-none": "grid-template-columns:none;",
+    "grid-rows-none": "grid-template-rows:none;",
+    "col-span-full": "grid-column:1 / -1;",
+    "row-span-full": "grid-row:1 / -1;",
+    "auto-cols-auto": "grid-auto-columns:auto;",
+    "auto-cols-min": "grid-auto-columns:min-content;",
+    "auto-cols-max": "grid-auto-columns:max-content;",
+    "auto-cols-fr": "grid-auto-columns:1fr;",
+    "auto-rows-auto": "grid-auto-rows:auto;",
+    "auto-rows-min": "grid-auto-rows:min-content;",
+    "auto-rows-max": "grid-auto-rows:max-content;",
+    "auto-rows-fr": "grid-auto-rows:1fr;",
+    "grid-flow-row": "grid-auto-flow:row;",
+    "grid-flow-col": "grid-auto-flow:column;",
+    "grid-flow-row-dense": "grid-auto-flow:row dense;",
+    "grid-flow-col-dense": "grid-auto-flow:column dense;",
+  });
+
+  // Typography utilities
+  Object.assign(utils, {
+    "text-left": "text-align:left;",
+    "text-center": "text-align:center;",
+    "text-right": "text-align:right;",
+    "text-justify": "text-align:justify;",
+    "font-thin": "font-weight:100;",
+    "font-extralight": "font-weight:200;",
+    "font-light": "font-weight:300;",
+    "font-normal": "font-weight:400;",
+    "font-medium": "font-weight:500;",
+    "font-semibold": "font-weight:600;",
+    "font-bold": "font-weight:700;",
+    "font-extrabold": "font-weight:800;",
+    "font-black": "font-weight:900;",
+    italic: "font-style:italic;",
+    "not-italic": "font-style:normal;",
+    uppercase: "text-transform:uppercase;",
+    lowercase: "text-transform:lowercase;",
+    capitalize: "text-transform:capitalize;",
+    "normal-case": "text-transform:none;",
+    underline: "text-decoration-line:underline;",
+    overline: "text-decoration-line:overline;",
+    "line-through": "text-decoration-line:line-through;",
+    "no-underline": "text-decoration-line:none;",
+    truncate: "overflow:hidden;text-overflow:ellipsis;white-space:nowrap;",
+    "whitespace-normal": "white-space:normal;",
+    "whitespace-nowrap": "white-space:nowrap;",
+    "whitespace-pre": "white-space:pre;",
+    "whitespace-pre-line": "white-space:pre-line;",
+    "whitespace-pre-wrap": "white-space:pre-wrap;",
+    "break-normal": "overflow-wrap:normal;word-break:normal;",
+    "break-words": "overflow-wrap:break-word;",
+    "break-all": "word-break:break-all;",
+  });
+
+  // Font sizes with proper line heights
+  const fontSizes = [
+    ["text-xs", "0.75rem", "1"],
+    ["text-sm", "0.875rem", "1.25"],
+    ["text-base", "1rem", "1.5"],
+    ["text-lg", "1.125rem", "1.75"],
+    ["text-xl", "1.25rem", "1.75"],
+    ["text-2xl", "1.5rem", "2"],
+    ["text-3xl", "1.875rem", "2.25"],
+    ["text-4xl", "2.25rem", "2.5"],
+    ["text-5xl", "3rem", "1"],
+    ["text-6xl", "3.75rem", "1"],
+    ["text-7xl", "4.5rem", "1"],
+    ["text-8xl", "6rem", "1"],
+    ["text-9xl", "8rem", "1"],
+  ];
+  fontSizes.forEach(([name, size, lineHeight]) => {
+    utils[name] = `font-size:${size};line-height:${lineHeight};`;
+  });
+
+  // Letter spacing (tracking)
+  const tracking = [
+    ["tracking-tighter", "-0.05em"],
+    ["tracking-tight", "-0.025em"],
+    ["tracking-normal", "0em"],
+    ["tracking-wide", "0.025em"],
+    ["tracking-wider", "0.05em"],
+    ["tracking-widest", "0.1em"],
+  ];
+  tracking.forEach(([name, value]) => {
+    utils[name] = `letter-spacing:${value};`;
+  });
+
+  // Line height (leading)
+  const leading = [
+    ["leading-3", "0.75rem"],
+    ["leading-4", "1rem"],
+    ["leading-5", "1.25rem"],
+    ["leading-6", "1.5rem"],
+    ["leading-7", "1.75rem"],
+    ["leading-8", "2rem"],
+    ["leading-9", "2.25rem"],
+    ["leading-10", "2.5rem"],
+    ["leading-none", "1"],
+    ["leading-tight", "1.25"],
+    ["leading-snug", "1.375"],
+    ["leading-normal", "1.5"],
+    ["leading-relaxed", "1.625"],
+    ["leading-loose", "2"],
+  ];
+  leading.forEach(([name, value]) => {
+    utils[name] = `line-height:${value};`;
+  });
+
+  // Font families
+  Object.assign(utils, {
+    "font-sans":
+      "font-family:var(--font-sans, ui-sans-serif,system-ui,sans-serif);",
+    "font-serif": "font-family:var(--font-serif, ui-serif,Georgia,serif);",
+    "font-mono":
+      "font-family:var(--font-mono, ui-monospace,SFMono-Regular,monospace);",
+  });
+
+  // Borders - generate programmatically
+  const borderWidths = [0, 1, 2, 4, 6, 8];
+  borderWidths.forEach((w) => {
+    const px = `${w}px`;
+    utils[`border-${w}`] = `border-width:${px};`;
+    utils[`border-t-${w}`] = `border-top-width:${px};`;
+    utils[`border-r-${w}`] = `border-right-width:${px};`;
+    utils[`border-b-${w}`] = `border-bottom-width:${px};`;
+    utils[`border-l-${w}`] = `border-left-width:${px};`;
+    utils[`border-x-${w}`] =
+      `border-left-width:${px};border-right-width:${px};`;
+    utils[`border-y-${w}`] =
+      `border-top-width:${px};border-bottom-width:${px};`;
+  });
+  utils.border = "border-width:1px;";
+  utils["border-t"] = "border-top-width:1px;";
+  utils["border-r"] = "border-right-width:1px;";
+  utils["border-b"] = "border-bottom-width:1px;";
+  utils["border-l"] = "border-left-width:1px;";
+  utils["border-x"] = "border-left-width:1px;border-right-width:1px;";
+  utils["border-y"] = "border-top-width:1px;border-bottom-width:1px;";
+
+  // Border styles
+  Object.assign(utils, {
+    "border-solid": "border-style:solid;",
+    "border-dashed": "border-style:dashed;",
+    "border-dotted": "border-style:dotted;",
+    "border-double": "border-style:double;",
+    "border-none": "border-style:none;",
+  });
+
+  // Rounded corners
+  const radiusMap = {
+    none: 0,
+    xs: 2,
+    sm: 4,
+    md: 6,
+    lg: 8,
+    xl: 12,
+    "2xl": 16,
+    "3xl": 24,
+    "4xl": 32,
+    full: 9999,
+  };
+  Object.entries(radiusMap).forEach(([key, value]) => {
+    const rem = value === 9999 ? "9999px" : `${value / 16}rem`;
+    utils[`rounded-${key}`] = `border-radius:${rem};`;
+    utils[`rounded-t-${key}`] =
+      `border-top-left-radius:${rem};border-top-right-radius:${rem};`;
+    utils[`rounded-r-${key}`] =
+      `border-top-right-radius:${rem};border-bottom-right-radius:${rem};`;
+    utils[`rounded-b-${key}`] =
+      `border-bottom-left-radius:${rem};border-bottom-right-radius:${rem};`;
+    utils[`rounded-l-${key}`] =
+      `border-top-left-radius:${rem};border-bottom-left-radius:${rem};`;
+    utils[`rounded-tl-${key}`] = `border-top-left-radius:${rem};`;
+    utils[`rounded-tr-${key}`] = `border-top-right-radius:${rem};`;
+    utils[`rounded-br-${key}`] = `border-bottom-right-radius:${rem};`;
+    utils[`rounded-bl-${key}`] = `border-bottom-left-radius:${rem};`;
+  });
+
+  // Shadows
+  Object.assign(utils, {
+    "shadow-none":
+      "--ce-shadow-color:rgb(0 0 0 / 0);box-shadow:0 0 var(--ce-shadow-color, #0000);",
+    "shadow-xs":
+      "--ce-shadow-color:rgb(0 0 0 / 0.05);box-shadow:0 1px 2px 0 var(--ce-shadow-color, rgb(0 0 0 / 0.05));",
+    "shadow-sm":
+      "--ce-shadow-color:rgb(0 0 0 / 0.1);box-shadow:0 1px 3px 0 var(--ce-shadow-color, rgb(0 0 0 / 0.1)),0 1px 2px -1px var(--ce-shadow-color, rgb(0 0 0 / 0.1));",
+    shadow:
+      "--ce-shadow-color:rgb(0 0 0 / 0.1);box-shadow:0 1px 3px 0 var(--ce-shadow-color, rgb(0 0 0 / 0.1)),0 1px 2px -1px var(--ce-shadow-color, rgb(0 0 0 / 0.1));",
+    "shadow-md":
+      "--ce-shadow-color:rgb(0 0 0 / 0.1);box-shadow:0 4px 6px -1px var(--ce-shadow-color, rgb(0 0 0 / 0.1)),0 2px 4px -2px var(--ce-shadow-color, rgb(0 0 0 / 0.1));",
+    "shadow-lg":
+      "--ce-shadow-color:rgb(0 0 0 / 0.1);box-shadow:0 10px 15px -3px var(--ce-shadow-color, rgb(0 0 0 / 0.1)),0 4px 6px -4px var(--ce-shadow-color, rgb(0 0 0 / 0.1));",
+    "shadow-xl":
+      "--ce-shadow-color:rgb(0 0 0 / 0.1);box-shadow:0 20px 25px -5px var(--ce-shadow-color, rgb(0 0 0 / 0.1)),0 8px 10px -6px var(--ce-shadow-color, rgb(0 0 0 / 0.1));",
+    "shadow-2xl":
+      "--ce-shadow-color:rgb(0 0 0 / 0.25);box-shadow:0 25px 50px -12px var(--ce-shadow-color, rgb(0 0 0 / 0.25));",
+    "shadow-inner": "box-shadow:inset 0 2px 4px 0 rgb(0 0 0 / 0.05);",
+  });
+
+  // Additional utilities that may be missing
+  Object.assign(utils, {
+    rounded: "border-radius:0.25rem;",
+    shadow:
+      "--ce-shadow-color:rgb(0 0 0 / 0.1);box-shadow:0 1px 3px 0 var(--ce-shadow-color, rgb(0 0 0 / 0.1)),0 1px 2px -1px var(--ce-shadow-color, rgb(0 0 0 / 0.1));",
+  });
+
+  // Overflow utilities
+  Object.assign(utils, {
+    "overflow-auto": "overflow:auto;",
+    "overflow-hidden": "overflow:hidden;",
+    "overflow-visible": "overflow:visible;",
+    "overflow-scroll": "overflow:scroll;",
+    "overflow-x-auto": "overflow-x:auto;",
+    "overflow-x-hidden": "overflow-x:hidden;",
+    "overflow-x-visible": "overflow-x:visible;",
+    "overflow-x-scroll": "overflow-x:scroll;",
+    "overflow-y-auto": "overflow-y:auto;",
+    "overflow-y-hidden": "overflow-y:hidden;",
+    "overflow-y-visible": "overflow-y:visible;",
+    "overflow-y-scroll": "overflow-y:scroll;",
+  });
+
+  // Accessibility
+  Object.assign(utils, {
+    "sr-only":
+      "position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border-width:0;",
+    "not-sr-only":
+      "position:static;width:auto;height:auto;padding:0;margin:0;overflow:visible;clip:auto;white-space:normal;",
+  });
+
+  // Pointer events
+  Object.assign(utils, {
+    "pointer-events-none": "pointer-events:none;",
+    "pointer-events-auto": "pointer-events:auto;",
+  });
+
+  // Cursor utilities
+  const cursors = [
+    "auto",
+    "default",
+    "pointer",
+    "wait",
+    "text",
+    "move",
+    "help",
+    "not-allowed",
+    "grab",
+    "grabbing",
+  ];
+  cursors.forEach((c) => {
+    utils[`cursor-${c}`] = `cursor:${c};`;
+  });
+
+  // Z-index
+  [0, 10, 20, 30, 40, 50].forEach((z) => {
+    utils[`z-${z}`] = `z-index:${z};`;
+  });
+
+  // Visibility
+  Object.assign(utils, {
+    visible: "visibility:visible;",
+    invisible: "visibility:hidden;",
+  });
+
+  // Size utilities
+  Object.assign(utils, {
+    "w-full": "width:100%;",
+    "w-screen": "width:100dvw;",
+    "h-full": "height:100%;",
+    "h-screen": "height:100dvh;",
+    "max-w-full": "max-width:100%;",
+    "max-h-full": "max-height:100%;",
+    "max-w-screen": "max-width:100dvw;",
+    "max-h-screen": "max-height:100dvh;",
+    "min-w-0": "min-width:0;",
+    "min-h-0": "min-height:0;",
+    "min-w-full": "min-width:100%;",
+    "min-h-full": "min-height:100%;",
+    "min-w-screen": "min-width:100dvw;",
+    "min-h-screen": "min-height:100dvh;",
+    "w-auto": "width:auto;",
+    "h-auto": "height:auto;",
+    "w-fit": "width:fit-content;",
+    "h-fit": "height:fit-content;",
+    "w-min": "width:min-content;",
+    "h-min": "height:min-content;",
+    "w-max": "width:max-content;",
+    "h-max": "height:max-content;",
+  });
+
+  // Auto margins
+  Object.assign(utils, {
+    "m-auto": "margin:auto;",
+    "mx-auto": "margin-inline:auto;",
+    "my-auto": "margin-block:auto;",
+  });
+
+  // Semantic sizes
+  Object.entries(semanticSizes).forEach(([key, value]) => {
+    utils[`max-w-${key}`] = `max-width:calc(${spacing} * ${value});`;
+    utils[`min-w-${key}`] = `min-width:calc(${spacing} * ${value});`;
+    utils[`w-${key}`] = `width:calc(${spacing} * ${value});`;
+    utils[`max-h-${key}`] = `max-height:calc(${spacing} * ${value});`;
+    utils[`min-h-${key}`] = `min-height:calc(${spacing} * ${value});`;
+    utils[`h-${key}`] = `height:calc(${spacing} * ${value});`;
+  });
+
+  // Transition utilities
+  Object.assign(utils, {
+    transition:
+      "transition-property:all;transition-duration:150ms;transition-timing-function:ease-in-out;",
+    "transition-none": "transition-property:none;",
+    "transition-all": "transition-property:all;",
+    "transition-colors":
+      "transition-property:color,background-color,border-color,text-decoration-color,fill,stroke;",
+    "transition-shadow": "transition-property:box-shadow;",
+    "transition-opacity": "transition-property:opacity;",
+    "transition-transform": "transition-property:transform;",
+    "ease-linear": "transition-timing-function:linear;",
+    "ease-in": "transition-timing-function:ease-in;",
+    "ease-out": "transition-timing-function:ease-out;",
+    "ease-in-out": "transition-timing-function:ease-in-out;",
+    "duration-75": "transition-duration:75ms;",
+    "duration-100": "transition-duration:100ms;",
+    "duration-150": "transition-duration:150ms;",
+    "duration-200": "transition-duration:200ms;",
+    "duration-300": "transition-duration:300ms;",
+    "duration-500": "transition-duration:500ms;",
+    "duration-700": "transition-duration:700ms;",
+    "duration-1000": "transition-duration:1000ms;",
+  });
+
+  // Transform utilities
+  Object.assign(utils, {
+    "scale-0": "transform:scale(0);",
+    "scale-50": "transform:scale(0.5);",
+    "scale-75": "transform:scale(0.75);",
+    "scale-90": "transform:scale(0.9);",
+    "scale-95": "transform:scale(0.95);",
+    "scale-100": "transform:scale(1);",
+    "scale-105": "transform:scale(1.05);",
+    "scale-110": "transform:scale(1.1);",
+    "scale-125": "transform:scale(1.25);",
+    "scale-150": "transform:scale(1.5);",
+    "rotate-0": "transform:rotate(0deg);",
+    "rotate-1": "transform:rotate(1deg);",
+    "rotate-2": "transform:rotate(2deg);",
+    "rotate-3": "transform:rotate(3deg);",
+    "rotate-6": "transform:rotate(6deg);",
+    "rotate-12": "transform:rotate(12deg);",
+    "rotate-45": "transform:rotate(45deg);",
+    "rotate-90": "transform:rotate(90deg);",
+    "rotate-180": "transform:rotate(180deg);",
+    "-rotate-1": "transform:rotate(-1deg);",
+    "-rotate-2": "transform:rotate(-2deg);",
+    "-rotate-3": "transform:rotate(-3deg);",
+    "-rotate-6": "transform:rotate(-6deg);",
+    "-rotate-12": "transform:rotate(-12deg);",
+    "-rotate-45": "transform:rotate(-45deg);",
+    "-rotate-90": "transform:rotate(-90deg);",
+    "-rotate-180": "transform:rotate(-180deg);",
+  });
+
+  // Aspect ratio utilities
+  Object.assign(utils, {
+    "aspect-auto": "aspect-ratio:auto;",
+    "aspect-square": "aspect-ratio:1 / 1;",
+    "aspect-video": "aspect-ratio:16 / 9;",
+  });
+
+  // Object utilities
+  Object.assign(utils, {
+    "object-contain": "object-fit:contain;",
+    "object-cover": "object-fit:cover;",
+    "object-fill": "object-fit:fill;",
+    "object-none": "object-fit:none;",
+    "object-scale-down": "object-fit:scale-down;",
+    "object-bottom": "object-position:bottom;",
+    "object-center": "object-position:center;",
+    "object-left": "object-position:left;",
+    "object-left-bottom": "object-position:left bottom;",
+    "object-left-top": "object-position:left top;",
+    "object-right": "object-position:right;",
+    "object-right-bottom": "object-position:right bottom;",
+    "object-right-top": "object-position:right top;",
+    "object-top": "object-position:top;",
+  });
+
+  // Line clamp utilities
+  for (let i = 1; i <= 6; i++) {
+    utils[`line-clamp-${i}`] =
+      `display:-webkit-box;-webkit-line-clamp:${i};-webkit-box-orient:vertical;overflow:hidden;`;
+  }
+  utils["line-clamp-none"] =
+    "overflow:visible;display:block;-webkit-box-orient:horizontal;-webkit-line-clamp:none;";
+
+  // Order utilities for flexbox
+  for (let i = 1; i <= 12; i++) {
+    utils[`order-${i}`] = `order:${i};`;
+  }
+  utils["order-first"] = "order:-9999;";
+  utils["order-last"] = "order:9999;";
+  utils["order-none"] = "order:0;";
+
+  // Additional flex grow/shrink utilities
+  for (let i = 0; i <= 12; i++) {
+    if (i <= 1) continue; // Already handled above
+    utils[`grow-${i}`] = `flex-grow:${i};`;
+    utils[`shrink-${i}`] = `flex-shrink:${i};`;
+  }
+
+  // Gradient background utilities
+  Object.assign(utils, {
+    "bg-gradient-to-t":
+      "background-image:linear-gradient(to top, var(--tw-gradient-stops));",
+    "bg-gradient-to-tr":
+      "background-image:linear-gradient(to top right, var(--tw-gradient-stops));",
+    "bg-gradient-to-r":
+      "background-image:linear-gradient(to right, var(--tw-gradient-stops));",
+    "bg-gradient-to-br":
+      "background-image:linear-gradient(to bottom right, var(--tw-gradient-stops));",
+    "bg-gradient-to-b":
+      "background-image:linear-gradient(to bottom, var(--tw-gradient-stops));",
+    "bg-gradient-to-bl":
+      "background-image:linear-gradient(to bottom left, var(--tw-gradient-stops));",
+    "bg-gradient-to-l":
+      "background-image:linear-gradient(to left, var(--tw-gradient-stops));",
+    "bg-gradient-to-tl":
+      "background-image:linear-gradient(to top left, var(--tw-gradient-stops));",
+  });
+
+  return utils;
+};
+
+// Generate static utilities once
+export const utilityMap: CSSMap = generateUtilities();
+
+// Optimized parsing functions with better performance
 function insertPseudoBeforeCombinator(sel: string, pseudo: string): string {
-  let depthSquare = 0;
-  let depthParen = 0;
+  let depth = 0;
   for (let i = 0; i < sel.length; i++) {
     const ch = sel[i];
-    if (ch === "[") depthSquare++;
-    else if (ch === "]" && depthSquare > 0) depthSquare--;
-    else if (ch === "(") depthParen++;
-    else if (ch === ")" && depthParen > 0) depthParen--;
-    else if (depthSquare === 0 && depthParen === 0 && (ch === ">" || ch === "+" || ch === "~" || ch === " ")) {
+    if (ch === "[" || ch === "(") depth++;
+    else if ((ch === "]" || ch === ")") && depth > 0) depth--;
+    else if (
+      depth === 0 &&
+      (ch === ">" || ch === "+" || ch === "~" || ch === " ")
+    ) {
       return sel.slice(0, i) + pseudo + sel.slice(i);
     }
   }
@@ -650,135 +878,171 @@ function insertPseudoBeforeCombinator(sel: string, pseudo: string): string {
 export const selectorVariants: SelectorVariantMap = {
   before: (sel, body) => `${sel}::before{${body}}`,
   after: (sel, body) => `${sel}::after{${body}}`,
-  hover: (sel, body) => `${insertPseudoBeforeCombinator(sel, ":hover")}{${body}}`,
-  focus: (sel, body) => `${insertPseudoBeforeCombinator(sel, ":focus")}{${body}}`,
-  active: (sel, body) => `${insertPseudoBeforeCombinator(sel, ":active")}{${body}}`,
-  disabled: (sel, body) => `${insertPseudoBeforeCombinator(sel, ":disabled")}{${body}}`,
-  visited: (sel, body) => `${insertPseudoBeforeCombinator(sel, ":visited")}{${body}}`,
-  checked: (sel, body) => `${insertPseudoBeforeCombinator(sel, ":checked")}{${body}}`,
-  first: (sel, body) => `${insertPseudoBeforeCombinator(sel, ":first-child")}{${body}}`,
-  last: (sel, body) => `${insertPseudoBeforeCombinator(sel, ":last-child")}{${body}}`,
-  odd: (sel, body) => `${insertPseudoBeforeCombinator(sel, ":nth-child(odd)")}{${body}}`,
-  even: (sel, body) => `${insertPseudoBeforeCombinator(sel, ":nth-child(even)")}{${body}}`,
-  "focus-within": (sel, body) => `${insertPseudoBeforeCombinator(sel, ":focus-within")}{${body}}`,
-  "focus-visible": (sel, body) => `${insertPseudoBeforeCombinator(sel, ":focus-visible")}{${body}}`,
-
+  hover: (sel, body) =>
+    `${insertPseudoBeforeCombinator(sel, ":hover")}{${body}}`,
+  focus: (sel, body) =>
+    `${insertPseudoBeforeCombinator(sel, ":focus")}{${body}}`,
+  active: (sel, body) =>
+    `${insertPseudoBeforeCombinator(sel, ":active")}{${body}}`,
+  disabled: (sel, body) =>
+    `${insertPseudoBeforeCombinator(sel, ":disabled")}{${body}}`,
+  visited: (sel, body) =>
+    `${insertPseudoBeforeCombinator(sel, ":visited")}{${body}}`,
+  checked: (sel, body) =>
+    `${insertPseudoBeforeCombinator(sel, ":checked")}{${body}}`,
+  first: (sel, body) =>
+    `${insertPseudoBeforeCombinator(sel, ":first-child")}{${body}}`,
+  last: (sel, body) =>
+    `${insertPseudoBeforeCombinator(sel, ":last-child")}{${body}}`,
+  odd: (sel, body) =>
+    `${insertPseudoBeforeCombinator(sel, ":nth-child(odd)")}{${body}}`,
+  even: (sel, body) =>
+    `${insertPseudoBeforeCombinator(sel, ":nth-child(even)")}{${body}}`,
+  "focus-within": (sel, body) =>
+    `${insertPseudoBeforeCombinator(sel, ":focus-within")}{${body}}`,
+  "focus-visible": (sel, body) =>
+    `${insertPseudoBeforeCombinator(sel, ":focus-visible")}{${body}}`,
   "group-hover": (sel, body) => `.group:hover ${sel}{${body}}`,
   "group-focus": (sel, body) => `.group:focus ${sel}{${body}}`,
   "group-active": (sel, body) => `.group:active ${sel}{${body}}`,
   "group-disabled": (sel, body) => `.group:disabled ${sel}{${body}}`,
-
   "peer-hover": (sel, body) => `.peer:hover ~ ${sel}{${body}}`,
   "peer-focus": (sel, body) => `.peer:focus ~ ${sel}{${body}}`,
   "peer-checked": (sel, body) => `.peer:checked ~ ${sel}{${body}}`,
   "peer-disabled": (sel, body) => `.peer:disabled ~ ${sel}{${body}}`,
 };
 
-
 export const mediaVariants: MediaVariantMap = {
-  // Responsive
-  "sm": "(min-width:640px)",
-  "md": "(min-width:768px)",
-  "lg": "(min-width:1024px)",
-  "xl": "(min-width:1280px)",
+  sm: "(min-width:640px)",
+  md: "(min-width:768px)",
+  lg: "(min-width:1024px)",
+  xl: "(min-width:1280px)",
   "2xl": "(min-width:1536px)",
+  dark: "(prefers-color-scheme: dark)",
+};
 
-  // Dark mode (now plain string)
-  "dark": "(prefers-color-scheme: dark)"
+export const containerVariants: MediaVariantMap = {
+  xs: "(min-width:20rem)",
+  sm: "(min-width:24rem)",
+  md: "(min-width:28rem)",
+  lg: "(min-width:32rem)",
+  xl: "(min-width:36rem)",
+  "2xl": "(min-width:42rem)",
+  "3xl": "(min-width:48rem)",
+  "4xl": "(min-width:56rem)",
+  "5xl": "(min-width:64rem)",
+  "6xl": "(min-width:72rem)",
+  "7xl": "(min-width:80rem)",
 };
 
 export const responsiveOrder = ["sm", "md", "lg", "xl", "2xl"];
+export const containerOrder = [
+  "xs",
+  "sm",
+  "md",
+  "lg",
+  "xl",
+  "2xl",
+  "3xl",
+  "4xl",
+  "5xl",
+  "6xl",
+  "7xl",
+];
 
+// Optimized parsing functions
 export function parseSpacing(className: string): string | null {
   const negative = className.startsWith("-");
   const raw = negative ? className.slice(1) : className;
-  const parts = raw.split("-");
+  const lastDashIndex = raw.lastIndexOf("-");
 
-  if (parts.length < 2) return null;
+  if (lastDashIndex === -1) return null;
 
-  const key = parts.slice(0, -1).join("-");
-  const numStr = parts[parts.length - 1];
+  const key = raw.slice(0, lastDashIndex);
+  const numStr = raw.slice(lastDashIndex + 1);
   const num = parseFloat(numStr);
 
   if (Number.isNaN(num) || !spacingProps[key]) return null;
 
   const sign = negative ? "-" : "";
   return spacingProps[key]
-    .map(prop => `${prop}:calc(${sign}${spacing} * ${num});`)
+    .map((prop) => `${prop}:calc(${sign}${spacing} * ${num});`)
     .join("");
 }
 
 export function hexToRgb(hex: string): string {
   const clean = hex.replace("#", "");
   const bigint = parseInt(clean, 16);
-  const r = (bigint >> 16) & 255;
-  const g = (bigint >> 8) & 255;
-  const b = bigint & 255;
-  return `${r} ${g} ${b}`;
+  return `${(bigint >> 16) & 255} ${(bigint >> 8) & 255} ${bigint & 255}`;
 }
 
+// Optimized color parsing with lookup tables
+const colorRegex =
+  /^(bg|text|border|decoration|shadow|outline|caret|accent|fill|stroke)-([a-z]+)-?(\d{2,3}|DEFAULT)?$/;
+const propMap: Record<string, string> = {
+  bg: "background-color",
+  decoration: "text-decoration-color",
+  text: "color",
+  border: "border-color",
+  outline: "outline-color",
+  caret: "caret-color",
+  accent: "accent-color",
+  fill: "fill",
+  stroke: "stroke",
+};
+
 export function parseColorClass(className: string): string | null {
-  // Match bg-red-500, text-gray-200, border-blue-600, etc.
-  const match = /^(bg|text|border|decoration|shadow|outline|caret|accent|fill|stroke)-([a-z]+)-?(\d{2,3}|DEFAULT)?$/.exec(className);
+  const match = colorRegex.exec(className);
   if (!match) return null;
 
   const [, type, colorName, shade = "DEFAULT"] = match;
   const colorValue = colors[colorName]?.[shade];
   if (!colorValue) return null;
 
-  // Special-case shadow: we set a CSS variable so shadow-size utilities can compose with color
-  if (type === 'shadow') return `--ce-shadow-color:${colorValue};`;
-
-  const propMap: Record<string, string> = {
-    bg: "background-color",
-    decoration: "text-decoration-color",
-    text: "color",
-    border: "border-color",
-    outline: "outline-color",
-    caret: "caret-color",
-    accent: "accent-color",
-    fill: "fill",
-    stroke: "stroke",
-  };
-
+  if (type === "shadow") return `--ce-shadow-color:${colorValue};`;
   const prop = propMap[type];
-  if (!prop) return null;
-  return `${prop}:${colorValue};`;
+  return prop ? `${prop}:${colorValue};` : null;
 }
 
-export function parseOpacityModifier(className: string): { base: string; opacity?: number } {
-  const [base, opacityStr] = className.split("/");
-  if (!opacityStr) return { base };
+export function parseOpacityModifier(className: string): {
+  base: string;
+  opacity?: number;
+} {
+  const slashIndex = className.indexOf("/");
+  if (slashIndex === -1) return { base: className };
 
+  const base = className.slice(0, slashIndex);
+  const opacityStr = className.slice(slashIndex + 1);
   const opacity = parseInt(opacityStr, 10);
-  if (isNaN(opacity) || opacity < 0 || opacity > 100) return { base };
 
-  return { base, opacity: opacity / 100 };
+  return isNaN(opacity) || opacity < 0 || opacity > 100
+    ? { base }
+    : { base, opacity: opacity / 100 };
 }
 
 export function parseColorWithOpacity(className: string): string | null {
   const { base, opacity } = parseOpacityModifier(className);
 
-  // Try palette first
-  const paletteRule = parseColorClass(base); // e.g., "background-color:#ef4444;"
-  if (paletteRule) {
-    if (opacity !== undefined) {
-      const match = /#([0-9a-f]{6})/i.exec(paletteRule);
-      if (match) {
-        const rgb = hexToRgb(match[0]);
-        return paletteRule.replace(/#([0-9a-f]{6})/i, `rgb(${rgb} / ${opacity})`);
-      }
+  const paletteRule = parseColorClass(base);
+  if (paletteRule && opacity !== undefined) {
+    const match = /#([0-9a-f]{6})/i.exec(paletteRule);
+    if (match) {
+      const rgb = hexToRgb(match[0]);
+      return paletteRule.replace(/#([0-9a-f]{6})/i, `rgb(${rgb} / ${opacity})`);
     }
-    return paletteRule;
   }
 
-  // Try arbitrary color: [bg:#ff0000]/50
+  if (paletteRule) return paletteRule;
+
   const arbitraryRule = parseArbitrary(base);
   if (arbitraryRule && opacity !== undefined) {
     const match = /#([0-9a-f]{6})/i.exec(arbitraryRule);
     if (match) {
       const rgb = hexToRgb(match[0]);
-      return arbitraryRule.replace(/#([0-9a-f]{6})/i, `rgb(${rgb} / ${opacity})`);
+      return arbitraryRule.replace(
+        /#([0-9a-f]{6})/i,
+        `rgb(${rgb} / ${opacity})`,
+      );
     }
   }
 
@@ -786,121 +1050,132 @@ export function parseColorWithOpacity(className: string): string | null {
 }
 
 /**
- * Parse opacity utility class (e.g., opacity-25)
- * Returns CSS rule string or null if not valid
+ * Parse gradient color stop utilities like from-red-500, to-blue-600, via-green-400
  */
+export function parseGradientColorStop(className: string): string | null {
+  const match = /^(from|to|via)-([a-z]+)-?(\d{2,3}|DEFAULT)?$/.exec(className);
+  if (!match) return null;
+
+  const [, position, colorName, shade = "DEFAULT"] = match;
+  const colorValue = colors[colorName]?.[shade];
+  if (!colorValue) return null;
+
+  switch (position) {
+    case "from":
+      return `--tw-gradient-from:${colorValue} var(--tw-gradient-from-position);--tw-gradient-to:rgb(255 255 255 / 0) var(--tw-gradient-to-position);--tw-gradient-stops:var(--tw-gradient-from), var(--tw-gradient-to);`;
+    case "to":
+      return `--tw-gradient-to:${colorValue} var(--tw-gradient-to-position);`;
+    case "via":
+      return `--tw-gradient-to:rgb(255 255 255 / 0) var(--tw-gradient-to-position);--tw-gradient-stops:var(--tw-gradient-from), ${colorValue} var(--tw-gradient-via-position), var(--tw-gradient-to);`;
+    default:
+      return null;
+  }
+}
+
 export function parseOpacity(className: string): string | null {
   const match = /^opacity-(\d{1,3})$/.exec(className);
   if (!match) return null;
   const value = parseInt(match[1], 10);
-  if (value < 0 || value > 100) return null;
-  return `opacity:${value / 100};`;
+  return value < 0 || value > 100 ? null : `opacity:${value / 100};`;
 }
 
-/**
- * Arbitrary value parser — supports:
- * - prop-[value]
- */
+// Enhanced arbitrary value parser
 export function parseArbitrary(className: string): string | null {
-  // 1) [prop:value] — only when "prop" is a valid CSS property name (not a selector)
-  if (className.startsWith("[") && className.endsWith("]") && !className.includes("-[")) {
+  // [prop:value] format
+  if (
+    className.startsWith("[") &&
+    className.endsWith("]") &&
+    !className.includes("-[")
+  ) {
     const inner = className.slice(1, -1).trim();
+    const colonIndex = inner.indexOf(":");
+    if (colonIndex === -1) return null;
 
-    // prop must be at the very start, and must be a CSS identifier (letters + hyphens)
-    const m = inner.match(/^([a-zA-Z][a-zA-Z0-9-]*)\s*:(.*)$/);
-    if (m) {
-      const prop = m[1].trim();
-      let value = m[2].trim();
-      // normalize url('...') to url("...") and whole-value single-quotes to double
-      value = value.replace(/url\('\s*([^']*?)\s*'\)/g, 'url("$1")');
-      value = value.replace(/^'([^']*)'$/g, '"$1"');
-      return `${prop}:${value};`;
-    }
-    // If it didn't match a property, it's an arbitrary variant selector (e.g. [&>h2:hover]) — not a utility
-    return null;
+    const prop = inner.slice(0, colonIndex).trim();
+    let value = inner.slice(colonIndex + 1).trim();
+
+    // Only allow valid CSS property names
+    if (!/^[a-zA-Z][a-zA-Z0-9-]*$/.test(prop)) return null;
+
+    value = value.replace(/url\('\s*([^']*?)\s*'\)/g, 'url("$1")');
+    value = value.replace(/^'([^']*)'$/g, '"$1"');
+    return `${prop}:${value};`;
   }
 
-  // 2) prop-[value] — arbitrary values for known properties
+  // prop-[value] format
   const bracketStart = className.indexOf("-[");
-  const bracketEnd = className.endsWith("]");
-  if (bracketStart > 0 && bracketEnd) {
-    const prop = className.slice(0, bracketStart);
-    let value = className.slice(bracketStart + 2, -1);
+  if (bracketStart <= 0 || !className.endsWith("]")) return null;
 
-    // Convert underscores to spaces
-    value = value.replace(/_/g, " ");
+  const prop = className.slice(0, bracketStart);
+  let value = className.slice(bracketStart + 2, -1).replace(/_/g, " ");
 
-    // Map common abbreviations to CSS properties
-    const propMap: Record<string, string> = {
-      bg: "background-color",
-      text: "color",
-      shadow: "box-shadow",
-      p: "padding",
-      px: "padding-inline",
-      py: "padding-block",
-      m: "margin",
-      mx: "margin-inline",
-      my: "margin-block",
-      w: "width",
-      h: "height",
-      "min-w": "min-width",
-      "max-w": "max-width",
-      "min-h": "min-height",
-      "max-h": "max-height",
-      "border-t": "border-top-width",
-      "border-b": "border-bottom-width",
-      "border-l": "border-left-width",
-      "border-r": "border-right-width",
-      "border-x": "border-inline-width",
-      "border-y": "border-block-width",
-      "grid-cols": "grid-template-columns",
-      "grid-rows": "grid-template-rows",
-      transition: "transition-property",
-      ease: "transition-timing-function",
-      delay: "transition-delay",
-      duration: "transition-duration",
-      list: "list-style",
-      break: "word-break",
-      flex: "flex-direction",
-      items: "align-items",
-      justify: "justify-content",
-      whitespace: "white-space",
-      select: "user-select",
-      content: "align-content",
-      self: "align-self",
-      basis: "flex-basis",
-      tracking: "letter-spacing",
-      scroll: "scroll-behavior",
-      weight: "font-weight",
-      leading: "line-height",
-      z: "z-index",
-    };
+  // Enhanced property mappings
+  const propMappings: Record<string, string> = {
+    bg: "background-color",
+    shadow: "box-shadow",
+    p: "padding",
+    px: "padding-inline",
+    py: "padding-block",
+    m: "margin",
+    mx: "margin-inline",
+    my: "margin-block",
+    w: "width",
+    h: "height",
+    "min-w": "min-width",
+    "max-w": "max-width",
+    "min-h": "min-height",
+    "max-h": "max-height",
+    "border-t": "border-top-width",
+    "border-b": "border-bottom-width",
+    "border-l": "border-left-width",
+    "border-r": "border-right-width",
+    "border-x": "border-inline-width",
+    "border-y": "border-block-width",
+    "grid-cols": "grid-template-columns",
+    "grid-rows": "grid-template-rows",
+    transition: "transition-property",
+    ease: "transition-timing-function",
+    delay: "transition-delay",
+    duration: "transition-duration",
+    list: "list-style",
+    break: "word-break",
+    flex: "flex-direction",
+    items: "align-items",
+    justify: "justify-content",
+    content: "align-content",
+    self: "align-self",
+    basis: "flex-basis",
+    tracking: "letter-spacing",
+    leading: "line-height",
+    z: "z-index",
+    opacity: "opacity",
+  };
 
-    // Tailwind-like rotate behavior for arbitrary values
-    if (prop === "rotate") {
-      return `transform:rotate(${value});`;
+  // Special handling for text properties
+  if (prop === "text") {
+    // If value looks like a size (ends with px, rem, em, etc.), treat as font-size
+    if (/^\d*\.?\d+(px|rem|em|%|vh|vw|ch|ex)$/.test(value)) {
+      return `font-size:${value};`;
     }
-
-    const cssProp = propMap[prop] ?? prop.replace(/_/g, "-");
-    if (cssProp && value) return `${cssProp}:${value};`;
+    // Otherwise treat as color
+    return `color:${value};`;
   }
 
-  return null;
+  if (prop === "rotate") return `transform:rotate(${value});`;
+  if (prop === "scale") return `transform:scale(${value});`;
+  if (prop === "translate-x") return `transform:translateX(${value});`;
+  if (prop === "translate-y") return `transform:translateY(${value});`;
+
+  const cssProp = propMappings[prop] ?? prop.replace(/_/g, "-");
+  return cssProp && value ? `${cssProp}:${value};` : null;
 }
 
-/**
- * Parse arbitrary variant from class name.
- * Supports [attr=value]:utility or foo-[bar]:utility
- */
 export function parseArbitraryVariant(token: string): string | null {
-  // [attr=value] or [&...]
   if (token.startsWith("[") && token.endsWith("]")) {
     const inner = token.slice(1, -1);
-    // If it contains &, return without brackets so & can be replaced
     return inner.includes("&") ? inner : token;
   }
 
-  // foo-[bar] style
   const bracketStart = token.indexOf("-[");
   if (bracketStart > 0 && token.endsWith("]")) {
     const inner = token.slice(bracketStart + 2, -1).replace(/_/g, "-");
@@ -911,35 +1186,29 @@ export function parseArbitraryVariant(token: string): string | null {
 }
 
 export function escapeClassName(name: string): string {
-  // Escape only selector-relevant characters, not brackets
-  return name.replace(/([!"#$%&'()*+,./:;<=>?@[\\\]^`{|}~])/g, '\\$1');
+  return name.replace(/([!"#$%&'()*+,./:;<=>?@[\\\]^`{|}~])/g, "\\$1");
 }
 
+// Optimized HTML class extraction
 export function extractClassesFromHTML(html: string): string[] {
-  // Match class attributes robustly by capturing the opening quote and
-  // using a backreference to the same quote for the closing boundary.
-  // This ensures embedded single quotes (e.g. url('/icons/mask.svg')) do
-  // not prematurely terminate the match.
   const classAttrRegex = /class\s*=\s*(['"])(.*?)\1/g;
   const classList: string[] = [];
   let match: RegExpExecArray | null;
 
   while ((match = classAttrRegex.exec(html))) {
-    // Split on whitespace to preserve complex tokens containing colons,
-    // brackets, parentheses and quotes (e.g. [mask-image:url('/icons/mask.svg')]).
     const tokens = match[2].split(/\s+/).filter(Boolean);
     if (tokens.length) classList.push(...tokens);
   }
-  return classList.filter(Boolean);
+  return classList;
 }
 
-/**
- * JIT CSS generation with throttling and memoization.
- * Only regenerates CSS if HTML changes and enough time has passed.
- * Caches results for repeated HTML inputs.
- */
-export const jitCssCache = new Map<string, { css: string; timestamp: number }>();
-export const JIT_CSS_THROTTLE_MS = 16; // 60fps
+// Enhanced JIT CSS generation with better performance
+export const jitCssCache = new Map<
+  string,
+  { css: string; timestamp: number }
+>();
+export const JIT_CSS_THROTTLE_MS = 16;
+const MAX_CACHE_SIZE = 1000;
 
 export function jitCSS(html: string): string {
   const now = Date.now();
@@ -947,90 +1216,98 @@ export function jitCSS(html: string): string {
   if (cached && now - cached.timestamp < JIT_CSS_THROTTLE_MS) return cached.css;
 
   const classes = extractClassesFromHTML(html);
-  const seen = new Set(classes);
+  if (!classes.length) return "";
 
-  const bucket1: string[] = [];
-  const bucket2: string[] = [];
-  const bucket3: string[] = [];
-  const bucket4: string[] = [];
+  const seen = new Set(classes);
+  const buckets: string[][] = [[], [], [], []];
   const ruleCache: Record<string, string | null> = {};
 
-  function generateRuleCached(cls: string, stripDark = false): string | null {
-    const cacheKey = (stripDark ? "dark|" : "") + cls;
+  const generateRuleCached = (
+    cls: string,
+    stripDark = false,
+  ): string | null => {
+    const cacheKey = stripDark ? `dark|${cls}` : cls;
     if (cacheKey in ruleCache) return ruleCache[cacheKey];
     const result = generateRule(cls, stripDark);
     ruleCache[cacheKey] = result;
     return result;
-  }
+  };
 
-  function classify(before: string[]): number {
-    const hasResponsive = before.some(t => responsiveOrder.includes(t));
-    const hasDark = before.includes("dark");
-    if (before.length === 0) return 1;
-    if (!hasResponsive && !hasDark) return 2;
-    if (hasResponsive && !hasDark) return 3;
-    return 4;
-  }
+  const classify = (variants: string[]): number => {
+    const hasResponsive = variants.some((t) => responsiveOrder.includes(t));
+    const hasContainer = variants.some(
+      (t) =>
+        t.startsWith("@") &&
+        (containerOrder.includes(t.slice(1)) || t.match(/^@\[.+\]$/)),
+    );
+    const hasDark = variants.includes("dark");
+    if (!variants.length) return 0;
+    if (!hasResponsive && !hasDark && !hasContainer) return 1;
+    if (hasDark && (hasResponsive || hasContainer)) return 3;
+    return 2;
+  };
 
-  function splitVariants(input: string): string[] {
-    const out: string[] = [];
-    let buf = "";
-    let depthSquare = 0;
-    let depthParen = 0;
+  const splitVariants = (input: string): string[] => {
+    const parts: string[] = [];
+    let current = "";
+    let depth = 0;
+
     for (let i = 0; i < input.length; i++) {
       const ch = input[i];
-      if (ch === "[") depthSquare++;
-      else if (ch === "]" && depthSquare > 0) depthSquare--;
-      else if (ch === "(") depthParen++;
-      else if (ch === ")" && depthParen > 0) depthParen--;
-      if (ch === ":" && depthSquare === 0 && depthParen === 0) {
-        out.push(buf);
-        buf = "";
+      if (ch === "[" || ch === "(") depth++;
+      else if (ch === "]" || ch === ")") depth--;
+
+      if (ch === ":" && depth === 0) {
+        parts.push(current);
+        current = "";
       } else {
-        buf += ch;
+        current += ch;
       }
     }
-    if (buf) out.push(buf);
-    return out;
-  }
+    if (current) parts.push(current);
+    return parts;
+  };
 
-  // Map Tailwind pseudo-variant tokens to their CSS pseudo class strings
-  function tokenToPseudo(token: string): string | null {
-    switch (token) {
-      case "hover": return ":hover";
-      case "focus": return ":focus";
-      case "active": return ":active";
-      case "visited": return ":visited";
-      case "disabled": return ":disabled";
-      case "checked": return ":checked";
-      case "first": return ":first-child";
-      case "last": return ":last-child";
-      case "odd": return ":nth-child(odd)";
-      case "even": return ":nth-child(even)";
-      case "focus-within": return ":focus-within";
-      case "focus-visible": return ":focus-visible";
-      default: return null;
-    }
-  }
+  const pseudoMap: Record<string, string> = {
+    hover: ":hover",
+    focus: ":focus",
+    active: ":active",
+    visited: ":visited",
+    disabled: ":disabled",
+    checked: ":checked",
+    first: ":first-child",
+    last: ":last-child",
+    odd: ":nth-child(odd)",
+    even: ":nth-child(even)",
+    "focus-within": ":focus-within",
+    "focus-visible": ":focus-visible",
+  };
 
-  function generateRule(cls: string, stripDark = false): string | null {
+  const generateRule = (cls: string, stripDark = false): string | null => {
     const parts = splitVariants(cls);
-
-    // Find base utility
+    let basePart = "";
     let important = false;
-    const basePart = parts.find(p => {
-      if (p.startsWith("!")) {
+
+    // Find the base utility
+    for (const part of parts) {
+      let checkPart = part;
+      if (checkPart.startsWith("!")) {
         important = true;
-        p = p.slice(1);
+        checkPart = checkPart.slice(1);
       }
-      return (
-        utilityMap[p] ||
-        parseSpacing(p) ||
-        parseOpacity(p) ||
-        parseColorWithOpacity(p) ||
-        parseArbitrary(p)
-      );
-    });
+
+      if (
+        utilityMap[checkPart] ||
+        parseSpacing(checkPart) ||
+        parseOpacity(checkPart) ||
+        parseColorWithOpacity(checkPart) ||
+        parseArbitrary(checkPart)
+      ) {
+        basePart = part;
+        break;
+      }
+    }
+
     if (!basePart) return null;
 
     const cleanBase = basePart.replace(/^!/, "");
@@ -1039,41 +1316,49 @@ export function jitCSS(html: string): string {
       parseSpacing(cleanBase) ??
       parseOpacity(cleanBase) ??
       parseColorWithOpacity(cleanBase) ??
+      parseGradientColorStop(cleanBase) ??
       parseArbitrary(cleanBase);
 
     if (!baseRule) return null;
 
     const baseIndex = parts.indexOf(basePart);
-    let before = baseIndex >= 0 ? parts.slice(0, baseIndex) : [];
-    if (stripDark) before = before.filter(t => t !== "dark");
+    let variants = baseIndex >= 0 ? parts.slice(0, baseIndex) : [];
+    if (stripDark) variants = variants.filter((t) => t !== "dark");
 
     const escapedClass = `.${escapeClassName(cls)}`;
+    const body = important ? baseRule.replace(/;/g, " !important;") : baseRule;
     const SUBJECT = "__SUBJECT__";
-    const body = important ? baseRule.replace(/;$/, " !important;") : baseRule;
-
-    // Start with a SUBJECT placeholder we will replace later with the real class
     let selector = SUBJECT;
 
-    // Handle structural wrappers (group/peer) first (preserve order)
+    // Handle structural variants
     const structural: string[] = [];
-    for (const token of before) {
+    for (const token of variants) {
       if (token.startsWith("group-")) {
         selector = `.group:${token.slice(6)} ${selector}`;
         structural.push(token);
       } else if (token.startsWith("peer-")) {
-        selector = selector.replace(SUBJECT, `.peer:${token.slice(5)}~${SUBJECT}`);
+        selector = selector.replace(
+          SUBJECT,
+          `.peer:${token.slice(5)}~${SUBJECT}`,
+        );
         structural.push(token);
       }
     }
-    before = before.filter(t => !structural.includes(t));
+    variants = variants.filter((t) => !structural.includes(t));
 
-    // Collect pseudos in left-to-right order, but don't mutate SUBJECT yet to preserve order.
+    // Handle pseudos and arbitrary variants
     const subjectPseudos: string[] = [];
     const innerPseudos: string[] = [];
     let wrapperVariant: string | null = null;
 
-    for (const token of before) {
-      if (token === "dark" || responsiveOrder.includes(token)) continue;
+    for (const token of variants) {
+      if (
+        token === "dark" ||
+        responsiveOrder.includes(token) ||
+        (token.startsWith("@") &&
+          (containerOrder.includes(token.slice(1)) || token.match(/^@\[.+\]$/)))
+      )
+        continue;
 
       const variantSelector = parseArbitraryVariant(token);
       if (variantSelector) {
@@ -1081,43 +1366,59 @@ export function jitCSS(html: string): string {
         continue;
       }
 
-      const pseudo = tokenToPseudo(token);
+      const pseudo = pseudoMap[token];
       if (pseudo) {
-        if (!wrapperVariant) subjectPseudos.push(pseudo);
-        else innerPseudos.push(pseudo);
+        if (!wrapperVariant) {
+          subjectPseudos.push(pseudo);
+        } else {
+          innerPseudos.push(pseudo);
+        }
         continue;
       }
 
       const fn = selectorVariants[token];
       if (typeof fn === "function") {
-        // apply structural variant immediately
         selector = fn(selector, body).split("{")[0];
       }
     }
 
-    // helper: insert inner pseudos into the 'post' part after the first simple selector
+    const subjectPseudoStr = subjectPseudos.join("");
+    const innerPseudoStr = innerPseudos.join("");
+
+    // Helper function to insert inner pseudos into post part
     function insertPseudosIntoPost(post: string, pseudos: string): string {
       if (!pseudos) return post;
       let depthSquare = 0;
       let depthParen = 0;
+
       // If post starts with a combinator, insert pseudos after the first simple selector
-      if (post.length && (post[0] === '>' || post[0] === '+' || post[0] === '~' || post[0] === ' ')) {
-        // find end of first simple selector after the combinator
+      if (
+        post.length &&
+        (post[0] === ">" ||
+          post[0] === "+" ||
+          post[0] === "~" ||
+          post[0] === " ")
+      ) {
         let i = 1;
         // skip initial whitespace
-        while (i < post.length && post[i] === ' ') i++;
+        while (i < post.length && post[i] === " ") i++;
         for (; i < post.length; i++) {
           const ch = post[i];
-          if (ch === '[') depthSquare++;
-          else if (ch === ']' && depthSquare > 0) depthSquare--;
-          else if (ch === '(') depthParen++;
-          else if (ch === ')' && depthParen > 0) depthParen--;
-          // stop at next combinator at depth 0
-          if (depthSquare === 0 && depthParen === 0 && (post[i] === '>' || post[i] === '+' || post[i] === '~' || post[i] === ' ')) {
+          if (ch === "[") depthSquare++;
+          else if (ch === "]" && depthSquare > 0) depthSquare--;
+          else if (ch === "(") depthParen++;
+          else if (ch === ")" && depthParen > 0) depthParen--;
+          if (
+            depthSquare === 0 &&
+            depthParen === 0 &&
+            (post[i] === ">" ||
+              post[i] === "+" ||
+              post[i] === "~" ||
+              post[i] === " ")
+          ) {
             return post.slice(0, i) + pseudos + post.slice(i);
           }
         }
-        // reached end: append pseudos at end
         return post + pseudos;
       }
 
@@ -1127,107 +1428,155 @@ export function jitCSS(html: string): string {
         else if (ch === "]" && depthSquare > 0) depthSquare--;
         else if (ch === "(") depthParen++;
         else if (ch === ")" && depthParen > 0) depthParen--;
-        // break at first combinator at depth 0 (space, >, +, ~)
-        if (depthSquare === 0 && depthParen === 0 && (ch === '>' || ch === '+' || ch === '~' || ch === ' ')) {
+        if (
+          depthSquare === 0 &&
+          depthParen === 0 &&
+          (ch === ">" || ch === "+" || ch === "~" || ch === " ")
+        ) {
           return post.slice(0, i) + pseudos + post.slice(i);
         }
       }
       return post + pseudos;
     }
 
-    const subjectPseudoStr = subjectPseudos.join("");
-    const innerPseudoStr = innerPseudos.join("");
-
-    // Build selector by applying wrapper if present, inserting pseudos in the right spots
     if (wrapperVariant) {
       if (wrapperVariant.includes("&")) {
         const idx = wrapperVariant.indexOf("&");
         const pre = wrapperVariant.slice(0, idx);
         const post = wrapperVariant.slice(idx + 1);
-        // place subject with its pseudos where & sits
         const subjectWithPseudos = SUBJECT + subjectPseudoStr;
-        // If there are no subject pseudos (nothing attached before the wrapper),
-        // inner pseudos should apply to the subject. Otherwise they target the
-        // element inside the wrapper (the post), so insert them into the post.
-        // Preserve any structural wrappers that were applied earlier by
-        // replacing the SUBJECT placeholder in the current selector.
-        const currentSelector = selector;
+
         if (subjectPseudos.length === 0) {
           // attach inner pseudos to the subject
-          selector = currentSelector.replace(SUBJECT, pre + subjectWithPseudos + innerPseudoStr + post);
+          selector = selector.replace(
+            SUBJECT,
+            pre + subjectWithPseudos + innerPseudoStr + post,
+          );
         } else {
           // insert inner pseudos into post after its first simple selector
           const postWithInner = insertPseudosIntoPost(post, innerPseudoStr);
-          selector = currentSelector.replace(SUBJECT, pre + subjectWithPseudos + postWithInner);
+          selector = selector.replace(
+            SUBJECT,
+            pre + subjectWithPseudos + postWithInner,
+          );
         }
       } else {
-        // prefix-style wrapper like [data-open=true]
-        // Insert the wrapper around the existing selector's SUBJECT so structural
-        // prefixes remain on the outside.
-        const currentSelector = selector;
-        selector = currentSelector.replace(SUBJECT, `${wrapperVariant}${SUBJECT + subjectPseudoStr}`);
-        if (innerPseudoStr) selector = selector.replace(SUBJECT, `${SUBJECT}${innerPseudoStr}`);
+        selector = selector.replace(
+          SUBJECT,
+          `${wrapperVariant}${SUBJECT + subjectPseudoStr}`,
+        );
+        if (innerPseudoStr) {
+          selector = selector.replace(SUBJECT, `${SUBJECT}${innerPseudoStr}`);
+        }
       }
     } else {
-      // no wrapper: just attach subject and inner pseudos directly to SUBJECT
-      selector = SUBJECT + subjectPseudoStr + innerPseudoStr;
+      selector = selector.replace(
+        SUBJECT,
+        SUBJECT + subjectPseudoStr + innerPseudoStr,
+      );
     }
 
-    // re-apply any previously applied structural wrappers (they were applied to the placeholder earlier)
-    // At this point 'selector' is a string containing SUBJECT (or actual class replacement next).
-    // Replace any remaining SUBJECT with escaped class
     selector = selector.replace(new RegExp(SUBJECT, "g"), escapedClass);
 
-    // Emit final rule
     let rule = `${selector}{${body}}`;
 
-    // Wrap in media queries
-    const responsiveTokens = before.filter(t => responsiveOrder.includes(t));
+    // Apply media queries and container queries
+    const responsiveTokens = variants.filter((t) =>
+      responsiveOrder.includes(t),
+    );
+    const containerTokens = variants.filter(
+      (t) =>
+        t.startsWith("@") &&
+        (containerOrder.includes(t.slice(1)) || t.match(/^@\[.+\]$/)),
+    );
     const lastResponsive = responsiveTokens.length
       ? responsiveTokens[responsiveTokens.length - 1]
       : null;
-    const hasDark = before.includes("dark");
+    const lastContainer = containerTokens.length
+      ? containerTokens[containerTokens.length - 1]
+      : null;
+    const hasDark = variants.includes("dark");
 
-    if (stripDark && lastResponsive) {
-      rule = `@media (prefers-color-scheme: dark) and ${mediaVariants[lastResponsive]}{${rule}}`;
-    } else if (stripDark) {
-      rule = `@media (prefers-color-scheme: dark){${rule}}`;
-    } else if (hasDark && lastResponsive) {
-      rule = `@media (prefers-color-scheme: dark) and ${mediaVariants[lastResponsive]}{${rule}}`;
+    // Handle media queries and container queries
+    let mediaQuery = "";
+    let containerQuery = "";
+
+    // Build media query
+    if (hasDark && lastResponsive) {
+      mediaQuery = `@media (prefers-color-scheme: dark) and ${mediaVariants[lastResponsive]}`;
     } else if (hasDark) {
-      rule = `@media (prefers-color-scheme: dark){${rule}}`;
+      mediaQuery = `@media (prefers-color-scheme: dark)`;
     } else if (lastResponsive) {
-      rule = `@media ${mediaVariants[lastResponsive]}{${rule}}`;
+      mediaQuery = `@media ${mediaVariants[lastResponsive]}`;
+    }
+
+    // Build container query
+    if (lastContainer) {
+      if (lastContainer.startsWith("@[") && lastContainer.endsWith("]")) {
+        // Arbitrary container query like @[300px]
+        const value = lastContainer.slice(2, -1);
+        // Validate that the value is a valid CSS length (px, rem, em, %, etc.)
+        if (
+          !/^-?\d*\.?\d+(px|rem|em|%|vh|vw|ch|ex|cm|mm|in|pt|pc)$/.test(value)
+        ) {
+          return null; // Invalid arbitrary container query value
+        }
+        containerQuery = `@container (min-width:${value})`;
+      } else {
+        // Named container query like @md
+        const containerKey = lastContainer.slice(1);
+        const queryValue =
+          containerVariants[containerKey] || `(min-width:${containerKey})`;
+        containerQuery = `@container ${queryValue}`;
+      }
+    }
+
+    // Combine queries
+    if (mediaQuery && containerQuery) {
+      rule = `${mediaQuery}${containerQuery}{${rule}}`;
+    } else if (mediaQuery) {
+      rule = `${mediaQuery}{${rule}}`;
+    } else if (containerQuery) {
+      rule = `${containerQuery}{${rule}}`;
     }
 
     return rule;
-  }
+  };
 
-  // Use safe splitting in the outer loop as well
+  // Process classes
   for (const cls of seen) {
     const parts = splitVariants(cls);
     const basePart = parts.find(
-      p => utilityMap[p] || parseSpacing(p) || parseOpacity(p) || parseColorWithOpacity(p) || parseArbitrary(p)
+      (p) =>
+        utilityMap[p.replace(/^!/, "")] ||
+        parseSpacing(p.replace(/^!/, "")) ||
+        parseOpacity(p.replace(/^!/, "")) ||
+        parseColorWithOpacity(p.replace(/^!/, "")) ||
+        parseGradientColorStop(p.replace(/^!/, "")) ||
+        parseArbitrary(p.replace(/^!/, "")),
     );
     if (!basePart) continue;
-    const baseIndex = parts.indexOf(basePart);
-    const before = baseIndex >= 0 ? parts.slice(0, baseIndex) : [];
-    const bucketNum = classify(before);
 
-    if (bucketNum === 4) {
-      const rule = generateRuleCached(cls, true);
-      if (rule) bucket4.push(rule);
-    } else {
-      const rule = generateRuleCached(cls);
-      if (rule) {
-        if (bucketNum === 1) bucket1.push(rule);
-        else if (bucketNum === 2) bucket2.push(rule);
-        else if (bucketNum === 3) bucket3.push(rule);
-      }
-    }
+    const baseIndex = parts.indexOf(basePart);
+    const variants = baseIndex >= 0 ? parts.slice(0, baseIndex) : [];
+    const bucketNum = classify(variants);
+
+    const rule = generateRuleCached(cls);
+    if (rule) buckets[bucketNum].push(rule);
   }
 
-  const css = [...bucket1, ...bucket2, ...bucket3, ...bucket4].join("");
+  const css = buckets.flat().join("");
+
+  // Cache size management to prevent memory leaks
+  if (jitCssCache.size >= MAX_CACHE_SIZE) {
+    // Remove oldest entries (simple FIFO cleanup)
+    const keysToDelete = Array.from(jitCssCache.keys()).slice(
+      0,
+      Math.floor(MAX_CACHE_SIZE / 2),
+    );
+    keysToDelete.forEach((key) => jitCssCache.delete(key));
+  }
+
   jitCssCache.set(html, { css, timestamp: now });
   return css;
 }

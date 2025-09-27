@@ -5,72 +5,155 @@ Custom Elements Runtime provides a high-performance, zero-dependency JIT CSS eng
 ## 🏗️ How JIT CSS Works
 
 1. **Base Reset:** Applies a minimal Shadow DOM reset for consistent rendering. This is shared across all components to save space.
-2. **Merges User-defined Styles:** Merges in user-defined styles from the component config.
+2. **Merges User-defined Styles:** Merges in user-defined styles from the component config and `useStyle` hook.
 3. **JIT CSS:** Extracts all class names from the Shadow DOM, parses utilities, variants, and arbitrary values, and generates scoped CSS rules on demand.
 4. **Minification:** Strips whitespace and comments for fast, small payloads.
 5. **Memoization & Throttling:** Caches CSS output for repeated HTML inputs and throttles regeneration for performance.
 
 ## 🧩 Built-in Utilities
 
-**Layout:**
-`block`, `inline`, `inline-block`, `flex`, `inline-flex`, `grid`, `hidden`
+### **Layout & Display**
+`block`, `inline`, `inline-block`, `flex`, `inline-flex`, `grid`, `inline-grid`, `table`, `table-cell`, `table-row`, `hidden`
 
-**Sizing & Spacing:**
-`w-full`, `w-screen`, `h-full`, `h-screen`, `max-w-full`, `max-h-full`, `min-w-0`, `min-h-0`, `m-auto`, `mx-auto`, `my-auto`,
-`p-4`, `m-2`, `mx-auto`, `gap-2`, `gap-x-2`, `gap-y-2`, etc. (all axis and negative values supported)
+### **Position**
+`absolute`, `relative`, `fixed`, `sticky`, `static`
 
-**Overflow:**
+### **Sizing & Spacing**
+`w-full`, `w-screen`, `w-auto`, `w-fit`, `w-min`, `w-max`, `h-full`, `h-screen`, `h-auto`, `h-fit`, `h-min`, `h-max`
+`max-w-full`, `max-w-screen`, `max-h-full`, `max-h-screen`, `min-w-0`, `min-h-0`, `min-w-full`, `min-h-full`, `min-w-screen`, `min-h-screen`
+
+**Semantic Sizes:**
+`w-3xs` to `w-7xl`, `h-3xs` to `h-7xl`, `max-w-3xs` to `max-w-7xl`, `max-h-3xs` to `max-h-7xl`, `min-w-3xs` to `min-w-7xl`, `min-h-3xs` to `min-h-7xl`
+
+**Spacing (Margin/Padding):**
+`m-auto`, `mx-auto`, `my-auto`, `p-4`, `m-2`, `mx-auto`, `gap-2`, `gap-x-2`, `gap-y-2`, etc. (all axis and negative values supported)
+
+### **Overflow**
 `overflow-auto`, `overflow-hidden`, `overflow-visible`, `overflow-scroll`
+`overflow-x-auto`, `overflow-x-hidden`, `overflow-x-visible`, `overflow-x-scroll`
+`overflow-y-auto`, `overflow-y-hidden`, `overflow-y-visible`, `overflow-y-scroll`
 
-**Pointer events:**
+### **Pointer Events & Cursor**
 `pointer-events-none`, `pointer-events-auto`
+`cursor-auto`, `cursor-default`, `cursor-pointer`, `cursor-wait`, `cursor-text`, `cursor-move`, `cursor-help`, `cursor-not-allowed`, `cursor-grab`, `cursor-grabbing`
 
-**Accessibility:**
+### **Accessibility**
 `sr-only`, `not-sr-only`
 
-**Grid:**
-`grid-cols-1` to `grid-cols-12`, `grid-rows-1` to `grid-rows-12`, `col-span-*`, `row-span-*`
-
-**Grid Placement:**
-`col-span-1` to `col-span-12`, `row-span-1` to `row-span-12`
-
-**Position:**
-`absolute`, `relative`, `fixed`, `sticky`
-
-**Typography:**
-`font-bold`, `font-semibold`, `font-medium`, `font-light`, `underline`, `overline`, `line-through`, `no-underline`, `italic`, `not-italic`, `uppercase`, `lowercase`, `capitalize`, `normal-case`, `text-left`, `text-center`, `text-right`, `text-xs` to `text-8xl`, `truncate`, `line-clamp-1` to `line-clamp-4`
-
-**Borders & Radius:**
-`border`, `border-2`, `border-4`, `border-6`, `border-8`, `rounded-none`, `rounded-xs`, `rounded-sm`, `rounded-md`, `rounded-lg`, `rounded-full`
-
-**Shadow & Effects:**
-`shadow-none`, `shadow-xs`, `shadow-sm`, `shadow-md`, `shadow-lg`, `shadow-xl`, `shadow-2xl`
-
-**Transitions:**
-`transition`, `transition-colors`, `transition-opacity`, `transition-transform`
-
-**Text Overflow & Whitespace:**
-`truncate`
-
-**Visibility:**
+### **Visibility**
 `visible`, `invisible`
 
-**Z-index:**
+### **Z-index**
 `z-0`, `z-10`, `z-20`, `z-30`, `z-40`, `z-50`
 
-**Flex:**
-`items-center`, `items-start`, `items-end`, `items-baseline`, `items-stretch`, `justify-center`, `justify-start`, `justify-between`, `justify-around`, `justify-evenly`, `justify-end`, `flex-wrap`, `flex-nowrap`, `flex-wrap-reverse`, `content-center`, `content-start`, `content-end`, `content-between`, `content-around`, `content-stretch`, `self-auto`, `self-start`, `self-end`, `self-center`, `self-stretch`, `flex-1`, `flex-auto`, `flex-initial`, `flex-none`, `flex-col`, `flex-row`, `grow`, `shrink`, `grow-0`, `shrink-0`, `basis-[value]`
+### **Grid**
+`grid-cols-1` to `grid-cols-12`, `grid-rows-1` to `grid-rows-12`, `grid-cols-none`, `grid-rows-none`
+`col-span-1` to `col-span-12`, `row-span-1` to `row-span-12`, `col-span-full`, `row-span-full`
+`col-start-1` to `col-start-12`, `col-end-1` to `col-end-12`, `row-start-1` to `row-start-12`, `row-end-1` to `row-end-12`
+`auto-cols-auto`, `auto-cols-min`, `auto-cols-max`, `auto-cols-fr`
+`auto-rows-auto`, `auto-rows-min`, `auto-rows-max`, `auto-rows-fr`
+`grid-flow-row`, `grid-flow-col`, `grid-flow-row-dense`, `grid-flow-col-dense`
+
+### **Flexbox**
+`items-center`, `items-start`, `items-end`, `items-baseline`, `items-stretch`
+`justify-center`, `justify-start`, `justify-between`, `justify-around`, `justify-evenly`, `justify-end`
+`flex-wrap`, `flex-nowrap`, `flex-wrap-reverse`
+`content-center`, `content-start`, `content-end`, `content-between`, `content-around`, `content-stretch`
+`self-auto`, `self-start`, `self-end`, `self-center`, `self-stretch`
+`flex-1`, `flex-auto`, `flex-initial`, `flex-none`
+`flex-col`, `flex-row`, `flex-col-reverse`, `flex-row-reverse`
+`grow`, `shrink`, `grow-0`, `shrink-0`
+`grow-0` to `grow-12`, `shrink-0` to `shrink-12`
+
+### **Order**
+`order-1` to `order-12`, `order-first`, `order-last`, `order-none`
+
+### **Typography**
+`font-thin`, `font-extralight`, `font-light`, `font-normal`, `font-medium`, `font-semibold`, `font-bold`, `font-extrabold`, `font-black`
+`italic`, `not-italic`
+`uppercase`, `lowercase`, `capitalize`, `normal-case`
+`underline`, `overline`, `line-through`, `no-underline`
+`text-left`, `text-center`, `text-right`, `text-justify`
+`text-xs`, `text-sm`, `text-base`, `text-lg`, `text-xl`, `text-2xl`, `text-3xl`, `text-4xl`, `text-5xl`, `text-6xl`, `text-7xl`, `text-8xl`, `text-9xl`
+
+**Letter Spacing (Tracking):**
+`tracking-tighter`, `tracking-tight`, `tracking-normal`, `tracking-wide`, `tracking-wider`, `tracking-widest`
+
+**Line Height (Leading):**
+`leading-3`, `leading-4`, `leading-5`, `leading-6`, `leading-7`, `leading-8`, `leading-9`, `leading-10`
+`leading-none`, `leading-tight`, `leading-snug`, `leading-normal`, `leading-relaxed`, `leading-loose`
 
 **Font Family:**
 `font-sans`, `font-serif`, `font-mono`
 
+**Text Overflow & Whitespace:**
+`truncate`
+`whitespace-normal`, `whitespace-nowrap`, `whitespace-pre`, `whitespace-pre-line`, `whitespace-pre-wrap`
+`break-normal`, `break-words`, `break-all`
+
 **Line Clamp:**
-`line-clamp-1`, `line-clamp-2`, `line-clamp-3`, `line-clamp-4`
+`line-clamp-1`, `line-clamp-2`, `line-clamp-3`, `line-clamp-4`, `line-clamp-5`, `line-clamp-6`, `line-clamp-none`
 
-**Transition Delay/Property:**
-`transition`, `transition-all`, `transition-colors`, `transition-shadow`, `transition-opacity`, `transition-transform`, `transition-none`
+### **Borders & Radius**
+**Border Widths:**
+`border`, `border-0`, `border-1`, `border-2`, `border-4`, `border-6`, `border-8`
+`border-t`, `border-t-0`, `border-t-1`, `border-t-2`, `border-t-4`, `border-t-6`, `border-t-8`
+`border-r`, `border-r-0`, `border-r-1`, `border-r-2`, `border-r-4`, `border-r-6`, `border-r-8`
+`border-b`, `border-b-0`, `border-b-1`, `border-b-2`, `border-b-4`, `border-b-6`, `border-b-8`
+`border-l`, `border-l-0`, `border-l-1`, `border-l-2`, `border-l-4`, `border-l-6`, `border-l-8`
+`border-x`, `border-x-0`, `border-x-1`, `border-x-2`, `border-x-4`, `border-x-6`, `border-x-8`
+`border-y`, `border-y-0`, `border-y-1`, `border-y-2`, `border-y-4`, `border-y-6`, `border-y-8`
 
-**Colors:**
+**Border Styles:**
+`border-solid`, `border-dashed`, `border-dotted`, `border-double`, `border-none`
+
+**Border Radius:**
+`rounded`, `rounded-none`, `rounded-xs`, `rounded-sm`, `rounded-md`, `rounded-lg`, `rounded-xl`, `rounded-2xl`, `rounded-3xl`, `rounded-4xl`, `rounded-full`
+`rounded-t-*`, `rounded-r-*`, `rounded-b-*`, `rounded-l-*`, `rounded-tl-*`, `rounded-tr-*`, `rounded-br-*`, `rounded-bl-*` (all sizes available)
+
+### **Shadow & Effects**
+`shadow-none`, `shadow-xs`, `shadow-sm`, `shadow`, `shadow-md`, `shadow-lg`, `shadow-xl`, `shadow-2xl`, `shadow-inner`
+
+### **Opacity**
+`opacity-0`, `opacity-5`, `opacity-10`, `opacity-20`, `opacity-25`, `opacity-30`, `opacity-40`, `opacity-50`, `opacity-60`, `opacity-70`, `opacity-75`, `opacity-80`, `opacity-90`, `opacity-95`, `opacity-100`
+
+### **Transforms**
+**Scale:**
+`scale-0`, `scale-50`, `scale-75`, `scale-90`, `scale-95`, `scale-100`, `scale-105`, `scale-110`, `scale-125`, `scale-150`
+
+**Rotate:**
+`rotate-0`, `rotate-1`, `rotate-2`, `rotate-3`, `rotate-6`, `rotate-12`, `rotate-45`, `rotate-90`, `rotate-180`
+`-rotate-1`, `-rotate-2`, `-rotate-3`, `-rotate-6`, `-rotate-12`, `-rotate-45`, `-rotate-90`, `-rotate-180`
+
+### **Transitions**
+**Properties:**
+`transition`, `transition-none`, `transition-all`, `transition-colors`, `transition-shadow`, `transition-opacity`, `transition-transform`
+
+**Timing Functions:**
+`ease-linear`, `ease-in`, `ease-out`, `ease-in-out`
+
+**Duration:**
+`duration-75`, `duration-100`, `duration-150`, `duration-200`, `duration-300`, `duration-500`, `duration-700`, `duration-1000`
+
+### **Aspect Ratio**
+`aspect-auto`, `aspect-square`, `aspect-video`
+
+### **Object Utilities**
+`object-contain`, `object-cover`, `object-fill`, `object-none`, `object-scale-down`
+`object-bottom`, `object-center`, `object-left`, `object-left-bottom`, `object-left-top`, `object-right`, `object-right-bottom`, `object-right-top`, `object-top`
+
+### **Gradient Backgrounds**
+`bg-gradient-to-t`, `bg-gradient-to-tr`, `bg-gradient-to-r`, `bg-gradient-to-br`, `bg-gradient-to-b`, `bg-gradient-to-bl`, `bg-gradient-to-l`, `bg-gradient-to-tl`
+
+**Gradient Color Stops:**
+`from-{color}`, `to-{color}`, `via-{color}` (works with all color palettes and shades)
+
+Examples: `from-primary-500`, `to-secondary-600`, `via-neutral-300`
+
+### **Container Queries**
+`@container` - Sets `container-type: inline-size`
+
+### **Colors**
 `bg-neutral-100`, `text-primary-500`, `border-error-500`, `shadow-primary-500`, etc. (full palette, semantic, and arbitrary)
 
 For a complete list, see the `utilityMap` in [`src/lib/runtime/style.ts`](../src/lib/runtime/style.ts).
@@ -87,6 +170,10 @@ For a complete list, see the `utilityMap` in [`src/lib/runtime/style.ts`](../src
 
 **Responsive:** `sm:`, `md:`, `lg:`, `xl:`, `2xl:`
 
+**Container Queries:** `@xs:`, `@sm:`, `@md:`, `@lg:`, `@xl:`, `@2xl:`, `@3xl:`, `@4xl:`, `@5xl:`, `@6xl:`, `@7xl:`
+
+**Arbitrary Container Queries:** `@[value]:` (e.g., `@[300px]:`, `@[20rem]:`, `@[50%]:`)
+
 **Dark Mode:** `dark:`
 
 **Example:**
@@ -98,6 +185,9 @@ For a complete list, see the `utilityMap` in [`src/lib/runtime/style.ts`](../src
 <input type="checkbox" class="peer" />
 <label class="peer-checked:text-success-600">Checked!</label>
 <div class="p-2 md:p-4 lg:p-8">Responsive Padding</div>
+<div class="@container">
+  <div class="@lg:p-4 @2xl:p-8">Container Query</div>
+</div>
 <div class="dark:bg-neutral-900">Dark Mode</div>
 ```
 
@@ -105,28 +195,64 @@ For a complete list, see the `utilityMap` in [`src/lib/runtime/style.ts`](../src
 
 Arbitrary values let you use any valid CSS value, not just those in the built-in utility map. This is essential for rapid prototyping, advanced design, and one-off tweaks.
 
-**Syntax:** `prop-[value]`
+### **Syntax Patterns**
 
-**Supported Properties:**
-- `bg-[value]`, `text-[value]`, `border-[value]`, `shadow-[value]`, `z-[value]`, `duration-[value]`, `delay-[value]`, `min-w-[value]`, `max-w-[value]`, `font-weight-[value]`, `basis-[value]`, `items-[value]`, `justify-[value]`, `self-[value]`, `tracking-[value]`, `gap-[value]`, `p-[value]`, `m-[value]`, etc.
+**Property-Value:** `prop-[value]`
+**CSS Property-Value:** `[property:value]`
 
-**Examples:**
+### **Supported Properties for `prop-[value]` Format**
+
+Based on the enhanced property mappings in the implementation:
+
+- `bg-[value]` → `background-color`
+- `text-[value]` → `color` (or `font-size` if value ends with px/rem/em/etc.)
+- `border-[value]` → `border`
+- `shadow-[value]` → `box-shadow`
+- `z-[value]` → `z-index`
+- `p-[value]`, `px-[value]`, `py-[value]` → padding variants
+- `m-[value]`, `mx-[value]`, `my-[value]` → margin variants
+- `w-[value]`, `h-[value]` → width, height
+- `min-w-[value]`, `max-w-[value]`, `min-h-[value]`, `max-h-value]` → size constraints
+- `border-t-[value]`, `border-r-[value]`, `border-b-[value]`, `border-l-[value]` → directional borders
+- `border-x-[value]`, `border-y-[value]` → axis borders
+- `grid-cols-[value]`, `grid-rows-[value]` → grid templates
+- `duration-[value]`, `delay-[value]` → transition properties
+- `basis-[value]` → flex-basis
+- `tracking-[value]` → letter-spacing
+- `leading-[value]` → line-height
+- `opacity-[value]` → opacity
+- `rotate-[value]` → transform rotate
+- `scale-[value]` → transform scale
+- `translate-x-[value]`, `translate-y-[value]` → transform translate
+- Plus any other CSS property using underscore-to-dash conversion
+
+### **Examples**
+
 ```html
+<!-- Property-value format -->
 <div class="bg-[#f00] text-[rgba(0,0,0,0.5)] border-[2px_solid_#333]"></div>
 <div class="shadow-[0_2px_8px_rgba(0,0,0,0.15)]"></div>
 <div class="z-[22]"></div>
 <div class="duration-[500ms] delay-[300ms]"></div>
 <div class="min-w-[320px] font-weight-[700]"></div>
 <div class="gap-[4rem] p-[2em] m-[-1em]"></div>
-<div class="tracking-[0.1em]"></div>
+<div class="tracking-[0.1em] leading-[1.6]"></div>
 <div class="basis-[50%]"></div>
-<div class="items-[center] justify-[space-between]"></div>
+<div class="rotate-[45deg] scale-[1.2]"></div>
+
+<!-- CSS property format -->
+<div class="[background:linear-gradient(45deg,red,blue)]"></div>
+<div class="[box-shadow:0_4px_8px_rgba(0,0,0,0.2)]"></div>
+<div class="[transform:translateX(50px)_rotate(45deg)]"></div>
+
+<!-- Arbitrary container queries -->
+<div class="@[300px]:p-4 @[500px]:grid-cols-2"></div>
 ```
 
 **Variants + Arbitrary:**
 ```html
 <button class="hover:bg-[#09f] focus:[box-shadow:0_0_0_2px_#09f]"></button>
-<div class="md:p-[2rem] dark:bg-[#222]"></div>
+<div class="md:p-[2rem] dark:bg-[#222] @lg:gap-[3rem]"></div>
 ```
 
 ## 🧪 Arbitrary Variants
@@ -236,21 +362,298 @@ JIT CSS provides a rich set of built-in color palettes, all accessible via utili
 
 **Tip:** You can use any palette with `bg-`, `text-`, `border-`, `shadow-`, `outline-`, `caret`, `accent`, `fill`, and `stroke` utilities for full flexibility.
 
+## 🎨 Dynamic Styling with `useStyle`
+
+The `useStyle` hook allows you to inject dynamic CSS-in-JS styles that can react to component props and state. This is perfect for complex styling logic that goes beyond utility classes.
+
+### **Basic Usage**
+
+```typescript
+import { component, html, css, useStyle, ref } from '@jasonshimmy/custom-elements-runtime';
+
+component('dynamic-card', ({ theme = 'light', size = 'md' }) => {
+  const isExpanded = ref(false);
+  
+  useStyle(() => css`
+    :host {
+      background: ${theme === 'light' ? 'white' : 'black'};
+      color: ${theme === 'light' ? 'black' : 'white'};
+      padding: ${size === 'sm' ? '0.5rem' : size === 'lg' ? '2rem' : '1rem'};
+      border-radius: 8px;
+      transition: all 0.3s ease;
+      transform: ${isExpanded.value ? 'scale(1.05)' : 'scale(1)'};
+    }
+    
+    .card-content {
+      opacity: ${isExpanded.value ? 1 : 0.8};
+      transition: opacity 0.2s ease;
+    }
+    
+    @media (prefers-color-scheme: dark) {
+      :host {
+        background: #111;
+        color: #fff;
+      }
+    }
+  `);
+  
+  return html`
+    <div class="card-content" @click="${() => isExpanded.value = !isExpanded.value}">
+      <h3>Dynamic Card</h3>
+      <p>Click to expand!</p>
+    </div>
+  `;
+});
+```
+
+### **Advanced Patterns**
+
+```typescript
+component('chart-widget', ({ data, colorScheme = 'blue' }) => {
+  const hoveredIndex = ref(-1);
+  
+  useStyle(() => css`
+    .chart-bar {
+      transition: all 0.2s ease;
+      background: var(--color-${colorScheme}-500);
+    }
+    
+    .chart-bar:hover {
+      background: var(--color-${colorScheme}-600);
+      transform: translateY(-2px);
+    }
+    
+    ${data.map((item, index) => `
+      .bar-${index} {
+        height: ${(item.value / Math.max(...data.map(d => d.value))) * 100}%;
+        opacity: ${hoveredIndex.value === -1 || hoveredIndex.value === index ? 1 : 0.5};
+      }
+    `).join('\n')}
+  `);
+  
+  return html`
+    <div class="chart-container">
+      ${data.map((item, index) => html`
+        <div 
+          class="chart-bar bar-${index}"
+          @mouseenter="${() => hoveredIndex.value = index}"
+          @mouseleave="${() => hoveredIndex.value = -1}"
+        >
+          ${item.label}
+        </div>
+      `)}
+    </div>
+  `;
+});
+```
+
+### **Combining with JIT CSS**
+
+You can mix `useStyle` with utility classes for maximum flexibility:
+
+```typescript
+component('hybrid-button', ({ variant = 'primary', loading = false }) => {
+  useStyle(() => css`
+    .btn-custom {
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .btn-custom::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: ${loading ? '0%' : '-100%'};
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+      transition: left 0.6s ease;
+    }
+    
+    .loading-spinner {
+      animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  `);
+  
+  return html`
+    <button class="btn-custom px-4 py-2 rounded-lg font-medium transition-colors
+                   ${variant === 'primary' ? 'bg-primary-500 hover:bg-primary-600 text-white' : 
+                     variant === 'secondary' ? 'bg-secondary-500 hover:bg-secondary-600 text-white' :
+                     'bg-neutral-200 hover:bg-neutral-300 text-neutral-800'}"
+    >
+      ${loading ? html`<span class="loading-spinner inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full"></span>` : ''}
+      <slot></slot>
+    </button>
+  `;
+});
+```
+
+## 📚 Real-World Examples
+
+### **Complex Layout with Mixed Approaches**
+
+```typescript
+component('dashboard-layout', ({ sidebarWidth = 280, headerHeight = 64 }) => {
+  const sidebarCollapsed = ref(false);
+  const currentWidth = computed(() => sidebarCollapsed.value ? 80 : sidebarWidth);
+  
+  useStyle(() => css`
+    :host {
+      display: grid;
+      grid-template-areas: 
+        "sidebar header"
+        "sidebar main";
+      grid-template-columns: ${currentWidth.value}px 1fr;
+      grid-template-rows: ${headerHeight}px 1fr;
+      height: 100vh;
+      transition: grid-template-columns 0.3s ease;
+    }
+    
+    .sidebar {
+      grid-area: sidebar;
+      background: var(--color-neutral-900);
+      transition: all 0.3s ease;
+    }
+    
+    .header {
+      grid-area: header;
+      background: var(--color-white);
+      border-bottom: 1px solid var(--color-neutral-200);
+    }
+    
+    .main {
+      grid-area: main;
+      overflow-y: auto;
+    }
+  `);
+  
+  return html`
+    <aside class="sidebar p-4">
+      <button 
+        class="w-full p-2 bg-neutral-800 hover:bg-neutral-700 text-white rounded-md mb-4 transition-colors"
+        @click="${() => sidebarCollapsed.value = !sidebarCollapsed.value}"
+      >
+        ${sidebarCollapsed.value ? '→' : '←'}
+      </button>
+      <slot name="sidebar"></slot>
+    </aside>
+    
+    <header class="header flex items-center justify-between px-6">
+      <slot name="header"></slot>
+    </header>
+    
+    <main class="main p-6 bg-neutral-50">
+      <slot></slot>
+    </main>
+  `;
+});
+```
+
+### **Responsive Card Grid with Container Queries**
+
+```html
+<div class="@container">
+  <div class="grid gap-4 
+              grid-cols-1 
+              @xs:grid-cols-2 
+              @md:grid-cols-3 
+              @lg:grid-cols-4 
+              @2xl:grid-cols-5">
+    <div class="bg-white rounded-lg shadow-md p-4 
+                hover:shadow-lg hover:scale-105 
+                transition-all duration-200">
+      <h3 class="font-semibold text-lg mb-2 text-neutral-800">Card Title</h3>
+      <p class="text-neutral-600 text-sm leading-relaxed">
+        This card uses container queries for responsive behavior.
+      </p>
+    </div>
+  </div>
+</div>
+```
+
+### **Gradient Background Example**
+
+```html
+<div class="bg-gradient-to-r from-primary-500 via-secondary-400 to-success-500 p-8 text-white">
+  <h2 class="text-2xl font-bold mb-4">Beautiful Gradient</h2>
+  <p class="opacity-90">This demonstrates gradient backgrounds with color stops.</p>
+</div>
+```
+
+### **Interactive Form with States**
+
+```html
+<form class="max-w-md mx-auto p-6 bg-white rounded-xl shadow-lg">
+  <div class="group mb-6">
+    <label class="block text-sm font-medium text-neutral-700 mb-2">
+      Email Address
+    </label>
+    <input 
+      type="email"
+      class="w-full px-3 py-2 
+             border border-neutral-300 rounded-md
+             focus:border-primary-500 focus:ring-2 focus:ring-primary-200
+             peer-invalid:border-error-500 peer-invalid:ring-error-200
+             transition-colors duration-200"
+      required
+    >
+    <p class="mt-1 text-sm text-error-600 opacity-0 peer-invalid:opacity-100 transition-opacity">
+      Please enter a valid email address
+    </p>
+  </div>
+  
+  <button 
+    type="submit"
+    class="w-full bg-primary-500 hover:bg-primary-600 
+           focus:bg-primary-600 focus:ring-4 focus:ring-primary-200
+           disabled:bg-neutral-300 disabled:cursor-not-allowed
+           text-white font-medium py-2 px-4 rounded-md
+           transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98]"
+  >
+    Submit Form
+  </button>
+</form>
+```
+
 ## 📚 Tips & Best Practices
 
-- Use arbitrary values for advanced design and rapid prototyping.
-- Arbitrary values: use `prop-[value]` syntax
-- Combine variants for powerful, dynamic styling.
-- Use semantic colors and CSS variables for theming.
-- All utilities are mobile-first and responsive.
-- Extend the utility map or property map for custom needs.
+- **Utility-first approach:** Start with utility classes, use `useStyle` for complex dynamic logic
+- **Arbitrary values:** Use `prop-[value]` for quick customizations and `[property:value]` for complex CSS
+- **Combine variants** for powerful, dynamic styling (e.g., `hover:focus:bg-primary-600`)
+- **Use semantic colors** and CSS variables for easy theming
+- **Container queries** provide more precise responsive design than viewport-based breakpoints
+- **Performance:** Arbitrary values are cached, so don't hesitate to use them
+- **All utilities are mobile-first** and responsive
+- **Extend the utility map** or property map for project-specific needs
 
-## 🔍 Reference
+## 🔍 API Reference
 
-- `minifyCSS(css: string): string`
-- `baseReset: string`
-- `jitCSS(html: string): string`
-- Utility classes: see `utilityMap` in `style.ts`
-- Variants: see `selectorVariants` and `mediaVariants`
+### **Core Functions**
+- `minifyCSS(css: string): string` - Minifies CSS by removing whitespace and comments
+- `jitCSS(html: string): string` - Generates CSS from HTML class names
+- `css(strings, ...values): string` - Template literal function for CSS-in-JS
+- `useStyle(callback: () => string): void` - Hook for dynamic CSS injection
 
-For full details, see the source in [`src/lib/runtime/style.ts`](../src/lib/runtime/style.ts).
+### **Built-in Exports**
+- `baseReset: string` - Base CSS reset for Shadow DOM
+- `colors: Record<string, Record<string, string>>` - Color palette object
+- `utilityMap: CSSMap` - Complete mapping of utility classes to CSS
+
+### **Parser Functions**
+- `parseSpacing(className: string): string | null` - Parses spacing utilities
+- `parseColorClass(className: string): string | null` - Parses color utilities 
+- `parseOpacityModifier(className: string): string | null` - Parses opacity modifiers
+- `parseArbitrary(className: string): string | null` - Parses arbitrary value utilities
+- `parseArbitraryVariant(token: string): string | null` - Parses arbitrary variant selectors
+
+### **Configuration Objects**
+- `selectorVariants: SelectorVariantMap` - State and pseudo-class variants
+- `mediaVariants: MediaVariantMap` - Responsive breakpoints and media queries
+- `containerVariants: MediaVariantMap` - Container query breakpoints
+- `spacingProps: Record<string, string[]>` - Property mappings for spacing utilities
+
+For complete implementation details, see [`src/lib/runtime/style.ts`](../src/lib/runtime/style.ts).

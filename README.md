@@ -38,7 +38,7 @@ component('my-counter', ({ initialCount = 0 }) => {
   return html`
     <button
       type="button"
-      class="px-4 py-2 bg-blue-500 text-white rounded"
+      class="px-4 py-2 bg-primary-500 text-white rounded"
       @click.prevent="${handleClick}"
     >
       Count: ${count.value}
