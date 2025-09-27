@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v1.0.10] - 2025-09-27
+
+- fix: fix gradient CSS generation and add corresponding tests for milestones component (c83b4fb)
+- fix: Add classes to jit css such as bg-gradient, container querires, scale, rotate (596d4ed)
+
+
 ## [v1.0.9] - 2025-09-27
 
 - fix: Add classes to jit css such as bg-gradient, container querires, scale, rotate (596d4ed)
