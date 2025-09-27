@@ -12,13 +12,13 @@ import { applyProps } from "./props";
 import {
   handleConnected,
   handleDisconnected,
-  handleAttributeChanged
+  handleAttributeChanged,
 } from "./lifecycle";
 import { renderComponent, requestRender, applyStyle } from "./render";
 import { scheduleDOMUpdate } from "./scheduler";
-import { 
-  setCurrentComponentContext, 
-  clearCurrentComponentContext 
+import {
+  setCurrentComponentContext,
+  clearCurrentComponentContext,
 } from "./hooks";
 
 /**
@@ -32,8 +32,8 @@ export const registry = new Map<string, ComponentConfig<any, any, any>>();
 
 // Expose the registry for browser/HMR use without overwriting existing globals
 // (avoid cross-request mutation in SSR and preserve HMR behavior).
-const GLOBAL_REG_KEY = Symbol.for('cer.registry');
-if (typeof window !== 'undefined') {
+const GLOBAL_REG_KEY = Symbol.for("cer.registry");
+if (typeof window !== "undefined") {
   const g = globalThis as any;
   // Authoritative, collision-safe slot for programmatic access
   if (!g[GLOBAL_REG_KEY]) g[GLOBAL_REG_KEY] = registry;
@@ -41,9 +41,10 @@ if (typeof window !== 'undefined') {
 
 // --- Hot Module Replacement (HMR) ---
 if (
-  typeof import.meta !== 'undefined' &&
+  typeof import.meta !== "undefined" &&
   (import.meta as any).hot &&
-  import.meta && import.meta.hot
+  import.meta &&
+  import.meta.hot
 ) {
   import.meta.hot.accept((newModule) => {
     // Update registry with new configs from the hot module
@@ -71,16 +72,19 @@ export function createElementClass<
   C extends object,
   P extends object,
   T extends object = any,
->(tag: string, config: ComponentConfig<S, C, P, T>): CustomElementConstructor | { new (): object } {
+>(
+  tag: string,
+  config: ComponentConfig<S, C, P, T>,
+): CustomElementConstructor | { new (): object } {
   // Validate that render is provided
   if (!config.render) {
-    throw new Error(
-      "Component must have a render function",
-    );
+    throw new Error("Component must have a render function");
   }
   if (typeof window === "undefined") {
     // SSR fallback: minimal class, no DOM, no lifecycle, no "this"
-    return class { constructor() {} };
+    return class {
+      constructor() {}
+    };
   }
   return class extends HTMLElement {
     public context: ComponentContext<S, C, P, T>;
@@ -92,7 +96,7 @@ export function createElementClass<
     private _mounted = false;
     private _hasError = false;
     private _initializing = true;
-    
+
     private _componentId: string;
 
     private _styleSheet: CSSStyleSheet | null = null;
@@ -132,7 +136,7 @@ export function createElementClass<
       // Always read the latest config from the registry so re-registration
       // (HMR / tests) updates future instances.
       this._cfg = (registry.get(tag) as ComponentConfig<S, C, P, T>) || config;
-      
+
       // Generate unique component ID for render deduplication
       this._componentId = `${tag}-${Math.random().toString(36).substr(2, 9)}`;
 
@@ -147,7 +151,7 @@ export function createElementClass<
       });
 
       // Inject requestRender into context (non-enumerable to avoid proxy traps)
-      Object.defineProperty(reactiveContext, 'requestRender', {
+      Object.defineProperty(reactiveContext, "requestRender", {
         value: () => this.requestRender(),
         writable: false,
         enumerable: false,
@@ -155,7 +159,7 @@ export function createElementClass<
       });
 
       // Inject _requestRender for backward compatibility (used by model directive)
-      Object.defineProperty(reactiveContext, '_requestRender', {
+      Object.defineProperty(reactiveContext, "_requestRender", {
         value: () => this._requestRender(),
         writable: false,
         enumerable: false,
@@ -163,7 +167,7 @@ export function createElementClass<
       });
 
       // Inject component ID for functional component state persistence
-      Object.defineProperty(reactiveContext, '_componentId', {
+      Object.defineProperty(reactiveContext, "_componentId", {
         value: this._componentId,
         writable: false,
         enumerable: false,
@@ -171,8 +175,9 @@ export function createElementClass<
       });
 
       // Inject _triggerWatchers for model directive to trigger watchers
-      Object.defineProperty(reactiveContext, '_triggerWatchers', {
-        value: (path: string, newValue: any) => this._triggerWatchers(path, newValue),
+      Object.defineProperty(reactiveContext, "_triggerWatchers", {
+        value: (path: string, newValue: any) =>
+          this._triggerWatchers(path, newValue),
         writable: false,
         enumerable: false,
         configurable: false,
@@ -194,7 +199,7 @@ export function createElementClass<
             detail,
             bubbles: true,
             composed: true,
-            ...(options || {})
+            ...(options || {}),
           });
           // DOM-first: dispatch the event and return whether it was prevented
           this.dispatchEvent(ev);
@@ -210,12 +215,14 @@ export function createElementClass<
       // handling is DOM-first: use standard DOM event listeners or
       // `context.emit` (which dispatches a DOM CustomEvent) to communicate
       // with the host. There is no property-based host-callback dispatch.
-      const cfgToUse = (registry.get(tag) as ComponentConfig<S, C, P, T>) || config;
+      const cfgToUse =
+        (registry.get(tag) as ComponentConfig<S, C, P, T>) || config;
       Object.keys(cfgToUse).forEach((key) => {
         const fn = (cfgToUse as any)[key];
         if (typeof fn === "function") {
           // Expose as context method: context.fn(...args) => fn(...args, context)
-          (this.context as any)[key] = (...args: any[]) => fn(...args, this.context);
+          (this.context as any)[key] = (...args: any[]) =>
+            fn(...args, this.context);
         }
       });
 
@@ -225,7 +232,7 @@ export function createElementClass<
       if (cfgToUse.props) {
         Object.keys(cfgToUse.props).forEach((propName) => {
           let internalValue = (this as any)[propName];
-          
+
           Object.defineProperty(this, propName, {
             get() {
               return internalValue;
@@ -233,10 +240,10 @@ export function createElementClass<
             set(newValue) {
               const oldValue = internalValue;
               internalValue = newValue;
-              
+
               // Update the context to trigger watchers
               (this.context as any)[propName] = newValue;
-              
+
               // Apply props to sync with context
               if (!this._initializing) {
                 this._applyProps(cfgToUse);
@@ -247,7 +254,7 @@ export function createElementClass<
               }
             },
             enumerable: true,
-            configurable: true
+            configurable: true,
           });
         });
       }
@@ -273,12 +280,9 @@ export function createElementClass<
         this._applyProps(config);
         // Re-render after applying props to ensure component shows updated values
         this._requestRender();
-        handleConnected(
-          config,
-          this.context,
-          this._mounted,
-          (val) => { this._mounted = val; }
-        );
+        handleConnected(config, this.context, this._mounted, (val) => {
+          this._mounted = val;
+        });
       });
     }
 
@@ -288,11 +292,21 @@ export function createElementClass<
           config,
           this.context,
           this._listeners,
-          () => { this._listeners = []; },
-          () => { this._watchers.clear(); },
-          (val) => { this._templateLoading = val; },
-          (err) => { this._templateError = err; },
-          (val) => { this._mounted = val; }
+          () => {
+            this._listeners = [];
+          },
+          () => {
+            this._watchers.clear();
+          },
+          (val) => {
+            this._templateLoading = val;
+          },
+          (err) => {
+            this._templateError = err;
+          },
+          (val) => {
+            this._mounted = val;
+          },
         );
       });
     }
@@ -308,13 +322,7 @@ export function createElementClass<
         if (oldValue !== newValue) {
           this._requestRender();
         }
-        handleAttributeChanged(
-          config,
-          name,
-          oldValue,
-          newValue,
-          this.context
-        );
+        handleAttributeChanged(config, name, oldValue, newValue, this.context);
       });
     }
 
@@ -356,7 +364,7 @@ export function createElementClass<
               (this as any).onErrorStateChange(err);
             }
           },
-          (html) => this._applyStyle(cfg, html)
+          (html) => this._applyStyle(cfg, html),
         );
       });
     }
@@ -373,13 +381,19 @@ export function createElementClass<
             () => this._render(this._cfg),
             this._lastRenderTime,
             this._renderCount,
-            (t) => { this._lastRenderTime = t; },
-            (c) => { this._renderCount = c; },
+            (t) => {
+              this._lastRenderTime = t;
+            },
+            (c) => {
+              this._renderCount = c;
+            },
             this._renderTimeoutId,
-            (id) => { this._renderTimeoutId = id; }
+            (id) => {
+              this._renderTimeoutId = id;
+            },
           );
         }, this._componentId);
-      })
+      });
     }
 
     // --- Style ---
@@ -390,9 +404,11 @@ export function createElementClass<
           this.context,
           html,
           this._styleSheet,
-          (sheet) => { this._styleSheet = sheet; }
+          (sheet) => {
+            this._styleSheet = sheet;
+          },
         );
-      })
+      });
     }
 
     // --- Error Boundary function ---
@@ -413,7 +429,9 @@ export function createElementClass<
     }
 
     // --- State, props, computed ---
-    private _initContext(cfg: ComponentConfig<S, C, P, T>): ComponentContext<S, C, P, T> {
+    private _initContext(
+      cfg: ComponentConfig<S, C, P, T>,
+    ): ComponentContext<S, C, P, T> {
       try {
         const self = this;
         function createReactive(obj: any, path = ""): any {
@@ -441,7 +459,10 @@ export function createElementClass<
                       if (!self._initializing) {
                         const fullPath = path || "root";
                         self._triggerWatchers(fullPath, target);
-                        scheduleDOMUpdate(() => self._render(cfg), self._componentId);
+                        scheduleDOMUpdate(
+                          () => self._render(cfg),
+                          self._componentId,
+                        );
                       }
 
                       return result;
@@ -477,10 +498,10 @@ export function createElementClass<
           }
           if (obj && typeof obj === "object") {
             // Skip ReactiveState objects to avoid corrupting their internal structure
-            if (obj.constructor && obj.constructor.name === 'ReactiveState') {
+            if (obj.constructor && obj.constructor.name === "ReactiveState") {
               return obj;
             }
-            
+
             Object.keys(obj).forEach((key) => {
               const newPath = path ? `${path}.${key}` : key;
               obj[key] = createReactive(obj[key], newPath);
@@ -492,10 +513,7 @@ export function createElementClass<
                   : String(prop);
                 target[prop as any] = createReactive(value, fullPath);
                 if (!self._initializing) {
-                  self._triggerWatchers(
-                    fullPath,
-                    target[prop as any]
-                  );
+                  self._triggerWatchers(fullPath, target[prop as any]);
                   scheduleDOMUpdate(() => self._render(cfg), self._componentId);
                 }
                 return true;
@@ -507,12 +525,17 @@ export function createElementClass<
           }
           return obj;
         }
-        return createReactive({ 
+        return createReactive({
           // For functional components, state is managed by state() function calls
           // Include prop defaults in initial reactive context so prop updates trigger reactivity
-          ...(cfg.props ? Object.fromEntries(
-            Object.entries(cfg.props).map(([key, def]) => [key, def.default])
-          ) : {})
+          ...(cfg.props
+            ? Object.fromEntries(
+                Object.entries(cfg.props).map(([key, def]) => [
+                  key,
+                  def.default,
+                ]),
+              )
+            : {}),
         }) as ComponentContext<S, C, P, T>;
       } catch (error) {
         return {} as ComponentContext<S, C, P, T>;
@@ -524,9 +547,9 @@ export function createElementClass<
         initWatchers(
           this.context,
           this._watchers,
-          {} // Watchers are now handled by the watch() function in functional API
+          {}, // Watchers are now handled by the watch() function in functional API
         );
-      })
+      });
     }
 
     private _triggerWatchers(path: string, newValue: any): void {
@@ -542,26 +565,26 @@ export function createElementClass<
           if (cfg.onError) cfg.onError(error as Error | null, this.context);
           // Note: errorFallback was removed as it's handled by the functional API directly
         }
-      })
+      });
     }
-  }
+  };
 }
 
 /**
  * Streamlined functional component API with automatic reactive props and lifecycle hooks.
- * 
+ *
  * @example
  * ```ts
  * // Simple component with no parameters
  * component('simple-header', () => {
  *   return html`<h1>Hello World</h1>`;
  * });
- * 
+ *
  * // With props only
  * component('with-props', ({ message = 'Hello' }) => {
  *   return html`<div>${message}</div>`;
  * });
- * 
+ *
  * // With props and hooks
  * component('my-switch', ({
  *   modelValue = false,
@@ -569,12 +592,12 @@ export function createElementClass<
  * }, { emit, onConnected, onDisconnected }) => {
  *   onConnected(() => console.log('Switch connected!'));
  *   onDisconnected(() => console.log('Switch disconnected!'));
- *   
+ *
  *   return html`
  *     <label>
  *       ${label}
- *       <input 
- *         type="checkbox" 
+ *       <input
+ *         type="checkbox"
  *         :checked="${modelValue}"
  *         @change="${(e) => emit('update:modelValue', e.target.checked)}"
  *       />
@@ -587,19 +610,19 @@ export function createElementClass<
 // Overload 1: No parameters - simple components
 export function component(
   tag: string,
-  renderFn: () => VNode | VNode[] | Promise<VNode | VNode[]>
+  renderFn: () => VNode | VNode[] | Promise<VNode | VNode[]>,
 ): void;
 
 // Overload 2: Props only - modern recommended approach with context-based hooks
 export function component<TProps extends Record<string, any> = {}>(
   tag: string,
-  renderFn: (props: TProps) => VNode | VNode[] | Promise<VNode | VNode[]>
+  renderFn: (props: TProps) => VNode | VNode[] | Promise<VNode | VNode[]>,
 ): void;
 
 // Implementation
 export function component(
   tag: string,
-  renderFn: (...args: any[]) => VNode | VNode[] | Promise<VNode | VNode[]>
+  renderFn: (...args: any[]) => VNode | VNode[] | Promise<VNode | VNode[]>,
 ): void {
   let normalizedTag = toKebab(tag);
   if (!normalizedTag.includes("-")) {
@@ -608,47 +631,302 @@ export function component(
 
   // We'll parse the function string to extract defaults (dev time only)
   let propDefaults: Record<string, any> = {};
-  
+
   if (typeof window !== "undefined") {
     try {
       const fnString = renderFn.toString();
-      
       // More robust parsing for destructured parameters with defaults
-      const paramsMatch = fnString.match(/\(\s*{\s*([^}]+)\s*}/);
+      // Use a more sophisticated approach to handle nested braces
+      let paramsMatch = null;
+      const openBraceIndex = fnString.indexOf("({");
+
+      if (openBraceIndex !== -1) {
+        let depth = 0;
+        let inString = false;
+        let stringChar = null;
+        let escaped = false;
+        let endIndex = -1;
+
+        for (let i = openBraceIndex + 2; i < fnString.length; i++) {
+          const char = fnString[i];
+
+          if (escaped) {
+            escaped = false;
+            continue;
+          }
+
+          if (char === "\\") {
+            escaped = true;
+            continue;
+          }
+
+          if (!inString && (char === '"' || char === "'" || char === "`")) {
+            inString = true;
+            stringChar = char;
+            continue;
+          }
+
+          if (inString && char === stringChar) {
+            inString = false;
+            stringChar = null;
+            continue;
+          }
+
+          if (!inString) {
+            if (char === "{") {
+              depth++;
+            } else if (char === "}") {
+              if (depth === 0) {
+                endIndex = i;
+                break;
+              }
+              depth--;
+            }
+          }
+        }
+
+        if (endIndex !== -1) {
+          const fullMatch = fnString.substring(openBraceIndex, endIndex + 2); // Include })
+          const innerContent = fnString
+            .substring(openBraceIndex + 2, endIndex)
+            .trim();
+          paramsMatch = [fullMatch, innerContent];
+        }
+      }
+
       if (paramsMatch) {
         const propsString = paramsMatch[1];
-        
-        // Split by comma but handle nested objects/arrays
-        const propPairs = propsString.split(',').map(p => p.trim());
-        
-        for (const pair of propPairs) {
-          // Handle "prop = defaultValue" pattern
-          const equalIndex = pair.indexOf('=');
-          if (equalIndex !== -1) {
-            const key = pair.substring(0, equalIndex).trim();
-            const defaultValue = pair.substring(equalIndex + 1).trim();
-            
-            try {
-              // Parse simple default values
-              if (defaultValue === 'true') propDefaults[key] = true;
-              else if (defaultValue === 'false') propDefaults[key] = false;
-              else if (defaultValue === '[]') propDefaults[key] = [];
-              else if (defaultValue === '{}') propDefaults[key] = {};
-              else if (/^\d+$/.test(defaultValue)) propDefaults[key] = parseInt(defaultValue);
-              else if (/^'.*'$/.test(defaultValue) || /^".*"$/.test(defaultValue)) {
-                propDefaults[key] = defaultValue.slice(1, -1);
-              } else {
-                propDefaults[key] = defaultValue;
+
+        // More robust parsing for destructured parameters with defaults
+        // Parse character by character to handle nested quotes and complex strings
+        let currentKey = "";
+        let currentValue = "";
+        let inKey = true;
+        let depth = 0;
+        let quoteChar = null;
+        let escaped = false;
+        let i = 0;
+
+        while (i < propsString.length) {
+          const char = propsString[i];
+
+          if (escaped) {
+            if (inKey) {
+              currentKey += char;
+            } else {
+              currentValue += char;
+            }
+            escaped = false;
+            i++;
+            continue;
+          }
+
+          if (char === "\\") {
+            escaped = true;
+            if (inKey) {
+              currentKey += char;
+            } else {
+              currentValue += char;
+            }
+            i++;
+            continue;
+          }
+
+          // Handle quotes
+          if ((char === '"' || char === "'" || char === "`") && !quoteChar) {
+            quoteChar = char;
+            if (inKey) {
+              currentKey += char;
+            } else {
+              currentValue += char;
+            }
+            i++;
+            continue;
+          }
+
+          if (char === quoteChar) {
+            quoteChar = null;
+            if (inKey) {
+              currentKey += char;
+            } else {
+              currentValue += char;
+            }
+            i++;
+            continue;
+          }
+
+          // If we're inside quotes, add everything
+          if (quoteChar) {
+            if (inKey) {
+              currentKey += char;
+            } else {
+              currentValue += char;
+            }
+            i++;
+            continue;
+          }
+
+          // Handle brackets for nested objects/arrays
+          if (char === "{" || char === "[") {
+            depth++;
+            if (inKey) {
+              currentKey += char;
+            } else {
+              currentValue += char;
+            }
+            i++;
+            continue;
+          }
+
+          if (char === "}" || char === "]") {
+            depth--;
+            if (inKey) {
+              currentKey += char;
+            } else {
+              currentValue += char;
+            }
+            i++;
+            continue;
+          }
+
+          // Handle assignment operator
+          if (char === "=" && depth === 0 && inKey) {
+            inKey = false;
+            i++;
+            continue;
+          }
+
+          // Handle comma separator
+          if (char === "," && depth === 0) {
+            // Process the current key-value pair
+            if (currentKey.trim() && currentValue.trim()) {
+              const key = currentKey.trim();
+              const value = currentValue.trim();
+
+              try {
+                // Parse the default value
+                if (value === "true") propDefaults[key] = true;
+                else if (value === "false") propDefaults[key] = false;
+                else if (value === "[]") propDefaults[key] = [];
+                else if (value === "{}") propDefaults[key] = {};
+                else if (/^\d+$/.test(value))
+                  propDefaults[key] = parseInt(value);
+                else if (/^'.*'$/s.test(value)) {
+                  // Single quoted string
+                  propDefaults[key] = value
+                    .slice(1, -1)
+                    .replace(/\\'/g, "'")
+                    .replace(/\\"/g, '"')
+                    .replace(/\\\//g, "/");
+                } else if (/^".*"$/s.test(value)) {
+                  // Double quoted string
+                  propDefaults[key] = value
+                    .slice(1, -1)
+                    .replace(/\\"/g, '"')
+                    .replace(/\\'/g, "'")
+                    .replace(/\\\//g, "/");
+                } else if (/^`.*`$/s.test(value)) {
+                  // Template literal - evaluate simple cases
+                  const templateContent = value.slice(1, -1);
+                  // Handle basic template literal evaluation
+                  if (templateContent.includes("${")) {
+                    // For expressions like ${Date.now()}, evaluate them
+                    try {
+                      propDefaults[key] = new Function(
+                        `return \`${templateContent}\`;`,
+                      )();
+                    } catch {
+                      // If evaluation fails, keep the literal content
+                      propDefaults[key] = templateContent;
+                    }
+                  } else {
+                    propDefaults[key] = templateContent;
+                  }
+                } else {
+                  propDefaults[key] = value;
+                }
+              } catch (e) {
+                propDefaults[key] = "";
               }
-            } catch (e) {
-              propDefaults[key] = '';
+            } else if (currentKey.trim()) {
+              // Key without value
+              const key = currentKey.split(":")[0].trim();
+              if (key && !key.includes("}")) {
+                propDefaults[key] = "";
+              }
             }
+
+            // Reset for next pair
+            currentKey = "";
+            currentValue = "";
+            inKey = true;
+            i++;
+            continue;
+          }
+
+          // Add regular characters
+          if (inKey) {
+            currentKey += char;
           } else {
-            // No default value, extract just the key name (remove type annotation)
-            const key = pair.split(':')[0].trim();
-            if (key && !key.includes('}')) {
-              propDefaults[key] = '';
+            currentValue += char;
+          }
+          i++;
+        }
+
+        // Process the last key-value pair
+        if (currentKey.trim() && currentValue.trim()) {
+          const key = currentKey.trim();
+          const value = currentValue.trim();
+
+          try {
+            // Parse the default value
+            if (value === "true") propDefaults[key] = true;
+            else if (value === "false") propDefaults[key] = false;
+            else if (value === "[]") propDefaults[key] = [];
+            else if (value === "{}") propDefaults[key] = {};
+            else if (/^\d+$/.test(value)) propDefaults[key] = parseInt(value);
+            else if (/^'.*'$/s.test(value)) {
+              // Single quoted string
+              propDefaults[key] = value
+                .slice(1, -1)
+                .replace(/\\'/g, "'")
+                .replace(/\\"/g, '"')
+                .replace(/\\\//g, "/");
+            } else if (/^".*"$/s.test(value)) {
+              // Double quoted string
+              propDefaults[key] = value
+                .slice(1, -1)
+                .replace(/\\"/g, '"')
+                .replace(/\\'/g, "'")
+                .replace(/\\\//g, "/");
+            } else if (/^`.*`$/s.test(value)) {
+              // Template literal - evaluate simple cases
+              const templateContent = value.slice(1, -1);
+              // Handle basic template literal evaluation
+              if (templateContent.includes("${")) {
+                // For expressions like ${Date.now()}, evaluate them
+                try {
+                  propDefaults[key] = new Function(
+                    `return \`${templateContent}\`;`,
+                  )();
+                } catch {
+                  // If evaluation fails, keep the literal content
+                  propDefaults[key] = templateContent;
+                }
+              } else {
+                propDefaults[key] = templateContent;
+              }
+            } else {
+              propDefaults[key] = value;
             }
+          } catch (e) {
+            propDefaults[key] = "";
+          }
+        } else if (currentKey.trim()) {
+          // Key without value
+          const key = currentKey.split(":")[0].trim();
+          if (key && !key.includes("}")) {
+            propDefaults[key] = "";
           }
         }
       }
@@ -661,7 +939,11 @@ export function component(
   let lifecycleHooks: {
     onConnected?: () => void;
     onDisconnected?: () => void;
-    onAttributeChanged?: (name: string, oldValue: string | null, newValue: string | null) => void;
+    onAttributeChanged?: (
+      name: string,
+      oldValue: string | null,
+      newValue: string | null,
+    ) => void;
     onError?: (error: Error) => void;
   } = {};
 
@@ -670,44 +952,50 @@ export function component(
     // Generate props config from defaults
     props: Object.fromEntries(
       Object.entries(propDefaults).map(([key, defaultValue]) => {
-        const type = typeof defaultValue === 'boolean' ? Boolean
-                   : typeof defaultValue === 'number' ? Number
-                   : typeof defaultValue === 'string' ? String
-                   : Function; // Use Function for complex types
+        const type =
+          typeof defaultValue === "boolean"
+            ? Boolean
+            : typeof defaultValue === "number"
+              ? Number
+              : typeof defaultValue === "string"
+                ? String
+                : Function; // Use Function for complex types
         return [key, { type, default: defaultValue }];
-      })
+      }),
     ),
-    
+
     // Add lifecycle hooks from the stored functions
     onConnected: (_context) => {
       if (lifecycleHooks.onConnected) {
         lifecycleHooks.onConnected();
       }
     },
-    
+
     onDisconnected: (_context) => {
       if (lifecycleHooks.onDisconnected) {
         lifecycleHooks.onDisconnected();
       }
     },
-    
+
     onAttributeChanged: (name, oldValue, newValue, _context) => {
       if (lifecycleHooks.onAttributeChanged) {
         lifecycleHooks.onAttributeChanged(name, oldValue, newValue);
       }
     },
-    
+
     onError: (error, _context) => {
       if (lifecycleHooks.onError && error) {
         lifecycleHooks.onError(error);
       }
     },
-    
+
     render: (context) => {
       // Track dependencies for rendering
       // Use stable component ID from context if available, otherwise generate new one
-      const componentId = (context as any)._componentId || `${normalizedTag}-${Math.random().toString(36).substr(2, 9)}`;
-      
+      const componentId =
+        (context as any)._componentId ||
+        `${normalizedTag}-${Math.random().toString(36).substr(2, 9)}`;
+
       reactiveSystem.setCurrentComponent(componentId, () => {
         if (context.requestRender) {
           context.requestRender();
@@ -717,23 +1005,31 @@ export function component(
       try {
         // Set current component context for hooks
         setCurrentComponentContext(context);
-        
+
         // Check if we have prop defaults (indicates destructured parameters)
         const hasProps = Object.keys(propDefaults).length > 0;
-        
+
         let result;
         if (hasProps) {
           // Destructured parameters detected - create fresh props object with current context values
           const freshProps: any = {};
-          Object.keys(propDefaults).forEach(key => {
-            freshProps[key] = (context as any)[key] ?? propDefaults[key];
+
+          Object.keys(propDefaults).forEach((key) => {
+            const contextValue = (context as any)[key];
+            const defaultValue = propDefaults[key];
+
+            // Use default value if context value is nullish or empty string
+            freshProps[key] =
+              contextValue != null && contextValue !== ""
+                ? contextValue
+                : defaultValue;
           });
           result = renderFn(freshProps);
         } else {
           // No parameters expected - call with no arguments
           result = renderFn();
         }
-        
+
         // Process hook callbacks that were set during render
         if ((context as any)._hookCallbacks) {
           const hookCallbacks = (context as any)._hookCallbacks;
@@ -744,7 +1040,8 @@ export function component(
             lifecycleHooks.onDisconnected = hookCallbacks.onDisconnected;
           }
           if (hookCallbacks.onAttributeChanged) {
-            lifecycleHooks.onAttributeChanged = hookCallbacks.onAttributeChanged;
+            lifecycleHooks.onAttributeChanged =
+              hookCallbacks.onAttributeChanged;
           }
           if (hookCallbacks.onError) {
             lifecycleHooks.onError = hookCallbacks.onError;
@@ -754,13 +1051,13 @@ export function component(
             (context as any)._styleCallback = hookCallbacks.style;
           }
         }
-        
+
         return result;
       } finally {
         clearCurrentComponentContext();
         reactiveSystem.clearCurrentComponent();
       }
-    }
+    },
   };
 
   // Store in registry
@@ -768,7 +1065,10 @@ export function component(
 
   if (typeof window !== "undefined") {
     if (!customElements.get(normalizedTag)) {
-      customElements.define(normalizedTag, createElementClass(normalizedTag, config) as CustomElementConstructor);
+      customElements.define(
+        normalizedTag,
+        createElementClass(normalizedTag, config) as CustomElementConstructor,
+      );
     }
   }
 }
