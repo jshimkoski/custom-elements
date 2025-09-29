@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v1.1.0] - 2025-09-29
+
+- feat: add useProps functionality and integration tests (08820c3)
+- fix: fix gradient CSS generation and add corresponding tests for milestones component (c83b4fb)
+
+
 ## [v1.0.10] - 2025-09-27
 
 - fix: fix gradient CSS generation and add corresponding tests for milestones component (c83b4fb)
