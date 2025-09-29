@@ -161,6 +161,58 @@ export function useOnError(callback: (error: Error) => void): void {
 }
 
 /**
+ * Register prop defaults for the component. Can be called during render.
+ * Stores the prop defaults on `context._hookCallbacks.props` so the runtime
+ * can pick them up when building the component config.
+ *
+ * Example:
+ * ```ts
+ * component('my-comp', () => {
+ *   useProps({ modelValue: false, label: 'Hello' });
+ *   return html`<div/>`;
+ * });
+ * ```
+ */
+export function useProps<T extends Record<string, any>>(defaults: T): T {
+  if (!currentComponentContext) {
+    throw new Error('useProps must be called during component render');
+  }
+
+  ensureHookCallbacks(currentComponentContext);
+  currentComponentContext._hookCallbacks.props = {
+    ...(currentComponentContext._hookCallbacks.props || {}),
+    ...defaults,
+  };
+
+  const ctx = currentComponentContext;
+  const result: any = {};
+  Object.keys(defaults).forEach((key) => {
+    Object.defineProperty(result, key, {
+      enumerable: true,
+      configurable: true,
+      get() {
+        const val = ctx[key];
+        if (val != null && val !== '') return val;
+        return defaults[key];
+      },
+    });
+  });
+
+  return result as T;
+}
+
+/**
+ * Register prop defaults and return a stable props object for use inside render.
+ * The returned object reads values from the current component context at render
+ * time and falls back to the provided defaults. This keeps prop access stable
+ * in production builds and avoids reliance on parsing the render function.
+ *
+ * Must be called during render. Example:
+ * const props = useProps({ modelValue: false });
+ */
+// (useProps now returns the props object directly)
+
+/**
  * Register a style function that will be called during each render
  * to provide reactive styles for the component
  * 

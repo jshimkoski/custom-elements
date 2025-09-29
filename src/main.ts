@@ -10,6 +10,8 @@ import './components/examples/FormInputValidation';
 
 // Import design system components
 import './components/design-system';
+// Test components used by automated tests
+import './components/test-props';
 
 
 // --- Simple Switch ---
@@ -546,6 +548,7 @@ ${JSON.stringify({ textInput, textareaContent, lastAction, checkboxValue, radioV
 
 document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
   <div>
+    <ce-test-props></ce-test-props>
     <test-app></test-app>
     <switch-test></switch-test>
     <design-system-test></design-system-test>

@@ -15,7 +15,8 @@ export {
   useOnDisconnected, 
   useOnAttributeChanged, 
   useOnError,
-  useStyle
+  useStyle,
+  useProps
 } from "./runtime/hooks";
 
 // Reactive system
