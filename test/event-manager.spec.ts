@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { EventManager, DetailedEventManager } from '../src/lib/runtime/event-manager';
+import { EventManager } from '../src/lib/runtime/event-manager';
 
 describe('EventManager', () => {
   beforeEach(() => {
@@ -37,19 +37,18 @@ describe('EventManager', () => {
   });
 });
 
-describe('DetailedEventManager', () => {
+describe('EventManager enhanced features', () => {
   it('tracks metadata and allows removal', () => {
     const el = document.createElement('div');
     const handler = () => {};
 
-    DetailedEventManager.addListener(el, 'custom', handler, { capture: true });
-    const info = DetailedEventManager.getListenerInfo(el);
+    EventManager.addListener(el, 'custom', handler, { capture: true });
+    const info = EventManager.getListenerInfo(el);
     expect(info.length).toBe(1);
     expect(info[0].event).toBe('custom');
 
-    const removed = DetailedEventManager.removeListener(el, 'custom', handler, { capture: true });
-    expect(removed).toBe(true);
-    expect(DetailedEventManager.getListenerInfo(el).length).toBe(0);
+    EventManager.removeListener(el, 'custom', handler, { capture: true });
+    expect(EventManager.getListenerInfo(el).length).toBe(0);
   });
 
   it('cleanup removes all detailed listeners', () => {
@@ -57,11 +56,11 @@ describe('DetailedEventManager', () => {
     let called = 0;
     const handler = () => called++;
 
-    DetailedEventManager.addListener(el, 'x', handler);
+    EventManager.addListener(el, 'x', handler);
     el.dispatchEvent(new Event('x'));
     expect(called).toBe(1);
 
-    DetailedEventManager.cleanup(el);
+    EventManager.cleanup(el);
     el.dispatchEvent(new Event('x'));
     expect(called).toBe(1);
   });

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { component, html, useEmit, useOnConnected, useOnDisconnected, useOnAttributeChanged, useOnError, ref, computed, css, useStyle } from '../src/lib';
+import { component, html, useProps, useEmit, useOnConnected, useOnDisconnected, useOnAttributeChanged, useOnError, ref, computed, css, useStyle } from '../src/lib';
 
 let container: HTMLElement;
 
@@ -19,11 +19,12 @@ describe('🎣 Context-Based Hooks API', () => {
     let emitResult: boolean | undefined;
     let eventData: any;
 
-    component('test-use-emit', ({ message = 'Hello' }) => {
+    component('test-use-emit', () => {
+      const props = useProps({ message: 'Hello' });
       const emit = useEmit();
       
       // Test that emit is strongly typed and returns boolean
-      emitResult = emit('test-event', { message });
+      emitResult = emit('test-event', { message: props.message });
       
       return html`<div>Test useEmit</div>`;
     });
@@ -44,10 +45,12 @@ describe('🎣 Context-Based Hooks API', () => {
     let connectedCalled = false;
     let connectedMessage = '';
 
-    component('test-use-on-connected', ({ greeting = 'Hello' }) => {
+    component('test-use-on-connected', () => {
+      const props = useProps({ greeting: 'Hello' });
+      
       useOnConnected(() => {
         connectedCalled = true;
-        connectedMessage = `${greeting} from onConnected!`;
+        connectedMessage = `${props.greeting} from onConnected!`;
       });
 
       return html`<div>Connected test</div>`;
@@ -89,10 +92,11 @@ describe('🎣 Context-Based Hooks API', () => {
     let disconnectedCalled = false;
     let disconnectedMessage = '';
 
-    component('test-use-on-disconnected', ({ farewell = 'Goodbye' }) => {
+    component('test-use-on-disconnected', () => {
+      const props = useProps({ farewell: 'Goodbye' });
       useOnDisconnected(() => {
         disconnectedCalled = true;
-        disconnectedMessage = `${farewell} from onDisconnected!`;
+        disconnectedMessage = `${props.farewell} from onDisconnected!`;
       });
 
       return html`<div>Disconnect test</div>`;
@@ -112,12 +116,13 @@ describe('🎣 Context-Based Hooks API', () => {
   it('should call useOnAttributeChanged hook when attributes change', async () => {
     let attributeChanges: Array<{name: string, oldValue: string | null, newValue: string | null}> = [];
 
-    component('test-use-on-attribute-changed', ({ message = 'initial' }: { message?: string }) => {
+    component('test-use-on-attribute-changed', () => {
+      const props = useProps({ message: 'initial' });
       useOnAttributeChanged((name, oldValue, newValue) => {
         attributeChanges.push({ name, oldValue, newValue });
       });
 
-      return html`<div>Attribute test: ${message}</div>`;
+      return html`<div>Attribute test: ${props.message}</div>`;
     });
 
     container.innerHTML = '<test-use-on-attribute-changed message="initial"></test-use-on-attribute-changed>';
@@ -171,12 +176,13 @@ describe('🎣 Context-Based Hooks API', () => {
     let emitResult: boolean | undefined;
     let eventReceived = false;
 
-    component('test-all-hooks-combined', ({ label = 'Multi', count = '0' }) => {
+    component('test-all-hooks-combined', () => {
+      const props = useProps({ label: 'Multi', count: '0' });
       const emit = useEmit();
       
       useOnConnected(() => {
         connectedCalled = true;
-        emitResult = emit('ready', { label });
+        emitResult = emit('ready', { label: props.label });
       });
 
       useOnDisconnected(() => {
@@ -191,7 +197,7 @@ describe('🎣 Context-Based Hooks API', () => {
         errorCalled = true;
       });
 
-      return html`<div>All hooks test: ${label} (${count})</div>`;
+      return html`<div>All hooks test: ${props.label} (${props.count})</div>`;
     });
 
     container.addEventListener('ready', () => {
@@ -229,22 +235,17 @@ describe('🎣 Context-Based Hooks API', () => {
   it('should work with props and hooks together', async () => {
     let componentData: any = {};
 
-    component('test-props-and-hooks', ({ 
-      title = 'Default', 
-      active = false 
-    }: { 
-      title?: string; 
-      active?: boolean; 
-    }) => {
+    component('test-props-and-hooks', () => {
+      const props = useProps({ title: 'Default', active: false });
       const emit = useEmit();
       
       useOnConnected(() => {
-        componentData.title = title;
-        componentData.active = active;
-        componentData.emitResult = emit('initialized', { title, active });
+        componentData.title = props.title;
+        componentData.active = props.active;
+        componentData.emitResult = emit('initialized', { title: props.title, active: props.active });
       });
 
-      return html`<div>${title}: ${active ? 'ON' : 'OFF'}</div>`;
+      return html`<div>${props.title}: ${props.active ? 'ON' : 'OFF'}</div>`;
     });
 
     container.innerHTML = '<test-props-and-hooks title="Test" active="true"></test-props-and-hooks>';
@@ -320,7 +321,8 @@ describe('🎣 Context-Based Hooks API', () => {
   it('docs-layout should have header ref in useOnConnected (computed/useStyle)', async () => {
     let seen: HTMLElement | null = null;
 
-    component('test-docs-layout', ({ variant = 'margined' }: { variant?: 'fullwidth' | 'margined' }) => {
+    component('test-docs-layout', () => {
+      const props = useProps({ variant: 'margined' });
       const headerEl = ref<HTMLElement | null>(null);
       const width = ref(0);
       const height = ref(0);
@@ -341,7 +343,7 @@ describe('🎣 Context-Based Hooks API', () => {
 
       return html`
         <header :ref="${headerEl}">
-          <div :class="{ 'max-w-[80rem]': ${variant !== 'fullwidth'} }">${width.value}px x ${height.value}px</div>
+          <div :class="{ 'max-w-[80rem]': ${props.variant !== 'fullwidth'} }">${width.value}px x ${height.value}px</div>
         </header>
       `;
     });

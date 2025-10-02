@@ -5,8 +5,8 @@ import type {
   WatcherState,
   VNode,
 } from "./types";
-import { reactiveSystem } from "./reactive";
-import { toKebab } from "./helpers";
+import { reactiveSystem, isReactiveState } from "./reactive";
+import { toKebab, safe } from "./helpers";
 import { initWatchers, triggerWatchers } from "./watchers";
 import { applyProps } from "./props";
 import {
@@ -57,6 +57,10 @@ if (
             if (typeof (el as any)._cfg !== "undefined") {
               (el as any)._cfg = newConfig;
             }
+            // HMR: Preserve existing state by keeping the context object intact.
+            // Instead of re-executing the component function (which would create new refs),
+            // we just update the config and re-render with the existing context.
+            // This ensures refs and other reactive state are preserved across HMR updates.
             if (typeof (el as any)._render === "function") {
               (el as any)._render(newConfig);
             }
@@ -142,49 +146,25 @@ export function createElementClass<
 
       const reactiveContext = this._initContext(config);
 
+      // Helper to define non-enumerable properties
+      const defineNonEnum = (obj: any, key: string, value: any) => {
+        Object.defineProperty(obj, key, { value, writable: false, enumerable: false, configurable: false });
+      };
+
       // Inject refs into context (non-enumerable to avoid proxy traps)
-      Object.defineProperty(reactiveContext, "refs", {
-        value: this._refs,
-        writable: false,
-        enumerable: false,
-        configurable: false,
-      });
-
-      // Inject requestRender into context (non-enumerable to avoid proxy traps)
-      Object.defineProperty(reactiveContext, "requestRender", {
-        value: () => this.requestRender(),
-        writable: false,
-        enumerable: false,
-        configurable: false,
-      });
-
-      // Inject _requestRender for backward compatibility (used by model directive)
-      Object.defineProperty(reactiveContext, "_requestRender", {
-        value: () => this._requestRender(),
-        writable: false,
-        enumerable: false,
-        configurable: false,
-      });
-
-      // Inject component ID for functional component state persistence
-      Object.defineProperty(reactiveContext, "_componentId", {
-        value: this._componentId,
-        writable: false,
-        enumerable: false,
-        configurable: false,
-      });
-
-      // Inject _triggerWatchers for model directive to trigger watchers
-      Object.defineProperty(reactiveContext, "_triggerWatchers", {
-        value: (path: string, newValue: any) =>
-          this._triggerWatchers(path, newValue),
-        writable: false,
-        enumerable: false,
-        configurable: false,
-      });
+      defineNonEnum(reactiveContext, "refs", this._refs);
+      defineNonEnum(reactiveContext, "requestRender", () => this.requestRender());
+      defineNonEnum(reactiveContext, "_requestRender", () => this._requestRender());
+      defineNonEnum(reactiveContext, "_componentId", this._componentId);
+      defineNonEnum(reactiveContext, "_triggerWatchers", (path: string, newValue: any) => this._triggerWatchers(path, newValue));
 
       // --- Apply props BEFORE wiring listeners and emit ---
       this.context = reactiveContext;
+      // Expose host element on the reactive context so hooks like useProps
+      // can fallback to reading element properties when attributes were
+      // serialized (e.g., objects became "[object Object]"). This is added
+      // as a non-enumerable field to avoid interfering with reactive proxy.
+      safe(() => { defineNonEnum(reactiveContext, '_host', this); });
       // Defer applying props until connectedCallback so attributes that are
       // set by the parent renderer (after element construction) are available.
       // applyProps will still be invoked from attributeChangedCallback when
@@ -193,21 +173,32 @@ export function createElementClass<
 
       // Inject emit helper for custom events (single canonical event API).
       // Emits a DOM CustomEvent and returns whether it was not defaultPrevented.
-      Object.defineProperty(this.context, "emit", {
-        value: (eventName: string, detail?: any, options?: CustomEventInit) => {
-          const ev = new CustomEvent(eventName, {
-            detail,
-            bubbles: true,
-            composed: true,
-            ...(options || {}),
-          });
-          // DOM-first: dispatch the event and return whether it was prevented
-          this.dispatchEvent(ev);
-          return !ev.defaultPrevented;
-        },
-        writable: false,
-        enumerable: false,
-        configurable: false,
+      defineNonEnum(this.context, "emit", (eventName: string, detail?: any, options?: CustomEventInit) => {
+            const eventOptions = {
+              detail,
+              bubbles: true,
+              composed: true,
+              ...(options || {}),
+            };
+            const ev = new CustomEvent(eventName, eventOptions);
+            
+            // Primary event dispatch
+            this.dispatchEvent(ev);
+            
+            // Dispatch alternate camel/kebab variation for compatibility
+            const colonIndex = eventName.indexOf(":");
+            if (colonIndex > 0) {
+              const prefix = eventName.substring(0, colonIndex);
+              const prop = eventName.substring(colonIndex + 1);
+              const altName = prop.includes("-")
+                ? `${prefix}:${prop.split("-").map((p, i) => i === 0 ? p : p.charAt(0).toUpperCase() + p.slice(1)).join("")}`
+                : `${prefix}:${prop.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase()}`;
+              if (altName !== eventName) {
+                safe(() => { this.dispatchEvent(new CustomEvent(altName, eventOptions)); });
+              }
+            }
+            
+            return !ev.defaultPrevented;
       });
 
       // --- Inject config methods into context ---
@@ -217,20 +208,18 @@ export function createElementClass<
       // with the host. There is no property-based host-callback dispatch.
       const cfgToUse =
         (registry.get(tag) as ComponentConfig<S, C, P, T>) || config;
-      Object.keys(cfgToUse).forEach((key) => {
+      for (const key in cfgToUse) {
         const fn = (cfgToUse as any)[key];
         if (typeof fn === "function") {
           // Expose as context method: context.fn(...args) => fn(...args, context)
           (this.context as any)[key] = (...args: any[]) =>
             fn(...args, this.context);
         }
-      });
-
-      this._applyComputed(cfgToUse);
+      }
 
       // Set up reactive property setters for all props to detect external changes
       if (cfgToUse.props) {
-        Object.keys(cfgToUse.props).forEach((propName) => {
+        for (const propName in cfgToUse.props) {
           let internalValue = (this as any)[propName];
 
           Object.defineProperty(this, propName, {
@@ -256,7 +245,7 @@ export function createElementClass<
             enumerable: true,
             configurable: true,
           });
-        });
+        }
       }
 
       this._initializing = false;
@@ -330,14 +319,10 @@ export function createElementClass<
       return config.props ? Object.keys(config.props).map(toKebab) : [];
     }
 
-    private _applyComputed(_cfg: ComponentConfig<S, C, P, T>) {
-      // Computed properties are now handled by the computed() function and reactive system
-      // This method is kept for compatibility but does nothing in the functional API
-    }
-
     // --- Render ---
     private _render(cfg: ComponentConfig<S, C, P, T>) {
       this._runLogicWithinErrorBoundary(cfg, () => {
+        // _render invoked; proceed to render via renderComponent
         renderComponent(
           this.shadowRoot,
           cfg,
@@ -498,14 +483,14 @@ export function createElementClass<
           }
           if (obj && typeof obj === "object") {
             // Skip ReactiveState objects to avoid corrupting their internal structure
-            if (obj.constructor && obj.constructor.name === "ReactiveState") {
+            if (isReactiveState(obj)) {
               return obj;
             }
 
-            Object.keys(obj).forEach((key) => {
+            for (const key in obj) {
               const newPath = path ? `${path}.${key}` : key;
               obj[key] = createReactive(obj[key], newPath);
-            });
+            }
             return new Proxy(obj, {
               set(target, prop, value) {
                 const fullPath = path
@@ -580,18 +565,19 @@ export function createElementClass<
  *   return html`<h1>Hello World</h1>`;
  * });
  *
- * // With props only
- * component('with-props', ({ message = 'Hello' }) => {
+ * // With props using useProps() hook
+ * component('with-props', () => {
+ *   const { message } = useProps({ message: 'Hello' });
  *   return html`<div>${message}</div>`;
  * });
  *
- * // With props and hooks
- * component('my-switch', ({
- *   modelValue = false,
- *   label = ''
- * }, { emit, onConnected, onDisconnected }) => {
- *   onConnected(() => console.log('Switch connected!'));
- *   onDisconnected(() => console.log('Switch disconnected!'));
+ * // With props and lifecycle hooks
+ * component('my-switch', () => {
+ *   const { modelValue, label } = useProps({ modelValue: false, label: '' });
+ *   const emit = useEmit();
+ *   
+ *   useOnConnected(() => console.log('Switch connected!'));
+ *   useOnDisconnected(() => console.log('Switch disconnected!'));
  *
  *   return html`
  *     <label>
@@ -607,332 +593,20 @@ export function createElementClass<
  * ```
  */
 
-// Overload 1: No parameters - simple components
+// Overload: No parameters - use useProps() hook for props access
 export function component(
   tag: string,
   renderFn: () => VNode | VNode[] | Promise<VNode | VNode[]>,
 ): void;
 
-// Overload 2: Props only - modern recommended approach with context-based hooks
-export function component<TProps extends Record<string, any> = {}>(
-  tag: string,
-  renderFn: (props: TProps) => VNode | VNode[] | Promise<VNode | VNode[]>,
-): void;
-
 // Implementation
 export function component(
   tag: string,
-  renderFn: (...args: any[]) => VNode | VNode[] | Promise<VNode | VNode[]>,
+  renderFn: () => VNode | VNode[] | Promise<VNode | VNode[]>,
 ): void {
   let normalizedTag = toKebab(tag);
   if (!normalizedTag.includes("-")) {
     normalizedTag = `cer-${normalizedTag}`;
-  }
-
-  // We'll parse the function string to extract defaults (dev time only)
-  let propDefaults: Record<string, any> = {};
-
-  if (typeof window !== "undefined") {
-    try {
-      const fnString = renderFn.toString();
-      // More robust parsing for destructured parameters with defaults
-      // Use a more sophisticated approach to handle nested braces
-      let paramsMatch = null;
-      const openBraceIndex = fnString.indexOf("({");
-
-      if (openBraceIndex !== -1) {
-        let depth = 0;
-        let inString = false;
-        let stringChar = null;
-        let escaped = false;
-        let endIndex = -1;
-
-        for (let i = openBraceIndex + 2; i < fnString.length; i++) {
-          const char = fnString[i];
-
-          if (escaped) {
-            escaped = false;
-            continue;
-          }
-
-          if (char === "\\") {
-            escaped = true;
-            continue;
-          }
-
-          if (!inString && (char === '"' || char === "'" || char === "`")) {
-            inString = true;
-            stringChar = char;
-            continue;
-          }
-
-          if (inString && char === stringChar) {
-            inString = false;
-            stringChar = null;
-            continue;
-          }
-
-          if (!inString) {
-            if (char === "{") {
-              depth++;
-            } else if (char === "}") {
-              if (depth === 0) {
-                endIndex = i;
-                break;
-              }
-              depth--;
-            }
-          }
-        }
-
-        if (endIndex !== -1) {
-          const fullMatch = fnString.substring(openBraceIndex, endIndex + 2); // Include })
-          const innerContent = fnString
-            .substring(openBraceIndex + 2, endIndex)
-            .trim();
-          paramsMatch = [fullMatch, innerContent];
-        }
-      }
-
-      if (paramsMatch) {
-        const propsString = paramsMatch[1];
-
-        // More robust parsing for destructured parameters with defaults
-        // Parse character by character to handle nested quotes and complex strings
-        let currentKey = "";
-        let currentValue = "";
-        let inKey = true;
-        let depth = 0;
-        let quoteChar = null;
-        let escaped = false;
-        let i = 0;
-
-        while (i < propsString.length) {
-          const char = propsString[i];
-
-          if (escaped) {
-            if (inKey) {
-              currentKey += char;
-            } else {
-              currentValue += char;
-            }
-            escaped = false;
-            i++;
-            continue;
-          }
-
-          if (char === "\\") {
-            escaped = true;
-            if (inKey) {
-              currentKey += char;
-            } else {
-              currentValue += char;
-            }
-            i++;
-            continue;
-          }
-
-          // Handle quotes
-          if ((char === '"' || char === "'" || char === "`") && !quoteChar) {
-            quoteChar = char;
-            if (inKey) {
-              currentKey += char;
-            } else {
-              currentValue += char;
-            }
-            i++;
-            continue;
-          }
-
-          if (char === quoteChar) {
-            quoteChar = null;
-            if (inKey) {
-              currentKey += char;
-            } else {
-              currentValue += char;
-            }
-            i++;
-            continue;
-          }
-
-          // If we're inside quotes, add everything
-          if (quoteChar) {
-            if (inKey) {
-              currentKey += char;
-            } else {
-              currentValue += char;
-            }
-            i++;
-            continue;
-          }
-
-          // Handle brackets for nested objects/arrays
-          if (char === "{" || char === "[") {
-            depth++;
-            if (inKey) {
-              currentKey += char;
-            } else {
-              currentValue += char;
-            }
-            i++;
-            continue;
-          }
-
-          if (char === "}" || char === "]") {
-            depth--;
-            if (inKey) {
-              currentKey += char;
-            } else {
-              currentValue += char;
-            }
-            i++;
-            continue;
-          }
-
-          // Handle assignment operator
-          if (char === "=" && depth === 0 && inKey) {
-            inKey = false;
-            i++;
-            continue;
-          }
-
-          // Handle comma separator
-          if (char === "," && depth === 0) {
-            // Process the current key-value pair
-            if (currentKey.trim() && currentValue.trim()) {
-              const key = currentKey.trim();
-              const value = currentValue.trim();
-
-              try {
-                // Parse the default value
-                if (value === "true") propDefaults[key] = true;
-                else if (value === "false") propDefaults[key] = false;
-                else if (value === "[]") propDefaults[key] = [];
-                else if (value === "{}") propDefaults[key] = {};
-                else if (/^\d+$/.test(value))
-                  propDefaults[key] = parseInt(value);
-                else if (/^'.*'$/s.test(value)) {
-                  // Single quoted string
-                  propDefaults[key] = value
-                    .slice(1, -1)
-                    .replace(/\\'/g, "'")
-                    .replace(/\\"/g, '"')
-                    .replace(/\\\//g, "/");
-                } else if (/^".*"$/s.test(value)) {
-                  // Double quoted string
-                  propDefaults[key] = value
-                    .slice(1, -1)
-                    .replace(/\\"/g, '"')
-                    .replace(/\\'/g, "'")
-                    .replace(/\\\//g, "/");
-                } else if (/^`.*`$/s.test(value)) {
-                  // Template literal - evaluate simple cases
-                  const templateContent = value.slice(1, -1);
-                  // Handle basic template literal evaluation
-                  if (templateContent.includes("${")) {
-                    // For expressions like ${Date.now()}, evaluate them
-                    try {
-                      propDefaults[key] = new Function(
-                        `return \`${templateContent}\`;`,
-                      )();
-                    } catch {
-                      // If evaluation fails, keep the literal content
-                      propDefaults[key] = templateContent;
-                    }
-                  } else {
-                    propDefaults[key] = templateContent;
-                  }
-                } else {
-                  propDefaults[key] = value;
-                }
-              } catch (e) {
-                propDefaults[key] = "";
-              }
-            } else if (currentKey.trim()) {
-              // Key without value
-              const key = currentKey.split(":")[0].trim();
-              if (key && !key.includes("}")) {
-                propDefaults[key] = "";
-              }
-            }
-
-            // Reset for next pair
-            currentKey = "";
-            currentValue = "";
-            inKey = true;
-            i++;
-            continue;
-          }
-
-          // Add regular characters
-          if (inKey) {
-            currentKey += char;
-          } else {
-            currentValue += char;
-          }
-          i++;
-        }
-
-        // Process the last key-value pair
-        if (currentKey.trim() && currentValue.trim()) {
-          const key = currentKey.trim();
-          const value = currentValue.trim();
-
-          try {
-            // Parse the default value
-            if (value === "true") propDefaults[key] = true;
-            else if (value === "false") propDefaults[key] = false;
-            else if (value === "[]") propDefaults[key] = [];
-            else if (value === "{}") propDefaults[key] = {};
-            else if (/^\d+$/.test(value)) propDefaults[key] = parseInt(value);
-            else if (/^'.*'$/s.test(value)) {
-              // Single quoted string
-              propDefaults[key] = value
-                .slice(1, -1)
-                .replace(/\\'/g, "'")
-                .replace(/\\"/g, '"')
-                .replace(/\\\//g, "/");
-            } else if (/^".*"$/s.test(value)) {
-              // Double quoted string
-              propDefaults[key] = value
-                .slice(1, -1)
-                .replace(/\\"/g, '"')
-                .replace(/\\'/g, "'")
-                .replace(/\\\//g, "/");
-            } else if (/^`.*`$/s.test(value)) {
-              // Template literal - evaluate simple cases
-              const templateContent = value.slice(1, -1);
-              // Handle basic template literal evaluation
-              if (templateContent.includes("${")) {
-                // For expressions like ${Date.now()}, evaluate them
-                try {
-                  propDefaults[key] = new Function(
-                    `return \`${templateContent}\`;`,
-                  )();
-                } catch {
-                  // If evaluation fails, keep the literal content
-                  propDefaults[key] = templateContent;
-                }
-              } else {
-                propDefaults[key] = templateContent;
-              }
-            } else {
-              propDefaults[key] = value;
-            }
-          } catch (e) {
-            propDefaults[key] = "";
-          }
-        } else if (currentKey.trim()) {
-          // Key without value
-          const key = currentKey.split(":")[0].trim();
-          if (key && !key.includes("}")) {
-            propDefaults[key] = "";
-          }
-        }
-      }
-    } catch (e) {
-      // Fallback: no props parsing
-    }
   }
 
   // Store lifecycle hooks from the render function
@@ -949,20 +623,8 @@ export function component(
 
   // Create component config
   const config: ComponentConfig<{}, {}, {}, {}> = {
-    // Generate props config from defaults
-    props: Object.fromEntries(
-      Object.entries(propDefaults).map(([key, defaultValue]) => {
-        const type =
-          typeof defaultValue === "boolean"
-            ? Boolean
-            : typeof defaultValue === "number"
-              ? Number
-              : typeof defaultValue === "string"
-                ? String
-                : Function; // Use Function for complex types
-        return [key, { type, default: defaultValue }];
-      }),
-    ),
+    // Props are accessed via useProps() hook
+    props: {},
 
     // Add lifecycle hooks from the stored functions
     onConnected: (_context) => {
@@ -1006,29 +668,8 @@ export function component(
         // Set current component context for hooks
         setCurrentComponentContext(context);
 
-        // Check if we have prop defaults (indicates destructured parameters)
-        const hasProps = Object.keys(propDefaults).length > 0;
-
-        let result;
-        if (hasProps) {
-          // Destructured parameters detected - create fresh props object with current context values
-          const freshProps: any = {};
-
-          Object.keys(propDefaults).forEach((key) => {
-            const contextValue = (context as any)[key];
-            const defaultValue = propDefaults[key];
-
-            // Use default value if context value is nullish or empty string
-            freshProps[key] =
-              contextValue != null && contextValue !== ""
-                ? contextValue
-                : defaultValue;
-          });
-          result = renderFn(freshProps);
-        } else {
-          // No parameters expected - call with no arguments
-          result = renderFn();
-        }
+        // Call render function with no arguments - use useProps() hook for props access
+        const result = renderFn();
 
         // Process hook callbacks that were set during render
         if ((context as any)._hookCallbacks) {
@@ -1050,6 +691,25 @@ export function component(
             // Store the style callback in the context for applyStyle to use
             (context as any)._styleCallback = hookCallbacks.style;
           }
+          // If useProps() was called, update config.props with the defaults
+          if (hookCallbacks.props) {
+            const propsDefaults = hookCallbacks.props;
+            config.props = Object.fromEntries(
+              Object.entries(propsDefaults).map(([key, defaultValue]) => {
+                const type =
+                  typeof defaultValue === "boolean"
+                    ? Boolean
+                    : typeof defaultValue === "number"
+                      ? Number
+                      : typeof defaultValue === "string"
+                        ? String
+                        : Function; // Use Function for complex types
+                return [key, { type, default: defaultValue as string | number | boolean }];
+              }),
+            );
+            // Update the registry so future instances and observedAttributes use the updated config
+            registry.set(normalizedTag, config);
+          }
         }
 
         return result;
@@ -1063,7 +723,43 @@ export function component(
   // Store in registry
   registry.set(normalizedTag, config);
 
+  // CRITICAL: Perform a "discovery render" to detect props from useProps()
+  // This must happen BEFORE defining the custom element, so observedAttributes
+  // includes all props declared via useProps()
   if (typeof window !== "undefined") {
+    try {
+      // Create a minimal mock context for discovery
+      const discoveryContext: any = {
+        _hookCallbacks: {},
+        requestRender: () => {},
+      };
+      setCurrentComponentContext(discoveryContext);
+      renderFn(); // Execute once to trigger useProps() calls
+      clearCurrentComponentContext();
+      
+      // If useProps() was called during discovery, update config.props
+      if (discoveryContext._hookCallbacks?.props) {
+        const propsDefaults = discoveryContext._hookCallbacks.props;
+        config.props = Object.fromEntries(
+          Object.entries(propsDefaults).map(([key, defaultValue]) => {
+            const type =
+              typeof defaultValue === "boolean"
+                ? Boolean
+                : typeof defaultValue === "number"
+                  ? Number
+                  : typeof defaultValue === "string"
+                    ? String
+                    : Function;
+            return [key, { type, default: defaultValue as string | number | boolean }];
+          }),
+        );
+        // Update registry with discovered props
+        registry.set(normalizedTag, config);
+      }
+    } catch (e) {
+      // Discovery render failed - this is OK, props will be discovered on first real render
+    }
+
     if (!customElements.get(normalizedTag)) {
       customElements.define(
         normalizedTag,

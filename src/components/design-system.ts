@@ -1,4 +1,4 @@
-import { component, html, ref, watch, useEmit, useOnConnected } from '../lib/index.js';
+import { component, html, ref, watch, useProps, useEmit, useOnConnected } from '../lib/index.js';
 
 /**
  * 🎨 Design System Components
@@ -12,29 +12,25 @@ import { component, html, ref, watch, useEmit, useOnConnected } from '../lib/ind
  */
 
 // Text Input Component
-component('ds-input', ({ modelValue = '', placeholder = '', disabled = false, type = 'text' }) => {
+component('ds-input', () => {
+  const props = useProps({
+    modelValue: '',
+    placeholder: '',
+    disabled: false,
+    type: 'text'
+  });
   const emit = useEmit();
-
-  watch(() => modelValue, (newVal, oldVal) => {
-    console.log('ds-input modelValue changed from', oldVal, 'to', newVal);
-  }, { immediate: true });
 
   return html`
     <div class="input-wrapper">
       <input
         class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-        type="${type}"
-        placeholder="${placeholder}"
-        :disabled="${disabled}"
-        :value="${modelValue}"
+        type="${props.type}"
+        placeholder="${props.placeholder}"
+        :disabled="${props.disabled}"
+        :value="${props.modelValue}"
         @input="${(e: Event) => {
           const input = e.target as HTMLInputElement;
-          console.log('ds-input emitting update:modelValue with value:', input.value);
-          emit('update:modelValue', input.value);
-        }}"
-        @keyup="${(e: Event) => {
-          const input = e.target as HTMLInputElement;
-          console.log('ds-input keyup emitting update:modelValue with value:', input.value);
           emit('update:modelValue', input.value);
         }}"
       />
@@ -43,23 +39,25 @@ component('ds-input', ({ modelValue = '', placeholder = '', disabled = false, ty
 });
 
 // Textarea Component
-component('ds-textarea', ({ modelValue = '', placeholder = '', disabled = false, rows = 3 }) => {
+component('ds-textarea', () => {
+  const props = useProps({
+    modelValue: '',
+    placeholder: '',
+    disabled: false,
+    rows: 3
+  });
   const emit = useEmit();
-  watch(() => modelValue, (newVal, oldVal) => {
-    console.log('ds-textarea modelValue changed from', oldVal, 'to', newVal);
-  }, { immediate: true });
 
   return html`
     <div class="textarea-wrapper">
       <textarea
         class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-        placeholder="${placeholder}"
-        :disabled="${disabled}"
-        :rows="${rows}"
-        :value="${modelValue}"
+        placeholder="${props.placeholder}"
+        :disabled="${props.disabled}"
+        :rows="${props.rows}"
+        :value="${props.modelValue}"
         @input="${(e: Event) => {
           const textarea = e.target as HTMLTextAreaElement;
-          console.log('ds-textarea emitting update:modelValue with value:', textarea.value);
           emit('update:modelValue', textarea.value);
         }}"
       ></textarea>
@@ -68,32 +66,37 @@ component('ds-textarea', ({ modelValue = '', placeholder = '', disabled = false,
 });
 
 // Checkbox Component
-component('ds-checkbox', ({ modelValue = false, label = '', disabled = false }) => {
+component('ds-checkbox', () => {
+  const props = useProps({
+    modelValue: false,
+    label: '',
+    disabled: false
+  });
   const emit = useEmit();
-  watch(() => modelValue, (newVal, oldVal) => {
-    console.log('ds-checkbox modelValue changed from', oldVal, 'to', newVal);
-  }, { immediate: true });
 
   return html`
     <label class="inline-flex items-center gap-2 cursor-pointer">
       <input
         class="form-checkbox h-5 w-5 text-blue-600"
         type="checkbox"
-        :disabled="${disabled}"
-        :checked="${modelValue}"
+        :disabled="${props.disabled}"
+        :checked="${props.modelValue}"
         @change="${(e: Event) => {
           const input = e.target as HTMLInputElement;
-          console.log('ds-checkbox emitting update:modelValue with value:', input.checked);
           emit('update:modelValue', input.checked);
         }}"
       />
-      ${label ? html`<span class="text-sm text-gray-700">${label}</span>` : ''}
+      ${props.label ? html`<span class="text-sm text-gray-700">${props.label}</span>` : ''}
     </label>
   `;
 });
 
 // Select Component
-component('ds-select', ({ modelValue = '', disabled = false }) => {
+component('ds-select', () => {
+  const props = useProps({
+    modelValue: '',
+    disabled: false
+  });
   const emit = useEmit();
   const options = ref([
     { value: 'red', label: 'Red' },
@@ -101,9 +104,7 @@ component('ds-select', ({ modelValue = '', disabled = false }) => {
     { value: 'blue', label: 'Blue' },
   ]);
 
-  watch(() => modelValue, (newVal, oldVal) => {
-    console.log('ds-select modelValue changed from', oldVal, 'to', newVal);
-  }, { immediate: true });
+
 
   useOnConnected(() => {
     // Ensure initial value is set correctly
@@ -117,11 +118,10 @@ component('ds-select', ({ modelValue = '', disabled = false }) => {
     <div class="select-wrapper">
       <select
         class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-        :disabled="${disabled}"
-        :value="${modelValue}"
+        :disabled="${props.disabled}"
+        :value="${props.modelValue}"
         @change="${(e: Event) => {
           const select = e.target as HTMLSelectElement;
-          console.log('ds-select emitting update:modelValue with value:', select.value);
           emit('update:modelValue', select.value);
         }}"
       >
@@ -135,7 +135,12 @@ component('ds-select', ({ modelValue = '', disabled = false }) => {
 });
 
 // Radio Group Component
-component('ds-radio-group', ({ modelValue = '', name = 'radio-group', disabled = false }) => {
+component('ds-radio-group', () => {
+  const props = useProps({
+    modelValue: '',
+    name: 'radio-group',
+    disabled: false
+  });
   const emit = useEmit();
 
   const options = ref([
@@ -144,9 +149,7 @@ component('ds-radio-group', ({ modelValue = '', name = 'radio-group', disabled =
     { value: 'option3', label: 'Option 3' },
   ]);
 
-  watch(() => modelValue, (newVal, oldVal) => {
-    console.log('ds-radio-group modelValue changed from', oldVal, 'to', newVal);
-  }, { immediate: true });
+
 
   return html`
     <div class="radio-group space-y-2">
@@ -155,14 +158,13 @@ component('ds-radio-group', ({ modelValue = '', name = 'radio-group', disabled =
           <input
             class="form-radio h-4 w-4 text-blue-600"
             type="radio"
-            name="${name}"
+            name="${props.name}"
             value="${option.value}"
-            :disabled="${disabled}"
-            :checked="${modelValue === option.value}"
+            :disabled="${props.disabled}"
+            :checked="${props.modelValue === option.value}"
             @change="${(e: Event) => {
               const input = e.target as HTMLInputElement;
               if (input.checked) {
-                console.log('ds-radio-group emitting update:modelValue with value:', input.value);
                 emit('update:modelValue', input.value);
               }
             }}"
@@ -175,21 +177,25 @@ component('ds-radio-group', ({ modelValue = '', name = 'radio-group', disabled =
 });
 
 // Button Component
-component('ds-button', ({ disabled = false, type = 'button', variant = 'primary' }) => {
+component('ds-button', () => {
+  const props = useProps({
+    disabled: false,
+    type: 'button',
+    variant: 'primary'
+  });
   const emit = useEmit();
   return html`
     <button
       class="px-4 py-2 rounded-md font-medium focus:outline-none focus:ring-2 transition-colors"
       :class="${{
-        'bg-blue-600 hover:bg-blue-700 text-white focus:ring-blue-500': variant === 'primary',
-        'bg-gray-600 hover:bg-gray-700 text-white focus:ring-gray-500': variant === 'secondary',
-        'bg-green-600 hover:bg-green-700 text-white focus:ring-green-500': variant === 'success',
-        'opacity-50 cursor-not-allowed': disabled
+        'bg-blue-600 hover:bg-blue-700 text-white focus:ring-blue-500': props.variant === 'primary',
+        'bg-gray-600 hover:bg-gray-700 text-white focus:ring-gray-500': props.variant === 'secondary',
+        'bg-green-600 hover:bg-green-700 text-white focus:ring-green-500': props.variant === 'success',
+        'opacity-50 cursor-not-allowed': props.disabled
       }}"
-      type="${type}"
-      :disabled="${disabled}"
+      type="${props.type}"
+      :disabled="${props.disabled}"
       @click="${(e: Event) => {
-        console.log('ds-button clicked');
         emit('click', e);
       }}"
     >
@@ -199,22 +205,25 @@ component('ds-button', ({ disabled = false, type = 'button', variant = 'primary'
 });
 
 // Progress Component
-component('ds-progress', ({ modelValue = 0, max = 100, showValue = true }) => {
+component('ds-progress', () => {
+  const props = useProps({
+    modelValue: 0,
+    max: 100,
+    showValue: true
+  });
 
-  watch(() => modelValue, (newVal, oldVal) => {
-    console.log('ds-progress modelValue changed from', oldVal, 'to', newVal);
-  }, { immediate: true });
+
 
   return html`
     <div class="progress-wrapper">
       <progress
         class="w-full h-4 rounded"
-        :value="${modelValue}"
-        :max="${max}"
+        :value="${props.modelValue}"
+        :max="${props.max}"
       ></progress>
-      ${showValue ? html`
+      ${props.showValue ? html`
         <div class="text-sm text-gray-600 mt-1">
-          ${modelValue} / ${max} (${Math.round((modelValue / max) * 100)}%)
+          ${props.modelValue} / ${props.max} (${Math.round((props.modelValue / props.max) * 100)}%)
         </div>
       ` : ''}
     </div>
@@ -222,60 +231,66 @@ component('ds-progress', ({ modelValue = 0, max = 100, showValue = true }) => {
 });
 
 // Range Slider Component
-component('ds-range', ({ modelValue = 0, min = 0, max = 100, step = 1, disabled = false }) => {
+component('ds-range', () => {
+  const props = useProps({
+    modelValue: 0,
+    min: 0,
+    max: 100,
+    step: 1,
+    disabled: false
+  });
   const emit = useEmit();
-  watch(() => modelValue, (newVal, oldVal) => {
-    console.log('ds-range modelValue changed from', oldVal, 'to', newVal);
-  }, { immediate: true });
 
   return html`
     <div class="range-wrapper">
       <input
         class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
         type="range"
-        :min="${min}"
-        :max="${max}"
-        :step="${step}"
-        :disabled="${disabled}"
-        :value="${modelValue}"
+        :min="${props.min}"
+        :max="${props.max}"
+        :step="${props.step}"
+        :disabled="${props.disabled}"
+        :value="${props.modelValue}"
         @input="${(e: Event) => {
           const input = e.target as HTMLInputElement;
-          console.log('ds-range emitting update:modelValue with value:', Number(input.value));
           emit('update:modelValue', Number(input.value));
         }}"
       />
       <div class="flex justify-between text-sm text-gray-600 mt-1">
-        <span>${min}</span>
-        <span class="font-medium">${modelValue}</span>
-        <span>${max}</span>
+        <span>${props.min}</span>
+        <span class="font-medium">${props.modelValue}</span>
+        <span>${props.max}</span>
       </div>
     </div>
   `;
 });
 
 // Number Input Component
-component('ds-number', ({ modelValue = 0, min = undefined, max = undefined, step = 1, disabled = false, placeholder = '' }) => {
+component('ds-number', () => {
+  const props = useProps({
+    modelValue: 0,
+    min: undefined,
+    max: undefined,
+    step: 1,
+    disabled: false,
+    placeholder: ''
+  });
   const emit = useEmit();
-
-  watch(() => modelValue, (newVal, oldVal) => {
-    console.log('ds-number modelValue changed from', oldVal, 'to', newVal);
-  }, { immediate: true });
 
   return html`
     <div class="number-wrapper">
       <input
         class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
         type="number"
-        :min="${min}"
-        :max="${max}"
-        :step="${step}"
-        :disabled="${disabled}"
-        placeholder="${placeholder}"
-        :value="${modelValue}"
+        :min="${props.min}"
+        :max="${props.max}"
+        :step="${props.step}"
+        :disabled="${props.disabled}"
+        placeholder="${props.placeholder}"
+        :value="${props.modelValue}"
         @input="${(e: Event) => {
           const input = e.target as HTMLInputElement;
           const value = Number(input.value);
-          console.log('ds-number emitting update:modelValue with value:', value);
           emit('update:modelValue', value);
         }}"
       />

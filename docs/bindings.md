@@ -12,6 +12,8 @@ Bindings allow you to connect your component's refs, props, and events directly 
 - `:style` — Style binding
 - `:model` — Two-way binding for form elements (native + custom elements)
 - `:ref` — Ref binding for element access
+- `:show` — Show/hide elements with display: none
+- `:when` — Conditional rendering (adds/removes from DOM)
 
 ## 🏷️ Attribute / Property Binding (`:prop` / `:attr`)
 
@@ -206,6 +208,133 @@ component('ref-example', () => {
 - Initialize refs as `null` and use proper TypeScript types (e.g., `HTMLInputElement | null`)
 - Access refs in lifecycle hooks (`useOnConnected`) to ensure elements are rendered
 - Avoid direct DOM manipulation when possible; prefer declarative updates
+
+## 👁️ Show/Hide Binding (`:show`)
+
+Toggle element visibility using `display: none` based on a boolean condition.
+
+```html
+<div :show="${isVisible}">This content can be hidden</div>
+<span :show="${count.value > 5}">High count!</span>
+```
+
+### How `:show` Works
+
+- Shows element when condition is truthy
+- Hides element (`display: none`) when condition is falsy
+- Element remains in the DOM (unlike `:when` which removes it)
+- Better for performance when toggling frequently since DOM structure is preserved
+
+### Example
+
+```typescript
+import { component, html, ref } from '@jasonshimmy/custom-elements-runtime';
+
+component('toggle-content', () => {
+  const { showDetails } = useProps({ showDetails: false });
+  const isExpanded = ref(showDetails);
+  
+  return html`
+    <div>
+      <button @click="${() => isExpanded.value = !isExpanded.value}">
+        ${isExpanded.value ? 'Hide' : 'Show'} Details
+      </button>
+      <div :show="${isExpanded.value}" class="details">
+        <p>These details can be toggled!</p>
+        <p>The element stays in the DOM but is hidden with display: none.</p>
+      </div>
+    </div>
+  `;
+});
+```
+
+### When to Use `:show`
+
+- ✅ Frequent toggling (animations, dropdowns, modals)
+- ✅ When you want to preserve element state
+- ✅ When you need the element to remain in the DOM
+- ❌ For conditional rendering based on data (use `:when` instead)
+- ❌ When element should be completely removed from DOM
+
+## 🔀 Conditional Rendering (`:when`)
+
+Conditionally render elements using the `:when` directive. Elements are added or removed from the DOM based on the condition.
+
+```html
+<div :when="${isLoggedIn}">Welcome back!</div>
+<span :when="${count.value > 10}">Count exceeded!</span>
+```
+
+### How `:when` Works
+
+- Renders element when condition is truthy
+- Completely removes element from DOM when condition is falsy
+- Uses anchor comment nodes for efficient re-rendering
+- Automatically wraps element in anchor blocks during compilation
+
+### Comparison: `when()` function vs `:when` directive
+
+Both approaches work identically under the hood:
+
+**Function approach**:
+```typescript
+${when(isVisible, html`<div>Content</div>`)}
+```
+
+**Directive approach**:
+```html
+<div :when="${isVisible}">Content</div>
+```
+
+### Advantages of `:when` directive
+
+- ✅ Cleaner, more HTML-like syntax
+- ✅ Better co-location of condition with element
+- ✅ Works with any HTML element
+- ✅ Automatically wraps in anchor blocks
+
+### Example
+
+```typescript
+import { component, html, ref } from '@jasonshimmy/custom-elements-runtime';
+
+component('conditional-message', () => {
+  const { loggedIn } = useProps({ loggedIn: false });
+  const messageCount = ref(0);
+  
+  return html`
+    <div>
+      <div :when="${loggedIn}">
+        <h2>Welcome back!</h2>
+        <p>You have ${messageCount.value} new messages.</p>
+      </div>
+      <div :when="${!loggedIn}">
+        <h2>Please log in</h2>
+        <button @click="${() => emit('login-requested')}">Log In</button>
+      </div>
+    </div>
+  `;
+});
+```
+
+### When to Use `:when`
+
+- ✅ Conditional rendering based on data or state
+- ✅ When element should be completely removed from DOM
+- ✅ For simpler syntax than `when()` function
+- ✅ Single element conditional rendering
+- ❌ For if/else logic with multiple branches (use `match()` instead)
+- ❌ For lists (use `each()` instead)
+
+### `:show` vs `:when` Comparison
+
+| Feature | `:show` | `:when` |
+|---------|---------|---------|
+| **DOM Presence** | Always in DOM | Added/removed from DOM |
+| **Method** | `display: none` | Complete removal |
+| **Performance** | Better for frequent toggling | Better for rarely shown content |
+| **State Preservation** | Preserves element state | Recreates element each time |
+| **Use Case** | Visibility toggles | Conditional rendering |
 
 
 ## 🧩 Example: All Bindings Together

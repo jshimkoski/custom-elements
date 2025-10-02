@@ -104,6 +104,106 @@ Notes:
 - `<router-view>` renders the matched route's component.
 - `<router-link>` creates a link or button for navigation. Use `tag="button"` for a button.
 
+## 🔗 Router Link Props
+
+The `<router-link>` component supports the following props:
+
+### Basic Props
+
+- **`to`** (string, required) - Target path for navigation
+- **`tag`** (string, default: `'a'`) - HTML tag to render (`'a'`, `'button'`, etc.)
+
+### Navigation Props
+
+- **`replace`** (boolean, default: `false`) - Use `router.replace()` instead of `router.push()`
+- **`external`** (boolean, default: `false`) - Open link in new tab with `target="_blank" rel="noopener noreferrer"` (only for `<a>` tags)
+- **`disabled`** (boolean, default: `false`) - Disable navigation and add `aria-disabled="true" tabindex="-1"`
+
+### Active Class Props
+
+- **`exact`** (boolean, default: `false`) - Require exact path match for active class
+- **`activeClass`** (string, default: `'active'`) - CSS class applied when route is active (JIT CSS supported)
+- **`exactActiveClass`** (string, default: `'exact-active'`) - CSS class applied when route is exactly active (JIT CSS supported)
+
+### Accessibility Props
+
+- **`ariaCurrentValue`** (string, default: `'page'`) - Value for `aria-current` attribute on exact match
+
+### Styling Props
+
+- **`class`** (string) - Additional CSS classes to apply (JIT CSS supported)
+
+### Examples
+
+#### Basic Navigation
+```html
+<router-link to="/about">About</router-link>
+```
+
+#### Button Navigation
+```html
+<router-link to="/settings" tag="button">Settings</router-link>
+```
+
+#### Replace Navigation (no history entry)
+```html
+<router-link to="/login" replace>Login</router-link>
+```
+
+#### Exact Match Active Class
+```html
+<router-link to="/" exact activeClass="home-active">Home</router-link>
+```
+
+#### External Link
+```html
+<router-link to="https://example.com" external>External Site</router-link>
+```
+
+#### Disabled Link
+```html
+<router-link to="/premium" disabled>Premium (Coming Soon)</router-link>
+```
+
+#### Custom Active Classes
+```html
+<router-link 
+  to="/dashboard" 
+  exact
+  activeClass="is-active"
+  exactActiveClass="is-exact-active"
+  ariaCurrentValue="page"
+>
+  Dashboard
+</router-link>
+```
+
+#### Styling with JIT CSS
+```html
+<router-link 
+  to="/profile" 
+  class="nav-link"
+  activeClass="nav-link-active"
+>
+  Profile
+</router-link>
+```
+
+### Active Class Behavior
+
+Router links automatically compute active classes based on the current route:
+
+- **Active**: Applied when `current.path.startsWith(to)` (unless `exact` is true)
+- **Exact Active**: Applied when `current.path === to`
+- **`aria-current`**: Automatically added with value from `ariaCurrentValue` when exactly active
+
+### Accessibility Features
+
+- Disabled links get `aria-disabled="true"` and `tabindex="-1"`
+- Buttons get `disabled` attribute when disabled
+- Active links get `aria-current` attribute for screen readers
+- External links get `rel="noopener noreferrer"` for security
+
 # 🛡️ Navigation Guards
 
 Routes support three types of navigation guards:
@@ -143,7 +243,108 @@ Clarification: guards are called after the router has matched a route for the re
 - **Framework agnostic?** Yes.
 - **Async components?** Use `load` property.
 
-## 📝 Best Practices
+## � Utility Functions
+
+The router module exports several utility functions for advanced use cases:
+
+### `parseQuery(search: string)`
+
+Parse a URL query string into an object:
+
+```ts
+import { parseQuery } from '@jasonshimmy/custom-elements-runtime';
+
+const params = parseQuery('?foo=bar&baz=qux&count=5');
+// { foo: 'bar', baz: 'qux', count: '5' }
+
+// Also works with leading '?' or without
+const params2 = parseQuery('foo=bar');
+// { foo: 'bar' }
+```
+
+**Parameters:**
+- `search`: string - URL query string (with or without leading '?')
+
+**Returns:** `Record<string, string>` - Parsed query parameters
+
+### `matchRoute(routes: Route[], path: string)`
+
+Manually match a route against a path:
+
+```ts
+import { matchRoute } from '@jasonshimmy/custom-elements-runtime';
+
+const routes = [
+  { path: '/', component: 'home-page' },
+  { path: '/user/:id', component: 'user-page' }
+];
+
+const result = matchRoute(routes, '/user/123');
+// {
+//   route: { path: '/user/:id', component: 'user-page' },
+//   params: { id: '123' }
+// }
+
+// No match returns null route
+const noMatch = matchRoute(routes, '/nonexistent');
+// { route: null, params: {} }
+```
+
+**Parameters:**
+- `routes`: Route[] - Array of route definitions
+- `path`: string - Path to match against routes
+
+**Returns:** `{ route: Route | null; params: Record<string, string> }`
+
+### `matchRouteSSR(routes: Route[], path: string)`
+
+Match routes during server-side rendering:
+
+```ts
+import { matchRouteSSR } from '@jasonshimmy/custom-elements-runtime';
+
+// On the server
+const result = matchRouteSSR(routes, req.path);
+if (result.route) {
+  // Render the matched component
+  const component = result.route.component;
+  // ... render to string
+}
+```
+
+**Parameters:**
+- `routes`: Route[] - Array of route definitions
+- `path`: string - Path to match
+
+**Returns:** `{ route: Route | null; params: Record<string, string> }`
+
+**Note:** This function is identical to `matchRoute()` but named specifically for SSR use cases to make code intent clearer.
+
+### `initRouter(config: RouterConfig)`
+
+Initialize router programmatically (covered in detail above):
+
+```ts
+import { initRouter } from '@jasonshimmy/custom-elements-runtime';
+
+const router = initRouter({
+  routes: [
+    { path: '/', component: 'home-page' },
+    { path: '/about', component: 'about-page' }
+  ],
+  mode: 'history', // or 'hash'
+  initialUrl: '/about' // optional, for SSR or testing
+});
+```
+
+**Returns:** Router instance with methods:
+- `push(path: string)` - Navigate to path
+- `replace(path: string)` - Replace current path
+- `back()` - Go back in history
+- `getCurrent()` - Get current route state
+- `subscribe(fn)` - Listen for route changes
+
+## �📝 Best Practices
 
 - Define all routes in one array
 - Use `load` for async/code-split components

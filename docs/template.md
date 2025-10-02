@@ -17,7 +17,8 @@ import { html, useEmit } from '@jasonshimmy/custom-elements-runtime';
 Write templates using tagged template literals:
 
 ```ts
-component('my-component', ({ name = 'World' }) => {
+component('my-component', () => {
+  const { name } = useProps({ name: 'World' });
   return html`<h1>Hello, ${name}!</h1>`;
 });
 ```
@@ -39,7 +40,8 @@ html`
 Bind attributes and events directly in your template:
 
 ```ts
-component('interactive-component', ({ count = 0, isLoading = false }) => {
+component('interactive-component', () => {
+  const { count, isLoading } = useProps({ count: 0, isLoading: false });
   const emit = useEmit();
   
   const increment = () => {
@@ -75,7 +77,8 @@ component('form-component', () => {
 Templates can include any dynamic value, including computed properties and store values:
 
 ```ts
-component('dynamic-component', ({ multiplier = 2 }) => {
+component('dynamic-component', () => {
+  const { multiplier } = useProps({ multiplier: 2 });
   const baseValue = ref(5);
   const doubled = computed(() => baseValue.value * multiplier);
   

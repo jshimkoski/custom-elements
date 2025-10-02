@@ -143,7 +143,18 @@ Custom Elements Runtime provides a high-performance, zero-dependency JIT CSS eng
 `object-bottom`, `object-center`, `object-left`, `object-left-bottom`, `object-left-top`, `object-right`, `object-right-bottom`, `object-right-top`, `object-top`
 
 ### **Gradient Backgrounds**
-`bg-gradient-to-t`, `bg-gradient-to-tr`, `bg-gradient-to-r`, `bg-gradient-to-br`, `bg-gradient-to-b`, `bg-gradient-to-bl`, `bg-gradient-to-l`, `bg-gradient-to-tl`
+
+**Linear Gradients:**
+`bg-linear-to-t`, `bg-linear-to-tr`, `bg-linear-to-r`, `bg-linear-to-br`, `bg-linear-to-b`, `bg-linear-to-bl`, `bg-linear-to-l`, `bg-linear-to-tl`
+
+**Radial Gradients (Ellipse):**
+`bg-radial`, `bg-radial-at-t`, `bg-radial-at-tr`, `bg-radial-at-r`, `bg-radial-at-br`, `bg-radial-at-b`, `bg-radial-at-bl`, `bg-radial-at-l`, `bg-radial-at-tl`
+
+**Radial Gradients (Circle):**
+`bg-radial-circle`, `bg-radial-circle-at-t`, `bg-radial-circle-at-tr`, `bg-radial-circle-at-r`, `bg-radial-circle-at-br`, `bg-radial-circle-at-b`, `bg-radial-circle-at-bl`, `bg-radial-circle-at-l`, `bg-radial-circle-at-tl`
+
+**Conic Gradients:**
+`bg-conic`, `bg-conic-at-t`, `bg-conic-at-tr`, `bg-conic-at-r`, `bg-conic-at-br`, `bg-conic-at-b`, `bg-conic-at-bl`, `bg-conic-at-l`, `bg-conic-at-tl`
 
 **Gradient Color Stops:**
 `from-{color}`, `to-{color}`, `via-{color}` (works with all color palettes and shades)
@@ -575,12 +586,67 @@ component('dashboard-layout', ({ sidebarWidth = 280, headerHeight = 64 }) => {
 </div>
 ```
 
-### **Gradient Background Example**
+### **Gradient Background Examples**
 
+**Linear Gradients:**
 ```html
-<div class="bg-gradient-to-r from-primary-500 via-secondary-400 to-success-500 p-8 text-white">
-  <h2 class="text-2xl font-bold mb-4">Beautiful Gradient</h2>
-  <p class="opacity-90">This demonstrates gradient backgrounds with color stops.</p>
+<!-- Top to bottom -->
+<div class="bg-linear-to-b from-primary-500 to-secondary-900 p-8 text-white">
+  <h2 class="text-2xl font-bold">Linear Gradient</h2>
+  <p>From top to bottom with two color stops</p>
+</div>
+
+<!-- Diagonal with via -->
+<div class="bg-linear-to-br from-success-400 via-info-500 to-warning-600 p-8">
+  <h2 class="text-2xl font-bold">Rainbow Diagonal</h2>
+  <p>Three color stops create smooth transitions</p>
+</div>
+```
+
+**Radial Gradients:**
+```html
+<!-- Ellipse from center -->
+<div class="bg-radial from-primary-500 to-secondary-900 p-8 text-white rounded-xl">
+  <h2 class="text-2xl font-bold text-center">Radial Ellipse</h2>
+  <p class="text-center">Fades from center outward</p>
+</div>
+
+<!-- Circle from top-right corner -->
+<div class="bg-radial-circle-at-tr from-success-400 via-info-500 to-warning-600 p-8 h-64">
+  <p class="text-right">Circular burst from corner</p>
+</div>
+```
+
+**Conic Gradients:**
+```html
+<!-- Color wheel effect -->
+<div class="bg-conic from-error-500 via-warning-500 to-success-500 p-8 rounded-full w-64 h-64">
+  <div class="flex items-center justify-center h-full">
+    <span class="text-white font-bold">360° Gradient</span>
+  </div>
+</div>
+
+<!-- Corner spotlight -->
+<div class="bg-conic-at-bl from-neutral-900 to-primary-500 p-8 h-64">
+  <p class="text-white">Conic from bottom-left</p>
+</div>
+```
+
+**Complex Multi-stop Gradients:**
+```html
+<div class="bg-linear-to-r from-primary-500 via-secondary-400 to-success-500 p-8">
+  <h2 class="text-2xl font-bold text-white drop-shadow-lg">
+    Beautiful Multi-Color Gradient
+  </h2>
+  <p class="text-white">Three color stops create smooth transitions</p>
+</div>
+
+<!-- Combining gradients with background opacity -->
+<div class="relative">
+  <div class="absolute inset-0 bg-linear-to-r from-primary-500 to-secondary-900 opacity-80"></div>
+  <div class="relative p-8 text-white">
+    <h2 class="text-2xl font-bold">Layered gradient effect</h2>
+  </div>
 </div>
 ```
 
@@ -629,6 +695,14 @@ component('dashboard-layout', ({ sidebarWidth = 280, headerHeight = 64 }) => {
 - **Performance:** Arbitrary values are cached, so don't hesitate to use them
 - **All utilities are mobile-first** and responsive
 - **Extend the utility map** or property map for project-specific needs
+- **Gradient tips:**
+  - Use `from-`, `via-`, and `to-` with any color palette for consistent theming
+  - Apply opacity to the entire gradient container (e.g., `bg-linear-to-r from-primary-500 to-secondary-900 opacity-80`)
+  - Linear gradients work great for backgrounds and overlays
+  - Radial gradients are perfect for spotlight effects and hero sections
+  - Conic gradients create unique color wheel and pie chart effects
+  - All gradient utilities use CSS variables (--tw-gradient-stops) for dynamic control
+  - Combine gradient backgrounds with utilities like `rounded-xl`, `shadow-lg`, and responsive variants
 
 ## 🔍 API Reference
 
@@ -647,6 +721,7 @@ component('dashboard-layout', ({ sidebarWidth = 280, headerHeight = 64 }) => {
 - `parseSpacing(className: string): string | null` - Parses spacing utilities
 - `parseColorClass(className: string): string | null` - Parses color utilities 
 - `parseOpacityModifier(className: string): string | null` - Parses opacity modifiers
+- `parseGradientColorStop(className: string): string | null` - Parses gradient color stops (`from-*`, `via-*`, `to-*`)
 - `parseArbitrary(className: string): string | null` - Parses arbitrary value utilities
 - `parseArbitraryVariant(token: string): string | null` - Parses arbitrary variant selectors
 

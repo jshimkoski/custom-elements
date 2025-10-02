@@ -1,6 +1,8 @@
 import { vdomRenderer } from "./vdom";
 import { minifyCSS, getBaseResetSheet, sanitizeCSS, jitCSS } from "./style";
+import { getTransitionStyleSheet } from "../transitions";
 import type { ComponentConfig, ComponentContext, VNode, Refs } from "./types";
+import { devWarn, devError } from "./logger";
 
 // Module-level stack for context injection (scoped to render cycle, no global pollution)
 export const contextStack: any[] = [];
@@ -97,7 +99,7 @@ export function requestRender(
     setRenderCount(renderCount + 1);
     // Progressive warnings and limits
     if (renderCount === 15) {
-      console.warn(
+      devWarn(
         '⚠️ Component is re-rendering rapidly. This might indicate:\n' +
         '  Common causes:\n' +
         '  • Event handler calling a function immediately: @click="${fn()}" should be @click="${fn}"\n' +
@@ -107,7 +109,7 @@ export function requestRender(
       );
     } else if (renderCount > 20) {
       // More aggressive limit for severe infinite loops
-      console.error(
+      devError(
         '🛑 Infinite loop detected in component render:\n' +
         '  • This might be caused by state updates during render\n' +
         '  • Ensure all state modifications are done in event handlers or effects\n' +
@@ -144,7 +146,7 @@ export function applyStyle<S extends object, C extends object, P extends object,
 
   if ((!jitCss || jitCss.trim() === "") && !(context as any)._computedStyle) {
     setStyleSheet(null);
-    shadowRoot.adoptedStyleSheets = [getBaseResetSheet()];
+    shadowRoot.adoptedStyleSheets = [getBaseResetSheet(), getTransitionStyleSheet()];
     return;
   }
 
@@ -160,9 +162,16 @@ export function applyStyle<S extends object, C extends object, P extends object,
 
   let sheet = styleSheet;
   if (!sheet) sheet = new CSSStyleSheet();
-  if (sheet.cssRules.length === 0 || sheet.toString() !== finalStyle) {
+  
+  // Compare by replacing the stylesheet entirely if rules changed
+  // Avoid using .toString() which may not be reliable across browsers
+  const needsUpdate = sheet.cssRules.length === 0 || 
+    (sheet.cssRules.length > 0 && Array.from(sheet.cssRules).map(r => r.cssText).join('') !== finalStyle);
+  
+  if (needsUpdate) {
     sheet.replaceSync(finalStyle);
   }
-  shadowRoot.adoptedStyleSheets = [getBaseResetSheet(), sheet];
+  
+  shadowRoot.adoptedStyleSheets = [getBaseResetSheet(), getTransitionStyleSheet(), sheet];
   setStyleSheet(sheet);
 }

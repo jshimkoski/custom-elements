@@ -5,6 +5,9 @@
 
 // Global state to track current component context during render
 let currentComponentContext: any = null;
+import { isReactiveState } from './reactive';
+import { toKebab } from "./helpers";
+import { devWarn } from "./logger";
 
 /**
  * Set the current component context (called internally during render)
@@ -28,7 +31,8 @@ export function clearCurrentComponentContext(): void {
  * 
  * @example
  * ```ts
- * component('my-button', ({ label = 'Click me' }) => {
+ * component('my-button', () => {
+ *   const { label } = useProps({ label: 'Click me' });
  *   const emit = useEmit();
  *   
  *   return html`
@@ -185,17 +189,182 @@ export function useProps<T extends Record<string, any>>(defaults: T): T {
   };
 
   const ctx = currentComponentContext;
-  const result: any = {};
-  Object.keys(defaults).forEach((key) => {
-    Object.defineProperty(result, key, {
-      enumerable: true,
-      configurable: true,
-      get() {
-        const val = ctx[key];
-        if (val != null && val !== '') return val;
-        return defaults[key];
-      },
-    });
+  // Define dynamic getters for declared props so the context property
+  // always reflects the host element's property (or reactive ref.value)
+  try {
+    const declaredKeys = Object.keys(defaults || {});
+    for (const key of declaredKeys) {
+      if (typeof key !== 'string' || key.startsWith('_')) continue;
+      const existing = Object.getOwnPropertyDescriptor(ctx, key);
+      // Only define if not present or configurable (allow overriding)
+      if (existing && !existing.configurable) continue;
+      try {
+        // Preserve any existing concrete value on the context in a closure.
+        // This avoids recursive getters when we later reference ctx[key].
+        const hasOwn = Object.prototype.hasOwnProperty.call(ctx, key);
+        let localValue: any = hasOwn ? (ctx as any)[key] : undefined;
+
+        Object.defineProperty(ctx, key, {
+          configurable: true,
+          enumerable: true,
+          get() {
+            try {
+              const host = (ctx && (ctx as any)._host) as HTMLElement | undefined;
+              if (host) {
+                // First, check for attribute value (attributes should take precedence)
+                const kebabKey = toKebab(key);
+                const attrValue = host.getAttribute(kebabKey);
+                if (attrValue !== null) {
+                  const defaultType = typeof defaults[key];
+                  if (defaultType === 'boolean') {
+                    // Standalone boolean attributes have empty string value
+                    return attrValue === '' || attrValue === 'true';
+                  }
+                  if (defaultType === 'number') {
+                    return Number(attrValue);
+                  }
+                  return attrValue;
+                }
+                
+                // If no attribute, check if host has a property value set
+                if (typeof (host as any)[key] !== 'undefined') {
+                  const fromHost = (host as any)[key];
+                  // prefer host value when present
+                  // If the host provided a ReactiveState instance or a wrapper
+                  // with a .value, unwrap it here so destructured props and
+                  // useProps return the primitive/current value consistently.
+                  if (isReactiveState(fromHost)) {
+                    return (fromHost as any).value;
+                  }
+                  if (fromHost && typeof fromHost === 'object' && 'value' in fromHost && !(fromHost instanceof Node)) {
+                    return (fromHost as any).value;
+                  }
+                  // For boolean defaults, treat empty string (standalone attribute) or 'true' as true.
+                  const defaultType = typeof defaults[key];
+                  if (defaultType === 'boolean' && typeof fromHost === 'string') {
+                    return fromHost === '' || fromHost === 'true';
+                  }
+                  return fromHost;
+                }
+              }
+            } catch (e) {
+              // ignore host read failures and fall back to context
+            }
+            return localValue;
+          },
+          set(v: any) {
+            // allow test/runtime code to set context props during render/init
+            localValue = v;
+          }
+        });
+      } catch (e) {
+        // ignore
+      }
+    }
+  } catch (e) {
+    // ignore
+  }
+  // Return a Proxy that always reads the latest value from the component
+  // context so accesses are reactive. Also unwrap functional refs ({ value })
+  // and coerce string attribute values to boolean/number when defaults
+  // indicate such types.
+  const result = new Proxy({} as any, {
+    get(_target, prop: string) {
+      if (typeof prop !== 'string') return undefined;
+      const def = (defaults as any)[prop];
+      
+      // If a host element is available, prefer reading from attributes first,
+      // then from properties. This ensures that HTML attributes take precedence
+      // over default property values (like the standard "title" attribute).
+      try {
+        const host = (ctx && (ctx as any)._host) as HTMLElement | undefined;
+        if (host) {
+          // Check attribute first (only if host is an actual HTMLElement)
+          if (host instanceof HTMLElement || (typeof (host as any).getAttribute === 'function' && typeof (host as any).hasAttribute === 'function')) {
+            const kebabKey = prop.replace(/([A-Z])/g, '-$1').toLowerCase();
+            const attrValue = (host as any).getAttribute(kebabKey);
+            if (attrValue !== null) {
+              // Attribute exists - convert based on default type
+              if (typeof def === 'boolean') {
+                return attrValue === '' || attrValue === 'true';
+              }
+              if (typeof def === 'number') {
+                return Number(attrValue);
+              }
+              return attrValue;
+            }
+          }
+          
+          // No attribute - check property value
+          const hostValue = (host as any)[prop];
+          // Only use host value if it's explicitly set (not undefined AND not empty string for string defaults)
+          // Empty strings on standard HTML properties (like 'title') should fall through to defaults
+          if (typeof hostValue !== 'undefined' && hostValue !== '') {
+            // Special handling for boolean props: if default is false and hostValue is empty string,
+            // treat it as if the property wasn't set (use default false)
+            if (typeof def === 'boolean' && def === false && hostValue === '') {
+              return def;
+            }
+            
+            // Unwrap ReactiveState instances and wrapper-like objects coming
+            // from the host so useProps mirrors applyProps/destructured props
+            // behavior and returns primitive/current values.
+            if (isReactiveState(hostValue)) {
+              return (hostValue as any).value;
+            }
+            if (hostValue && typeof hostValue === 'object' && 'value' in hostValue && !(hostValue instanceof Node)) {
+              return (hostValue as any).value;
+            }
+            // Primitive on host - return directly (but coerce strings if default provided)
+            if (typeof def === 'boolean' && typeof hostValue === 'string') {
+              // For boolean attributes, only explicit 'true' string or non-empty presence means true
+              return hostValue === 'true' || (hostValue !== '' && hostValue !== 'false');
+            }
+            if (typeof def === 'number' && typeof hostValue === 'string' && !Number.isNaN(Number(hostValue))) return Number(hostValue);
+            return hostValue;
+          }
+        }
+      } catch (e) {
+        // ignore host read failures and fall back to context
+      }
+
+      // Fall back to reading from the component context itself.
+      const raw = ctx[prop];
+      // Treat empty-string on context as boolean true (attribute presence)
+      // EXCEPT when the default is false - in that case, empty string means "not set"
+      if (typeof def === 'boolean' && raw === '') {
+        if (def === false) {
+          // For boolean props with default false, empty string means use the default
+          return def;
+        }
+        // For boolean props with default true, empty string means attribute presence = true
+        return true;
+      }
+      // If the context stores a ReactiveState or wrapper, unwrap it here
+      // so components using useProps receive the primitive/current value
+      // when the source is the component context itself. Host-provided
+      // ReactiveState instances are preserved above; this path is only
+      // for ctx values and defaults.
+      if (isReactiveState(raw)) return (raw as any).value;
+      if (raw && typeof raw === 'object' && 'value' in raw && !(raw instanceof Node)) return (raw as any).value;
+      if (raw != null && raw !== '') {
+        if (typeof def === 'boolean' && typeof raw === 'string') {
+          return raw === 'true';
+        }
+        if (typeof def === 'number' && typeof raw === 'string' && !Number.isNaN(Number(raw))) return Number(raw);
+        return raw;
+      }
+      return def;
+    },
+    has(_target, prop: string) {
+      return typeof prop === 'string' && ((prop in ctx) || (prop in defaults));
+    },
+    ownKeys() {
+      return Array.from(new Set([...Object.keys(defaults), ...Object.keys(ctx || {})]));
+    },
+    getOwnPropertyDescriptor() {
+      return { configurable: true, enumerable: true } as PropertyDescriptor;
+    }
   });
 
   return result as T;
@@ -220,7 +389,9 @@ export function useProps<T extends Record<string, any>>(defaults: T): T {
  * ```ts
  * import { css } from '@lib/style';
  * 
- * component('my-component', ({ theme = 'light' }) => {
+ * component('my-component', () => {
+ *   const { theme } = useProps({ theme: 'light' });
+ *   
  *   useStyle(() => css`
  *     :host {
  *       background: ${theme === 'light' ? 'white' : 'black'};
@@ -252,7 +423,7 @@ export function useStyle(callback: () => string): void {
       configurable: true
     });
   } catch (error) {
-    console.warn('Error in useStyle callback:', error);
+    devWarn('Error in useStyle callback:', error);
     Object.defineProperty(currentComponentContext, '_computedStyle', {
       value: '',
       writable: true,

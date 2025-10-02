@@ -8,9 +8,22 @@ The event bus is a lightweight publish/subscribe system for sending and receivin
 
 ## 🚀 Importing
 
+**Standard API:**
 ```ts
 import { eventBus } from '@jasonshimmy/custom-elements-runtime';
 ```
+
+**✨ Shorthand API (Recommended):**
+```ts
+// Import shorthand functions for cleaner code
+import { emit, on, off, once, listen } from '@jasonshimmy/custom-elements-runtime';
+
+// Use directly without eventBus prefix
+emit('cart:add', { id: 123 });
+const unsubscribe = on('cart:add', (data) => console.log(data));
+```
+
+Both APIs work identically - the shorthand functions are just convenience exports that call `eventBus.*` internally.
 
 ## 📬 Sending Events
 
@@ -36,12 +49,19 @@ unsubscribe();
 
 ## 🔄 One-time Listeners
 
-Use `eventBus.once(eventName, handler)` to listen for an event only once.
+Use `eventBus.once(eventName, handler)` to listen for an event only once. Returns a Promise that resolves with the event data.
 
 ```ts
+// With handler callback
 eventBus.once('user:login', (user) => {
   alert(`Welcome, ${user.name}!`);
 });
+
+// Or use as Promise
+const user = await eventBus.once('user:login', (user) => {
+  console.log('Handler called first');
+});
+console.log('Promise resolved with:', user);
 ```
 
 ## 🧹 Removing Listeners

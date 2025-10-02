@@ -14,6 +14,8 @@ export interface VNode {
     reactiveRef?: any; // For reactive state objects
     /** Compiler-provided hint: whether this VNode represents a custom element (contains a dash) */
     isCustomElement?: boolean;
+    /** Transition group metadata */
+    _transitionGroup?: any;
   };
   children?: VNode[] | string;
 }

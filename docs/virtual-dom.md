@@ -36,6 +36,64 @@ const vnode = {
 };
 ```
 
+## 📦 VNode Type Export
+
+The `VNode` type is exported for TypeScript users who need type-safe virtual DOM manipulation:
+
+```typescript
+import type { VNode } from '@jasonshimmy/custom-elements-runtime';
+
+// VNode interface structure
+interface VNode {
+  tag: string;                              // Element tag or special type
+  key?: string;                             // Unique identifier for diffing
+  props?: {                                 // Props object (optional)
+    key?: string;                           // Alternative key location
+    props?: any;                            // Component props
+    attrs?: Record<string, any>;            // Raw attributes
+    directives?: Record<string, {           // Directive metadata
+      value: string;
+      modifiers: string[];
+      arg?: string;
+    }>;
+    ref?: string;                           // String ref name
+    reactiveRef?: any;                      // Reactive state ref
+    isCustomElement?: boolean;              // Compiler hint for custom elements
+    _transitionGroup?: any;                 // Transition group metadata
+    [key: string]: any;                     // Other dynamic props/attributes
+  };
+  children?: VNode[] | string;              // Child nodes or text content
+}
+```
+
+**Use cases:**
+- Custom render functions with proper typing
+- VDOM manipulation utilities
+- Type-safe template composition
+- Building reusable VNode factories
+
+**Example: Type-safe VNode factory**
+```typescript
+import type { VNode } from '@jasonshimmy/custom-elements-runtime';
+
+function createCard(title: string, content: string): VNode {
+  return {
+    tag: 'div',
+    props: { class: 'card p-4 rounded shadow' },
+    children: [
+      { tag: 'h3', props: { class: 'font-bold' }, children: [title] },
+      { tag: 'p', props: {}, children: [content] }
+    ]
+  };
+}
+
+// Use in component
+component('card-demo', () => {
+  const card = createCard('Hello', 'World');
+  return html`${card}`;
+});
+```
+
 ## 🔄 How vdomRenderer Works
 
 1. **Receives VNode(s) and ctx**

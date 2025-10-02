@@ -1,10 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { component, html, ref } from '../src/lib/index';
+import { component, html, ref, useProps } from '../src/lib/index';
 
 describe('smoke: VDOM -> custom element mounting', () => {
   it('mounts a canonicalized hyphenated tag and applies props', async () => {
     // Register a simple child component that accepts modelValue prop and renders it
-    component('smoke-child', ({ modelValue = 'initial' } = {}) => {
+    component('smoke-child', () => {
+      const { modelValue } = useProps({ modelValue: 'initial' });
       console.log('smoke-child received modelValue:', modelValue);
       return html`<div id="val">${modelValue}</div>`;
     });

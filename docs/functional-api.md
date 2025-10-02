@@ -3,7 +3,7 @@
 ## Table of Contents
 
 - [✨ Key Features](#-key-features)
-- [🚀 Basic Component Structure](#-basic-component-structure)
+- [🏗️ Basic Component Structure](#-basic-component-structure)
 - [🔒 Props and Type Safety](#-props-and-type-safety)
 - [🚀 Event Emission](#-event-emission)
 - [🔁 Lifecycle Hooks](#-lifecycle-hooks)
@@ -31,7 +31,7 @@ The Custom Elements Runtime provides a powerful, intuitive functional component 
 - **🔄 Automatic Prop Parsing** - Runtime extracts prop defaults from function signature
 - **💡 Intuitive API** - Familiar patterns similar to modern React/Vue components
 
-## 🚀 Basic Component Structure
+## 🏗️ Basic Component Structure
 
 The functional API follows a simple, intuitive pattern using context-based hooks:
 
@@ -40,6 +40,7 @@ import {
   component, 
   html, 
   css,
+  useProps,
   useEmit, 
   useOnConnected, 
   useOnDisconnected, 
@@ -55,7 +56,10 @@ import {
   eventBus 
 } from '@jasonshimmy/custom-elements-runtime';
 
-component('component-name', ({ prop1 = 'default', prop2 = 0 }) => {
+component('component-name', () => {
+  // Access reactive props via useProps hook
+  const props = useProps({ prop1: 'default', prop2: 0 });
+  
   // Get hooks with perfect TypeScript inference
   const emit = useEmit();
   
@@ -75,9 +79,9 @@ component('component-name', ({ prop1 = 'default', prop2 = 0 }) => {
 ### Function Signature
 
 ```typescript
-component<TProps>(
+component(
   tag: string,
-  renderFn: (props: TProps) => VNode | VNode[] | Promise<VNode | VNode[]>,
+  renderFn: () => VNode | VNode[] | Promise<VNode | VNode[]>,
   options?: ComponentOptions
 )
 ```
@@ -86,6 +90,7 @@ component<TProps>(
 
 All hooks must be called during component render and provide perfect TypeScript inference:
 
+- **`useProps(defaults)`**: Get reactive props with default values and type inference
 - **`useEmit()`**: Get the emit function for dispatching custom events
 - **`useOnConnected(callback)`**: Set up lifecycle hook for when component connects to DOM
 - **`useOnDisconnected(callback)`**: Set up lifecycle hook for when component disconnects from DOM  
@@ -94,32 +99,28 @@ All hooks must be called during component render and provide perfect TypeScript 
 
 ## 🔒 Props and Type Safety
 
-### Destructured Props with Defaults
+### Props with useProps Hook
 
-Define your component props using destructuring with default values. The runtime automatically extracts these defaults and creates reactive props:
+Define your component props using the `useProps()` hook with default values. The runtime automatically creates reactive props with type inference:
 
 ```typescript
-component('user-card', ({
-  name = 'Anonymous',
-  age = 0,
-  email = '',
-  isActive = true,
-  tags = []
-}: {
-  name?: string;
-  age?: number;
-  email?: string;
-  isActive?: boolean;
-  tags?: string[];
-}) => {
+component('user-card', () => {
+  const props = useProps({
+    name: 'Anonymous',
+    age: 0,
+    email: '',
+    isActive: true,
+    tags: [] as string[]
+  });
+  
   return html`
     <div class="user-card">
-      <h3>${name}</h3>
-      <p>Age: ${age}</p>
-      <p>Email: ${email}</p>
-      <p>Status: ${isActive ? 'Active' : 'Inactive'}</p>
+      <h3>${props.name}</h3>
+      <p>Age: ${props.age}</p>
+      <p>Email: ${props.email}</p>
+      <p>Status: ${props.isActive ? 'Active' : 'Inactive'}</p>
       <ul>
-        ${tags.map(tag => html`<li>${tag}</li>`)}
+        ${props.tags.map(tag => html`<li>${tag}</li>`)}
       </ul>
     </div>
   `;
@@ -141,9 +142,9 @@ component('user-card', ({
 ### Automatic Type Inference
 
 The runtime automatically:
-- ✅ Extracts default values from destructured parameters
-- ✅ Infers prop types from TypeScript annotations
-- ✅ Creates reactive proxies for all props
+- ✅ Extracts default values from useProps defaults object
+- ✅ Infers prop types from default values and TypeScript annotations
+- ✅ Creates reactive Proxy for all props with automatic dependency tracking
 - ✅ Converts attribute names (kebab-case) to prop names (camelCase)
 - ✅ Handles type conversion (String, Number, Boolean)
 
@@ -152,29 +153,24 @@ The runtime automatically:
 Use the `useEmit()` hook to get a strongly typed emit function:
 
 ```typescript
-component('interactive-button', ({
-  label = 'Click me',
-  disabled = false
-}: {
-  label?: string;
-  disabled?: boolean;
-}) => {
+component('interactive-button', () => {
+  const props = useProps({ label: 'Click me', disabled: false });
   const emit = useEmit();
   
   const handleClick = () => {
-    if (!disabled) {
+    if (!props.disabled) {
       // Emit with type safety
-      emit('button-clicked', { timestamp: Date.now(), label });
+      emit('button-clicked', { timestamp: Date.now(), label: props.label });
       emit('custom-event', { data: 'some data' });
     }
   };
 
   return html`
     <button 
-      :disabled="${disabled}"
+      :disabled="${props.disabled}"
       @click="${handleClick}"
     >
-      ${label}
+      ${props.label}
     </button>
   `;
 });
@@ -195,12 +191,10 @@ button.addEventListener('button-clicked', (event) => {
 The functional API provides lifecycle hooks through context-based hooks, allowing you to respond to component lifecycle events:
 
 ```typescript
-component('lifecycle-demo', ({
-  data = []
-}: {
-  data?: any[];
-}) => {
+component('lifecycle-demo', () => {
   const emit = useEmit();
+
+  const props = useProps({ data: [] });
   
   // Set up lifecycle hooks
   useOnConnected(() => {
@@ -230,9 +224,9 @@ component('lifecycle-demo', ({
   return html`
     <div class="lifecycle-demo">
       <h3>Lifecycle Demo</h3>
-      <p>Data items: ${data.length}</p>
+      <p>Data items: ${props.data.length}</p>
       <ul>
-        ${data.map(item => html`<li>${item}</li>`)}
+        ${props.data.map(item => html`<li>${item}</li>`)}
       </ul>
     </div>
   `;
@@ -248,11 +242,8 @@ component('lifecycle-demo', ({
 
 ```typescript
 // Example with external API integration
-component('api-data', ({
-  endpoint = '/api/data'
-}: {
-  endpoint?: string;
-}) => {
+component('api-data', () => {
+  const props = useProps({ endpoint: '/api/data' });
   const emit = useEmit();
   const data = ref(null);
   const loading = ref(false);
@@ -263,7 +254,7 @@ component('api-data', ({
     loading.value = true;
     
     try {
-      const response = await fetch(endpoint, {
+      const response = await fetch(props.endpoint, {
         signal: abortController.signal
       });
       data.value = await response.json();
@@ -360,25 +351,19 @@ component('user-profile', () => {
 For component-specific state, create reactive state within the component:
 
 ```typescript
-component('counter', ({
-  initialValue = 0,
-  step = 1
-}: {
-  initialValue?: number;
-  step?: number;
-}) => {
+component('counter', () => {
+  const props = useProps({ initialValue: 0, step: 1 });
   const emit = useEmit();
   
   // Component-scoped reactive state
-  const count = ref(initialValue);
-  
+  const count = ref(props.initialValue);
   const increment = () => {
-    count.value += step;
+    count.value += props.step;
     emit('count-changed', { count: count.value });
   };
   
   const decrement = () => {
-    count.value -= step;
+    count.value -= props.step;
     emit('count-changed', { count: count.value });
   };
 
@@ -401,25 +386,21 @@ The streamlined API works seamlessly with all existing directives and bindings:
 Bind reactive values to element properties and attributes:
 
 ```typescript
-component('dynamic-input', ({
-  value = '',
-  placeholder = 'Enter text...',
-  disabled = false,
-  type = 'text'
-}: {
-  value?: string;
-  placeholder?: string;
-  disabled?: boolean;
-  type?: string;
-}) => {
+component('dynamic-input', () => {
   const emit = useEmit();
-  
+  const props = useProps({
+    type: 'text',
+    value: '',
+    placeholder: 'Enter text...',
+    disabled: false
+  });
+
   return html`
     <input
-      :type="${type}"
-      :value="${value}"
-      :placeholder="${placeholder}"
-      :disabled="${disabled}"
+      :type="${props.type}"
+      :value="${props.value}"
+      :placeholder="${props.placeholder}"
+      :disabled="${props.disabled}"
       @input="${(e) => emit('input', e.target.value)}"
     />
   `;
@@ -431,23 +412,20 @@ component('dynamic-input', ({
 For complex objects, functions, or when you need to ensure JavaScript property assignment:
 
 ```typescript
-component('complex-props', ({
-  config = {},
-  items = [],
-  onItemClick = null
-}: {
-  config?: any;
-  items?: any[];
-  onItemClick?: Function | null;
-}) => {
+component('complex-props', () => {
   const emit = useEmit();
+  const props = useProps({
+    config: {},
+    items: [] as any[],
+    onItemClick: null as ((item: any) => void) | null
+  });
   
   return html`
     <custom-element 
       :bind="${{ 
-        config, 
-        items, 
-        onItemClick: onItemClick || ((item) => emit('item-clicked', item))
+        config: props.config, 
+        items: props.items,
+        onItemClick: props.onItemClick || ((item) => emit('item-clicked', item))
       }}"
     ></custom-element>
   `;
@@ -459,25 +437,23 @@ component('complex-props', ({
 Dynamic class management with object and array syntax:
 
 ```typescript
-component('status-card', ({
-  status = 'normal',
-  size = 'medium',
-  interactive = false
-}: {
-  status?: 'normal' | 'success' | 'warning' | 'error';
-  size?: 'small' | 'medium' | 'large';
-  interactive?: boolean;
-}, { emit }) => {
+component('status-card', () => {
+  const props = useProps({
+    status: 'normal',
+    size: 'medium',
+    interactive: false
+  });
+  const emit = useEmit();
   return html`
     <div 
       :class="${{
         'status-card': true,
-        [`status-${status}`]: true,
-        [`size-${size}`]: true,
-        'interactive': interactive,
-        'clickable': interactive
+        [`status-${props.status}`]: true,
+        [`size-${props.size}`]: true,
+        'interactive': props.interactive,
+        'clickable': props.interactive
       }}"
-      @click="${interactive ? () => emit('card-clicked') : null}"
+      @click="${props.interactive ? () => emit('card-clicked') : null}"
     >
       <slot></slot>
     </div>
@@ -490,29 +466,25 @@ component('status-card', ({
 Dynamic inline styles with object and string syntax:
 
 ```typescript
-component('progress-bar', ({
-  progress = 0,
-  color = '#007bff',
-  height = '8px',
-  animated = false
-}: {
-  progress?: number;
-  color?: string;
-  height?: string;
-  animated?: boolean;
-}, { emit }) => {
+component('progress-bar', () => {
+  const props = useProps({
+    progress: 0,
+    color: '#007bff',
+    height: '8px',
+    animated: false
+  });
   return html`
     <div 
       class="progress-container"
-      :style="${{ height }}"
+      :style="${{ height: props.height }}"
     >
       <div 
         class="progress-bar"
-        :class="${{ animated }}"
+        :class="${{ animated: props.animated }}"
         :style="${{
-          width: `${Math.min(100, Math.max(0, progress))}%`,
-          backgroundColor: color,
-          transition: animated ? 'width 0.3s ease' : 'none'
+          width: `${Math.min(100, Math.max(0, props.progress))}%`,
+          backgroundColor: props.color,
+          transition: props.animated ? 'width 0.3s ease' : 'none'
         }}"
       ></div>
     </div>
@@ -525,23 +497,20 @@ component('progress-bar', ({
 The `:model` directive provides automatic two-way data binding for form elements. With the functional API, you can bind directly to reactive state objects:
 
 ```typescript
-component('form-field', ({
-  initialValue = '',
-  label = '',
-  type = 'text'
-}: {
-  initialValue?: string;
-  label?: string;
-  type?: string;
-}) => {
+component('form-field', () => {
   const emit = useEmit();
-  const value = ref(initialValue);
-  
+  const props = useProps({
+    label: 'Name',
+    type: 'text',
+    initialValue: ''
+  });
+  const value = ref(props.initialValue);
+
   return html`
     <label class="form-field">
-      ${label}
+      ${props.label}
       <input
-        type="${type}"
+        type="${props.type}"
         :model="${value}"
         @update:value="${(newValue) => emit('value-changed', newValue)}"
       />
@@ -556,20 +525,18 @@ component('form-field', ({
 For custom elements that need to work with parent components using props:
 
 ```typescript
-component('controlled-input', ({
-  modelValue = '',
-  label = ''
-}: {
-  modelValue?: string;
-  label?: string;
-}) => {
+component('controlled-input', () => {
   const emit = useEmit();
-  
+  const props = useProps({
+    modelValue: '',
+    label: ''
+  });
+
   return html`
     <label class="controlled-input">
-      ${label}
+      ${props.label}
       <input
-        value="${modelValue}"
+        value="${props.modelValue}"
         @input="${(e: Event) => emit('update:modelValue', (e.target as HTMLInputElement).value)}"
       />
     </label>
@@ -582,28 +549,27 @@ component('controlled-input', ({
 Custom property binding for complex components using reactive state:
 
 ```typescript
-component('multi-select', ({
-  options = []
-}: {
-  options?: Array<{ value: string; label: string }>;
-}) => {
+component('multi-select', () => {
   const emit = useEmit();
+  const props = useProps({
+    options: [] as { label: string; value: string }[],
+    selectedValues: [] as string[]
+  });
   const selectedItems = ref<string[]>([]);
   const multiple = ref(true);
-  
-  const isSelected = (value: string) => selectedItems.value.includes(value);
-  
+
+  const isSelected = (value: string) => props.selectedValues.includes(value);
   const toggleSelection = (value: string) => {
     const newSelection = isSelected(value)
-      ? selectedItems.value.filter(item => item !== value)
-      : [...selectedItems.value, value];
-    selectedItems.value = newSelection;
+      ? props.selectedValues.filter(item => item !== value)
+      : [...props.selectedValues, value];
+    props.selectedValues = newSelection;
     emit('selection-changed', newSelection);
   };
 
   return html`
     <div class="multi-select">
-      ${each(options, (option) => html`
+      ${each(props.options, (option) => html`
         <label class="option">
           <input
             type="checkbox"
@@ -613,7 +579,7 @@ component('multi-select', ({
           ${option.label}
         </label>
       `)}
-      <p>Selected: ${selectedItems.value.join(', ')}</p>
+      <p>Selected: ${props.selectedValues.join(', ')}</p>
     </div>
   `;
 });
@@ -624,11 +590,10 @@ component('multi-select', ({
 Comprehensive event handling with modifiers:
 
 ```typescript
-component('event-demo', ({
-  disabled = false
-}: {
-  disabled?: boolean;
-}, { emit }) => {
+component('event-demo', () => {
+  const props = useProps({ disabled: false });
+  const emit = useEmit();
+  
   const handleKeydown = (e: KeyboardEvent) => {
     if (e.key === 'Enter') {
       emit('enter-pressed', { value: (e.target as HTMLInputElement).value });
@@ -639,7 +604,7 @@ component('event-demo', ({
 
   const handleSubmit = (e: Event) => {
     e.preventDefault();
-    if (!disabled) {
+    if (!props.disabled) {
       const formData = new FormData(e.target as HTMLFormElement);
       emit('form-submitted', Object.fromEntries(formData));
     }
@@ -649,7 +614,7 @@ component('event-demo', ({
     <form @submit="${handleSubmit}">
       <input
         type="text"
-        :disabled="${disabled}"
+        :disabled="${props.disabled}"
         @keydown="${handleKeydown}"
         @focus="${() => emit('input-focused')}"
         @blur="${() => emit('input-blurred')}"
@@ -657,7 +622,7 @@ component('event-demo', ({
       />
       <button 
         type="submit" 
-        :disabled="${disabled}"
+        :disabled="${props.disabled}"
         @click="${() => emit('submit-clicked')}"
       >
         Submit
@@ -672,11 +637,9 @@ component('event-demo', ({
 Access DOM elements directly:
 
 ```typescript
-component('focusable-input', ({
-  autoFocus = false
-}: {
-  autoFocus?: boolean;
-}, { emit }) => {
+component('focusable-input', () => {
+  const props = useProps({ autoFocus: false });
+  const emit = useEmit();
   let inputRef: HTMLInputElement | null = null;
 
   const focusInput = () => {
@@ -699,7 +662,7 @@ component('focusable-input', ({
       <input
         ref="${(el) => { 
           inputRef = el;
-          if (autoFocus) el.focus();
+          if (props.autoFocus) el.focus();
         }}"
         type="text"
         @input="${(e) => emit('input-changed', e.target.value)}"
@@ -717,31 +680,30 @@ component('focusable-input', ({
 
 ```typescript
 
-component('conditional-content', ({
-  isLoggedIn = false,
-  userRole = 'guest',
-  showAdvanced = false
-}: {
-  isLoggedIn?: boolean;
-  userRole?: string;
-  showAdvanced?: boolean;
-}, { emit }) => {
+component('conditional-content', () => {
+  const props = useProps({
+    isLoggedIn: false,
+    userRole: 'guest',
+    showAdvanced: false
+  });
+  const emit = useEmit();
+  
   return html`
     <div>
-      ${when(isLoggedIn, html`
+      ${when(props.isLoggedIn, html`
         <h2>Welcome back!</h2>
-        <p>Role: ${userRole}</p>
-        ${when(userRole === 'admin', html`
+        <p>Role: ${props.userRole}</p>
+        ${when(props.userRole === 'admin', html`
           <button @click="${() => emit('admin-action')}">Admin Panel</button>
         `)}
-        ${when(showAdvanced, html`
+        ${when(props.showAdvanced, html`
           <div class="advanced-settings">
             <h3>Advanced Settings</h3>
             <!-- Advanced content -->
           </div>
         `)}
       `)}
-      ${when(!isLoggedIn, html`
+      ${when(!props.isLoggedIn, html`
         <div class="login-prompt">
           <h2>Please log in</h2>
           <button @click="${() => emit('login-requested')}">Login</button>
@@ -758,44 +720,44 @@ component('conditional-content', ({
 
 ```typescript
 
-component('status-indicator', ({
-  status = 'pending',
-  message = ''
-}: {
-  status?: 'pending' | 'success' | 'error' | 'warning';
-  message?: string;
-}, { emit }) => {
+component('status-indicator', () => {
+  const props = useProps({
+    status: 'pending' as 'pending' | 'success' | 'error' | 'warning',
+    message: ''
+  });
+  const emit = useEmit();
+  
   return html`
     <div class="status-indicator">
       ${match()
-        .when(status === 'pending', html`
+        .when(props.status === 'pending', html`
           <div class="pending">
             <span class="icon">⏳</span>
             <span>Processing...</span>
           </div>
         `)
-        .when(status === 'success', html`
+        .when(props.status === 'success', html`
           <div class="success">
             <span class="icon">✅</span>
-            <span>Success: ${message}</span>
+            <span>Success: ${props.message}</span>
           </div>
         `)
-        .when(status === 'error', html`
+        .when(props.status === 'error', html`
           <div class="error">
             <span class="icon">❌</span>
-            <span>Error: ${message}</span>
+            <span>Error: ${props.message}</span>
             <button @click="${() => emit('retry')}">Retry</button>
           </div>
         `)
-        .when(status === 'warning', html`
+        .when(props.status === 'warning', html`
           <div class="warning">
             <span class="icon">⚠️</span>
-            <span>Warning: ${message}</span>
+            <span>Warning: ${props.message}</span>
           </div>
         `)
         .otherwise(html`
           <div class="unknown">
-            <span>Unknown status: ${status}</span>
+            <span>Unknown status: ${props.status}</span>
           </div>
         `)
         .done()}
@@ -808,21 +770,21 @@ component('status-indicator', ({
 
 ```typescript
 
-component('todo-list', ({
-  todos = [],
-  filter = 'all'
-}: {
-  todos?: Array<{ id: string; text: string; completed: boolean }>;
-  filter?: 'all' | 'active' | 'completed';
-}, { emit }) => {
+component('todo-list', () => {
+  const props = useProps({
+    todos: [] as Array<{ id: string; text: string; completed: boolean }>,
+    filter: 'all' as 'all' | 'active' | 'completed'
+  });
+  const emit = useEmit();
+  
   const filteredTodos = computed(() => {
-    switch (filter) {
+    switch (props.filter) {
       case 'active':
-        return todos.filter(todo => !todo.completed);
+        return props.todos.filter(todo => !todo.completed);
       case 'completed':
-        return todos.filter(todo => todo.completed);
+        return props.todos.filter(todo => todo.completed);
       default:
-        return todos;
+        return props.todos;
     }
   });
 
@@ -838,19 +800,19 @@ component('todo-list', ({
     <div class="todo-list">
       <div class="filters">
         <button 
-          :class="${{ active: filter === 'all' }}"
+          :class="${{ active: props.filter === 'all' }}"
           @click="${() => emit('filter-changed', 'all')}"
         >
           All
         </button>
         <button 
-          :class="${{ active: filter === 'active' }}"
+          :class="${{ active: props.filter === 'active' }}"
           @click="${() => emit('filter-changed', 'active')}"
         >
           Active
         </button>
         <button 
-          :class="${{ active: filter === 'completed' }}"
+          :class="${{ active: props.filter === 'completed' }}"
           @click="${() => emit('filter-changed', 'completed')}"
         >
           Completed
@@ -894,13 +856,11 @@ component('todo-list', ({
 ```typescript
 import { component, html, css, useStyle } from '@jasonshimmy/custom-elements-runtime';
 
-component('styled-button', ({
-  variant = 'primary',
-  size = 'medium'
-}: {
-  variant?: 'primary' | 'secondary' | 'danger';
-  size?: 'small' | 'medium' | 'large';
-}) => {
+component('styled-button', () => {
+  const props = useProps({
+    variant: 'primary' as 'primary' | 'secondary' | 'danger',
+    size: 'medium' as 'small' | 'medium' | 'large'
+  });
   const emit = useEmit();
   
   useStyle(() => css`
@@ -943,7 +903,7 @@ component('styled-button', ({
   
   return html`
     <button 
-      class="btn btn-${variant} btn-${size}"
+      class="btn btn-${props.variant} btn-${props.size}"
       @click="${() => emit('click')}"
     >
       <slot></slot>
@@ -955,22 +915,20 @@ component('styled-button', ({
 ### Dynamic Styles
 
 ```typescript
-component('themed-card', ({
-  theme = 'light',
-  accentColor = '#007bff'
-}: {
-  theme?: 'light' | 'dark';
-  accentColor?: string;
-}) => {
+component('themed-card', () => {
+  const props = useProps({
+    theme: 'light' as 'light' | 'dark',
+    accentColor: '#007bff'
+  });
   const emit = useEmit();
   
   useStyle(() => css`
     :host {
       display: block;
-      --accent-color: ${accentColor};
-      --bg-color: ${theme === 'dark' ? '#2d3748' : '#ffffff'};
-      --text-color: ${theme === 'dark' ? '#e2e8f0' : '#2d3748'};
-      --border-color: ${theme === 'dark' ? '#4a5568' : '#e2e8f0'};
+      --accent-color: ${props.accentColor};
+      --bg-color: ${props.theme === 'dark' ? '#2d3748' : '#ffffff'};
+      --text-color: ${props.theme === 'dark' ? '#e2e8f0' : '#2d3748'};
+      --border-color: ${props.theme === 'dark' ? '#4a5568' : '#e2e8f0'};
     }
     
     .card {
@@ -1022,11 +980,13 @@ The `useStyle` hook provides a powerful way to apply styles reactively based on 
 #### 📖 Basic Usage
 
 ```typescript
-component('styled-component', ({ color = 'blue' }) => {
+component('styled-component', () => {
+  const props = useProps({ color: 'blue' });
+  
   useStyle(() => css`
     :host {
-      background-color: ${color};
-      border: 1px solid ${color};
+      background-color: ${props.color};
+      border: 1px solid ${props.color};
     }
   `);
   
@@ -1037,8 +997,9 @@ component('styled-component', ({ color = 'blue' }) => {
 #### 🔄 Reactive Styles with State
 
 ```typescript
-component('interactive-button', ({ initialColor = 'blue' }) => {
-  const buttonState = ref({ color: initialColor, hovered: false });
+component('interactive-button', () => {
+  const props = useProps({ initialColor: 'blue' });
+  const buttonState = ref({ color: props.initialColor, hovered: false });
   
   useStyle(() => css`
     :host {
@@ -1074,17 +1035,18 @@ component('interactive-button', ({ initialColor = 'blue' }) => {
 #### 🎨 Complex Styling Logic
 
 ```typescript
-component('adaptive-card', ({ 
-  theme = 'light', 
-  size = 'medium',
-  highlighted = false 
-}) => {
+component('adaptive-card', () => {
+  const props = useProps({ 
+    theme: 'light' as 'light' | 'dark',
+    size: 'medium' as 'small' | 'medium' | 'large',
+    highlighted: false
+  });
   const cardState = ref({ expanded: false });
   
   useStyle(() => {
-    const isDark = theme === 'dark';
-    const isLarge = size === 'large';
-    const isHighlighted = highlighted;
+    const isDark = props.theme === 'dark';
+    const isLarge = props.size === 'large';
+    const isHighlighted = props.highlighted;
     
     return css`
       :host {
@@ -1129,10 +1091,12 @@ component('adaptive-card', ({
 
 ```typescript
 // Good: Using CSS custom properties for consistency
-component('themed-component', ({ primaryColor = '#007bff' }) => {
+component('themed-component', () => {
+  const props = useProps({ primaryColor: '#007bff' });
+  
   useStyle(() => css`
     :host {
-      --primary: ${primaryColor};
+      --primary: ${props.primaryColor};
       --primary-hover: color-mix(in srgb, var(--primary) 80%, black);
       --primary-light: color-mix(in srgb, var(--primary) 20%, white);
     }
@@ -1150,25 +1114,22 @@ component('themed-component', ({ primaryColor = '#007bff' }) => {
 
 ```typescript
 // Child component
-component('form-input', ({
-  label = '',
-  value = '',
-  type = 'text',
-  required = false,
-  error = ''
-}: {
-  label?: string;
-  value?: string;
-  type?: string;
-  required?: boolean;
-  error?: string;
-}, { emit }) => {
+component('form-input', () => {
+  const props = useProps({
+    label: '',
+    value: '',
+    type: 'text',
+    required: false,
+    error: ''
+  });
+  const emit = useEmit();
+  
   const handleInput = (e: Event) => {
     const input = e.target as HTMLInputElement;
     emit('update:value', input.value);
     
     // Emit validation event
-    if (required && !input.value.trim()) {
+    if (props.required && !input.value.trim()) {
       emit('validation-error', 'This field is required');
     } else {
       emit('validation-success');
@@ -1178,26 +1139,27 @@ component('form-input', ({
   return html`
     <div class="form-group">
       <label class="form-label">
-        ${label}
-        ${when(required, html`<span class="required">*</span>`)}
+        ${props.label}
+        ${when(props.required, html`<span class="required">*</span>`)}
       </label>
       <input
-        :type="${type}"
-        :value="${value}"
-        :required="${required}"
-        :class="${{ error: !!error }}"
+        :type="${props.type}"
+        :value="${props.value}"
+        :required="${props.required}"
+        :class="${{ error: !!props.error }}"
         @input="${handleInput}"
         @blur="${handleInput}"
       />
-      ${when(error, html`
-        <span class="error-message">${error}</span>
+      ${when(props.error, html`
+        <span class="error-message">${props.error}</span>
       `)}
     </div>
   `;
 });
 
 // Parent component
-component('contact-form', ({}, { emit }) => {
+component('contact-form', () => {
+  const emit = useEmit();
   const formData = ref({
     name: '',
     email: '',
@@ -1299,7 +1261,9 @@ const userActions = {
 };
 
 // Components can access global state
-component('user-avatar', ({}, { emit }) => {
+component('user-avatar', () => {
+  const emit = useEmit();
+  
   return html`
     <div class="user-avatar">
       ${when(appState.value.user, html`
@@ -1318,7 +1282,9 @@ component('user-avatar', ({}, { emit }) => {
   `;
 });
 
-component('notification-center', ({}, { emit }) => {
+component('notification-center', () => {
+  const emit = useEmit();
+  
   const dismissNotification = (id: number) => {
     appState.value.notifications = appState.value.notifications.filter(
       n => n.id !== id
@@ -1354,11 +1320,8 @@ component('notification-center', ({}, { emit }) => {
 The functional API uses hooks for all component features:
 
 ```typescript
-component('advanced-component', ({
-  data = []
-}: {
-  data?: any[];
-}) => {
+component('advanced-component', () => {
+  const props = useProps({ data: [] as any[] });
   const emit = useEmit();
   
   // Set up lifecycle hooks
@@ -1382,7 +1345,7 @@ component('advanced-component', ({
     }
   `);
 
-  return html`<div>${data.length} items</div>`;
+  return html`<div>${props.data.length} items</div>`;
 });
 ```
 
@@ -1391,23 +1354,21 @@ component('advanced-component', ({
 Handle asynchronous operations seamlessly:
 
 ```typescript
-component('async-data', ({
-  userId = ''
-}: {
-  userId?: string;
-}, { emit }) => {
+component('async-data', () => {
+  const props = useProps({ userId: '' });
+  const emit = useEmit();
   const loading = ref(false);
   const data = ref(null);
   const error = ref(null);
 
   const fetchData = async () => {
-    if (!userId) return;
+    if (!props.userId) return;
     
     loading.value = true;
     error.value = null;
     
     try {
-      const response = await fetch(`/api/users/${userId}`);
+      const response = await fetch(`/api/users/${props.userId}`);
       if (!response.ok) throw new Error('Failed to fetch user');
       
       data.value = await response.json();
@@ -1421,7 +1382,7 @@ component('async-data', ({
   };
 
   // Watch for userId changes
-  watch(() => userId, fetchData, { immediate: true });
+  watch(() => props.userId, fetchData, { immediate: true });
 
   return html`
     <div class="async-data">
@@ -1462,17 +1423,17 @@ describe('Streamlined Component', () => {
   });
 
   it('should render with reactive props', async () => {
-    component('test-component', ({
-      message = 'default',
-      count = 0
-    }: {
-      message?: string;
-      count?: number;
-    }, { emit }) => {
+    component('test-component', () => {
+      const props = useProps({
+        message: 'default',
+        count: 0
+      });
+      const emit = useEmit();
+      
       return html`
         <div>
-          <span class="message">${message}</span>
-          <span class="count">${count}</span>
+          <span class="message">${props.message}</span>
+          <span class="count">${props.count}</span>
           <button @click="${() => emit('increment')}">+</button>
         </div>
       `;
@@ -1495,7 +1456,9 @@ describe('Streamlined Component', () => {
   it('should emit events correctly', async () => {
     let emittedData = null;
     
-    component('emitter-test', ({}, { emit }) => {
+    component('emitter-test', () => {
+      const emit = useEmit();
+      
       return html`
         <button @click="${() => emit('test-event', { data: 'test' })}">
           Click
@@ -1524,17 +1487,15 @@ describe('Streamlined Component', () => {
 ### 1. **Use Descriptive Props with Defaults**
 ```typescript
 // ✅ Good
-component('user-badge', ({
-  name = 'Anonymous',
-  role = 'user',
-  showAvatar = true,
-  size = 'medium'
-}: {
-  name?: string;
-  role?: 'user' | 'admin' | 'moderator';
-  showAvatar?: boolean;
-  size?: 'small' | 'medium' | 'large';
-}, { emit }) => {
+component('user-badge', () => {
+  const props = useProps({
+    name: 'Anonymous',
+    role: 'user' as 'user' | 'admin' | 'moderator',
+    showAvatar: true,
+    size: 'medium' as 'small' | 'medium' | 'large'
+  });
+  const emit = useEmit();
+  
   // ...
 });
 
@@ -1552,11 +1513,13 @@ const userPreferences = ref({
   language: 'en'
 });
 
-component('theme-switcher', ({}, { emit }) => {
+component('theme-switcher', () => {
+  const emit = useEmit();
   // Use shared state
 });
 
-component('language-selector', ({}, { emit }) => {
+component('language-selector', () => {
+  const emit = useEmit();
   // Use same shared state
 });
 ```
@@ -1593,7 +1556,9 @@ emit('event', data);
 
 ### 5. **Handle Errors Gracefully**
 ```typescript
-component('data-loader', ({ url = '' }: { url?: string }, { emit }) => {
+component('data-loader', () => {
+  const props = useProps({ url: '' });
+  const emit = useEmit();
   const loading = ref(false);
   const error = ref(null);
   
@@ -1641,15 +1606,12 @@ component('my-component', {
 ### After (Functional API)
 ```typescript
 // ✅ Current streamlined functional API
-component('my-component', ({
-  message = 'Hello'
-}: {
-  message?: string;
-}) => {
+component('my-component', () => {
+  const props = useProps({ message: 'Hello' });
   const count = ref(0);
   
   return html`
-    <div>${message} - ${count.value}</div>
+    <div>${props.message} - ${count.value}</div>
   `;
 });
 ```
