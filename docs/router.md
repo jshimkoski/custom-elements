@@ -104,6 +104,106 @@ Notes:
 - `<router-view>` renders the matched route's component.
 - `<router-link>` creates a link or button for navigation. Use `tag="button"` for a button.
 
+## 🔗 Router Link Props
+
+The `<router-link>` component supports the following props:
+
+### Basic Props
+
+- **`to`** (string, required) - Target path for navigation
+- **`tag`** (string, default: `'a'`) - HTML tag to render (`'a'`, `'button'`, etc.)
+
+### Navigation Props
+
+- **`replace`** (boolean, default: `false`) - Use `router.replace()` instead of `router.push()`
+- **`external`** (boolean, default: `false`) - Open link in new tab with `target="_blank" rel="noopener noreferrer"` (only for `<a>` tags)
+- **`disabled`** (boolean, default: `false`) - Disable navigation and add `aria-disabled="true" tabindex="-1"`
+
+### Active Class Props
+
+- **`exact`** (boolean, default: `false`) - Require exact path match for active class
+- **`activeClass`** (string, default: `'active'`) - CSS class applied when route is active (JIT CSS supported)
+- **`exactActiveClass`** (string, default: `'exact-active'`) - CSS class applied when route is exactly active (JIT CSS supported)
+
+### Accessibility Props
+
+- **`ariaCurrentValue`** (string, default: `'page'`) - Value for `aria-current` attribute on exact match
+
+### Styling Props
+
+- **`class`** (string) - Additional CSS classes to apply (JIT CSS supported)
+
+### Examples
+
+#### Basic Navigation
+```html
+<router-link to="/about">About</router-link>
+```
+
+#### Button Navigation
+```html
+<router-link to="/settings" tag="button">Settings</router-link>
+```
+
+#### Replace Navigation (no history entry)
+```html
+<router-link to="/login" replace>Login</router-link>
+```
+
+#### Exact Match Active Class
+```html
+<router-link to="/" exact activeClass="home-active">Home</router-link>
+```
+
+#### External Link
+```html
+<router-link to="https://example.com" external>External Site</router-link>
+```
+
+#### Disabled Link
+```html
+<router-link to="/premium" disabled>Premium (Coming Soon)</router-link>
+```
+
+#### Custom Active Classes
+```html
+<router-link 
+  to="/dashboard" 
+  exact
+  activeClass="is-active"
+  exactActiveClass="is-exact-active"
+  ariaCurrentValue="page"
+>
+  Dashboard
+</router-link>
+```
+
+#### Styling with JIT CSS
+```html
+<router-link 
+  to="/profile" 
+  class="nav-link"
+  activeClass="nav-link-active"
+>
+  Profile
+</router-link>
+```
+
+### Active Class Behavior
+
+Router links automatically compute active classes based on the current route:
+
+- **Active**: Applied when `current.path.startsWith(to)` (unless `exact` is true)
+- **Exact Active**: Applied when `current.path === to`
+- **`aria-current`**: Automatically added with value from `ariaCurrentValue` when exactly active
+
+### Accessibility Features
+
+- Disabled links get `aria-disabled="true"` and `tabindex="-1"`
+- Buttons get `disabled` attribute when disabled
+- Active links get `aria-current` attribute for screen readers
+- External links get `rel="noopener noreferrer"` for security
+
 # 🛡️ Navigation Guards
 
 Routes support three types of navigation guards:

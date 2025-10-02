@@ -2,7 +2,7 @@
 
 [![Patreon](https://img.shields.io/badge/support-patreon-orange?logo=patreon)](https://patreon.com/jshimkoski)
 
-> **Ultra-powerful, type-safe runtime for fast, reactive, and maintainable web components.**
+> **The Complete Web Components Framework**
 
 Build modern components with strict TypeScript, zero dependencies, and a clean functional API. Designed for speed, standards compliance, and productivity.
 

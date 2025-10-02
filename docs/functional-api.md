@@ -2,22 +2,22 @@
 
 ## Table of Contents
 
-- [✨ Key Features](#key-features)
-- [🏗️ Basic Component Structure](#basic-component-structure)
-- [🔒 Props and Type Safety](#props-and-type-safety)
-- [🚀 Event Emission](#event-emission)
-- [🔁 Lifecycle Hooks](#lifecycle-hooks)
-- [🧬 Reactive State Management](#reactive-state-management)
-- [🎛️ Directives and Bindings](#directives-and-bindings)
-- [🔀 Conditional Rendering and Lists](#conditional-rendering-and-lists)
-- [🎨 Styling](#styling)
-- [🔗 Component Communication](#component-communication)
-- [⚙️ Advanced Configuration](#advanced-configuration)
-- [⏳ Async Components](#async-components)
-- [🧪 Testing Components](#testing-components)
-- [🎯 Best Practices](#best-practices)
-- [🔄 Migration from Old API](#migration-from-old-api)
-- [🎉 Summary](#summary)
+- [✨ Key Features](#-key-features)
+- [🏗️ Basic Component Structure](#-basic-component-structure)
+- [🔒 Props and Type Safety](#-props-and-type-safety)
+- [🚀 Event Emission](#-event-emission)
+- [🔁 Lifecycle Hooks](#-lifecycle-hooks)
+- [🧬 Reactive State Management](#-reactive-state-management)
+- [🎛️ Directives and Bindings](#-directives-and-bindings)
+- [🔀 Conditional Rendering and Lists](#-conditional-rendering-and-lists)
+- [🎨 Styling](#-styling)
+- [🔗 Component Communication](#-component-communication)
+- [⚙️ Advanced Configuration](#-advanced-configuration)
+- [⏳ Async Components](#-async-components)
+- [🧪 Testing Components](#-testing-components)
+- [🎯 Best Practices](#-best-practices)
+- [🔄 Migration from Old API](#-migration-from-old-api)
+- [🎉 Summary](#-summary)
 
 The Custom Elements Runtime provides a powerful, intuitive functional component API that emphasizes simplicity, type safety, and developer ergonomics. This API automatically handles reactive props, type inference, and event emission without requiring complex configuration objects.
 
