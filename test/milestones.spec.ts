@@ -4,7 +4,7 @@ import { minifyCSS, jitCSS } from '../src/lib/runtime/style';
 describe('milestones component JIT CSS', () => {
   it('generates gradient CSS for milestones markup', () => {
     const html = `
-      <div class="text-sm bg-gradient-to-r from-primary-500 via-secondary-400 to-success-500">
+      <div class="text-sm bg-linear-to-r from-primary-500 via-secondary-400 to-success-500">
         <h3 class="text-neutral-300">Milestone</h3>
         <div id="milestone" class="log">Survive rounds to earn titles:</div>
         <div class="text-neutral-300">Cat Food: 3 • Little Dweeb: 5 • Official Dweeb: 7 • Ultra Mega Uber Giga-Dweeb: 10+</div>
@@ -14,7 +14,7 @@ describe('milestones component JIT CSS', () => {
     const css = minifyCSS(jitCSS(html));
 
     // Core gradient utilities should be generated
-    expect(css).toContain('.bg-gradient-to-r');
+    expect(css).toContain('.bg-linear-to-r');
 
     // Ensure at least the gradient rule and stops variable are generated
     expect(css).toContain('--tw-gradient-stops');

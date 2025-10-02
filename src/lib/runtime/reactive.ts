@@ -1,33 +1,40 @@
 import { scheduleDOMUpdate } from "./scheduler";
 import { ProxyOptimizer } from "./reactive-proxy-cache";
+import { devWarn } from "./logger";
 
 /**
  * Global reactive system for tracking dependencies and triggering updates
  */
 class ReactiveSystem {
   private currentComponent: string | null = null;
-  private componentDependencies = new Map<string, Set<ReactiveState<any>>>();
-  private componentRenderFunctions = new Map<string, () => void>();
+  // Consolidated component data: stores dependencies, render function, state index, and last warning time
+  private componentData = new Map<string, {
+    dependencies: Set<ReactiveState<any>>;
+    renderFn: () => void;
+    stateIndex: number;
+    lastWarnTime: number;
+  }>();
   // Flat storage: compound key `${componentId}:${stateIndex}` -> ReactiveState
   private stateStorage = new Map<string, ReactiveState<any>>();
-  private stateIndexCounter = new Map<string, number>();
   private trackingDisabled = false;
-  // Per-component last warning timestamp to throttle repeated warnings
-  private lastWarningTime = new Map<string, number>();
 
   /**
    * Set the current component being rendered for dependency tracking
    */
   setCurrentComponent(componentId: string, renderFn: () => void): void {
     this.currentComponent = componentId;
-    this.componentRenderFunctions.set(componentId, renderFn);
-    if (!this.componentDependencies.has(componentId)) {
-      this.componentDependencies.set(componentId, new Set());
+    if (!this.componentData.has(componentId)) {
+      this.componentData.set(componentId, {
+        dependencies: new Set(),
+        renderFn,
+        stateIndex: 0,
+        lastWarnTime: 0,
+      });
+    } else {
+      const data = this.componentData.get(componentId)!;
+      data.renderFn = renderFn;
+      data.stateIndex = 0; // Reset state index for this render
     }
-    // reset index; state instances will be stored in `stateStorage`
-    // under compound keys when created
-    // Reset state index for this render
-    this.stateIndexCounter.set(componentId, 0);
   }
 
   /**
@@ -64,12 +71,14 @@ class ReactiveSystem {
    */
   shouldEmitRenderWarning(): boolean {
     if (!this.currentComponent) return true;
-    const id = this.currentComponent;
-    const last = this.lastWarningTime.get(id) || 0;
+    const data = this.componentData.get(this.currentComponent);
+    if (!data) return true;
+    
     const now = Date.now();
     const THROTTLE_MS = 1000; // 1 second per component
-    if (now - last < THROTTLE_MS) return false;
-    this.lastWarningTime.set(id, now);
+    if (now - data.lastWarnTime < THROTTLE_MS) return false;
+    
+    data.lastWarnTime = now;
     return true;
   }
 
@@ -96,11 +105,16 @@ class ReactiveSystem {
     }
     
     const componentId = this.currentComponent;
-    const currentIndex = this.stateIndexCounter.get(componentId) || 0;
+    const data = this.componentData.get(componentId);
+    if (!data) {
+      return new ReactiveState(initialValue);
+    }
+
+    const currentIndex = data.stateIndex;
     const stateKey = `${componentId}:${currentIndex}`;
 
     // Increment state index for next state call
-    this.stateIndexCounter.set(componentId, currentIndex + 1);
+    data.stateIndex++;
 
     if (this.stateStorage.has(stateKey)) {
       return this.stateStorage.get(stateKey)! as ReactiveState<T>;
@@ -115,10 +129,11 @@ class ReactiveSystem {
    * Track a dependency for the current component
    */
   trackDependency(state: ReactiveState<any>): void {
-    if (this.trackingDisabled) return;
+    if (this.trackingDisabled || !this.currentComponent) return;
     
-    if (this.currentComponent) {
-      this.componentDependencies.get(this.currentComponent)?.add(state);
+    const data = this.componentData.get(this.currentComponent);
+    if (data) {
+      data.dependencies.add(state);
       state.addDependent(this.currentComponent);
     }
   }
@@ -127,29 +142,28 @@ class ReactiveSystem {
    * Trigger updates for all components that depend on a state
    */
   triggerUpdate(state: ReactiveState<any>): void {
-    state.getDependents().forEach(componentId => {
-      const renderFn = this.componentRenderFunctions.get(componentId);
-      if (renderFn) {
-        scheduleDOMUpdate(renderFn, componentId);
+    const deps = Array.from(state.getDependents());
+    for (const componentId of deps) {
+      const data = this.componentData.get(componentId);
+      if (data) {
+        scheduleDOMUpdate(data.renderFn, componentId);
       }
-    });
+    }
   }
 
   /**
    * Clean up component dependencies when component is destroyed
    */
   cleanup(componentId: string): void {
-    const dependencies = this.componentDependencies.get(componentId);
-    if (dependencies) {
-      dependencies.forEach(state => state.removeDependent(componentId));
-      this.componentDependencies.delete(componentId);
+    const data = this.componentData.get(componentId);
+    if (data) {
+      data.dependencies.forEach(state => state.removeDependent(componentId));
+      this.componentData.delete(componentId);
     }
-    this.componentRenderFunctions.delete(componentId);
     // Remove any flat-stored state keys for this component
     for (const key of Array.from(this.stateStorage.keys())) {
       if (key.startsWith(componentId + ':')) this.stateStorage.delete(key);
     }
-    this.stateIndexCounter.delete(componentId);
   }
 }
 
@@ -189,7 +203,7 @@ export class ReactiveState<T> {
     // Check for state modifications during render (potential infinite loop)
     if (reactiveSystem.isRenderingComponent()) {
       if (reactiveSystem.shouldEmitRenderWarning()) {
-        console.warn(
+        devWarn(
           '🚨 State modification detected during render! This can cause infinite loops.\n' +
           '  • Move state updates to event handlers\n' +
           '  • Use useEffect/watch for side effects\n' +
@@ -263,14 +277,7 @@ export function isReactiveState(v: any): v is ReactiveState<any> {
   if (!v || typeof v !== 'object') return false;
   try {
     const key = Symbol.for('@cer/ReactiveState');
-    if (v[key]) return true;
-  } catch (e) {
-    // ignore and fall back
-  }
-
-  // Fallback for test doubles or environments without symbol tagging
-  try {
-    return !!(v.constructor && v.constructor.name === 'ReactiveState');
+    return !!v[key];
   } catch (e) {
     return false;
   }

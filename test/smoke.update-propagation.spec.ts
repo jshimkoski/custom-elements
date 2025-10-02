@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { component, html, ref } from '../src/lib/index';
+import { component, html, ref, useProps } from '../src/lib/index';
 
 describe('smoke: update propagation from child to parent', () => {
   it('propagates update:model-value from child to parent state', async () => {
-    component('prop-child', ({ modelValue = 'child-initial' } = {}) => {
+    component('prop-child', () => {
+      const { modelValue } = useProps({ modelValue: 'child-initial' });
       console.log('prop-child received modelValue:', modelValue);
       return html`<div id="val">${modelValue}</div>`;
     });
@@ -37,7 +38,8 @@ describe('smoke: update propagation from child to parent', () => {
   });
 
   it.skip('propagates update:beta (arg) from child to parent state', async () => {
-    component('arg-child', ({ beta = 0 } = {}) => {
+    component('arg-child', () => {
+      const { beta } = useProps({ beta: 0 });
       return html`<div id="v">${beta}</div>`;
     });
 

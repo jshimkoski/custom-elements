@@ -289,10 +289,6 @@ export const colors: Record<
 
 export const spacing = "0.25rem";
 
-// Enhanced spacing scale including Tailwind's fractional values
-// Note: This scale is available for future use if needed
-// const spacingScale = [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 16, 20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60, 64, 72, 80, 96];
-
 const semanticSizes: Record<string, number> = {
   "3xs": 64,
   "2xs": 72,
@@ -537,38 +533,29 @@ const generateUtilities = (): CSSMap => {
   });
 
   // Font families
-  Object.assign(utils, {
-    "font-sans":
-      "font-family:var(--font-sans, ui-sans-serif,system-ui,sans-serif);",
-    "font-serif": "font-family:var(--font-serif, ui-serif,Georgia,serif);",
-    "font-mono":
-      "font-family:var(--font-mono, ui-monospace,SFMono-Regular,monospace);",
-  });
-
-  // Borders - generate programmatically
+  // Font families and borders
   const borderWidths = [0, 1, 2, 4, 6, 8];
-  borderWidths.forEach((w) => {
+  for (const w of borderWidths) {
     const px = `${w}px`;
     utils[`border-${w}`] = `border-width:${px};`;
     utils[`border-t-${w}`] = `border-top-width:${px};`;
     utils[`border-r-${w}`] = `border-right-width:${px};`;
     utils[`border-b-${w}`] = `border-bottom-width:${px};`;
     utils[`border-l-${w}`] = `border-left-width:${px};`;
-    utils[`border-x-${w}`] =
-      `border-left-width:${px};border-right-width:${px};`;
-    utils[`border-y-${w}`] =
-      `border-top-width:${px};border-bottom-width:${px};`;
-  });
-  utils.border = "border-width:1px;";
-  utils["border-t"] = "border-top-width:1px;";
-  utils["border-r"] = "border-right-width:1px;";
-  utils["border-b"] = "border-bottom-width:1px;";
-  utils["border-l"] = "border-left-width:1px;";
-  utils["border-x"] = "border-left-width:1px;border-right-width:1px;";
-  utils["border-y"] = "border-top-width:1px;border-bottom-width:1px;";
-
-  // Border styles
+    utils[`border-x-${w}`] = `border-left-width:${px};border-right-width:${px};`;
+    utils[`border-y-${w}`] = `border-top-width:${px};border-bottom-width:${px};`;
+  }
   Object.assign(utils, {
+    "font-sans": "font-family:var(--font-sans, ui-sans-serif,system-ui,sans-serif);",
+    "font-serif": "font-family:var(--font-serif, ui-serif,Georgia,serif);",
+    "font-mono": "font-family:var(--font-mono, ui-monospace,SFMono-Regular,monospace);",
+    border: "border-width:1px;",
+    "border-t": "border-top-width:1px;",
+    "border-r": "border-right-width:1px;",
+    "border-b": "border-bottom-width:1px;",
+    "border-l": "border-left-width:1px;",
+    "border-x": "border-left-width:1px;border-right-width:1px;",
+    "border-y": "border-top-width:1px;border-bottom-width:1px;",
     "border-solid": "border-style:solid;",
     "border-dashed": "border-style:dashed;",
     "border-dotted": "border-style:dotted;",
@@ -578,33 +565,20 @@ const generateUtilities = (): CSSMap => {
 
   // Rounded corners
   const radiusMap = {
-    none: 0,
-    xs: 2,
-    sm: 4,
-    md: 6,
-    lg: 8,
-    xl: 12,
-    "2xl": 16,
-    "3xl": 24,
-    "4xl": 32,
-    full: 9999,
+    none: 0, xs: 2, sm: 4, md: 6, lg: 8, xl: 12, "2xl": 16, "3xl": 24, "4xl": 32, full: 9999,
   };
-  Object.entries(radiusMap).forEach(([key, value]) => {
+  for (const [key, value] of Object.entries(radiusMap)) {
     const rem = value === 9999 ? "9999px" : `${value / 16}rem`;
     utils[`rounded-${key}`] = `border-radius:${rem};`;
-    utils[`rounded-t-${key}`] =
-      `border-top-left-radius:${rem};border-top-right-radius:${rem};`;
-    utils[`rounded-r-${key}`] =
-      `border-top-right-radius:${rem};border-bottom-right-radius:${rem};`;
-    utils[`rounded-b-${key}`] =
-      `border-bottom-left-radius:${rem};border-bottom-right-radius:${rem};`;
-    utils[`rounded-l-${key}`] =
-      `border-top-left-radius:${rem};border-bottom-left-radius:${rem};`;
+    utils[`rounded-t-${key}`] = `border-top-left-radius:${rem};border-top-right-radius:${rem};`;
+    utils[`rounded-r-${key}`] = `border-top-right-radius:${rem};border-bottom-right-radius:${rem};`;
+    utils[`rounded-b-${key}`] = `border-bottom-left-radius:${rem};border-bottom-right-radius:${rem};`;
+    utils[`rounded-l-${key}`] = `border-top-left-radius:${rem};border-bottom-left-radius:${rem};`;
     utils[`rounded-tl-${key}`] = `border-top-left-radius:${rem};`;
     utils[`rounded-tr-${key}`] = `border-top-right-radius:${rem};`;
     utils[`rounded-br-${key}`] = `border-bottom-right-radius:${rem};`;
     utils[`rounded-bl-${key}`] = `border-bottom-left-radius:${rem};`;
-  });
+  }
 
   // Shadows
   Object.assign(utils, {
@@ -650,49 +624,20 @@ const generateUtilities = (): CSSMap => {
     "overflow-y-scroll": "overflow-y:scroll;",
   });
 
-  // Accessibility
+  // Accessibility, pointer events, visibility, cursors, z-index
+  const cursors = ["auto", "default", "pointer", "wait", "text", "move", "help", "not-allowed", "grab", "grabbing"];
+  for (const c of cursors) utils[`cursor-${c}`] = `cursor:${c};`;
+  for (const z of [0, 10, 20, 30, 40, 50]) utils[`z-${z}`] = `z-index:${z};`;
   Object.assign(utils, {
-    "sr-only":
-      "position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border-width:0;",
-    "not-sr-only":
-      "position:static;width:auto;height:auto;padding:0;margin:0;overflow:visible;clip:auto;white-space:normal;",
-  });
-
-  // Pointer events
-  Object.assign(utils, {
+    "sr-only": "position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border-width:0;",
+    "not-sr-only": "position:static;width:auto;height:auto;padding:0;margin:0;overflow:visible;clip:auto;white-space:normal;",
     "pointer-events-none": "pointer-events:none;",
     "pointer-events-auto": "pointer-events:auto;",
-  });
-
-  // Cursor utilities
-  const cursors = [
-    "auto",
-    "default",
-    "pointer",
-    "wait",
-    "text",
-    "move",
-    "help",
-    "not-allowed",
-    "grab",
-    "grabbing",
-  ];
-  cursors.forEach((c) => {
-    utils[`cursor-${c}`] = `cursor:${c};`;
-  });
-
-  // Z-index
-  [0, 10, 20, 30, 40, 50].forEach((z) => {
-    utils[`z-${z}`] = `z-index:${z};`;
-  });
-
-  // Visibility
-  Object.assign(utils, {
     visible: "visibility:visible;",
     invisible: "visibility:hidden;",
   });
 
-  // Size utilities
+  // Size utilities and auto margins
   Object.assign(utils, {
     "w-full": "width:100%;",
     "w-screen": "width:100dvw;",
@@ -716,24 +661,20 @@ const generateUtilities = (): CSSMap => {
     "h-min": "height:min-content;",
     "w-max": "width:max-content;",
     "h-max": "height:max-content;",
-  });
-
-  // Auto margins
-  Object.assign(utils, {
     "m-auto": "margin:auto;",
     "mx-auto": "margin-inline:auto;",
     "my-auto": "margin-block:auto;",
   });
 
   // Semantic sizes
-  Object.entries(semanticSizes).forEach(([key, value]) => {
+  for (const [key, value] of Object.entries(semanticSizes)) {
     utils[`max-w-${key}`] = `max-width:calc(${spacing} * ${value});`;
     utils[`min-w-${key}`] = `min-width:calc(${spacing} * ${value});`;
     utils[`w-${key}`] = `width:calc(${spacing} * ${value});`;
     utils[`max-h-${key}`] = `max-height:calc(${spacing} * ${value});`;
     utils[`min-h-${key}`] = `min-height:calc(${spacing} * ${value});`;
     utils[`h-${key}`] = `height:calc(${spacing} * ${value});`;
-  });
+  }
 
   // Transition utilities
   Object.assign(utils, {
@@ -841,22 +782,81 @@ const generateUtilities = (): CSSMap => {
 
   // Gradient background utilities
   Object.assign(utils, {
-    "bg-gradient-to-t":
+    // Linear gradients
+    "bg-linear-to-t":
       "background-image:linear-gradient(to top, var(--tw-gradient-stops));",
-    "bg-gradient-to-tr":
+    "bg-linear-to-tr":
       "background-image:linear-gradient(to top right, var(--tw-gradient-stops));",
-    "bg-gradient-to-r":
+    "bg-linear-to-r":
       "background-image:linear-gradient(to right, var(--tw-gradient-stops));",
-    "bg-gradient-to-br":
+    "bg-linear-to-br":
       "background-image:linear-gradient(to bottom right, var(--tw-gradient-stops));",
-    "bg-gradient-to-b":
+    "bg-linear-to-b":
       "background-image:linear-gradient(to bottom, var(--tw-gradient-stops));",
-    "bg-gradient-to-bl":
+    "bg-linear-to-bl":
       "background-image:linear-gradient(to bottom left, var(--tw-gradient-stops));",
-    "bg-gradient-to-l":
+    "bg-linear-to-l":
       "background-image:linear-gradient(to left, var(--tw-gradient-stops));",
-    "bg-gradient-to-tl":
+    "bg-linear-to-tl":
       "background-image:linear-gradient(to top left, var(--tw-gradient-stops));",
+    
+    // Radial gradients
+    "bg-radial":
+      "background-image:radial-gradient(ellipse at center, var(--tw-gradient-stops));",
+    "bg-radial-at-t":
+      "background-image:radial-gradient(ellipse at top, var(--tw-gradient-stops));",
+    "bg-radial-at-tr":
+      "background-image:radial-gradient(ellipse at top right, var(--tw-gradient-stops));",
+    "bg-radial-at-r":
+      "background-image:radial-gradient(ellipse at right, var(--tw-gradient-stops));",
+    "bg-radial-at-br":
+      "background-image:radial-gradient(ellipse at bottom right, var(--tw-gradient-stops));",
+    "bg-radial-at-b":
+      "background-image:radial-gradient(ellipse at bottom, var(--tw-gradient-stops));",
+    "bg-radial-at-bl":
+      "background-image:radial-gradient(ellipse at bottom left, var(--tw-gradient-stops));",
+    "bg-radial-at-l":
+      "background-image:radial-gradient(ellipse at left, var(--tw-gradient-stops));",
+    "bg-radial-at-tl":
+      "background-image:radial-gradient(ellipse at top left, var(--tw-gradient-stops));",
+    "bg-radial-circle":
+      "background-image:radial-gradient(circle at center, var(--tw-gradient-stops));",
+    "bg-radial-circle-at-t":
+      "background-image:radial-gradient(circle at top, var(--tw-gradient-stops));",
+    "bg-radial-circle-at-tr":
+      "background-image:radial-gradient(circle at top right, var(--tw-gradient-stops));",
+    "bg-radial-circle-at-r":
+      "background-image:radial-gradient(circle at right, var(--tw-gradient-stops));",
+    "bg-radial-circle-at-br":
+      "background-image:radial-gradient(circle at bottom right, var(--tw-gradient-stops));",
+    "bg-radial-circle-at-b":
+      "background-image:radial-gradient(circle at bottom, var(--tw-gradient-stops));",
+    "bg-radial-circle-at-bl":
+      "background-image:radial-gradient(circle at bottom left, var(--tw-gradient-stops));",
+    "bg-radial-circle-at-l":
+      "background-image:radial-gradient(circle at left, var(--tw-gradient-stops));",
+    "bg-radial-circle-at-tl":
+      "background-image:radial-gradient(circle at top left, var(--tw-gradient-stops));",
+    
+    // Conic gradients
+    "bg-conic":
+      "background-image:conic-gradient(from 0deg at center, var(--tw-gradient-stops));",
+    "bg-conic-at-t":
+      "background-image:conic-gradient(from 0deg at top, var(--tw-gradient-stops));",
+    "bg-conic-at-tr":
+      "background-image:conic-gradient(from 0deg at top right, var(--tw-gradient-stops));",
+    "bg-conic-at-r":
+      "background-image:conic-gradient(from 0deg at right, var(--tw-gradient-stops));",
+    "bg-conic-at-br":
+      "background-image:conic-gradient(from 0deg at bottom right, var(--tw-gradient-stops));",
+    "bg-conic-at-b":
+      "background-image:conic-gradient(from 0deg at bottom, var(--tw-gradient-stops));",
+    "bg-conic-at-bl":
+      "background-image:conic-gradient(from 0deg at bottom left, var(--tw-gradient-stops));",
+    "bg-conic-at-l":
+      "background-image:conic-gradient(from 0deg at left, var(--tw-gradient-stops));",
+    "bg-conic-at-tl":
+      "background-image:conic-gradient(from 0deg at top left, var(--tw-gradient-stops));",
   });
 
   return utils;
@@ -966,10 +966,23 @@ export function parseSpacing(className: string): string | null {
   if (lastDashIndex === -1) return null;
 
   const key = raw.slice(0, lastDashIndex);
-  const numStr = raw.slice(lastDashIndex + 1);
-  const num = parseFloat(numStr);
+  const valueStr = raw.slice(lastDashIndex + 1);
 
-  if (Number.isNaN(num) || !spacingProps[key]) return null;
+  if (!spacingProps[key]) return null;
+
+  // Handle fractions (e.g., w-1/2, h-2/3)
+  if (valueStr.includes("/")) {
+    const [numerator, denominator] = valueStr.split("/").map((v) => parseFloat(v));
+    if (Number.isNaN(numerator) || Number.isNaN(denominator) || denominator === 0) {
+      return null;
+    }
+    const percentage = (numerator / denominator) * 100;
+    return spacingProps[key].map((prop) => `${prop}:${percentage}%;`).join("");
+  }
+
+  // Handle numeric values
+  const num = parseFloat(valueStr);
+  if (Number.isNaN(num)) return null;
 
   const sign = negative ? "-" : "";
   return spacingProps[key]
@@ -1057,7 +1070,7 @@ export function parseColorWithOpacity(className: string): string | null {
 }
 
 /**
- * Parse gradient color stop utilities like from-red-500, to-blue-600, via-green-400
+ * Parse gradient color stop utilities like from-error-500, to-primary-600, via-success-400
  */
 export function parseGradientColorStop(className: string): string | null {
   const match = /^(from|to|via)-([a-z]+)-?(\d{2,3}|DEFAULT)?$/.exec(className);
@@ -1589,6 +1602,79 @@ export function jitCSS(html: string): string {
       if (generated) buckets[0].push(generated);
     }
   }
+
+  // Sort rules within buckets to ensure proper CSS cascade order
+  // Larger breakpoints must come after smaller ones for correct precedence
+  const sortRulesByBreakpoint = (rules: string[]): string[] => {
+    return rules.sort((a, b) => {
+      // Extract responsive breakpoint from media query and return pixel value
+      const getResponsivePixels = (rule: string): number => {
+        const responsiveSizes: Record<string, number> = {
+          sm: 640,
+          md: 768,
+          lg: 1024,
+          xl: 1280,
+          "2xl": 1536,
+        };
+        for (const [key, px] of Object.entries(responsiveSizes)) {
+          if (rule.includes(`@media ${mediaVariants[key]}`)) return px;
+        }
+        return -1;
+      };
+
+      // Extract container breakpoint and return pixel value
+      const getContainerPixels = (rule: string): number => {
+        const containerSizes: Record<string, number> = {
+          xs: 320,   // 20rem
+          sm: 384,   // 24rem
+          md: 448,   // 28rem
+          lg: 512,   // 32rem
+          xl: 576,   // 36rem
+          "2xl": 672, // 42rem
+          "3xl": 768, // 48rem
+          "4xl": 896, // 56rem
+          "5xl": 1024, // 64rem
+          "6xl": 1152, // 72rem
+          "7xl": 1280, // 80rem
+        };
+        
+        // Check for named container breakpoints
+        for (const [key, px] of Object.entries(containerSizes)) {
+          if (rule.includes(`@container ${containerVariants[key]}`)) return px;
+        }
+        
+        // Check for arbitrary container queries like @container (min-width:300px)
+        if (rule.includes("@container (min-width:")) {
+          const match = /@container \(min-width:(\d+(?:\.\d+)?)(px|rem|em)/.exec(rule);
+          if (match) {
+            const value = parseFloat(match[1]);
+            const unit = match[2];
+            // Convert to pixels for comparison
+            return unit === "rem" || unit === "em" ? value * 16 : value;
+          }
+        }
+        return -1;
+      };
+
+      const aRespPx = getResponsivePixels(a);
+      const bRespPx = getResponsivePixels(b);
+      const aContPx = getContainerPixels(a);
+      const bContPx = getContainerPixels(b);
+
+      // Sort by responsive breakpoint if both have responsive queries
+      if (aRespPx >= 0 && bRespPx >= 0 && aRespPx !== bRespPx) return aRespPx - bRespPx;
+
+      // Sort by container breakpoint if both have container queries
+      if (aContPx >= 0 && bContPx >= 0 && aContPx !== bContPx) return aContPx - bContPx;
+
+      // Keep original order for same breakpoint or no breakpoint
+      return 0;
+    });
+  };
+
+  // Sort buckets 2 and 3 which contain responsive/container queries
+  buckets[2] = sortRulesByBreakpoint(buckets[2]);
+  buckets[3] = sortRulesByBreakpoint(buckets[3]);
 
   const css = buckets.flat().join("");
 

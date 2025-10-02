@@ -2,9 +2,10 @@
  * Update Scheduler for batching DOM updates
  * Prevents excessive re-renders and improves performance
  */
+import { devError } from "./logger";
 
 class UpdateScheduler {
-  private pendingUpdates = new Map<string, () => void>();
+  private pendingUpdates = new Map<string | (() => void), () => void>();
   private isFlushScheduled = false;
 
   /**
@@ -12,7 +13,10 @@ class UpdateScheduler {
    * Uses component identity to deduplicate multiple render requests for the same component
    */
   schedule(update: () => void, componentId?: string): void {
-    const key = componentId || update.toString();
+    // IMPORTANT: Never use update.toString() as it breaks with minification!
+    // Use the componentId if provided, otherwise use the function reference directly as the key
+    // since Map supports using function references as keys (identity-based comparison)
+    const key = componentId || update;
     this.pendingUpdates.set(key, update);
     
     if (!this.isFlushScheduled) {
@@ -36,19 +40,17 @@ class UpdateScheduler {
    * Execute all pending updates
    */
   private flush(): void {
-    const updates = Array.from(this.pendingUpdates.values());
-    this.pendingUpdates.clear();
+    const updates = this.pendingUpdates;
+    this.pendingUpdates = new Map();
     this.isFlushScheduled = false;
 
     // Execute all updates in batch
-    for (const update of updates) {
+    for (const update of updates.values()) {
       try {
         update();
       } catch (error) {
         // Continue with other updates even if one fails
-        if (typeof console !== 'undefined' && console.error) {
-          console.error('Error in batched update:', error);
-        }
+        devError('Error in batched update:', error);
       }
     }
   }

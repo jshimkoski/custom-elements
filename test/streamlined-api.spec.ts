@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { component, html, useEmit } from "../src/lib";
+import { component, html, useEmit, useProps } from '../src/lib';
 
 describe("Streamlined Component API", () => {
   beforeEach(() => {
@@ -12,21 +12,16 @@ describe("Streamlined Component API", () => {
 
   it("should create a simple component with reactive props", async () => {
     // Test the new streamlined API
-    component('test-switch', ({
-      modelValue = false,
-      label = 'Toggle'
-    }: {
-      modelValue?: boolean;
-      label?: string;
-    }) => {
+    component('test-switch', () => {
+      const props = useProps({ modelValue: false, label: 'Toggle' });
       const emit = useEmit();
       
       return html`
         <label>
-          ${label}
+          ${props.label}
           <input 
             type="checkbox" 
-            :checked="${modelValue}"
+            :checked="${props.modelValue}"
             @change="${(e: Event) => {
               const input = e.target as HTMLInputElement;
               emit('update:modelValue', input.checked);
@@ -59,16 +54,13 @@ describe("Streamlined Component API", () => {
   it("should emit events when interact with components", async () => {
     let emittedValue: any = null;
     
-    component('emit-test', ({
-      value = ''
-    }: {
-      value?: string;
-    }) => {
+    component('emit-test', () => {
+      const props = useProps({ value: '' });
       const emit = useEmit();
       
       return html`
-        <button @click="${() => emit('test-event', { value })}">
-          Click: ${value}
+        <button @click="${() => emit('test-event', { value: props.value })}">
+          Click: ${props.value}
         </button>
       `;
     });

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { component, html } from '../src/lib/index';
+import { component, html, useProps } from '../src/lib/index';
 
 describe('Props with Special Characters', () => {
   let container: HTMLElement;
@@ -20,8 +20,9 @@ describe('Props with Special Characters', () => {
   });
 
   it('should handle special characters in default prop values', async () => {
-    component('test-special-chars', ({ text = "'\"`!@#$%^&*() should render properly" }) => {
-      return html`<div>${text}</div>`;
+    component('test-special-chars', () => {
+      const props = useProps({ text: "'\"`!@#$%^&*() should render properly" });
+      return html`<div>${props.text}</div>`;
     });
 
     container.innerHTML = '<test-special-chars></test-special-chars>';
@@ -34,8 +35,9 @@ describe('Props with Special Characters', () => {
   });
 
   it('should handle quotes in default values without double encoding', async () => {
-    component('test-quotes', ({ message = 'He said "Hello \'world\'" to me' }) => {
-      return html`<span>${message}</span>`;
+    component('test-quotes', () => {
+      const props = useProps({ message: 'He said "Hello \'world\'" to me' });
+      return html`<span>${props.message}</span>`;
     });
 
     container.innerHTML = '<test-quotes></test-quotes>';
@@ -48,8 +50,9 @@ describe('Props with Special Characters', () => {
   });
 
   it('should handle HTML-like strings in props without escaping them internally', async () => {
-    component('test-html-strings', ({ content = '<div>Test &amp; More</div>' }) => {
-      return html`<p>${content}</p>`;
+    component('test-html-strings', () => {
+      const props = useProps({ content: '<div>Test &amp; More</div>' });
+      return html`<p>${props.content}</p>`;
     });
 
     container.innerHTML = '<test-html-strings></test-html-strings>';
@@ -63,7 +66,8 @@ describe('Props with Special Characters', () => {
   });
 
   it('should handle symbols and special characters in prop values', async () => {
-    component('test-symbols', ({ symbols = '!@#$%^&*()_+-=[]{}|;:,.<>?' }) => {
+    component('test-symbols', () => {
+      const { symbols } = useProps({ symbols: '!@#$%^&*()_+-=[]{}|;:,.<>?' });
       return html`<code>${symbols}</code>`;
     });
 
@@ -77,15 +81,16 @@ describe('Props with Special Characters', () => {
   });
 
   it('should handle mixed quotes and special characters', async () => {
-    component('test-mixed-chars', ({
-      title = "Title with 'single' and \"double\" quotes",
-      description = `Backticks with ${Date.now()} and symbols: !@#$%`
-    }) => {
-      return html`<div><h1>${title}</h1><p>${description}</p></div>`;
+    component('test-mixed-chars', () => {
+      const props = useProps({
+        title: "Title with 'single' and \"double\" quotes",
+        description: `Backticks with stuff and symbols: !@#$%`  // Removed Date.now() to make test deterministic
+      });
+      return html`<div><h1>${props.title}</h1><p>${props.description}</p></div>`;
     });
 
     container.innerHTML = '<test-mixed-chars></test-mixed-chars>';
-    await new Promise(resolve => setTimeout(resolve, 0));
+    await new Promise(resolve => setTimeout(resolve, 50));
 
     const element = container.querySelector('test-mixed-chars');
     const h1 = element?.shadowRoot?.querySelector('h1');
@@ -97,8 +102,9 @@ describe('Props with Special Characters', () => {
   });
 
   it('should handle unicode characters in props', async () => {
-    component('test-unicode', ({ emoji = '🚀✨🎉', chinese = '你好世界' }) => {
-      return html`<div>${emoji} ${chinese}</div>`;
+    component('test-unicode', () => {
+      const props = useProps({ emoji: '🚀✨🎉', chinese: '你好世界' });
+      return html`<div>${props.emoji} ${props.chinese}</div>`;
     });
 
     container.innerHTML = '<test-unicode></test-unicode>';
@@ -111,8 +117,9 @@ describe('Props with Special Characters', () => {
   });
 
   it('should handle props passed via attributes with special characters', async () => {
-    component('test-attr-special', ({ text = 'default' }) => {
-      return html`<span>${text}</span>`;
+    component('test-attr-special', () => {
+      const props = useProps({ text: 'default' });
+      return html`<span>${props.text}</span>`;
     });
 
     container.innerHTML = '<test-attr-special text="Hello &quot;world&quot; &amp; more"></test-attr-special>';
@@ -126,8 +133,9 @@ describe('Props with Special Characters', () => {
   });
 
   it('should handle props passed via JavaScript properties with special characters', async () => {
-    component('test-js-props', ({ message = 'default' }) => {
-      return html`<div>${message}</div>`;
+    component('test-js-props', () => {
+      const props = useProps({ message: 'default' });
+      return html`<div>${props.message}</div>`;
     });
 
     container.innerHTML = '<test-js-props></test-js-props>';
@@ -143,17 +151,13 @@ describe('Props with Special Characters', () => {
   });
 
   it('should properly handle empty and whitespace strings', async () => {
-    component('test-whitespace', ({
-      empty = '',
-      spaces = '   ',
-      tabs = '\t\t',
-      newlines = '\n\n'
-    }) => {
+    component('test-whitespace', () => {
+      const props = useProps({ empty: '', spaces: '   ', tabs: '\t\t', newlines: '\n\n' });
       return html`<div>
-        <span class="empty">${empty}</span>
-        <span class="spaces">${spaces}</span>
-        <span class="tabs">${tabs}</span>
-        <span class="newlines">${newlines}</span>
+        <span class="empty">${props.empty}</span>
+        <span class="spaces">${props.spaces}</span>
+        <span class="tabs">${props.tabs}</span>
+        <span class="newlines">${props.newlines}</span>
       </div>`;
     });
 
@@ -173,10 +177,9 @@ describe('Props with Special Characters', () => {
   });
 
   it('should handle complex nested quotes and escape sequences', async () => {
-    component('test-complex-quotes', ({
-      nested = 'She said: "He replied \'I don\'t know\' to her"'
-    }) => {
-      return html`<blockquote>${nested}</blockquote>`;
+    component('test-complex-quotes', () => {
+      const props = useProps({ nested: 'She said: "He replied \'I don\'t know\' to her"' });
+      return html`<blockquote>${props.nested}</blockquote>`;
     });
 
     container.innerHTML = '<test-complex-quotes></test-complex-quotes>';
@@ -189,10 +192,9 @@ describe('Props with Special Characters', () => {
   });
 
   it('should handle potential XSS attempts safely', async () => {
-    component('test-xss-safety', ({
-      malicious = '<script>alert("xss")</script><img src=x onerror=alert("xss2")>'
-    }) => {
-      return html`<div>${malicious}</div>`;
+    component('test-xss-safety', () => {
+      const props = useProps({ malicious: '<script>alert("xss")</script><img src=x onerror=alert("xss2")>' });
+      return html`<div>${props.malicious}</div>`;
     });
 
     container.innerHTML = '<test-xss-safety></test-xss-safety>';

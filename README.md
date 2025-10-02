@@ -24,10 +24,11 @@ Build modern components with strict TypeScript, zero dependencies, and a clean f
 1. **Install:** `npm install @jasonshimmy/custom-elements-runtime`
 2. **Create a Component:**
 ```ts
-import { component, ref, html, useEmit } from '@jasonshimmy/custom-elements-runtime';
+import { component, ref, html, useEmit, useProps } from '@jasonshimmy/custom-elements-runtime';
 
-component('my-counter', ({ initialCount = 0 }) => {
-  const count = ref(initialCount);
+component('my-counter', () => {
+  const props = useProps({ initialCount: 0 });
+  const count = ref(props.initialCount);
   const emit = useEmit();
 
   const handleClick = () => {

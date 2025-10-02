@@ -96,7 +96,8 @@ class SecureExpressionEvaluator {
   
   private static createSafeEvaluator(expression: string): (context: any) => any {
     // Handle object literals like "{ active: ctx.isActive, disabled: ctx.isDisabled }"
-    if (expression.trim().startsWith('{') && expression.trim().endsWith('}')) {
+    const trimmedExpr = expression.trim();
+    if (trimmedExpr.startsWith('{') && trimmedExpr.endsWith('}')) {
       return this.createObjectEvaluator(expression);
     }
     

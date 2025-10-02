@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { component, html, useOnConnected, useEmit } from '../src/lib';
+import { component, html, useOnConnected, useEmit, useProps } from '../src/lib';
 
 describe('Optional Parameters', () => {
   beforeEach(() => {
@@ -21,8 +21,9 @@ describe('Optional Parameters', () => {
   });
 
   it('should support component with destructured props only', async () => {
-    component('props-only', ({ message = 'Default Message' }: { message?: string }) => {
-      return html`<div>${message}</div>`;
+    component('props-only', () => {
+      const props = useProps({ message: 'Default Message' });
+      return html`<div>${props.message}</div>`;
     });
 
     const element = document.createElement('props-only');
@@ -38,12 +39,13 @@ describe('Optional Parameters', () => {
   it('should support component with props and hooks', async () => {
     let connected = false;
     
-    component('full-component', ({ text = 'Default' }: { text?: string }) => {
+    component('full-component', () => {
+      const props = useProps({ text: 'Default' });
       useOnConnected(() => {
         connected = true;
       });
-      
-      return html`<div>${text}</div>`;
+
+      return html`<div>${props.text}</div>`;
     });
 
     const element = document.createElement('full-component');

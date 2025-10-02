@@ -1,5 +1,5 @@
 import './style.css';
-import { component, html, when, each, match, eventBus, watch, ref, css, computed, useEmit, useOnConnected, useOnError, useStyle } from "./lib";
+import { component, html, when, each, match, eventBus, watch, ref, css, computed, useProps, useEmit, useOnConnected, useOnError, useStyle } from "./lib";
 
 // Import example components so they register themselves
 import './components/examples/BabyChildParent';
@@ -17,14 +17,15 @@ import './components/test-props';
 // --- Simple Switch ---
 
 
-component('simple-switch', ({ modelValue = false }) => {
+component('simple-switch', () => {
+  const props = useProps({ modelValue: false });
   const emit = useEmit();
   return html`
     <div>
-      <p>ModelValue: ${modelValue}</p>
+      <p>ModelValue: ${props.modelValue}</p>
       <input
         type="checkbox"
-        :checked="${modelValue}"
+        :checked="${props.modelValue}"
         @change="${(e: Event) => {
           const input = e.target as HTMLInputElement;
           const isChecked = input.checked;
@@ -39,23 +40,24 @@ component('simple-switch', ({ modelValue = false }) => {
 
 // --- Cer Switch ---
 
-component('cer-switch', ({
-  label = '',
-  modelValue = false
-}) => {
+component('cer-switch', () => {
+  const props = useProps({
+    label: '',
+    modelValue: false
+  });
   const emit = useEmit();
   return html`
     <label
       class="inline-flex items-center gap-3 cursor-[pointer]"
       role="switch"
-      :aria-checked="${modelValue}"
+      :aria-checked="${props.modelValue}"
     >
-      ${modelValue}
+      ${props.modelValue}
       <div class="relative">
         <input
           class="sr-only"
           type="checkbox"
-          :checked="${modelValue}"
+          :checked="${props.modelValue}"
           @change="${(e: Event) => {
             const input = e.target as HTMLInputElement;
             const isChecked = input.checked;
@@ -65,16 +67,16 @@ component('cer-switch', ({
 
         <div
           class="w-9 h-5 rounded-full shadow-inner transition"
-          :class="${{ 'bg-primary-600': modelValue, 'bg-neutral-200': !modelValue }}"
+          :class="${{ 'bg-primary-600': props.modelValue, 'bg-neutral-200': !props.modelValue }}"
         ></div>
 
         <div
           class="absolute left-0.5 transition top-0 w-4 h-4 mt-0.5 bg-white rounded-full shadow"
-          :class="${[ modelValue ? 'transform-[translateX(1rem)]' : 'transform-[translateX(0)]' ]}"
+          :class="${[ props.modelValue ? 'transform-[translateX(1rem)]' : 'transform-[translateX(0)]' ]}"
         ></div>
       </div>
 
-      ${label ? html`<span class="text-sm text-neutral-700">${label}</span>` : ''}
+      ${props.label ? html`<span class="text-sm text-neutral-700">${props.label}</span>` : ''}
     </label>
   `;
 });
@@ -189,10 +191,13 @@ const handleSomething = (event: Event) => {
   console.log("component did something", event, message.value);
 }
 
-component("child-component", ({ test = '' }) => {
+component("child-component", () => {
+  const props = useProps({
+    test: ''
+  });
   return html`
     <div>
-      <p>From parent: ${test}</p>
+      <p>From parent: ${props.test}</p>
       <slot></slot>
       <p>Slot is right above me</p>
       <p>${message.value}</p>

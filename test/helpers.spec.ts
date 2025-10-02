@@ -38,8 +38,8 @@ describe('helpers nested value utilities', () => {
     const o: any = { a: { b: 2 } };
     expect(getNestedValue(o, 'a.b')).toBe(2);
 
-    // simulate ReactiveState-like wrapper
-    const reactive = { value: 5, constructor: { name: 'ReactiveState' } } as any;
+    // simulate ReactiveState-like wrapper with Symbol
+    const reactive = { value: 5, [Symbol.for('@cer/ReactiveState')]: true } as any;
     const x: any = { r: reactive };
     expect(getNestedValue(x, 'r')).toBe(5);
   });
@@ -49,7 +49,7 @@ describe('helpers nested value utilities', () => {
     setNestedValue(o, 'foo.bar', 3);
     expect(o.foo.bar).toBe(3);
 
-    const reactive = { value: 1, constructor: { name: 'ReactiveState' } } as any;
+    const reactive = { value: 1, [Symbol.for('@cer/ReactiveState')]: true } as any;
     const y: any = { inner: { r: reactive } };
     setNestedValue(y, 'inner.r', 9);
     expect(y.inner.r.value).toBe(9);

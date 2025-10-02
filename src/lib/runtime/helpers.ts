@@ -1,3 +1,8 @@
+/**
+ * Safe execution helper - silently ignores errors
+ */
+export const safe = (fn: () => void): void => { try { fn(); } catch {} };
+
 // Caches for string transformations to improve performance
 const KEBAB_CASE_CACHE = new Map<string, string>();
 const CAMEL_CASE_CACHE = new Map<string, string>();

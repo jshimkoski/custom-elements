@@ -1,6 +1,7 @@
 import { vdomRenderer } from "./vdom";
 import { minifyCSS, getBaseResetSheet, sanitizeCSS, jitCSS } from "./style";
 import type { ComponentConfig, ComponentContext, VNode, Refs } from "./types";
+import { devWarn, devError } from "./logger";
 
 // Module-level stack for context injection (scoped to render cycle, no global pollution)
 export const contextStack: any[] = [];
@@ -97,7 +98,7 @@ export function requestRender(
     setRenderCount(renderCount + 1);
     // Progressive warnings and limits
     if (renderCount === 15) {
-      console.warn(
+      devWarn(
         '⚠️ Component is re-rendering rapidly. This might indicate:\n' +
         '  Common causes:\n' +
         '  • Event handler calling a function immediately: @click="${fn()}" should be @click="${fn}"\n' +
@@ -107,7 +108,7 @@ export function requestRender(
       );
     } else if (renderCount > 20) {
       // More aggressive limit for severe infinite loops
-      console.error(
+      devError(
         '🛑 Infinite loop detected in component render:\n' +
         '  • This might be caused by state updates during render\n' +
         '  • Ensure all state modifications are done in event handlers or effects\n' +

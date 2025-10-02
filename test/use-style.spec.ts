@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { component, html, css, useStyle, ref } from '../src/lib';
+import { component, html, css, useStyle, ref, useProps } from '../src/lib';
 
 describe('useStyle Hook', () => {
   beforeEach(() => {
@@ -41,15 +41,16 @@ describe('useStyle Hook', () => {
   });
 
   it('should apply reactive styles via useStyle hook', async () => {
-    component('test-reactive-style', ({ theme = 'light' }) => {
+    component('test-reactive-style', () => {
+      const props = useProps({ theme: 'light' });
       useStyle(() => css`
         :host {
-          background-color: ${theme === 'light' ? 'white' : 'black'};
-          color: ${theme === 'light' ? 'black' : 'white'};
+          background-color: ${props.theme === 'light' ? 'white' : 'black'};
+          color: ${props.theme === 'light' ? 'black' : 'white'};
         }
       `);
       
-      return html`<div>Theme: ${theme}</div>`;
+      return html`<div>Theme: ${props.theme}</div>`;
     });
 
     // Create and mount component with light theme

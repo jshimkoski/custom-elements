@@ -1,6 +1,6 @@
 import type { VNode } from "./types";
 import { contextStack } from "./render";
-import { toKebab, getNestedValue, setNestedValue } from "./helpers";
+import { toKebab, toCamel, getNestedValue, setNestedValue, safe } from "./helpers";
 import { isReactiveState } from "./reactive";
 
 // Strict LRU cache helper for fully static templates (no interpolations, no context)
@@ -113,8 +113,9 @@ export function parseProps(
   const bound: string[] = [];
 
   // Match attributes with optional prefix and support for single/double quotes
+  // Also matches standalone boolean attributes (without =value)
   const attrRegex =
-    /([:@#]?)([a-zA-Z0-9-:\.]+)=("([^"\\]*(\\.[^"\\]*)*)"|'([^'\\]*(\\.[^'\\]*)*)')/g;
+    /([:@#]?)([a-zA-Z0-9-:\.]+)(?:=("([^"\\]*(\\.[^"\\]*)*)"|'([^'\\]*(\\.[^'\\]*)*)'))?/g;
 
   let match: RegExpExecArray | null;
 
@@ -122,10 +123,15 @@ export function parseProps(
     const prefix = match[1];
     const rawName = match[2];
     const rawVal = (match[4] || match[6]) ?? "";
+    
+    // If no value was provided (standalone attribute), treat as boolean true
+    const isStandalone = match[3] === undefined && match[6] === undefined;
 
     // Interpolation detection
     const interpMatch = rawVal.match(/^{{(\d+)}}$/);
-    let value: any = interpMatch
+    let value: any = isStandalone
+      ? true  // Standalone attributes are boolean true
+      : interpMatch
       ? values[Number(interpMatch[1])] ?? null
       : rawVal;
 
@@ -138,7 +144,7 @@ export function parseProps(
     }
 
     // Known directive names
-    const knownDirectives = ["model", "bind", "show", "class", "style", "ref"];
+    const knownDirectives = ["model", "bind", "show", "class", "style", "ref", "when"];
     if (prefix === ":") {
       // Support :model:checked (directive with argument) and :class.foo (modifiers)
       const [nameAndModifiers, argPart] = rawName.split(":");
@@ -155,13 +161,39 @@ export function parseProps(
           arg: argPart,
         };
       } else {
-        // Unwrap reactive state objects for bound attributes
-        let attrValue = value;
-        if (attrValue && isReactiveState(attrValue)) {
-          attrValue = (attrValue as any).value; // This triggers dependency tracking
+        // Special-case certain boolean-like attributes to promote them to
+        // props so runtime property assignment and coercion behave correctly
+        // for native elements (e.g. :disabled should affect el.disabled).
+        if (rawName === 'disabled') {
+          // Be conservative: only promote disabled to props at compile-time
+          // when the bound value is an explicit boolean-ish primitive
+          // (boolean, empty-string presence, literal 'true'/'false', null, or number).
+          // Otherwise leave it in attrs so the runtime can apply safer coercion.
+          let propValue = value;
+          if (propValue && isReactiveState(propValue)) propValue = (propValue as any).value;
+          const t = typeof propValue;
+          const isBoolStr = t === 'string' && (propValue === 'true' || propValue === 'false');
+          const shouldPromote = propValue === '' || t === 'boolean' || isBoolStr || propValue == null || t === 'number';
+          if (shouldPromote) {
+            props[rawName] = propValue;
+          } else{
+            // Unwrap reactive state objects for bound attributes and keep in attrs
+            let attrValue = value;
+            if (attrValue && isReactiveState(attrValue)) {
+              attrValue = (attrValue as any).value; // This triggers dependency tracking
+            }
+            attrs[rawName] = attrValue;
+          }
+          bound.push(rawName);
+        } else {
+          // Unwrap reactive state objects for bound attributes
+          let attrValue = value;
+          if (attrValue && isReactiveState(attrValue)) {
+            attrValue = (attrValue as any).value; // This triggers dependency tracking
+          }
+          attrs[rawName] = attrValue;
+          bound.push(rawName);
         }
-        attrs[rawName] = attrValue;
-        bound.push(rawName);
       }
     } else if (prefix === "@") {
       // Parse event modifiers: @click.prevent.stop
@@ -212,6 +244,65 @@ export function parseProps(
   }
 
   return { props, attrs, directives, bound };
+}
+
+/**
+ * Transform VNodes with :when directive into anchor blocks for conditional rendering
+ */
+function transformWhenDirective(vnode: VNode): VNode {
+  // Skip if not an element VNode or is already an anchor block
+  if (!isElementVNode(vnode) || isAnchorBlock(vnode)) {
+    return vnode;
+  }
+
+  // Check if this VNode has a :when directive
+  const directives = vnode.props?.directives;
+  if (directives && directives.when) {
+    const whenCondition = directives.when.value;
+    
+    // Remove the :when directive from the VNode since we're handling it here
+    const { when, ...remainingDirectives } = directives;
+    const newProps = { ...vnode.props };
+    if (Object.keys(remainingDirectives).length > 0) {
+      newProps.directives = remainingDirectives;
+    } else {
+      delete newProps.directives;
+    }
+    
+    // Create a new VNode without the :when directive
+    const elementVNode: VNode = {
+      ...vnode,
+      props: newProps,
+    };
+    
+    // Recursively transform children if they exist
+    if (Array.isArray(elementVNode.children)) {
+      elementVNode.children = elementVNode.children.map(child => 
+        typeof child === 'object' && child !== null ? transformWhenDirective(child as VNode) : child
+      );
+    }
+    
+    // Wrap in an anchor block with the condition
+    const anchorKey = vnode.key != null ? `when-${vnode.key}` : `when-${vnode.tag}`;
+    return {
+      tag: "#anchor",
+      key: anchorKey,
+      children: whenCondition ? [elementVNode] : [],
+    };
+  }
+  
+  // Recursively transform children if they exist
+  if (Array.isArray(vnode.children)) {
+    const transformedChildren = vnode.children.map(child => 
+      typeof child === 'object' && child !== null ? transformWhenDirective(child as VNode) : child
+    );
+    return {
+      ...vnode,
+      children: transformedChildren,
+    };
+  }
+  
+  return vnode;
 }
 
 /**
@@ -440,11 +531,7 @@ export function htmlImpl(
         Object.prototype.hasOwnProperty.call(vnodeProps.attrs, 'key') &&
         !(vnodeProps.props && Object.prototype.hasOwnProperty.call(vnodeProps.props, 'key'))
       ) {
-        try {
-          vnodeProps.props.key = vnodeProps.attrs['key'];
-        } catch (e) {
-          // best-effort; ignore
-        }
+        safe(() => { vnodeProps.props.key = vnodeProps.attrs['key']; });
       }
 
       // Ensure native form control properties are set as JS props when the
@@ -455,15 +542,21 @@ export function htmlImpl(
       // with `:value`), otherwise leave static attributes in attrs for
       // tests and expected behavior.
       try {
+        // Conservative promotion map: promote attributes that must be properties
+        // for correct native behavior (value/checked/etc.). We intentionally
+        // avoid promoting `disabled` at compile-time because early promotion
+        // can cause accidental enabling/disabling when bound expressions or
+        // wrapper proxies evaluate to truthy values. The runtime already
+        // performs defensive coercion for boolean-like values; prefer that.
         const nativePromoteMap: Record<string, string[]> = {
-          input: ['value', 'checked', 'disabled', 'readonly', 'required', 'placeholder', 'maxlength', 'minlength'],
-          textarea: ['value', 'disabled', 'readonly', 'required', 'placeholder', 'maxlength', 'minlength'],
-          select: ['value', 'disabled', 'required', 'multiple'],
-          option: ['selected', 'disabled', 'value'],
+          input: ['value', 'checked', 'readonly', 'required', 'placeholder', 'maxlength', 'minlength'],
+          textarea: ['value', 'readonly', 'required', 'placeholder', 'maxlength', 'minlength'],
+          select: ['value', 'required', 'multiple'],
+          option: ['selected', 'value'],
           video: ['muted', 'autoplay', 'controls', 'loop', 'playsinline'],
           audio: ['muted', 'autoplay', 'controls', 'loop'],
           img: ['src', 'alt', 'width', 'height'],
-          button: ['type', 'name', 'value', 'disabled', 'autofocus', 'form'],
+          button: ['type', 'name', 'value', 'autofocus', 'form'],
         };
 
         const lname = tagName.toLowerCase();
@@ -473,12 +566,48 @@ export function htmlImpl(
           for (const propName of promotable) {
             if (boundList && boundList.includes(propName) && propName in vnodeProps.attrs && !(vnodeProps.props && propName in vnodeProps.props)) {
               let attrValue = vnodeProps.attrs[propName];
-              // Unwrap reactive state objects during promotion
-              if (attrValue && isReactiveState(attrValue)) {
-                attrValue = (attrValue as any).value; // This triggers dependency tracking
-              }
-              vnodeProps.props[propName] = attrValue;
-              delete vnodeProps.attrs[propName];
+                // Unwrap reactive state objects during promotion
+                if (attrValue && isReactiveState(attrValue)) {
+                  attrValue = (attrValue as any).value; // This triggers dependency tracking
+                  // Promote the unwrapped primitive value
+                  vnodeProps.props[propName] = attrValue;
+                  delete vnodeProps.attrs[propName];
+                } else {
+                  // Only promote primitive values to native element properties.
+                  // For most attributes we accept string/number/boolean/empty-string
+                  // but for boolean-like attributes such as `disabled` be more
+                  // conservative: only promote when the value is a real boolean,
+                  // an explicit empty-string (attribute presence), or the
+                  // literal strings 'true'/'false'. This avoids promoting other
+                  // non-boolean strings which could be misinterpreted as
+                  // truthy and accidentally enable native controls.
+                  const t = typeof attrValue;
+                  if (propName === 'disabled') {
+                    const isBoolStr = t === 'string' && (attrValue === 'true' || attrValue === 'false');
+                    const shouldPromote = attrValue === '' || t === 'boolean' || isBoolStr || attrValue == null || t === 'number';
+                    if (shouldPromote) {
+                        vnodeProps.props[propName] = attrValue;
+                        // DEV INSTRUMENTATION: record compiler-time promotions of disabled
+                        safe(() => {
+                          const w = (globalThis as any) as any;
+                          if (!w.__VDOM_DISABLED_PROMOTIONS) w.__VDOM_DISABLED_PROMOTIONS = [];
+                          w.__VDOM_DISABLED_PROMOTIONS.push({ phase: 'compiler-promotion', tag: tagName, propName, value: attrValue, time: Date.now(), stack: (new Error()).stack });
+                        });
+                      delete vnodeProps.attrs[propName];
+                    } else {
+                      // leave complex objects/unknown strings in attrs so the
+                      // runtime can make a safer decision when applying props
+                    }
+                  } else {
+                    if (attrValue === '' || t === 'string' || t === 'number' || t === 'boolean' || attrValue == null) {
+                      vnodeProps.props[propName] = attrValue;
+                      delete vnodeProps.attrs[propName];
+                    } else {
+                      // leave complex objects in attrs so the runtime can decide how
+                      // to apply them (for example, :bind object form or custom handling)
+                    }
+                  }
+                }
             }
           }
         }
@@ -494,12 +623,12 @@ export function htmlImpl(
             for (const b of boundList) {
               if (b in vnodeProps.attrs && !(vnodeProps.props && b in vnodeProps.props)) {
                 // Convert kebab-case to camelCase for JS property names on custom elements
-                const camel = b.includes('-') ? b.split('-').map((s, i) => i === 0 ? s : s.charAt(0).toUpperCase() + s.slice(1)).join('') : b;
+                const camel = b.includes('-') ? toCamel(b) : b;
                 let attrValue = vnodeProps.attrs[b];
-                // Unwrap reactive state objects during promotion
-                if (attrValue && isReactiveState(attrValue)) {
-                  attrValue = (attrValue as any).value; // This triggers dependency tracking
-                }
+                // Preserve ReactiveState instances for custom elements so the
+                // runtime can assign the live ReactiveState to the element
+                // property (children using useProps will read .value). Do not
+                // unwrap here; let the renderer/runtime decide how to apply.
                 vnodeProps.props[camel] = attrValue;
                 // Preserve potential key attributes in attrs to avoid unstable keys
                 if (!keyAttrs.has(b)) {
@@ -554,9 +683,10 @@ export function htmlImpl(
               } else {
                 initial = modelVal;
                 // Unwrap reactive state objects
-                if (initial && isReactiveState(initial)) {
-                  initial = (initial as any).value; // This triggers dependency tracking
-                }
+                // Keep ReactiveState objects intact for runtime so children
+                // receive the ReactiveState instance instead of an unwrapped
+                // plain object. The runtime knows how to handle ReactiveState
+                // when applying props/attrs.
               }
 
               vnodeProps.props[argToUse] = initial;
@@ -564,7 +694,10 @@ export function htmlImpl(
               try {
                 const attrName = toKebab(argToUse);
                 if (!vnodeProps.attrs) vnodeProps.attrs = {} as any;
-                if (initial !== undefined) vnodeProps.attrs[attrName] = initial;
+                // Only set attributes for primitive values; skip objects/refs
+                if (initial !== undefined && initial !== null && (typeof initial === 'string' || typeof initial === 'number' || typeof initial === 'boolean')) {
+                  vnodeProps.attrs[attrName] = initial;
+                }
               } catch (e) {
                 /* best-effort */
               }
@@ -582,6 +715,7 @@ export function htmlImpl(
                 
                 // Handle reactive state objects (functional API)
                 if (modelVal && isReactiveState(modelVal)) {
+                  // Compiled handler: update reactive modelVal when event received
                   const current = modelVal.value;
                   const changed = Array.isArray(newVal) && Array.isArray(current)
                     ? JSON.stringify([...newVal].sort()) !== JSON.stringify([...current].sort())
@@ -719,14 +853,17 @@ export function htmlImpl(
     return true;
   });
 
-  if (cleanedFragments.length === 1) {
+  // Transform nodes with :when directive into anchor blocks
+  const transformedFragments = cleanedFragments.map(child => transformWhenDirective(child));
+
+  if (transformedFragments.length === 1) {
     // Single non-empty root node
-    const out = cleanedFragments[0];
+    const out = transformedFragments[0];
       if (canCache && cacheKey) TEMPLATE_COMPILE_CACHE.set(cacheKey, out);
     return out;
-  } else if (cleanedFragments.length > 1) {
+  } else if (transformedFragments.length > 1) {
     // True multi-root: return array
-    const out = cleanedFragments;
+    const out = transformedFragments;
     if (canCache && cacheKey) {
       TEMPLATE_COMPILE_CACHE.set(cacheKey, out);
     }

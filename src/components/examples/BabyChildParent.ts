@@ -1,20 +1,26 @@
-import { component, useEmit, ref, html } from "../../lib";
+import { component, useProps, useEmit, ref, html } from "../../lib";
 
-component("baby", ({ babyText = '' }) => {
+component("baby", () => {
+  const props = useProps({
+    babyText: ''
+  });
   const emit = useEmit();
   return html`
     <div class="p-4 border rounded-sm">
       <input
         type="text"
         class="border border-neutral-300 p-2 rounded-sm"
-        :value="${babyText}"
+        :value="${props.babyText}"
         @input="${(e: Event) => emit('update:babyText', (e.target as HTMLInputElement).value)}"
       />
     </div>
   `;
 })
 
-component("child", ({ test = '' }) =>{
+component("child", () =>{
+  const props = useProps({
+    test: ''
+  });
   const text = ref("baby text");
 
   const emit = useEmit();
@@ -29,7 +35,7 @@ component("child", ({ test = '' }) =>{
   return html`
     <div class="p-4 border rounded-sm space-y-4">
       <button @click="${onClick}">Model Value Update - Click me</button>
-      <button @click="${onPropClick}">Prop Value Update - ${test}</button>
+      <button @click="${onPropClick}">Prop Value Update - ${props.test}</button>
       <div>
         <cer-baby :model:babyText="${text}"></cer-baby>
         Baby text is (in child): ${text.value}
