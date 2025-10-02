@@ -1117,6 +1117,8 @@ export function parseArbitrary(className: string): string | null {
     // Only allow valid CSS property names
     if (!/^[a-zA-Z][a-zA-Z0-9-]*$/.test(prop)) return null;
 
+    // Convert underscores to spaces for multiple values
+    value = value.replace(/_/g, " ");
     value = value.replace(/url\('\s*([^']*?)\s*'\)/g, 'url("$1")');
     value = value.replace(/^'([^']*)'$/g, '"$1"');
     return `${prop}:${value};`;
@@ -1211,7 +1213,8 @@ export function escapeClassName(name: string): string {
 
 // Optimized HTML class extraction
 export function extractClassesFromHTML(html: string): string[] {
-  const classAttrRegex = /class\s*=\s*(['"])(.*?)\1/g;
+  // Use [\s\S] instead of . to match newlines in class attributes
+  const classAttrRegex = /class\s*=\s*(['"])([\s\S]*?)\1/g;
   const classList: string[] = [];
   let match: RegExpExecArray | null;
 
@@ -1219,6 +1222,7 @@ export function extractClassesFromHTML(html: string): string[] {
     const tokens = match[2].split(/\s+/).filter(Boolean);
     if (tokens.length) classList.push(...tokens);
   }
+
   return classList;
 }
 
@@ -1233,7 +1237,9 @@ const MAX_CACHE_SIZE = 1000;
 export function jitCSS(html: string): string {
   const now = Date.now();
   const cached = jitCssCache.get(html);
-  if (cached && now - cached.timestamp < JIT_CSS_THROTTLE_MS) return cached.css;
+  if (cached && now - cached.timestamp < JIT_CSS_THROTTLE_MS) {
+    return cached.css;
+  }
 
   const classes = extractClassesFromHTML(html);
   if (!classes.length) return "";

@@ -62,6 +62,83 @@ component('my-counter', () => {
   ```
 4. **Enjoy instant reactivity and type safety!**
 
+## 📦 Complete API Reference
+
+### Core API
+```ts
+import {
+  // Component Creation
+  component,
+  
+  // Template & Styling
+  html,
+  css,
+  
+  // Reactive State
+  ref,
+  computed,
+  watch,
+  
+  // Hooks
+  useProps,
+  useEmit,
+  useOnConnected,
+  useOnDisconnected,
+  useOnAttributeChanged,
+  useOnError,
+  useStyle,
+  
+  // Directives
+  when,
+  each,
+  match,
+  anchorBlock,
+  
+  // Directive Enhancements
+  unless,
+  whenEmpty,
+  whenNotEmpty,
+  eachWhere,
+  switchOnLength,
+  eachGroup,
+  eachPage,
+  switchOnPromise,
+  whenMedia,
+  responsive,
+  mediaVariants,
+  responsiveOrder,
+  
+  // Transitions
+  Transition,
+  TransitionGroup,
+  transitionPresets,
+  createTransitionPreset,
+  getTransitionStyleSheet,
+  
+  // Event Bus
+  eventBus,
+  emit,      // Shorthand for eventBus.emit
+  on,        // Shorthand for eventBus.on
+  off,       // Shorthand for eventBus.off
+  once,      // Shorthand for eventBus.once
+  listen,    // DOM event listener wrapper
+  
+  // Store
+  createStore,
+  
+  // Router
+  useRouter,
+  initRouter,
+  matchRoute,
+  matchRouteSSR,
+  parseQuery,
+  
+  // SSR & Types
+  renderToString,
+  VNode,
+} from '@jasonshimmy/custom-elements-runtime';
+```
+
 ## 📖 Documentation Index
 
 Explore the complete documentation for every runtime feature:
@@ -72,9 +149,19 @@ Explore the complete documentation for every runtime feature:
 ### 🏗️ **Core Features**
 - [🧩 Template](./docs/template.md) - Template syntax and html function
 - [🧭 Directives](./docs/directives.md) - Conditional rendering with `when`, `each`, and `match`
-- [🛠️ Directive Enhancements](./docs/directive-enhancements.md) - Advanced directive utilities (`unless`, `whenEmpty`, etc.)
+- [🛠️ Directive Enhancements](./docs/directive-enhancements.md) - Advanced directive utilities:
+  - `unless` - Inverse of `when`
+  - `whenEmpty` / `whenNotEmpty` - Collection checks
+  - `eachWhere` - Filtered iteration
+  - `switchOnLength` - Render based on array length
+  - `eachGroup` - Group and render items
+  - `eachPage` - Pagination support
+  - `switchOnPromise` - Async state rendering
+  - `whenMedia` - Media query responsive rendering
+  - `responsive` - Responsive utilities
 - [🔗 Bindings](./docs/bindings.md) - Data binding with `:prop`, `@event`, `:model`, `:class`, `:style`
 - [🔔 Events Deep Dive](./docs/events-deep-dive.md) - Custom event emission and handling patterns
+- [🎬 Transitions Guide](./docs/transitions.md) - Animation and transition effects
 
 ### 🎨 **Styling**
 - [🎨 JIT CSS](./docs/jit-css.md) - On-demand utility-first styling system

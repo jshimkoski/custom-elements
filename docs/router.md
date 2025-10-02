@@ -143,7 +143,108 @@ Clarification: guards are called after the router has matched a route for the re
 - **Framework agnostic?** Yes.
 - **Async components?** Use `load` property.
 
-## 📝 Best Practices
+## � Utility Functions
+
+The router module exports several utility functions for advanced use cases:
+
+### `parseQuery(search: string)`
+
+Parse a URL query string into an object:
+
+```ts
+import { parseQuery } from '@jasonshimmy/custom-elements-runtime';
+
+const params = parseQuery('?foo=bar&baz=qux&count=5');
+// { foo: 'bar', baz: 'qux', count: '5' }
+
+// Also works with leading '?' or without
+const params2 = parseQuery('foo=bar');
+// { foo: 'bar' }
+```
+
+**Parameters:**
+- `search`: string - URL query string (with or without leading '?')
+
+**Returns:** `Record<string, string>` - Parsed query parameters
+
+### `matchRoute(routes: Route[], path: string)`
+
+Manually match a route against a path:
+
+```ts
+import { matchRoute } from '@jasonshimmy/custom-elements-runtime';
+
+const routes = [
+  { path: '/', component: 'home-page' },
+  { path: '/user/:id', component: 'user-page' }
+];
+
+const result = matchRoute(routes, '/user/123');
+// {
+//   route: { path: '/user/:id', component: 'user-page' },
+//   params: { id: '123' }
+// }
+
+// No match returns null route
+const noMatch = matchRoute(routes, '/nonexistent');
+// { route: null, params: {} }
+```
+
+**Parameters:**
+- `routes`: Route[] - Array of route definitions
+- `path`: string - Path to match against routes
+
+**Returns:** `{ route: Route | null; params: Record<string, string> }`
+
+### `matchRouteSSR(routes: Route[], path: string)`
+
+Match routes during server-side rendering:
+
+```ts
+import { matchRouteSSR } from '@jasonshimmy/custom-elements-runtime';
+
+// On the server
+const result = matchRouteSSR(routes, req.path);
+if (result.route) {
+  // Render the matched component
+  const component = result.route.component;
+  // ... render to string
+}
+```
+
+**Parameters:**
+- `routes`: Route[] - Array of route definitions
+- `path`: string - Path to match
+
+**Returns:** `{ route: Route | null; params: Record<string, string> }`
+
+**Note:** This function is identical to `matchRoute()` but named specifically for SSR use cases to make code intent clearer.
+
+### `initRouter(config: RouterConfig)`
+
+Initialize router programmatically (covered in detail above):
+
+```ts
+import { initRouter } from '@jasonshimmy/custom-elements-runtime';
+
+const router = initRouter({
+  routes: [
+    { path: '/', component: 'home-page' },
+    { path: '/about', component: 'about-page' }
+  ],
+  mode: 'history', // or 'hash'
+  initialUrl: '/about' // optional, for SSR or testing
+});
+```
+
+**Returns:** Router instance with methods:
+- `push(path: string)` - Navigate to path
+- `replace(path: string)` - Replace current path
+- `back()` - Go back in history
+- `getCurrent()` - Get current route state
+- `subscribe(fn)` - Listen for route changes
+
+## �📝 Best Practices
 
 - Define all routes in one array
 - Use `load` for async/code-split components

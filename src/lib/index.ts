@@ -36,3 +36,4 @@ export * from "./directive-enhancements";
 export * from "./event-bus";
 export * from "./store";
 export * from "./router";
+export * from "./transitions";

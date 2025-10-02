@@ -100,29 +100,23 @@ class ReactiveSystem {
    */
   getOrCreateState<T>(initialValue: T): ReactiveState<T> {
     if (!this.currentComponent) {
-      // If not in component context, create standalone state
       return new ReactiveState(initialValue);
     }
     
-    const componentId = this.currentComponent;
-    const data = this.componentData.get(componentId);
+    const data = this.componentData.get(this.currentComponent);
     if (!data) {
       return new ReactiveState(initialValue);
     }
 
-    const currentIndex = data.stateIndex;
-    const stateKey = `${componentId}:${currentIndex}`;
-
-    // Increment state index for next state call
-    data.stateIndex++;
-
-    if (this.stateStorage.has(stateKey)) {
-      return this.stateStorage.get(stateKey)! as ReactiveState<T>;
+    const stateKey = `${this.currentComponent}:${data.stateIndex++}`;
+    let state = this.stateStorage.get(stateKey) as ReactiveState<T> | undefined;
+    
+    if (!state) {
+      state = new ReactiveState(initialValue);
+      this.stateStorage.set(stateKey, state);
     }
-
-    const stateInstance = new ReactiveState(initialValue);
-    this.stateStorage.set(stateKey, stateInstance);
-    return stateInstance;
+    
+    return state;
   }
 
   /**
@@ -142,7 +136,7 @@ class ReactiveSystem {
    * Trigger updates for all components that depend on a state
    */
   triggerUpdate(state: ReactiveState<any>): void {
-    const deps = Array.from(state.getDependents());
+    const deps = state.getDependents();
     for (const componentId of deps) {
       const data = this.componentData.get(componentId);
       if (data) {
@@ -157,12 +151,17 @@ class ReactiveSystem {
   cleanup(componentId: string): void {
     const data = this.componentData.get(componentId);
     if (data) {
-      data.dependencies.forEach(state => state.removeDependent(componentId));
+      for (const state of data.dependencies) {
+        state.removeDependent(componentId);
+      }
       this.componentData.delete(componentId);
     }
     // Remove any flat-stored state keys for this component
-    for (const key of Array.from(this.stateStorage.keys())) {
-      if (key.startsWith(componentId + ':')) this.stateStorage.delete(key);
+    const prefix = componentId + ':';
+    for (const key of this.stateStorage.keys()) {
+      if (key.startsWith(prefix)) {
+        this.stateStorage.delete(key);
+      }
     }
   }
 }

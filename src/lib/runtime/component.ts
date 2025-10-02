@@ -174,40 +174,30 @@ export function createElementClass<
       // Inject emit helper for custom events (single canonical event API).
       // Emits a DOM CustomEvent and returns whether it was not defaultPrevented.
       defineNonEnum(this.context, "emit", (eventName: string, detail?: any, options?: CustomEventInit) => {
-            const ev = new CustomEvent(eventName, {
+            const eventOptions = {
               detail,
               bubbles: true,
               composed: true,
               ...(options || {}),
-            });
-            // Emit DOM CustomEvent; no test-only logging
-            // DOM-first: dispatch the event and return whether it was prevented
-            safe(() => { if ((ev as any).composedPath) (ev as any).composedPath(); });
+            };
+            const ev = new CustomEvent(eventName, eventOptions);
+            
+            // Primary event dispatch
             this.dispatchEvent(ev);
-            // Also dispatch on parent/host as a compatibility fallback to
-            // ensure parent listeners receive update:* events in environments
-            // where composed/bubbling retargeting may prevent the handler.
-            const parent = (this as any).parentElement as Element | null;
-            if (parent && parent !== this) {
-              safe(() => { parent.dispatchEvent(new CustomEvent(eventName, { detail, bubbles: true, composed: true, ...(options || {}) })); });
-            }
-            const root = (this as any).getRootNode && (this as any).getRootNode();
-            const host = root && (root as any).host ? (root as any).host : null;
-            if (host && host !== this && host !== parent) {
-              safe(() => { (host as any).dispatchEvent(new CustomEvent(eventName, { detail, bubbles: true, composed: true, ...(options || {}) })); });
-            }
-            // Also dispatch alternate camel/kebab variation for compatibility
-            const m = eventName.split(":");
-            if (m.length === 2) {
-              const prefix = m[0];
-              const prop = m[1];
+            
+            // Dispatch alternate camel/kebab variation for compatibility
+            const colonIndex = eventName.indexOf(":");
+            if (colonIndex > 0) {
+              const prefix = eventName.substring(0, colonIndex);
+              const prop = eventName.substring(colonIndex + 1);
               const altName = prop.includes("-")
                 ? `${prefix}:${prop.split("-").map((p, i) => i === 0 ? p : p.charAt(0).toUpperCase() + p.slice(1)).join("")}`
                 : `${prefix}:${prop.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase()}`;
               if (altName !== eventName) {
-                safe(() => { this.dispatchEvent(new CustomEvent(altName, { detail, bubbles: true, composed: true, ...(options || {}) })); });
+                safe(() => { this.dispatchEvent(new CustomEvent(altName, eventOptions)); });
               }
             }
+            
             return !ev.defaultPrevented;
       });
 

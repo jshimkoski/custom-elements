@@ -51,18 +51,17 @@ class EventManager {
     element.removeEventListener(event, handler, options);
     
     const cleanups = this.cleanupFunctions.get(element);
-    if (cleanups) {
-      const idx = cleanups.findIndex(m => 
-        m.event === event && 
-        m.handler === handler && 
-        JSON.stringify(m.options) === JSON.stringify(options)
-      );
-      
-      if (idx >= 0) {
-        cleanups.splice(idx, 1);
+    if (!cleanups) return;
+    
+    // Optimized: find and remove in single pass
+    for (let i = 0; i < cleanups.length; i++) {
+      const m = cleanups[i];
+      if (m.event === event && m.handler === handler) {
+        cleanups.splice(i, 1);
         if (cleanups.length === 0) {
           this.cleanupFunctions.delete(element);
         }
+        return;
       }
     }
   }

@@ -17,6 +17,7 @@ import {
   syncElementWithState,
   getCurrentStateValue
 } from "./vdom-model-helpers";
+import { performEnterTransition, performLeaveTransition } from "./transition-utils";
 
 /**
  * Helper: determine whether an element is a native form control we treat
@@ -67,21 +68,22 @@ function coerceBooleanForNative(val: any): boolean {
  * @returns 
  */
 export function cleanupRefs(node: Node, refs?: VDomRefs) {
-  if (!refs) return;
-  if (node instanceof HTMLElement) {
-    // Clean up event listeners for this element
-    EventManager.cleanup(node);
-    
-    for (const refKey in refs) {
-      if (refs[refKey] === node) {
-        delete refs[refKey];
-      }
+  if (!refs || !(node instanceof HTMLElement)) return;
+  
+  // Clean up event listeners for this element
+  EventManager.cleanup(node);
+  
+  // Clean up refs
+  for (const refKey in refs) {
+    if (refs[refKey] === node) {
+      delete refs[refKey];
     }
-    // Clean up child nodes (iterate NodeList directly)
-    const children = node.childNodes;
-    for (let i = 0; i < children.length; i++) {
-      cleanupRefs(children[i], refs);
-    }
+  }
+  
+  // Clean up child nodes
+  const children = node.childNodes;
+  for (let i = 0; i < children.length; i++) {
+    cleanupRefs(children[i], refs);
   }
 }
 
@@ -605,20 +607,19 @@ export function processClassDirective(
   } else if (Array.isArray(classValue)) {
     classes = classValue.filter(Boolean);
   } else if (typeof classValue === "object" && classValue !== null) {
-    // Object syntax: { className: condition }
-    classes = Object.entries(classValue)
-      .filter(([, condition]) => Boolean(condition))
-      .flatMap(([className]) => className.split(/\s+/).filter(Boolean));
+    // Object syntax: { className: condition } - optimized without flatMap
+    for (const [className, condition] of Object.entries(classValue)) {
+      if (condition) {
+        classes.push(className);
+      }
+    }
   }
 
   const existingClasses = attrs.class || "";
-  const allClasses = existingClasses
-    ? `${existingClasses} ${classes.join(" ")}`.trim()
-    : classes.join(" ");
-
-  if (allClasses) {
-    attrs.class = allClasses;
-  }
+  const classString = classes.join(" ");
+  attrs.class = existingClasses
+    ? `${existingClasses} ${classString}`.trim()
+    : classString;
 }
 
 /**
@@ -1302,8 +1303,20 @@ export function createElement(
 
     const frag = document.createDocumentFragment();
     frag.appendChild(start);
+    
     for (const child of children) {
       const childNode = createElement(child, context);
+      // Propagate anchor block's key to child elements ONLY if child doesn't have its own key
+      // This allows keyed lists (each()) to preserve their own keys
+      if (anchorVNode.key != null && childNode instanceof Element && !childNode.hasAttribute('data-anchor-key')) {
+        const childVNode = child as VNode;
+        const childHasOwnKey = childVNode && typeof childVNode === 'object' && childVNode.key != null;
+        
+        if (!childHasOwnKey) {
+          (childNode as any).key = anchorVNode.key;
+          childNode.setAttribute('data-anchor-key', String(anchorVNode.key));
+        }
+      }
       frag.appendChild(childNode);
     }
     frag.appendChild(end);
@@ -1313,6 +1326,11 @@ export function createElement(
   // Standard element VNode
   const el = document.createElement(vnode.tag);
   if (vnode.key != null) (el as any).key = vnode.key; // attach key
+
+  // Store TransitionGroup metadata on the DOM element for patchChildren to use
+  if (vnode.props && (vnode.props as any)._transitionGroup) {
+    (el as any)._transitionGroup = (vnode.props as any)._transitionGroup;
+  }
 
   const { props = {}, attrs = {}, directives = {} } = vnode.props ?? {};
 
@@ -1656,6 +1674,205 @@ export function patchChildren(
   }
   const oldVNodes: VNode[] = Array.isArray(oldChildren) ? oldChildren : [];
 
+  // Check if parent has TransitionGroup metadata
+  const transitionGroup = (parent as any)._transitionGroup;
+
+  // If TransitionGroup, flatten anchor blocks and handle as batch keyed diff
+  if (transitionGroup) {
+    // Track if this TransitionGroup has ever rendered before
+    // This lets us distinguish "true initial render" from "empty list → first item"
+    const hasRenderedBefore = (parent as any)._hasTransitionGroupRendered || false;
+    if (!hasRenderedBefore) {
+      (parent as any)._hasTransitionGroupRendered = true;
+    }
+
+    // Helper to strip 'each-' prefix from keys for proper keyed diffing
+    const stripKeyPrefix = (key: any): any => {
+      return typeof key === 'string' && key.startsWith('each-') ? key.substring(5) : key;
+    };
+    
+    const flattenedNew: VNode[] = [];
+    const flattenedOldVNodes: VNode[] = [];
+    
+    // Flatten new children (extract from anchor blocks)
+    for (const child of newChildren) {
+      if (child && child.tag === '#anchor') {
+        const anchorChildren = Array.isArray(child.children) ? child.children : [];
+        for (const anchorChild of anchorChildren) {
+          // Extract the actual item key from the anchor key
+          const actualKey = stripKeyPrefix(anchorChild.key || child.key || 'unknown');
+          flattenedNew.push({ ...anchorChild, key: actualKey });
+        }
+      } else if (child) {
+        // Handle already-flattened children (from previous renders)
+        flattenedNew.push({ ...child, key: stripKeyPrefix(child.key) });
+      }
+    }
+    
+    // Flatten old VNodes (extract from anchor blocks)
+    for (const oldVNode of oldVNodes) {
+      if (oldVNode && oldVNode.tag === '#anchor') {
+        const anchorChildren = Array.isArray(oldVNode.children) ? oldVNode.children : [];
+        for (const anchorChild of anchorChildren) {
+          // Extract the actual item key from the anchor key
+          const actualKey = stripKeyPrefix(anchorChild.key || oldVNode.key || 'unknown');
+          flattenedOldVNodes.push({ ...anchorChild, key: actualKey });
+        }
+      } else if (oldVNode) {
+        // Handle already-flattened children (from previous renders)
+        flattenedOldVNodes.push({ ...oldVNode, key: stripKeyPrefix(oldVNode.key) });
+      }
+    }
+
+    // Now perform keyed diffing on flattened lists
+    const hasKeys = flattenedNew.some(c => c && c.key != null) || flattenedOldVNodes.some(c => c && c.key != null);
+
+    if (hasKeys) {
+      // Build maps for keyed diffing
+      const oldVNodeByKeyFlat = new Map<string | number, VNode>();
+      const oldNodeByKeyFlat = new Map<string | number, Node>();
+      
+      for (const v of flattenedOldVNodes) {
+        if (v && v.key != null) {
+          // Ensure key is a string for consistent comparison
+          const key = String(v.key);
+          oldVNodeByKeyFlat.set(key, v);
+        }
+      }
+      
+      // Map old DOM nodes by their keys with dual mapping for numeric/string keys
+      for (let i = 0; i < oldNodesCache.length; i++) {
+        const node = oldNodesCache[i];
+        
+        // Try multiple ways to find the key
+        let nodeKey = (node as any).key;
+
+        // If node has data-anchor-key, use that
+        if (!nodeKey && node instanceof Element) {
+          const anchorKey = node.getAttribute('data-anchor-key');
+          if (anchorKey) nodeKey = anchorKey;
+        }
+
+        // Strip "each-" prefix from node keys to match flattened VNode keys
+        nodeKey = stripKeyPrefix(nodeKey);
+        
+        // Skip text nodes and comment nodes without keys
+        if (nodeKey != null && node instanceof Element && node.nodeType === Node.ELEMENT_NODE) {
+          // Extract the base key (remove :tagname suffix if present)
+          let baseKey = typeof nodeKey === 'string' && nodeKey.includes(':') 
+            ? nodeKey.substring(0, nodeKey.lastIndexOf(':'))
+            : nodeKey;
+          
+          // Ensure key is a string for consistent comparison with VNode keys
+          baseKey = String(baseKey);
+          
+          // Store with the base key (stripped of "each-" prefix to match VNode keys)
+          oldNodeByKeyFlat.set(baseKey, node);
+        }
+      }
+
+      const usedFlat = new Set<Node>();
+      
+      // PHASE 1: Identify which nodes to keep, create new nodes, but DON'T move anything yet
+      const nodesToProcess: Array<{ node: Node; key: string; newVNode: VNode; oldVNode?: VNode; isNew: boolean }> = [];
+      
+      for (const newVNode of flattenedNew) {
+        let key = newVNode.key;
+        if (key == null) continue;
+        
+        // Ensure key is a string for consistent comparison
+        key = String(key);
+        
+        const oldVNode = oldVNodeByKeyFlat.get(key);
+        let node = oldNodeByKeyFlat.get(key);
+        
+        if (node && oldVNode) {
+          // Existing node - patch it but don't move yet
+          const patched = patch(node, oldVNode, newVNode, context);
+          usedFlat.add(node);
+          
+          // Ensure the node has the correct key and attribute
+          const keyStr = String(key);
+          (patched as any).key = keyStr;
+          if (patched instanceof Element) {
+            patched.setAttribute('data-anchor-key', keyStr);
+          }
+          
+          nodesToProcess.push({ node: patched, key, newVNode, oldVNode, isNew: false });
+        } else {
+          // Create new node and insert it immediately (but invisible via enterFrom classes)
+          node = createElement(newVNode, context);
+          (node as any).key = key;
+          if (node instanceof Element) {
+            node.setAttribute('data-anchor-key', String(key));
+          }
+          
+          // For new nodes, immediately insert them into DOM (at the end) and start enter transition
+          // This ensures the transition can capture the correct FROM state
+          parent.appendChild(node);
+          
+          // Only animate if: not initial render OR appear is true
+          // Use the hasRenderedBefore flag stored on parent element
+          const isInitialRender = !hasRenderedBefore;
+          const shouldAnimate = !isInitialRender || transitionGroup.appear === true;
+
+          if (node instanceof HTMLElement && shouldAnimate) {
+            performEnterTransition(node, transitionGroup).catch(err => {
+              console.error('Enter transition error:', err);
+            });
+          }
+
+          nodesToProcess.push({ node, key, newVNode, isNew: true });
+        }
+      }
+
+      const leaveTransitions: Promise<void>[] = [];
+      
+      for (let i = 0; i < oldNodesCache.length; i++) {
+        const node = oldNodesCache[i];
+        const nodeKey = (node as any).key;
+        const isUsed = usedFlat.has(node);
+
+        if (!isUsed && nodeKey != null && node instanceof HTMLElement) {
+          const leavePromise = performLeaveTransition(node, transitionGroup)
+            .then(() => {
+              if (parent.contains(node)) {
+                parent.removeChild(node);
+              }
+            })
+            .catch(err => {
+              console.error('Leave transition error:', err);
+              if (parent.contains(node)) {
+                parent.removeChild(node);
+              }
+            });
+          leaveTransitions.push(leavePromise);
+        }
+      }
+      
+      // Wait a tick to let leave transitions start applying their classes
+      requestAnimationFrame(() => {
+        // PHASE 3: Move nodes to correct positions (enter transitions already started in Phase 1)
+        // SKIP if there are active leave transitions to prevent visual jumps
+        if (leaveTransitions.length > 0) {
+          return;
+        }
+
+        let currentPosition: Node | null = parent.firstChild;
+
+        for (const { node } of nodesToProcess) {
+          // Move node to correct position if needed
+          if (node !== currentPosition) {
+            parent.insertBefore(node, currentPosition);
+          }
+          currentPosition = node.nextSibling;
+        }
+      });
+      
+      return; // Done with TransitionGroup keyed diffing
+    }
+  }
+
   // Map old VNodes by key
   const oldVNodeByKey = new Map<string | number, VNode>();
   for (const v of oldVNodes) {
@@ -1691,6 +1908,8 @@ export function patchChildren(
     end: Comment,
     oldChildren: VNode[] | undefined,
     newChildren: VNode[],
+    transition?: any,
+    shouldAnimate = true,
   ) {
     const oldNodesInRange: Node[] = [];
     let cur: Node | null = start.nextSibling;
@@ -1719,6 +1938,10 @@ export function patchChildren(
         if (k != null) oldNodeByKeyRange.set(k, node);
       }
 
+      // Calculate if this is initial visible render (for appear transitions)
+      const isInitialVisible = transition && transition.state === 'visible' && 
+                                oldVNodesInRange.length === 0 && newChildren.length > 0;
+
       const usedInRange = new Set<Node>();
       let next: Node | null = start.nextSibling;
 
@@ -1733,6 +1956,14 @@ export function patchChildren(
             context,
           );
           usedInRange.add(node);
+          
+          // Apply enter transition to patched nodes if this is initial visible render with appear: true
+          if (transition && node instanceof HTMLElement && isInitialVisible && transition.appear) {
+            performEnterTransition(node, transition).catch(err => {
+              console.error('Transition enter error (appear):', err);
+            });
+          }
+          
           if (node !== next && parent.contains(node)) {
             parent.insertBefore(node, next);
           }
@@ -1740,14 +1971,34 @@ export function patchChildren(
           node = createElement(newVNode, context);
           parent.insertBefore(node, next);
           usedInRange.add(node);
+          
+          // Apply enter transition to new nodes ONLY if shouldAnimate is true
+          if (transition && node instanceof HTMLElement && shouldAnimate) {
+            performEnterTransition(node, transition).catch(err => {
+              console.error('Transition enter error:', err);
+            });
+          }
         }
         next = node.nextSibling;
       }
 
-      // Remove unused
       for (const node of oldNodesInRange) {
         if (!usedInRange.has(node) && parent.contains(node)) {
-          parent.removeChild(node);
+          if (transition && node instanceof HTMLElement && shouldAnimate) {
+            // Apply leave transition before removing
+            performLeaveTransition(node, transition).then(() => {
+              if (parent.contains(node)) {
+                parent.removeChild(node);
+              }
+            }).catch(err => {
+              console.error('Transition leave error:', err);
+              if (parent.contains(node)) {
+                parent.removeChild(node);
+              }
+            });
+          } else {
+            parent.removeChild(node);
+          }
         }
       }
     } else {
@@ -1769,12 +2020,35 @@ export function patchChildren(
 
       // Add extra new
       for (let i = commonLength; i < newChildren.length; i++) {
-        parent.insertBefore(createElement(newChildren[i], context), end);
+        const node = createElement(newChildren[i], context);
+        parent.insertBefore(node, end);
+        
+        // Apply enter transition to new nodes ONLY if shouldAnimate is true
+        if (transition && node instanceof HTMLElement && shouldAnimate) {
+          performEnterTransition(node, transition).catch(err => {
+            console.error('Transition enter error:', err);
+          });
+        }
       }
 
       // Remove extra old
       for (let i = commonLength; i < oldNodesInRange.length; i++) {
-        parent.removeChild(oldNodesInRange[i]);
+        const node = oldNodesInRange[i];
+        if (transition && node instanceof HTMLElement && shouldAnimate) {
+          // Apply leave transition before removing
+          performLeaveTransition(node, transition).then(() => {
+            if (parent.contains(node)) {
+              parent.removeChild(node);
+            }
+          }).catch(err => {
+            console.error('Transition leave error:', err);
+            if (parent.contains(node)) {
+              parent.removeChild(node);
+            }
+          });
+        } else {
+          parent.removeChild(node);
+        }
       }
     }
   }
@@ -1811,17 +2085,51 @@ export function patchChildren(
       // If boundaries aren't in DOM, insert the whole fragment
       if (!parent.contains(start) || !parent.contains(end)) {
         parent.insertBefore(start, nextSibling);
+        const transition = (newVNode as any)._transition;
+
+        // Determine if we should animate:
+        // - If transition.state === 'visible' and children.length > 0, this is initial visible state
+        //   → only animate if appear: true
+        // - If transition.state === 'hidden' and children.length === 0, this is initial hidden state  
+        //   → don't animate (nothing to animate)
+        // - Otherwise, this is a state change → always animate
+        const isInitialVisible = transition && transition.state === 'visible' && children.length > 0;
+        const shouldAnimate = !isInitialVisible || transition.appear;
+
         for (const child of children) {
-          parent.insertBefore(createElement(child, context), nextSibling);
+          const childNode = createElement(child, context);
+          parent.insertBefore(childNode, nextSibling);
+          
+          // Apply enter transitions to new nodes ONLY if shouldAnimate is true
+          if (transition && childNode instanceof HTMLElement) {
+            if (shouldAnimate) {
+              performEnterTransition(childNode, transition).catch(err => {
+                console.error('Transition enter error:', err);
+              });
+            }
+          }
         }
         parent.insertBefore(end, nextSibling);
       } else {
         // Patch children between existing boundaries
+        const transition = (newVNode as any)._transition;
+        const oldVNode = oldVNodeByKey.get(aKey) as VNode;
+        const oldTransition = (oldVNode as any)?._transition;
+        
+        // Determine if we should animate:
+        // - If this is a state change (hidden → visible or visible → hidden), always animate
+        // - If this is initial render with state='visible', only animate if appear: true
+        const isStateChange = oldTransition && oldTransition.state !== transition?.state;
+        const isInitialVisible = transition && transition.state === 'visible' && children.length > 0 && !isStateChange;
+        const shouldAnimate = isStateChange || !isInitialVisible || (transition?.appear === true);
+
         patchChildrenBetween(
           start as Comment,
           end as Comment,
           (oldVNodeByKey.get(aKey) as VNode)?.children as VNode[] | undefined,
           children,
+          transition,
+          shouldAnimate,
         );
       }
 

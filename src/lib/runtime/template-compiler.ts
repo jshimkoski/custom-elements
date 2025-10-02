@@ -11,20 +11,19 @@ class LRUCache<K, V> {
   get(key: K): V | undefined {
     const v = this.map.get(key);
     if (v === undefined) return undefined;
-    // move to end
+    // move to end (LRU ordering)
     this.map.delete(key);
     this.map.set(key, v);
     return v;
   }
   set(key: K, value: V) {
-    if (this.map.has(key)) {
-      this.map.delete(key);
-    }
+    // Delete if exists to maintain insertion order
+    this.map.delete(key);
     this.map.set(key, value);
     if (this.map.size > this.maxSize) {
-      // remove oldest
-      const first = this.map.keys().next().value;
-      if (first !== undefined) this.map.delete(first);
+      // remove oldest (first key)
+      const firstKey = this.map.keys().next().value;
+      if (firstKey !== undefined) this.map.delete(firstKey);
     }
   }
   has(key: K): boolean { return this.map.has(key); }

@@ -1,5 +1,6 @@
 import { vdomRenderer } from "./vdom";
 import { minifyCSS, getBaseResetSheet, sanitizeCSS, jitCSS } from "./style";
+import { getTransitionStyleSheet } from "../transitions";
 import type { ComponentConfig, ComponentContext, VNode, Refs } from "./types";
 import { devWarn, devError } from "./logger";
 
@@ -145,7 +146,7 @@ export function applyStyle<S extends object, C extends object, P extends object,
 
   if ((!jitCss || jitCss.trim() === "") && !(context as any)._computedStyle) {
     setStyleSheet(null);
-    shadowRoot.adoptedStyleSheets = [getBaseResetSheet()];
+    shadowRoot.adoptedStyleSheets = [getBaseResetSheet(), getTransitionStyleSheet()];
     return;
   }
 
@@ -161,9 +162,16 @@ export function applyStyle<S extends object, C extends object, P extends object,
 
   let sheet = styleSheet;
   if (!sheet) sheet = new CSSStyleSheet();
-  if (sheet.cssRules.length === 0 || sheet.toString() !== finalStyle) {
+  
+  // Compare by replacing the stylesheet entirely if rules changed
+  // Avoid using .toString() which may not be reliable across browsers
+  const needsUpdate = sheet.cssRules.length === 0 || 
+    (sheet.cssRules.length > 0 && Array.from(sheet.cssRules).map(r => r.cssText).join('') !== finalStyle);
+  
+  if (needsUpdate) {
     sheet.replaceSync(finalStyle);
   }
-  shadowRoot.adoptedStyleSheets = [getBaseResetSheet(), sheet];
+  
+  shadowRoot.adoptedStyleSheets = [getBaseResetSheet(), getTransitionStyleSheet(), sheet];
   setStyleSheet(sheet);
 }
