@@ -18,6 +18,7 @@ import {
   getCurrentStateValue
 } from "./vdom-model-helpers";
 import { performEnterTransition, performLeaveTransition } from "./transition-utils";
+import { devError } from "./logger";
 
 /**
  * Helper: determine whether an element is a native form control we treat
@@ -1818,7 +1819,7 @@ export function patchChildren(
 
           if (node instanceof HTMLElement && shouldAnimate) {
             performEnterTransition(node, transitionGroup).catch(err => {
-              console.error('Enter transition error:', err);
+              devError('Enter transition error:', err);
             });
           }
 
@@ -1841,7 +1842,7 @@ export function patchChildren(
               }
             })
             .catch(err => {
-              console.error('Leave transition error:', err);
+              devError('Leave transition error:', err);
               if (parent.contains(node)) {
                 parent.removeChild(node);
               }
@@ -1960,7 +1961,7 @@ export function patchChildren(
           // Apply enter transition to patched nodes if this is initial visible render with appear: true
           if (transition && node instanceof HTMLElement && isInitialVisible && transition.appear) {
             performEnterTransition(node, transition).catch(err => {
-              console.error('Transition enter error (appear):', err);
+              devError('Transition enter error (appear):', err);
             });
           }
           
@@ -1975,7 +1976,7 @@ export function patchChildren(
           // Apply enter transition to new nodes ONLY if shouldAnimate is true
           if (transition && node instanceof HTMLElement && shouldAnimate) {
             performEnterTransition(node, transition).catch(err => {
-              console.error('Transition enter error:', err);
+              devError('Transition enter error:', err);
             });
           }
         }
@@ -1991,7 +1992,7 @@ export function patchChildren(
                 parent.removeChild(node);
               }
             }).catch(err => {
-              console.error('Transition leave error:', err);
+              devError('Transition leave error:', err);
               if (parent.contains(node)) {
                 parent.removeChild(node);
               }
@@ -2026,7 +2027,7 @@ export function patchChildren(
         // Apply enter transition to new nodes ONLY if shouldAnimate is true
         if (transition && node instanceof HTMLElement && shouldAnimate) {
           performEnterTransition(node, transition).catch(err => {
-            console.error('Transition enter error:', err);
+            devError('Transition enter error:', err);
           });
         }
       }
@@ -2041,7 +2042,7 @@ export function patchChildren(
               parent.removeChild(node);
             }
           }).catch(err => {
-            console.error('Transition leave error:', err);
+            devError('Transition leave error:', err);
             if (parent.contains(node)) {
               parent.removeChild(node);
             }
@@ -2104,7 +2105,7 @@ export function patchChildren(
           if (transition && childNode instanceof HTMLElement) {
             if (shouldAnimate) {
               performEnterTransition(childNode, transition).catch(err => {
-                console.error('Transition enter error:', err);
+                devError('Transition enter error:', err);
               });
             }
           }

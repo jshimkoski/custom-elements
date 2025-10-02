@@ -2,6 +2,7 @@ import type { VNode } from "./types";
 import { contextStack } from "./render";
 import { toKebab, toCamel, getNestedValue, setNestedValue, safe } from "./helpers";
 import { isReactiveState } from "./reactive";
+import { devWarn } from "./logger";
 
 // Strict LRU cache helper for fully static templates (no interpolations, no context)
 class LRUCache<K, V> {
@@ -38,7 +39,7 @@ const TEMPLATE_COMPILE_CACHE = new LRUCache<string, VNode | VNode[]>(500);
 function validateEventHandler(value: any, eventName: string): void {
   // Check for null/undefined handlers
   if (value === null || value === undefined) {
-    console.warn(
+    devWarn(
       `⚠️ Event handler for '@${eventName}' is ${value}. ` +
       `This will prevent the event from working. ` +
       `Use a function reference instead: @${eventName}="\${functionName}"`
@@ -48,7 +49,7 @@ function validateEventHandler(value: any, eventName: string): void {
 
   // Check for immediate function invocation (most common mistake)
   if (typeof value !== "function") {
-    console.warn(
+    devWarn(
       `🚨 Potential infinite loop detected! Event handler for '@${eventName}' appears to be ` +
       `the result of a function call (${typeof value}) instead of a function reference. ` +
       `Change @${eventName}="\${functionName()}" to @${eventName}="\${functionName}" ` +
@@ -58,7 +59,7 @@ function validateEventHandler(value: any, eventName: string): void {
 
   // Additional check for common return values of mistaken function calls
   if (value === undefined && typeof value !== "function") {
-    console.warn(
+    devWarn(
       `💡 Tip: If your event handler function returns undefined, make sure you're passing ` +
       `the function reference, not calling it. Use @${eventName}="\${fn}" not @${eventName}="\${fn()}"`
     );

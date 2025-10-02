@@ -1,3 +1,5 @@
+import { devWarn, devError } from "./logger";
+
 /**
  * Transition utilities for VDOM
  * Handles applying transition classes and managing animation lifecycles
@@ -56,7 +58,7 @@ async function waitForStyles(el: HTMLElement, _classesToCheck: string[], maxAtte
   
   // If element is not in the document, styles won't compute
   if (!el.isConnected) {
-    console.warn('⚠️ Element not connected to DOM, skipping style wait');
+    devWarn('⚠️ Element not connected to DOM, skipping style wait');
     return;
   }
   
@@ -83,7 +85,7 @@ async function waitForStyles(el: HTMLElement, _classesToCheck: string[], maxAtte
   // If we timeout, continue anyway - styles might not be for transform/opacity
   // But mark as loaded so we don't keep checking
   stylesLoadedOnce = true;
-  console.warn('⚠️ Styles did not load in time for transition, continuing anyway');
+  devWarn('⚠️ Styles did not load in time for transition, continuing anyway');
 }
 
 /**
@@ -148,7 +150,7 @@ export async function performEnterTransition(
     try {
       hooks.onBeforeEnter(el);
     } catch (e) {
-      console.error('Transition onBeforeEnter error:', e);
+      devError('Transition onBeforeEnter error:', e);
     }
   }
   
@@ -161,7 +163,7 @@ export async function performEnterTransition(
             try {
               hooks.onAfterEnter(el);
             } catch (e) {
-              console.error('Transition onAfterEnter error:', e);
+              devError('Transition onAfterEnter error:', e);
             }
           }
           resolve();
@@ -203,7 +205,7 @@ export async function performEnterTransition(
         if (manualDone) manualDone();
       });
     } catch (e) {
-      console.error('Transition onEnter error:', e);
+      devError('Transition onEnter error:', e);
     }
     
     // If hook provides done callback, wait for it
@@ -293,7 +295,7 @@ export async function performEnterTransition(
     try {
       hooks.onAfterEnter(el);
     } catch (e) {
-      console.error('Transition onAfterEnter error:', e);
+      devError('Transition onAfterEnter error:', e);
     }
   }
 }
@@ -312,7 +314,7 @@ export async function performLeaveTransition(
     try {
       hooks.onBeforeLeave(el);
     } catch (e) {
-      console.error('Transition onBeforeLeave error:', e);
+      devError('Transition onBeforeLeave error:', e);
     }
   }
   
@@ -325,7 +327,7 @@ export async function performLeaveTransition(
             try {
               hooks.onAfterLeave(el);
             } catch (e) {
-              console.error('Transition onAfterLeave error:', e);
+              devError('Transition onAfterLeave error:', e);
             }
           }
           resolve();
@@ -362,7 +364,7 @@ export async function performLeaveTransition(
         if (manualDone) manualDone();
       });
     } catch (e) {
-      console.error('Transition onLeave error:', e);
+      devError('Transition onLeave error:', e);
     }
     
     // If hook provides done callback, wait for it
@@ -402,7 +404,7 @@ export async function performLeaveTransition(
     try {
       hooks.onAfterLeave(el);
     } catch (e) {
-      console.error('Transition onAfterLeave error:', e);
+      devError('Transition onAfterLeave error:', e);
     }
   }
 }
@@ -426,7 +428,7 @@ export function cancelTransition(el: HTMLElement, isEnter: boolean, transitionMe
       try {
         hooks.onEnterCancelled(el);
       } catch (e) {
-        console.error('Transition onEnterCancelled error:', e);
+        devError('Transition onEnterCancelled error:', e);
       }
     }
   } else {
@@ -442,7 +444,7 @@ export function cancelTransition(el: HTMLElement, isEnter: boolean, transitionMe
       try {
         hooks.onLeaveCancelled(el);
       } catch (e) {
-        console.error('Transition onLeaveCancelled error:', e);
+        devError('Transition onLeaveCancelled error:', e);
       }
     }
   }
