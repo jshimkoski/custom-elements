@@ -27,9 +27,6 @@ component('fade-demo', () => {
   
   return html`
     <div class="p-4">
-      <!-- Preload transition classes -->
-      <div style="display:none" class="opacity-0 opacity-100 transition-opacity duration-300 ease-out duration-200 ease-in"></div>
-      
       <button 
         @click="${() => show.value = !show.value}"
         class="px-4 py-2 bg-primary-500 text-white rounded hover:bg-primary-600 mb-4"
@@ -158,6 +155,8 @@ component('notification-demo', () => {
       <div class="fixed top-4 right-4 w-80 space-y-2">
         ${TransitionGroup({
           tag: 'div',
+          class: 'space-y-2',
+          appear: true,  // Always animate, even first notification
           enterFrom: 'translate-x-[100%] opacity-0',
           enterActive: 'transition-all duration-300 ease-out',
           enterTo: 'translate-x-[0%] opacity-100',
@@ -282,7 +281,8 @@ component('list-animation-demo', () => {
       ${TransitionGroup({
         preset: 'slide-right',
         tag: 'div',
-        moveClass: 'transition-transform duration-500 ease-out'
+        moveClass: 'transition-transform duration-500 ease-out',
+        appear: true
       }, each(items.value, (item: { id: number; text: string }) => html`
         <div
           key="${item.id}"
@@ -302,6 +302,235 @@ component('list-animation-demo', () => {
   `;
 });
 
+// Flex and Grid layout demo with class prop
+component('layout-demo', () => {
+  const flexItems = ref([
+    { id: 1, emoji: '🎨', name: 'Design' },
+    { id: 2, emoji: '💻', name: 'Code' },
+    { id: 3, emoji: '🚀', name: 'Deploy' },
+    { id: 4, emoji: '🎉', name: 'Celebrate' }
+  ]);
+  
+  const gridItems = ref([
+    { id: 1, emoji: '🏠', name: 'Home', color: 'bg-primary-500' },
+    { id: 2, emoji: '⚙️', name: 'Settings', color: 'bg-secondary-500' },
+    { id: 3, emoji: '📊', name: 'Analytics', color: 'bg-success-500' },
+    { id: 4, emoji: '👤', name: 'Profile', color: 'bg-info-500' },
+    { id: 5, emoji: '📧', name: 'Messages', color: 'bg-error-500' },
+    { id: 6, emoji: '🔔', name: 'Alerts', color: 'bg-warning-500' }
+  ]);
+  
+  const layoutType = ref('flex');
+  const flexShuffleCount = ref(0);
+  const gridShuffleCount = ref(0);
+  const lastFlexOrder = ref<string>('');
+  const lastGridOrder = ref<string>('');
+
+  const addFlexItem = () => {
+    const emojis = ['✨', '🌟', '⭐', '💫', '🌈', '🎯', '🎪'];
+    const names = ['New', 'Item', 'Feature', 'Update', 'Release', 'Version'];
+    const id = Date.now();
+    const emoji = emojis[Math.floor(Math.random() * emojis.length)];
+    const name = names[Math.floor(Math.random() * names.length)];
+    flexItems.value = [...flexItems.value, { id, emoji, name }];
+  };
+  
+  const removeFlexItem = (id: number) => {
+    flexItems.value = flexItems.value.filter(item => item.id !== id);
+  };
+
+  const shuffleFlexItems = () => {
+    const beforeOrder = flexItems.value.map(i => i.id).join(',');
+    lastFlexOrder.value = beforeOrder;
+    
+    const shuffled = [...flexItems.value];
+    // Fisher-Yates shuffle algorithm
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    // Ensure order actually changed
+    if (shuffled.every((item, idx) => item.id === flexItems.value[idx].id)) {
+      shuffled.reverse();
+    }
+    flexItems.value = shuffled;
+    flexShuffleCount.value++;
+  };
+
+  const addGridItem = () => {
+    const emojis = ['🎮', '🎲', '🎭', '🎪', '🎨', '🎬', '🎸'];
+    const names = ['Gaming', 'Random', 'Theater', 'Circus', 'Art', 'Movies', 'Music'];
+    const colors = ['bg-primary-500', 'bg-secondary-500', 'bg-success-500', 'bg-info-500', 'bg-warning-500', 'bg-error-500'];
+    const id = Date.now();
+    const emoji = emojis[Math.floor(Math.random() * emojis.length)];
+    const name = names[Math.floor(Math.random() * names.length)];
+    const color = colors[Math.floor(Math.random() * colors.length)];
+    gridItems.value = [...gridItems.value, { id, emoji, name, color }];
+  };
+  
+  const removeGridItem = (id: number) => {
+    gridItems.value = gridItems.value.filter(item => item.id !== id);
+  };
+
+  const shuffleGridItems = () => {
+    const beforeOrder = gridItems.value.map(i => i.id).join(',');
+    lastGridOrder.value = beforeOrder;
+    
+    const shuffled = [...gridItems.value];
+    // Fisher-Yates shuffle algorithm
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    // Ensure order actually changed
+    if (shuffled.every((item, idx) => item.id === gridItems.value[idx].id)) {
+      shuffled.reverse();
+    }
+    gridItems.value = shuffled;
+    gridShuffleCount.value++;
+  };
+
+  return html`
+    <div class="p-6">
+      <div class="mb-6">
+        <h2 class="text-2xl font-bold mb-2">🎨 Layout Styling with class Prop</h2>
+        <p class="text-neutral-600 mb-4">
+          The <code class="bg-neutral-100 px-2 py-1 rounded">class</code> prop allows you to style 
+          the TransitionGroup wrapper with flex, grid, or any other layout system!
+        </p>
+        
+        <div class="flex gap-2 mb-4">
+          <button
+            @click="${() => layoutType.value = 'flex'}"
+            class="px-4 py-2 rounded ${layoutType.value === 'flex' ? 'bg-primary-500 text-white' : 'bg-neutral-200'}"
+          >
+            Flex Layout
+          </button>
+          <button
+            @click="${() => layoutType.value = 'grid'}"
+            class="px-4 py-2 rounded ${layoutType.value === 'grid' ? 'bg-primary-500 text-white' : 'bg-neutral-200'}"
+          >
+            Grid Layout
+          </button>
+        </div>
+      </div>
+
+      ${when(layoutType.value === 'flex', html`
+        <div class="mb-4">
+          <h3 class="text-xl font-semibold mb-3">Flex Layout Example</h3>
+          <p class="text-neutral-600 mb-4">
+            Using <code class="bg-neutral-100 px-2 py-1 rounded text-sm">class="flex gap-4 items-center justify-around p-6 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl"</code>
+          </p>
+          
+          <div class="flex gap-2 mb-4 items-center">
+            <button 
+              @click="${addFlexItem}"
+              class="px-4 py-2 bg-success-500 text-white rounded hover:bg-success-600"
+            >
+              ➕ Add Item
+            </button>
+            <button 
+              @click="${shuffleFlexItems}"
+              class="px-4 py-2 bg-info-500 text-white rounded hover:bg-info-600"
+            >
+              🔀 Shuffle
+            </button>
+            ${when(flexShuffleCount.value > 0, html`
+              <span class="px-3 py-1 bg-neutral-100 rounded text-sm font-medium">
+                Shuffles: ${flexShuffleCount.value}
+              </span>
+            `)}
+          </div>
+
+          ${TransitionGroup({
+            preset: 'scale',
+            class: 'flex gap-4 items-center justify-around p-6 bg-gradient-to-r from-primary-50 to-secondary-50 rounded-xl min-h-[120px]',
+            tag: 'div',
+            moveClass: 'transition-all duration-500 ease-out',
+            appear: true
+          }, each(flexItems.value, (item: { id: number; emoji: string; name: string }) => html`
+            <div
+              key="${item.id}"
+              class="flex flex-col items-center gap-2 p-4 bg-white rounded-lg shadow-md hover:shadow-xl transition-shadow cursor-pointer group"
+            >
+              <div class="text-4xl group-hover:scale-110 transition-transform">${item.emoji}</div>
+              <div class="font-medium text-neutral-700">${item.name}</div>
+              <button
+                @click="${() => removeFlexItem(item.id)}"
+                class="text-xs px-2 py-1 bg-error-500 text-white rounded opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                Remove
+              </button>
+            </div>
+          `))}
+        </div>
+      `)}
+
+      ${when(layoutType.value === 'grid', html`
+        <div>
+          <h3 class="text-xl font-semibold mb-3">Grid Layout Example</h3>
+          <p class="text-neutral-600 mb-4">
+            Using <code class="bg-neutral-100 px-2 py-1 rounded text-sm">class="grid grid-cols-3 gap-4 p-6 bg-neutral-50 rounded-xl"</code>
+          </p>
+          
+          <div class="flex gap-2 mb-4 items-center">
+            <button 
+              @click="${addGridItem}"
+              class="px-4 py-2 bg-success-500 text-white rounded hover:bg-success-600"
+            >
+              ➕ Add Card
+            </button>
+            <button 
+              @click="${shuffleGridItems}"
+              class="px-4 py-2 bg-info-500 text-white rounded hover:bg-info-600"
+            >
+              🔀 Shuffle
+            </button>
+            ${when(gridShuffleCount.value > 0, html`
+              <span class="px-3 py-1 bg-neutral-100 rounded text-sm font-medium">
+                Shuffles: ${gridShuffleCount.value}
+              </span>
+            `)}
+          </div>
+
+          ${TransitionGroup({
+            preset: 'fade',
+            class: 'grid grid-cols-3 gap-4 p-6 bg-neutral-50 rounded-xl min-h-[200px]',
+            tag: 'div',
+            moveClass: 'transition-all duration-700 ease-in-out',
+            appear: true
+          }, each(gridItems.value, (item: { id: number; emoji: string; name: string; color: string }) => html`
+            <div
+              key="${item.id}"
+              class="${item.color} text-white rounded-xl p-6 shadow-lg hover:shadow-2xl hover:scale-105 transition-all cursor-pointer group relative"
+            >
+              <div class="text-5xl mb-3">${item.emoji}</div>
+              <div class="text-lg font-bold">${item.name}</div>
+              <button
+                @click="${() => removeGridItem(item.id)}"
+                class="absolute top-2 right-2 w-6 h-6 flex items-center justify-center bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                ×
+              </button>
+            </div>
+          `))}
+        </div>
+      `)}
+
+      <div class="mt-8 p-4 bg-info-50 border border-info-200 rounded-lg">
+        <h4 class="font-semibold text-info-900 mb-2">💡 Pro Tip</h4>
+        <p class="text-info-800 text-sm">
+          The <code class="bg-info-100 px-2 py-1 rounded">class</code> prop works seamlessly with JIT CSS! 
+          All utility classes are automatically generated and added to the component's adoptedStyleSheets. 
+          You can use any Tailwind-like utilities including responsive variants (<code class="bg-info-100 px-2 py-1 rounded">sm:</code>, 
+          <code class="bg-info-100 px-2 py-1 rounded">md:</code>), state variants (<code class="bg-info-100 px-2 py-1 rounded">hover:</code>, 
+          <code class="bg-info-100 px-2 py-1 rounded">focus:</code>), and more!
+        </p>
+      </div>
+    </div>
+  `;
+});
+
 // Master demo component
 component('transition-showcase', () => {
   const activeDemo = ref('fade');
@@ -311,29 +540,11 @@ component('transition-showcase', () => {
     { id: 'slide', name: 'Slide', component: 'slide-demo' },
     { id: 'notifications', name: 'Notifications', component: 'notification-demo' },
     { id: 'complex', name: 'Complex', component: 'complex-animation-demo' },
-    { id: 'list', name: 'List Animation', component: 'list-animation-demo' }
+    { id: 'list', name: 'List Animation', component: 'list-animation-demo' },
+    { id: 'layouts', name: 'Flex & Grid Layouts', component: 'layout-demo' }
   ];
   
   return html`
-    <!-- Hidden div to pre-generate JIT CSS for all transition classes -->
-    <div style="display:none" class="
-      opacity-0 opacity-100
-      transition-slide-right-from transition-slide-right-to
-      transition-slide-left-from transition-slide-left-to
-      transition-slide-up-from transition-slide-up-to
-      transition-slide-down-from transition-slide-down-to
-      transition-scale-from transition-scale-to
-      transition-scale-down-from transition-scale-down-to
-      transition-zoom-from transition-zoom-to
-      transition-bounce-from transition-bounce-to
-      transition-flip-from transition-flip-to
-      transition-complex-from transition-complex-to transition-complex-leave
-      transition-opacity transition-all transition-transform transition-colors
-      duration-300 duration-200 duration-500 duration-150 duration-400
-      ease-out ease-in ease-bounce ease-elastic
-      delay-100
-    "></div>
-    
     <div class="min-h-screen bg-neutral-50">
       <header class="bg-white shadow">
         <div class="max-w-7xl mx-auto px-4 py-6">
@@ -368,6 +579,7 @@ component('transition-showcase', () => {
           ${when(activeDemo.value === 'notifications', html`<notification-demo></notification-demo>`)}
           ${when(activeDemo.value === 'complex', html`<complex-animation-demo></complex-animation-demo>`)}
           ${when(activeDemo.value === 'list', html`<list-animation-demo></list-animation-demo>`)}
+          ${when(activeDemo.value === 'layouts', html`<layout-demo></layout-demo>`)}
         </div>
       </main>
     </div>

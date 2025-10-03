@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TransitionGroup with Flex & Grid Layouts</title>
+  <script type="module">
+    import { component, html, ref, each, TransitionGroup } from './src/lib/index.ts';
+
+    // Flex Layout Demo
+    component('flex-demo', () => {
+      const items = ref([
+        { id: 1, text: 'Item 1', color: 'bg-blue-500' },
+        { id: 2, text: 'Item 2', color: 'bg-green-500' },
+        { id: 3, text: 'Item 3', color: 'bg-purple-500' },
+        { id: 4, text: 'Item 4', color: 'bg-pink-500' },
+      ]);
+
+      let nextId = 5;
+
+      const addItem = () => {
+        const colors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-pink-500', 'bg-yellow-500', 'bg-red-500'];
+        items.value = [...items.value, {
+          id: nextId,
+          text: `Item ${nextId}`,
+          color: colors[Math.floor(Math.random() * colors.length)]
+        }];
+        nextId++;
+      };
+
+      const removeItem = (id) => {
+        items.value = items.value.filter(item => item.id !== id);
+      };
+
+      const shuffle = () => {
+        items.value = [...items.value].sort(() => Math.random() - 0.5);
+      };
+
+      return html`
+        <div class="p-8">
+          <h2 class="text-2xl font-bold mb-4">Flex Layout with TransitionGroup</h2>
+          
+          <div class="mb-4 flex gap-2">
+            <button 
+              @click="${addItem}"
+              class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+            >
+              Add Item
+            </button>
+            <button 
+              @click="${shuffle}"
+              class="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors"
+            >
+              Shuffle
+            </button>
+          </div>
+
+          ${TransitionGroup({
+            preset: 'scale',
+            class: 'flex gap-4 flex-wrap',
+            moveClass: 'transition-all duration-500'
+          }, each(items.value, (item) => html`
+            <div 
+              key="${item.id}"
+              class="flex-shrink-0 ${item.color} text-white p-6 rounded-lg shadow-lg cursor-pointer hover:scale-110 transition-transform"
+              @click="${() => removeItem(item.id)}"
+            >
+              <div class="text-lg font-semibold">${item.text}</div>
+              <div class="text-sm opacity-75 mt-1">Click to remove</div>
+            </div>
+          `))}
+        </div>
+      `;
+    });
+
+    // Grid Layout Demo
+    component('grid-demo', () => {
+      const items = ref([
+        { id: 1, emoji: '🎨', label: 'Art' },
+        { id: 2, emoji: '🎵', label: 'Music' },
+        { id: 3, emoji: '🎮', label: 'Gaming' },
+        { id: 4, emoji: '📚', label: 'Books' },
+        { id: 5, emoji: '🏀', label: 'Sports' },
+        { id: 6, emoji: '🍕', label: 'Food' },
+      ]);
+
+      let nextId = 7;
+
+      const emojis = [
+        { emoji: '🚀', label: 'Space' },
+        { emoji: '🌈', label: 'Rainbow' },
+        { emoji: '⚡', label: 'Power' },
+        { emoji: '🔥', label: 'Fire' },
+        { emoji: '💎', label: 'Gems' },
+        { emoji: '🎯', label: 'Target' },
+        { emoji: '🌟', label: 'Star' },
+        { emoji: '🎪', label: 'Circus' },
+      ];
+
+      const addItem = () => {
+        const random = emojis[Math.floor(Math.random() * emojis.length)];
+        items.value = [...items.value, {
+          id: nextId,
+          emoji: random.emoji,
+          label: random.label
+        }];
+        nextId++;
+      };
+
+      const removeItem = (id) => {
+        items.value = items.value.filter(item => item.id !== id);
+      };
+
+      const shuffle = () => {
+        items.value = [...items.value].sort(() => Math.random() - 0.5);
+      };
+
+      return html`
+        <div class="p-8">
+          <h2 class="text-2xl font-bold mb-4">Grid Layout with TransitionGroup</h2>
+          
+          <div class="mb-4 flex gap-2">
+            <button 
+              @click="${addItem}"
+              class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+            >
+              Add Item
+            </button>
+            <button 
+              @click="${shuffle}"
+              class="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors"
+            >
+              Shuffle
+            </button>
+          </div>
+
+          ${TransitionGroup({
+            preset: 'slide-up',
+            class: 'grid grid-cols-3 gap-4',
+            moveClass: 'transition-all duration-500',
+            tag: 'div'
+          }, each(items.value, (item) => html`
+            <div 
+              key="${item.id}"
+              class="bg-gradient-to-br from-purple-400 to-pink-400 p-8 rounded-xl shadow-lg cursor-pointer hover:shadow-2xl hover:scale-105 transition-all text-center"
+              @click="${() => removeItem(item.id)}"
+            >
+              <div class="text-5xl mb-2">${item.emoji}</div>
+              <div class="text-white font-semibold">${item.label}</div>
+              <div class="text-white text-xs opacity-75 mt-1">Click to remove</div>
+            </div>
+          `))}
+        </div>
+      `;
+    });
+
+    // Custom Layout Demo
+    component('custom-layout-demo', () => {
+      const items = ref([
+        { id: 1, title: 'Card 1', desc: 'Description 1' },
+        { id: 2, title: 'Card 2', desc: 'Description 2' },
+        { id: 3, title: 'Card 3', desc: 'Description 3' },
+        { id: 4, title: 'Card 4', desc: 'Description 4' },
+      ]);
+
+      let nextId = 5;
+
+      const addItem = () => {
+        items.value = [...items.value, {
+          id: nextId,
+          title: `Card ${nextId}`,
+          desc: `Description ${nextId}`
+        }];
+        nextId++;
+      };
+
+      const removeItem = (id) => {
+        items.value = items.value.filter(item => item.id !== id);
+      };
+
+      return html`
+        <div class="p-8">
+          <h2 class="text-2xl font-bold mb-4">Custom Layout with Inline Styles</h2>
+          
+          <div class="mb-4 flex gap-2">
+            <button 
+              @click="${addItem}"
+              class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors"
+            >
+              Add Item
+            </button>
+          </div>
+
+          ${TransitionGroup({
+            preset: 'fade',
+            style: 'display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;',
+            moveClass: 'transition-all duration-500',
+            tag: 'div'
+          }, each(items.value, (item) => html`
+            <div 
+              key="${item.id}"
+              class="bg-white border-2 border-gray-200 p-6 rounded-lg shadow hover:shadow-lg transition-shadow cursor-pointer"
+              @click="${() => removeItem(item.id)}"
+            >
+              <h3 class="text-lg font-bold text-gray-800 mb-2">${item.title}</h3>
+              <p class="text-gray-600">${item.desc}</p>
+              <div class="text-xs text-gray-400 mt-2">Click to remove</div>
+            </div>
+          `))}
+        </div>
+      `;
+    });
+  </script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+  <div class="container mx-auto py-12">
+    <h1 class="text-4xl font-bold text-center mb-12 text-gray-800">
+      TransitionGroup Layouts Demo
+    </h1>
+    
+    <div class="space-y-12">
+      <flex-demo></flex-demo>
+      <hr class="border-gray-300">
+      <grid-demo></grid-demo>
+      <hr class="border-gray-300">
+      <custom-layout-demo></custom-layout-demo>
+    </div>
+
+    <div class="mt-12 p-6 bg-blue-50 rounded-lg">
+      <h3 class="text-xl font-bold mb-2">✨ New Feature!</h3>
+      <p class="text-gray-700">
+        <code class="bg-white px-2 py-1 rounded">TransitionGroup</code> now supports 
+        <code class="bg-white px-2 py-1 rounded">class</code> and 
+        <code class="bg-white px-2 py-1 rounded">style</code> props to apply flex, grid, 
+        or any custom layout to the wrapper element!
+      </p>
+    </div>
+  </div>
+</body>
+</html>

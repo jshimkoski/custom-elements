@@ -253,7 +253,7 @@ component('responsive-content', () => {
 
 ### `whenVariants` - Multi-Condition Responsive
 
-Combine dark mode and responsive conditions (matches style system).
+Combine dark/light mode and responsive conditions (matches style system behavior).
 
 ```typescript
 component('variant-layout', () => {
@@ -268,9 +268,47 @@ component('variant-layout', () => {
 });
 ```
 
+**How it works:**
+- Processes dark/light mode first
+- Then applies the **last** responsive breakpoint (matching CSS cascade behavior)
+- Combines conditions with `and` operator
+
+**Advanced examples:**
+
+```typescript
+component('theme-aware-content', () => {
+  return html`
+    <!-- Dark mode on large screens -->
+    ${whenVariants(['dark', 'lg'], html`
+      <div class="bg-neutral-900 p-8">
+        <h2 class="text-white text-2xl">Dark Desktop View</h2>
+      </div>
+    `)}
+    
+    <!-- Light mode on mobile -->
+    ${whenVariants(['light', 'sm'], html`
+      <div class="bg-white p-4">
+        <h2 class="text-neutral-900 text-lg">Light Mobile View</h2>
+      </div>
+    `)}
+    
+    <!-- Multiple breakpoints - last one wins (lg) -->
+    ${whenVariants(['dark', 'md', 'lg'], html`
+      <div>Only shows on lg+ in dark mode</div>
+    `)}
+  `;
+});
+```
+
+**Supported variant keys:**
+- **Color schemes**: `dark`, `light`
+- **Breakpoints**: `sm`, `md`, `lg`, `xl`, `2xl`
+
+**Note:** This matches the multi-variant processing in the style system. When multiple breakpoints are specified, only the last one is applied (e.g., `['sm', 'md', 'lg']` → applies `lg` only).
+
 ### `responsiveSwitch` - Breakpoint Content Switching
 
-Render different content for different breakpoints and dark mode.
+Render different content for different breakpoints.
 
 ```typescript
 component('responsive-layout', () => {
@@ -279,16 +317,52 @@ component('responsive-layout', () => {
       base: html`<mobile-view></mobile-view>`,
       md: html`<tablet-view></tablet-view>`,
       lg: html`<desktop-view></desktop-view>`,
+      xl: html`<desktop-wide-view></desktop-wide-view>`,
+      '2xl': html`<ultra-wide-view></ultra-wide-view>`
     })}
   `;
 });
 ```
 
+**Real-world example - Dashboard layouts:**
+
+```typescript
+component('dashboard-layout', ({ metrics = [] }: { metrics?: any[] }) => {
+  return html`
+    ${responsiveSwitch({
+      base: html`
+        <div class="flex flex-col gap-4">
+          ${metrics.map(m => html`<metric-card :metric="${m}"></metric-card>`)}
+        </div>
+      `,
+      md: html`
+        <div class="grid grid-cols-2 gap-4">
+          ${metrics.map(m => html`<metric-card :metric="${m}"></metric-card>`)}
+        </div>
+      `,
+      lg: html`
+        <div class="grid grid-cols-3 gap-6">
+          ${metrics.map(m => html`<metric-card :metric="${m}" size="large"></metric-card>`)}
+        </div>
+      `
+    })}
+  `;
+});
+```
+
+**Available breakpoints:**
+- `base` - Mobile-first, no media query (always applies)
+- `sm` - Small screens (640px+)
+- `md` - Medium screens (768px+)
+- `lg` - Large screens (1024px+)
+- `xl` - Extra large screens (1280px+)
+- `2xl` - 2X large screens (1536px+)
+
 ## 🔀 General Purpose Directives
 
 ### `switchOn` - Fluent Switch/Case
 
-Declarative switch/case with fluent API.
+Declarative switch/case with fluent API for complex conditional logic.
 
 ```typescript
 component('role-based-ui', ({ user = { role: 'guest' } }: { user?: { role: string } }) => {
@@ -302,6 +376,78 @@ component('role-based-ui', ({ user = { role: 'guest' } }: { user?: { role: strin
   `;
 });
 ```
+
+**API Methods:**
+
+- **`.case(matcher, content)`** - Match exact value or use predicate function
+- **`.when(predicate, content)`** - Match using custom condition function  
+- **`.otherwise(content)`** - Fallback content if no cases match
+- **`.done()`** - Execute and return the matching content
+
+**Real-world examples:**
+
+```typescript
+// Status badge with color coding
+component('status-badge', ({ status }: { status: string }) => {
+  return html`
+    ${switchOn(status)
+      .case('success', html`<span class="badge bg-success-500 text-white">✓ Success</span>`)
+      .case('pending', html`<span class="badge bg-warning-500 text-white">⏳ Pending</span>`)
+      .case('error', html`<span class="badge bg-error-500 text-white">✗ Error</span>`)
+      .otherwise(html`<span class="badge bg-neutral-500 text-white">Unknown</span>`)
+      .done()}
+  `;
+});
+
+// Complex conditions with predicates
+component('user-greeting', ({ user }: { user: { age: number; isPremium: boolean } }) => {
+  return html`
+    ${switchOn(user)
+      .when(u => u.age < 18, html`<div>Welcome, young user! 🎈</div>`)
+      .when(u => u.isPremium && u.age >= 18, html`<div>Welcome back, Premium Member! ⭐</div>`)
+      .when(u => u.age >= 65, html`<div>Welcome, valued senior member! 🎖️</div>`)
+      .otherwise(html`<div>Welcome! 👋</div>`)
+      .done()}
+  `;
+});
+
+// Range matching
+component('price-tier', ({ price }: { price: number }) => {
+  return html`
+    ${switchOn(price)
+      .when(p => p < 10, html`<span class="tier-budget">Budget Friendly</span>`)
+      .when(p => p >= 10 && p < 50, html`<span class="tier-standard">Standard</span>`)
+      .when(p => p >= 50 && p < 100, html`<span class="tier-premium">Premium</span>`)
+      .when(p => p >= 100, html`<span class="tier-luxury">Luxury</span>`)
+      .otherwise(html`<span class="tier-unknown">Price TBD</span>`)
+      .done()}
+  `;
+});
+
+// Type-safe enum matching
+type OrderStatus = 'draft' | 'submitted' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
+
+component('order-status-flow', ({ status }: { status: OrderStatus }) => {
+  return html`
+    ${switchOn(status)
+      .case('draft', html`<step-indicator step="1">Creating Order</step-indicator>`)
+      .case('submitted', html`<step-indicator step="2">Order Submitted</step-indicator>`)
+      .case('processing', html`<step-indicator step="3">Processing Payment</step-indicator>`)
+      .case('shipped', html`<step-indicator step="4">Out for Delivery</step-indicator>`)
+      .case('delivered', html`<step-indicator step="5" complete>Delivered!</step-indicator>`)
+      .case('cancelled', html`<error-indicator>Order Cancelled</error-indicator>`)
+      .done()}
+  `;
+});
+```
+
+**Why use `switchOn` over `match`?**
+
+- **More readable** for multiple conditions
+- **Fluent API** chains better in templates
+- **Type inference** works better with the builder pattern
+- **Predicate functions** allow complex matching logic
+- **Explicit** - clearly shows all branches and fallback
 
 ## 📐 Breakpoint Values
 

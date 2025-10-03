@@ -1680,13 +1680,6 @@ export function patchChildren(
 
   // If TransitionGroup, flatten anchor blocks and handle as batch keyed diff
   if (transitionGroup) {
-    // Track if this TransitionGroup has ever rendered before
-    // This lets us distinguish "true initial render" from "empty list → first item"
-    const hasRenderedBefore = (parent as any)._hasTransitionGroupRendered || false;
-    if (!hasRenderedBefore) {
-      (parent as any)._hasTransitionGroupRendered = true;
-    }
-
     // Helper to strip 'each-' prefix from keys for proper keyed diffing
     const stripKeyPrefix = (key: any): any => {
       return typeof key === 'string' && key.startsWith('each-') ? key.substring(5) : key;
@@ -1774,6 +1767,22 @@ export function patchChildren(
 
       const usedFlat = new Set<Node>();
       
+      // PHASE 0: Record positions BEFORE any DOM modifications for FLIP animation
+      // Only record if we have existing nodes to animate from
+      const positionsBefore = new Map<Node, DOMRect>();
+      const hadPreviousContent = oldNodesCache.length > 0;
+      
+      if (transitionGroup.moveClass && hadPreviousContent) {
+        for (let i = 0; i < oldNodesCache.length; i++) {
+          const node = oldNodesCache[i];
+          if (node instanceof HTMLElement && node.parentElement) {
+            const rect = node.getBoundingClientRect();
+            // Record position even if dimensions are zero (test environments)
+            positionsBefore.set(node, rect);
+          }
+        }
+      }
+      
       // PHASE 1: Identify which nodes to keep, create new nodes, but DON'T move anything yet
       const nodesToProcess: Array<{ node: Node; key: string; newVNode: VNode; oldVNode?: VNode; isNew: boolean }> = [];
       
@@ -1812,10 +1821,10 @@ export function patchChildren(
           // This ensures the transition can capture the correct FROM state
           parent.appendChild(node);
           
-          // Only animate if: not initial render OR appear is true
-          // Use the hasRenderedBefore flag stored on parent element
-          const isInitialRender = !hasRenderedBefore;
-          const shouldAnimate = !isInitialRender || transitionGroup.appear === true;
+          // Only animate if: we had previous content to transition from OR appear is true
+          // This prevents initial render items from animating (unless appear: true explicitly set)
+          // but allows subsequent additions to animate
+          const shouldAnimate = hadPreviousContent || transitionGroup.appear === true;
 
           if (node instanceof HTMLElement && shouldAnimate) {
             performEnterTransition(node, transitionGroup).catch(err => {
@@ -1851,14 +1860,11 @@ export function patchChildren(
         }
       }
       
-      // Wait a tick to let leave transitions start applying their classes
-      requestAnimationFrame(() => {
-        // PHASE 3: Move nodes to correct positions (enter transitions already started in Phase 1)
-        // SKIP if there are active leave transitions to prevent visual jumps
-        if (leaveTransitions.length > 0) {
-          return;
-        }
-
+      // PHASE 3: Move nodes to correct positions and apply FLIP animations
+      // SKIP if there are active leave transitions to prevent visual jumps
+      if (leaveTransitions.length === 0) {
+        // FLIP Animation for move transitions
+        // Positions were already recorded in PHASE 0, now we just move and animate
         let currentPosition: Node | null = parent.firstChild;
 
         for (const { node } of nodesToProcess) {
@@ -1868,7 +1874,96 @@ export function patchChildren(
           }
           currentPosition = node.nextSibling;
         }
-      });
+
+        // Apply FLIP animation for moved items
+        if (transitionGroup.moveClass && positionsBefore.size > 0) {
+          // Collect elements that need to be animated
+          const elementsToAnimate: Array<{ node: HTMLElement; deltaX: number; deltaY: number; moveClasses: string[] }> = [];
+          
+          for (const { node, isNew } of nodesToProcess) {
+            if (!isNew && node instanceof HTMLElement) {
+              const oldPos = positionsBefore.get(node);
+              if (oldPos) {
+                const newPos = node.getBoundingClientRect();
+                const deltaX = oldPos.left - newPos.left;
+                const deltaY = oldPos.top - newPos.top;
+
+                // If position changed, prepare for animation
+                if (deltaX !== 0 || deltaY !== 0) {
+                  const moveClasses = transitionGroup.moveClass.split(/\s+/).filter((c: string) => c);
+                  elementsToAnimate.push({ node, deltaX, deltaY, moveClasses });
+                }
+              }
+            }
+          }
+
+          if (elementsToAnimate.length > 0) {
+            // FLIP Animation technique:
+            // We need to ensure the browser paints the inverted state before animating
+            // Step 1: Apply inverted transforms (without transition)
+            for (const { node, deltaX, deltaY } of elementsToAnimate) {
+              node.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
+              node.style.transitionProperty = 'none';
+            }
+
+            // Step 2: Force reflow to ensure transforms are applied
+            void parent.offsetHeight;
+
+            // Step 3: Use triple RAF to ensure browser has:
+            // 1. Painted the inverted state
+            // 2. Applied the transition classes
+            // 3. Ready to animate when transform is removed
+            requestAnimationFrame(() => {
+              requestAnimationFrame(() => {
+                // Add moveClass for transition properties
+                for (const { node, moveClasses } of elementsToAnimate) {
+                  for (const cls of moveClasses) {
+                    node.classList.add(cls);
+                  }
+                }
+                
+                // One more RAF to ensure transition classes are processed
+                requestAnimationFrame(() => {
+                  // Set transition directly on each element
+                  // Parse moveClass to extract duration and timing
+                  const moveClassStr = transitionGroup.moveClass || '';
+                  const durationMatch = moveClassStr.match(/duration-(\d+)/);
+                  const duration = durationMatch ? `${durationMatch[1]}ms` : '300ms';
+                  const easingMatch = moveClassStr.match(/ease-(out|in|in-out|linear)/);
+                  const easing = easingMatch ? `ease-${easingMatch[1]}` : 'ease-out';
+                  
+                  for (const { node } of elementsToAnimate) {
+                    // Set transition inline to override everything
+                    // This sets transition-property, transition-duration, and transition-timing-function
+                    node.style.transition = `transform ${duration} ${easing}`;
+                  }
+                  
+                  // One final RAF before removing transform
+                  requestAnimationFrame(() => {
+                    // Now remove transforms to trigger animation
+                    for (const { node, moveClasses } of elementsToAnimate) {
+                      node.style.removeProperty('transform');
+                      // Clean up moveClass after transition completes
+                      const cleanup = () => {
+                        for (const cls of moveClasses) {
+                          node.classList.remove(cls);
+                        }
+                        // Also remove the inline transition we set for move animation
+                        // This allows leave transitions to work properly
+                        node.style.removeProperty('transition');
+                        node.removeEventListener('transitionend', cleanup);
+                        node.removeEventListener('transitioncancel', cleanup);
+                      };
+                      node.addEventListener('transitionend', cleanup, { once: true });
+                      node.addEventListener('transitioncancel', cleanup, { once: true });
+                    }
+                  });
+                });
+              });
+            });
+          }
+        }
+      }
       
       return; // Done with TransitionGroup keyed diffing
     }

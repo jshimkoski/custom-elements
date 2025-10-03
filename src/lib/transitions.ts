@@ -81,6 +81,10 @@ export interface TransitionGroupOptions extends Omit<TransitionOptions, 'show'> 
   moveClass?: string;
   /** Whether to show the group (defaults to true for TransitionGroup) */
   show?: boolean;
+  /** CSS classes to apply to the wrapper element (e.g., 'flex gap-4' or 'grid grid-cols-3') */
+  class?: string;
+  /** Inline styles to apply to the wrapper element */
+  style?: string | Record<string, string>;
 }
 
 /* --- Transition Presets --- */
@@ -304,12 +308,29 @@ export function Transition(
  * 
  * @example
  * ```ts
+ * // Basic usage
  * ${TransitionGroup({
  *   preset: 'slide-right',
  *   tag: 'ul',
  *   moveClass: 'transition-transform duration-300'
  * }, each(items.value, (item) => html`
  *   <li key="${item.id}">${item.text}</li>
+ * `))}
+ * 
+ * // With flex layout
+ * ${TransitionGroup({
+ *   preset: 'fade',
+ *   class: 'flex gap-4 flex-wrap'
+ * }, each(items.value, (item) => html`
+ *   <div key="${item.id}" class="flex-shrink-0">${item.text}</div>
+ * `))}
+ * 
+ * // With grid layout
+ * ${TransitionGroup({
+ *   preset: 'scale',
+ *   class: 'grid grid-cols-3 gap-4'
+ * }, each(items.value, (item) => html`
+ *   <div key="${item.id}">${item.text}</div>
  * `))}
  * ```
  */
@@ -327,6 +348,8 @@ export function TransitionGroup(
     appear = false,
     css = true,
     name,
+    class: className,
+    style,
     enterFrom,
     enterActive,
     enterTo,
@@ -402,6 +425,10 @@ export function TransitionGroup(
     children: flattenedChildren,
     key: groupKey,
     props: {
+      attrs: {
+        ...(className ? { class: className } : {}),
+        ...(style ? { style: style } : {}),
+      },
       _transitionGroup: {
         name: groupKey,
         classes: transitionClasses,

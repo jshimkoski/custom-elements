@@ -7,6 +7,125 @@ describe('List Animation - Styling and Animation Tests', () => {
     document.body.innerHTML = '';
   });
 
+  it('should support flex layout with class prop', async () => {
+    component('test-flex-layout', () => {
+      const items = ref([
+        { id: 1, text: 'A' },
+        { id: 2, text: 'B' },
+        { id: 3, text: 'C' }
+      ]);
+      
+      return html`
+        <div>
+          ${TransitionGroup({
+            preset: 'fade',
+            class: 'flex gap-4 flex-wrap',
+            tag: 'div'
+          }, each(items.value, (item: any) => html`
+            <div 
+              key="${item.id}"
+              class="flex-shrink-0 p-4 bg-blue-100"
+              data-test-id="${item.id}"
+            >${item.text}</div>
+          `))}
+        </div>
+      `;
+    });
+
+    const el = document.createElement('test-flex-layout') as any;
+    document.body.appendChild(el);
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    // Find the TransitionGroup wrapper
+    const wrapper = el.shadowRoot.querySelector('[class*="flex"]') as HTMLElement;
+    expect(wrapper).toBeTruthy();
+    expect(wrapper.className).toContain('flex');
+    expect(wrapper.className).toContain('gap-4');
+    expect(wrapper.className).toContain('flex-wrap');
+
+    // Check items exist
+    const items = wrapper.querySelectorAll('[data-test-id]');
+    expect(items.length).toBe(3);
+  });
+
+  it('should support grid layout with class prop', async () => {
+    component('test-grid-layout', () => {
+      const items = ref([
+        { id: 1, text: '1' },
+        { id: 2, text: '2' },
+        { id: 3, text: '3' },
+        { id: 4, text: '4' }
+      ]);
+      
+      return html`
+        <div>
+          ${TransitionGroup({
+            preset: 'scale',
+            class: 'grid grid-cols-2 gap-4',
+            tag: 'div'
+          }, each(items.value, (item: any) => html`
+            <div 
+              key="${item.id}"
+              class="p-4 bg-purple-100"
+              data-test-id="${item.id}"
+            >${item.text}</div>
+          `))}
+        </div>
+      `;
+    });
+
+    const el = document.createElement('test-grid-layout') as any;
+    document.body.appendChild(el);
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    // Find the TransitionGroup wrapper
+    const wrapper = el.shadowRoot.querySelector('[class*="grid"]') as HTMLElement;
+    expect(wrapper).toBeTruthy();
+    expect(wrapper.className).toContain('grid');
+    expect(wrapper.className).toContain('grid-cols-2');
+    expect(wrapper.className).toContain('gap-4');
+
+    // Check items exist
+    const items = wrapper.querySelectorAll('[data-test-id]');
+    expect(items.length).toBe(4);
+  });
+
+  it('should support inline styles with style prop', async () => {
+    component('test-inline-styles', () => {
+      const items = ref([
+        { id: 1, text: 'X' },
+        { id: 2, text: 'Y' }
+      ]);
+      
+      return html`
+        <div>
+          ${TransitionGroup({
+            preset: 'fade',
+            style: 'display: flex; gap: 1rem; padding: 2rem;',
+            tag: 'div'
+          }, each(items.value, (item: any) => html`
+            <div 
+              key="${item.id}"
+              data-test-id="${item.id}"
+            >${item.text}</div>
+          `))}
+        </div>
+      `;
+    });
+
+    const el = document.createElement('test-inline-styles') as any;
+    document.body.appendChild(el);
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    // Find the TransitionGroup wrapper with style attribute
+    const wrapper = el.shadowRoot.querySelector('[style]') as HTMLElement;
+    expect(wrapper).toBeTruthy();
+    
+    // Check computed styles (the style attribute gets parsed)
+    const computedStyle = window.getComputedStyle(wrapper);
+    expect(computedStyle.display).toBe('flex');
+  });
+
   it('should apply initial styles to all list items on first render', async () => {
     component('test-list-initial-styles', () => {
       const items = ref([

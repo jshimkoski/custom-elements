@@ -52,13 +52,19 @@ describe("Transitions - Comprehensive Tests", () => {
     const items = el.shadowRoot?.querySelectorAll('[data-test-id]');
     expect(items?.length).toBe(3);
     
-    // Check that all items have transition classes (since they were added dynamically)
-    items?.forEach((item, index) => {
-      const classes = (item as HTMLElement).className;
-      
-      // Should have the final state classes from enter transition
-      expect(classes).toContain('opacity-100');
-    });
+    // Check transition classes: first item is initial content, subsequent items animate
+    const item1Classes = (items?.[0] as HTMLElement)?.className || '';
+    const item2Classes = (items?.[1] as HTMLElement)?.className || '';
+    const item3Classes = (items?.[2] as HTMLElement)?.className || '';
+    
+    console.log('Item 1 classes:', item1Classes);
+    console.log('Item 2 classes:', item2Classes);
+    console.log('Item 3 classes:', item3Classes);
+    
+    // First item doesn't animate (no appear:true), items 2-3 do animate
+    expect(item1Classes).not.toContain('opacity-100');
+    expect(item2Classes).toContain('opacity-100');
+    expect(item3Classes).toContain('opacity-100');
   });
 
   it("should apply move transitions when shuffling maintains all items", async () => {
@@ -230,7 +236,7 @@ describe("Transitions - Comprehensive Tests", () => {
     console.log('Item count after rapid adds:', items?.length);
     expect(items?.length).toBe(4);
     
-    // Check each item has transition classes (all should since they were all added)
+    // Check each item has transition classes (first is initial, rest animate)
     let hasTransitionClasses = 0;
     items?.forEach((item, index) => {
       const classes = (item as HTMLElement).className;
@@ -241,6 +247,6 @@ describe("Transitions - Comprehensive Tests", () => {
     });
     
     console.log(`Items with transition classes: ${hasTransitionClasses} / ${items?.length}`);
-    expect(hasTransitionClasses).toBe(4); // All items should have transition classes
+    expect(hasTransitionClasses).toBe(3); // Items 2-4 have transition classes (item 1 is initial)
   });
 });
