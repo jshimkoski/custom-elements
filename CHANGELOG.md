@@ -1,6 +1,15 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v1.1.1] - 2025-10-03
+
+- fix: add licenese fix: replace console logs with dev safe versions (771f12d)
+- fix: update readme, functional api toc, and router docs (fe6b866)
+- feat: add transition and transition group support (a3f5e8b)
+- BREAKING CHANGE: remove destructure props in favor of useProps feat: fraction width/heights feat: when directive feat: additional gradient styles fix: performance improvements (d722237)
+- feat: add useProps functionality and integration tests (08820c3)
+
+
 ## [v1.1.0] - 2025-09-29
 
 - feat: add useProps functionality and integration tests (08820c3)
