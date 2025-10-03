@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>each() vs TransitionGroup: Flex & Grid Layouts</title>
+  <script type="module">
+    import { component, html, ref, each, TransitionGroup } from './src/lib/index.ts';
+
+    // Demo 1: each() with flex (no transitions)
+    component('each-flex-demo', () => {
+      const items = ref([
+        { id: 1, text: 'Item 1', color: 'bg-blue-500' },
+        { id: 2, text: 'Item 2', color: 'bg-green-500' },
+        { id: 3, text: 'Item 3', color: 'bg-purple-500' },
+      ]);
+
+      let nextId = 4;
+
+      const addItem = () => {
+        const colors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-pink-500', 'bg-yellow-500'];
+        items.value = [...items.value, {
+          id: nextId,
+          text: `Item ${nextId}`,
+          color: colors[Math.floor(Math.random() * colors.length)]
+        }];
+        nextId++;
+      };
+
+      const removeItem = (id) => {
+        items.value = items.value.filter(item => item.id !== id);
+      };
+
+      return html`
+        <div class="p-6 bg-white rounded-lg shadow">
+          <h3 class="text-xl font-bold mb-4">each() with Flex Layout</h3>
+          <p class="text-sm text-gray-600 mb-4">
+            ✅ No wrapper element · ❌ No transitions · ⚡ Instant updates
+          </p>
+          
+          <div class="mb-4 flex gap-2">
+            <button 
+              @click="${addItem}"
+              class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+            >
+              Add Item
+            </button>
+          </div>
+
+          <div class="flex gap-4 flex-wrap">
+            ${each(items.value, (item) => html`
+              <div 
+                key="${item.id}"
+                class="flex-shrink-0 ${item.color} text-white p-6 rounded-lg shadow cursor-pointer hover:scale-105 transition-transform"
+                @click="${() => removeItem(item.id)}"
+              >
+                <div class="text-lg font-semibold">${item.text}</div>
+                <div class="text-sm opacity-75 mt-1">Click to remove</div>
+              </div>
+            `)}
+          </div>
+        </div>
+      `;
+    });
+
+    // Demo 2: TransitionGroup with flex (with transitions)
+    component('transitiongroup-flex-demo', () => {
+      const items = ref([
+        { id: 1, text: 'Item 1', color: 'bg-blue-500' },
+        { id: 2, text: 'Item 2', color: 'bg-green-500' },
+        { id: 3, text: 'Item 3', color: 'bg-purple-500' },
+      ]);
+
+      let nextId = 4;
+
+      const addItem = () => {
+        const colors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-pink-500', 'bg-yellow-500'];
+        items.value = [...items.value, {
+          id: nextId,
+          text: `Item ${nextId}`,
+          color: colors[Math.floor(Math.random() * colors.length)]
+        }];
+        nextId++;
+      };
+
+      const removeItem = (id) => {
+        items.value = items.value.filter(item => item.id !== id);
+      };
+
+      return html`
+        <div class="p-6 bg-white rounded-lg shadow">
+          <h3 class="text-xl font-bold mb-4">TransitionGroup with Flex Layout</h3>
+          <p class="text-sm text-gray-600 mb-4">
+            ✅ Wrapper element with class prop · ✅ Smooth transitions · 🎬 Animated updates
+          </p>
+          
+          <div class="mb-4 flex gap-2">
+            <button 
+              @click="${addItem}"
+              class="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors"
+            >
+              Add Item
+            </button>
+          </div>
+
+          ${TransitionGroup({
+            preset: 'scale',
+            class: 'flex gap-4 flex-wrap',
+            moveClass: 'transition-all duration-500'
+          }, each(items.value, (item) => html`
+            <div 
+              key="${item.id}"
+              class="flex-shrink-0 ${item.color} text-white p-6 rounded-lg shadow cursor-pointer hover:scale-110 transition-transform"
+              @click="${() => removeItem(item.id)}"
+            >
+              <div class="text-lg font-semibold">${item.text}</div>
+              <div class="text-sm opacity-75 mt-1">Click to remove (animated!)</div>
+            </div>
+          `))}
+        </div>
+      `;
+    });
+
+    // Demo 3: each() with grid (no transitions)
+    component('each-grid-demo', () => {
+      const items = ref([
+        { id: 1, emoji: '🎨', label: 'Art' },
+        { id: 2, emoji: '🎵', label: 'Music' },
+        { id: 3, emoji: '🎮', label: 'Gaming' },
+        { id: 4, emoji: '📚', label: 'Books' },
+      ]);
+
+      let nextId = 5;
+      const emojis = [
+        { emoji: '🚀', label: 'Space' },
+        { emoji: '🌈', label: 'Rainbow' },
+        { emoji: '⚡', label: 'Power' },
+        { emoji: '🔥', label: 'Fire' },
+      ];
+
+      const addItem = () => {
+        const random = emojis[Math.floor(Math.random() * emojis.length)];
+        items.value = [...items.value, {
+          id: nextId,
+          emoji: random.emoji,
+          label: random.label
+        }];
+        nextId++;
+      };
+
+      const removeItem = (id) => {
+        items.value = items.value.filter(item => item.id !== id);
+      };
+
+      return html`
+        <div class="p-6 bg-white rounded-lg shadow">
+          <h3 class="text-xl font-bold mb-4">each() with Grid Layout</h3>
+          <p class="text-sm text-gray-600 mb-4">
+            ✅ No wrapper element · ❌ No transitions · ⚡ Instant updates
+          </p>
+          
+          <div class="mb-4 flex gap-2">
+            <button 
+              @click="${addItem}"
+              class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+            >
+              Add Item
+            </button>
+          </div>
+
+          <div class="grid grid-cols-4 gap-4">
+            ${each(items.value, (item) => html`
+              <div 
+                key="${item.id}"
+                class="bg-gradient-to-br from-blue-400 to-purple-400 p-6 rounded-xl shadow cursor-pointer hover:shadow-lg transition-shadow text-center"
+                @click="${() => removeItem(item.id)}"
+              >
+                <div class="text-4xl mb-2">${item.emoji}</div>
+                <div class="text-white font-semibold">${item.label}</div>
+              </div>
+            `)}
+          </div>
+        </div>
+      `;
+    });
+
+    // Demo 4: TransitionGroup with grid (with transitions)
+    component('transitiongroup-grid-demo', () => {
+      const items = ref([
+        { id: 1, emoji: '🎨', label: 'Art' },
+        { id: 2, emoji: '🎵', label: 'Music' },
+        { id: 3, emoji: '🎮', label: 'Gaming' },
+        { id: 4, emoji: '📚', label: 'Books' },
+      ]);
+
+      let nextId = 5;
+      const emojis = [
+        { emoji: '🚀', label: 'Space' },
+        { emoji: '🌈', label: 'Rainbow' },
+        { emoji: '⚡', label: 'Power' },
+        { emoji: '🔥', label: 'Fire' },
+      ];
+
+      const addItem = () => {
+        const random = emojis[Math.floor(Math.random() * emojis.length)];
+        items.value = [...items.value, {
+          id: nextId,
+          emoji: random.emoji,
+          label: random.label
+        }];
+        nextId++;
+      };
+
+      const removeItem = (id) => {
+        items.value = items.value.filter(item => item.id !== id);
+      };
+
+      return html`
+        <div class="p-6 bg-white rounded-lg shadow">
+          <h3 class="text-xl font-bold mb-4">TransitionGroup with Grid Layout</h3>
+          <p class="text-sm text-gray-600 mb-4">
+            ✅ Wrapper element with class prop · ✅ Smooth transitions · 🎬 Animated updates
+          </p>
+          
+          <div class="mb-4 flex gap-2">
+            <button 
+              @click="${addItem}"
+              class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors"
+            >
+              Add Item
+            </button>
+          </div>
+
+          ${TransitionGroup({
+            preset: 'slide-up',
+            class: 'grid grid-cols-4 gap-4',
+            moveClass: 'transition-all duration-500'
+          }, each(items.value, (item) => html`
+            <div 
+              key="${item.id}"
+              class="bg-gradient-to-br from-purple-400 to-pink-400 p-6 rounded-xl shadow cursor-pointer hover:shadow-2xl transition-shadow text-center"
+              @click="${() => removeItem(item.id)}"
+            >
+              <div class="text-4xl mb-2">${item.emoji}</div>
+              <div class="text-white font-semibold">${item.label}</div>
+              <div class="text-white text-xs opacity-75 mt-1">Click to remove (animated!)</div>
+            </div>
+          `))}
+        </div>
+      `;
+    });
+  </script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+  <div class="container mx-auto py-12 px-4">
+    <h1 class="text-4xl font-bold text-center mb-4 text-gray-800">
+      each() vs TransitionGroup
+    </h1>
+    <p class="text-center text-gray-600 mb-12 text-lg">
+      Comparing flex & grid layouts with and without transitions
+    </p>
+    
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <!-- Left Column: each() demos -->
+      <div class="space-y-8">
+        <each-flex-demo></each-flex-demo>
+        <each-grid-demo></each-grid-demo>
+      </div>
+
+      <!-- Right Column: TransitionGroup demos -->
+      <div class="space-y-8">
+        <transitiongroup-flex-demo></transitiongroup-flex-demo>
+        <transitiongroup-grid-demo></transitiongroup-grid-demo>
+      </div>
+    </div>
+
+    <div class="mt-12 p-8 bg-blue-50 rounded-lg">
+      <h2 class="text-2xl font-bold mb-4">🎯 Key Differences</h2>
+      
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="bg-white p-6 rounded-lg">
+          <h3 class="text-xl font-bold mb-2 text-blue-600">each() directive</h3>
+          <ul class="space-y-2 text-gray-700">
+            <li>✅ <strong>No wrapper element</strong> - items are direct children</li>
+            <li>❌ <strong>No built-in transitions</strong> - instant updates</li>
+            <li>⚡ <strong>Lightweight</strong> - pure function, minimal overhead</li>
+            <li>📦 <strong>Returns array</strong> - VNode[] of anchor blocks</li>
+            <li>🎯 <strong>Best for:</strong> Simple lists without animations</li>
+          </ul>
+        </div>
+
+        <div class="bg-white p-6 rounded-lg">
+          <h3 class="text-xl font-bold mb-2 text-purple-600">TransitionGroup</h3>
+          <ul class="space-y-2 text-gray-700">
+            <li>✅ <strong>Wrapper element</strong> - styleable via class/style props</li>
+            <li>✅ <strong>Enter/leave/move transitions</strong> - smooth animations</li>
+            <li>🎬 <strong>Preset animations</strong> - fade, slide, scale, etc.</li>
+            <li>📦 <strong>Returns VNode</strong> - single wrapper element</li>
+            <li>🎯 <strong>Best for:</strong> Animated lists with layout control</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="mt-6 p-4 bg-yellow-50 rounded border-l-4 border-yellow-400">
+        <p class="text-gray-800">
+          <strong>💡 Pro Tip:</strong> Use <code class="bg-white px-2 py-1 rounded">each()</code> 
+          for simple lists where you control the parent container. Use 
+          <code class="bg-white px-2 py-1 rounded">TransitionGroup</code> when you need 
+          animations and want to apply flex/grid directly to the animated container!
+        </p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

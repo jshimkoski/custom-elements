@@ -990,6 +990,54 @@ export function parseSpacing(className: string): string | null {
     .join("");
 }
 
+export function parseSpaceUtility(className: string): string | null {
+  const negative = className.startsWith("-");
+  const raw = negative ? className.slice(1) : className;
+  
+  // Match space-x-{value} or space-y-{value}
+  const match = raw.match(/^space-(x|y)-(.+)$/);
+  if (!match) return null;
+  
+  const [, direction, valueStr] = match;
+  const isHorizontal = direction === "x";
+  
+  // Handle "reverse" modifier
+  if (valueStr === "reverse") {
+    return isHorizontal
+      ? "--tw-space-x-reverse:1;"
+      : "--tw-space-y-reverse:1;";
+  }
+  
+  // Handle fractions (e.g., space-x-1/2)
+  if (valueStr.includes("/")) {
+    const [numerator, denominator] = valueStr.split("/").map((v) => parseFloat(v));
+    if (Number.isNaN(numerator) || Number.isNaN(denominator) || denominator === 0) {
+      return null;
+    }
+    const percentage = (numerator / denominator) * 100;
+    const sign = negative ? "-" : "";
+    
+    if (isHorizontal) {
+      return `--tw-space-x-reverse:0;& > :not([hidden]) ~ :not([hidden]){margin-inline-start:calc(${sign}${percentage}% * calc(1 - var(--tw-space-x-reverse)));margin-inline-end:calc(${sign}${percentage}% * var(--tw-space-x-reverse));}`;
+    } else {
+      return `--tw-space-y-reverse:0;& > :not([hidden]) ~ :not([hidden]){margin-top:calc(${sign}${percentage}% * calc(1 - var(--tw-space-y-reverse)));margin-bottom:calc(${sign}${percentage}% * var(--tw-space-y-reverse));}`;
+    }
+  }
+  
+  // Handle numeric values
+  const num = parseFloat(valueStr);
+  if (Number.isNaN(num)) return null;
+  
+  const sign = negative ? "-" : "";
+  const value = `calc(${sign}${spacing} * ${num})`;
+  
+  if (isHorizontal) {
+    return `--tw-space-x-reverse:0;& > :not([hidden]) ~ :not([hidden]){margin-inline-start:calc(${value} * calc(1 - var(--tw-space-x-reverse)));margin-inline-end:calc(${value} * var(--tw-space-x-reverse));}`;
+  } else {
+    return `--tw-space-y-reverse:0;& > :not([hidden]) ~ :not([hidden]){margin-top:calc(${value} * calc(1 - var(--tw-space-y-reverse)));margin-bottom:calc(${value} * var(--tw-space-y-reverse));}`;
+  }
+}
+
 export function hexToRgb(hex: string): string {
   const clean = hex.replace("#", "");
   const bigint = parseInt(clean, 16);
@@ -1325,6 +1373,7 @@ export function jitCSS(html: string): string {
       if (
         utilityMap[checkPart] ||
         parseSpacing(checkPart) ||
+        parseSpaceUtility(checkPart) ||
         parseOpacity(checkPart) ||
         parseColorWithOpacity(checkPart) ||
         parseGradientColorStop(checkPart) ||
@@ -1341,6 +1390,7 @@ export function jitCSS(html: string): string {
     const baseRule =
       utilityMap[cleanBase] ??
       parseSpacing(cleanBase) ??
+      parseSpaceUtility(cleanBase) ??
       parseOpacity(cleanBase) ??
       parseColorWithOpacity(cleanBase) ??
       parseGradientColorStop(cleanBase) ??
@@ -1577,6 +1627,7 @@ export function jitCSS(html: string): string {
       (p) =>
         utilityMap[p.replace(/^!/, "")] ||
         parseSpacing(p.replace(/^!/, "")) ||
+        parseSpaceUtility(p.replace(/^!/, "")) ||
         parseOpacity(p.replace(/^!/, "")) ||
         parseColorWithOpacity(p.replace(/^!/, "")) ||
         parseGradientColorStop(p.replace(/^!/, "")) ||

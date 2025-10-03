@@ -192,6 +192,43 @@ component('todo-list', () => {
 });
 ```
 
+### Flex and Grid Layouts
+
+Use the `class` prop to apply flex or grid layouts to the wrapper element:
+
+```typescript
+// Flex layout
+${TransitionGroup({
+  preset: 'fade',
+  class: 'flex gap-4 flex-wrap',
+  tag: 'div'
+}, each(items.value, (item) => html`
+  <div key="${item.id}" class="flex-shrink-0 p-4 bg-blue-100 rounded">
+    ${item.text}
+  </div>
+`))}
+
+// Grid layout
+${TransitionGroup({
+  preset: 'scale',
+  class: 'grid grid-cols-3 gap-4',
+  tag: 'div'
+}, each(items.value, (item) => html`
+  <div key="${item.id}" class="p-4 bg-purple-100 rounded">
+    ${item.text}
+  </div>
+`))}
+
+// Custom inline styles
+${TransitionGroup({
+  preset: 'slide-up',
+  style: 'display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;',
+  tag: 'div'
+}, each(items.value, (item) => html`
+  <div key="${item.id}">${item.text}</div>
+`))}
+```
+
 ### Move Transitions
 
 The `moveClass` applies to items that change position:
@@ -202,6 +239,31 @@ ${TransitionGroup({
   moveClass: 'transition-transform duration-500 ease-out'
 }, items)}
 ```
+
+### TransitionGroup Options
+
+Complete list of available options:
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `preset` | `string` | - | Preset name (fade, slide-right, scale, etc.) |
+| `show` | `boolean` | `true` | Whether to show the group |
+| `tag` | `string` | `'div'` | HTML tag for wrapper element |
+| `class` | `string` | - | CSS classes for wrapper (e.g., 'flex gap-4') |
+| `style` | `string \| object` | - | Inline styles for wrapper |
+| `moveClass` | `string` | `'transition-transform duration-300'` | Classes applied during move transitions |
+| `mode` | `'default' \| 'out-in' \| 'in-out'` | `'default'` | Transition timing mode |
+| `duration` | `number \| {enter, leave}` | - | Override transition duration (ms) |
+| `appear` | `boolean` | `false` | Apply transition on initial render |
+| `css` | `boolean` | `true` | Use CSS transitions (false = JS-only) |
+| `name` | `string` | - | Optional name for debugging |
+| `enterFrom` | `string` | - | Classes at start of enter |
+| `enterActive` | `string` | - | Classes during enter |
+| `enterTo` | `string` | - | Classes at end of enter |
+| `leaveFrom` | `string` | - | Classes at start of leave |
+| `leaveActive` | `string` | - | Classes during leave |
+| `leaveTo` | `string` | - | Classes at end of leave |
+| Lifecycle Hooks | - | - | All 8 hooks (see below) |
 
 ## 🪝 Lifecycle Hooks
 
@@ -372,7 +434,69 @@ ${Transition({
 `)}
 ```
 
-## 💡 Tips & Best Practices
+## � Utility Functions
+
+### createTransitionPreset
+
+Create reusable custom transition presets:
+
+```typescript
+import { createTransitionPreset, Transition } from '@jasonshimmy/custom-elements-runtime';
+
+// Define a custom preset
+const myCustomFade = createTransitionPreset({
+  enterFrom: 'opacity-0',
+  enterActive: 'transition-opacity duration-500 ease-out',
+  enterTo: 'opacity-100',
+  leaveFrom: 'opacity-100',
+  leaveActive: 'transition-opacity duration-300 ease-in',
+  leaveTo: 'opacity-0'
+});
+
+// Use it with Transition
+${Transition({ 
+  ...myCustomFade, 
+  show: visible.value 
+}, content)}
+
+// Or share across your application
+export const appTransitions = {
+  slideIn: createTransitionPreset({
+    enterFrom: 'translate-x-full opacity-0',
+    enterActive: 'transition-all duration-400 ease-out',
+    enterTo: 'translate-x-0 opacity-100',
+    leaveFrom: 'translate-x-0 opacity-100',
+    leaveActive: 'transition-all duration-300 ease-in',
+    leaveTo: '-translate-x-full opacity-0'
+  }),
+  popIn: createTransitionPreset({
+    enterFrom: 'scale-0 opacity-0',
+    enterActive: 'transition-all duration-300 ease-out',
+    enterTo: 'scale-100 opacity-100',
+    leaveFrom: 'scale-100 opacity-100',
+    leaveActive: 'transition-all duration-200 ease-in',
+    leaveTo: 'scale-0 opacity-0'
+  })
+};
+```
+
+### getTransitionStyleSheet
+
+Get the pre-generated stylesheet for all transition presets (automatically initialized on module load):
+
+```typescript
+import { getTransitionStyleSheet } from '@jasonshimmy/custom-elements-runtime';
+
+// Get the global transition stylesheet
+const stylesheet = getTransitionStyleSheet();
+
+// All preset classes are pre-generated and ready to use
+// This happens automatically - you typically don't need to call this
+```
+
+**Note:** The transition CSS is automatically initialized when the module loads, ensuring all preset classes are available immediately.
+
+## �💡 Tips & Best Practices
 
 ### 1. Keep Transitions Short
 
@@ -531,13 +655,37 @@ component('notification-center', () => {
 The transitions system provides powerful animation capabilities with:
 
 - **Seamless JIT CSS integration** for utility-first animations
-- **Pre-built presets** for common patterns
+- **Pre-built presets** for common patterns (fade, slide-right, slide-left, slide-up, slide-down, scale, scale-down, bounce, zoom, flip)
 - **Full customization** with JIT utilities
 - **Responsive animations** with breakpoint variants
 - **List animations** with TransitionGroup
-- **Lifecycle hooks** for JavaScript control
-- **Multiple modes** for timing control
+- **Flex/Grid support** via `class` and `style` props on TransitionGroup
+- **Lifecycle hooks** for JavaScript control (8 hooks total)
+- **Multiple modes** for timing control (default, out-in, in-out)
 - **Performance optimized** with native CSS transitions
+- **Utility functions** for creating custom presets
+
+### API Reference
+
+**Components:**
+- `Transition(options, content)` - Single element transitions
+- `TransitionGroup(options, children)` - List transitions with move support
+
+**Utility Functions:**
+- `createTransitionPreset(classes)` - Create reusable custom presets
+- `getTransitionStyleSheet()` - Get pre-generated transition stylesheet
+
+**Presets:**
+- `fade` - Simple opacity transition
+- `slide-right`, `slide-left`, `slide-up`, `slide-down` - Directional slides
+- `scale`, `scale-down` - Scale animations
+- `bounce` - Bounce effect
+- `zoom` - Zoom from zero
+- `flip` - Rotation effect
+
+**Lifecycle Hooks:**
+- `onBeforeEnter`, `onEnter`, `onAfterEnter`, `onEnterCancelled`
+- `onBeforeLeave`, `onLeave`, `onAfterLeave`, `onLeaveCancelled`
 
 Create beautiful, smooth animations with minimal code! 🎬✨
 
@@ -546,3 +694,4 @@ Create beautiful, smooth animations with minimal code! 🎬✨
 - [JIT CSS Guide](./jit-css.md)
 - [Directives Guide](./directives.md)
 - [Functional API](./functional-api.md)
+- [each() vs TransitionGroup Layouts](./each-vs-transitiongroup-layouts.md)

@@ -25,8 +25,11 @@ Custom Elements Runtime provides a high-performance, zero-dependency JIT CSS eng
 **Semantic Sizes:**
 `w-3xs` to `w-7xl`, `h-3xs` to `h-7xl`, `max-w-3xs` to `max-w-7xl`, `max-h-3xs` to `max-h-7xl`, `min-w-3xs` to `min-w-7xl`, `min-h-3xs` to `min-h-7xl`
 
-**Spacing (Margin/Padding):**
+### **Spacing (Margin/Padding/Gap):**
 `m-auto`, `mx-auto`, `my-auto`, `p-4`, `m-2`, `mx-auto`, `gap-2`, `gap-x-2`, `gap-y-2`, etc. (all axis and negative values supported)
+
+### **Space Between (Tailwind-style)**
+`space-x-*`, `space-y-*` - Add consistent spacing between child elements using margin (see [Spacing Utilities](./space-utilities.md) for details)
 
 ### **Overflow**
 `overflow-auto`, `overflow-hidden`, `overflow-visible`, `overflow-scroll`
