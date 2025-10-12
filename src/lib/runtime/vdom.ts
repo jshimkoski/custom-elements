@@ -19,6 +19,7 @@ import {
 } from "./vdom-model-helpers";
 import { performEnterTransition, performLeaveTransition } from "./transition-utils";
 import { devError } from "./logger";
+import { getNodeKey, setNodeKey, getElementTransition, setElementTransition } from "./node-metadata";
 
 /**
  * Helper: determine whether an element is a native form control we treat
@@ -1280,8 +1281,18 @@ export function createElement(
     const textNode = document.createTextNode(
       typeof vnode.children === "string" ? vnode.children : "",
     );
-    if (vnode.key != null) (textNode as any).key = vnode.key; // attach key
+    if (vnode.key != null) setNodeKey(textNode, vnode.key); // attach key
     return textNode;
+  }
+
+  // Raw HTML vnode - insert provided HTML as nodes (unsafe: caller must opt-in)
+  if (vnode.tag === "#raw") {
+    const html = typeof vnode.children === 'string' ? vnode.children : '';
+    const range = document.createRange();
+    // createContextualFragment is broadly supported and safe when used with
+    // controlled input. We intentionally call it for opt-in raw HTML insertion.
+    const frag = range.createContextualFragment(html);
+    return frag;
   }
 
   // Anchor block VNode - ALWAYS create start/end boundaries
@@ -1296,8 +1307,8 @@ export function createElement(
     const end = document.createTextNode("");
 
     if (anchorVNode.key != null) {
-      (start as any).key = `${anchorVNode.key}:start`;
-      (end as any).key = `${anchorVNode.key}:end`;
+      setNodeKey(start, `${anchorVNode.key}:start`);
+      setNodeKey(end, `${anchorVNode.key}:end`);
     }
     anchorVNode._startNode = start;
     anchorVNode._endNode = end;
@@ -1314,8 +1325,7 @@ export function createElement(
         const childHasOwnKey = childVNode && typeof childVNode === 'object' && childVNode.key != null;
         
         if (!childHasOwnKey) {
-          (childNode as any).key = anchorVNode.key;
-          childNode.setAttribute('data-anchor-key', String(anchorVNode.key));
+          setNodeKey(childNode, anchorVNode.key as any);
         }
       }
       frag.appendChild(childNode);
@@ -1326,11 +1336,11 @@ export function createElement(
 
   // Standard element VNode
   const el = document.createElement(vnode.tag);
-  if (vnode.key != null) (el as any).key = vnode.key; // attach key
+  if (vnode.key != null) setNodeKey(el, vnode.key);
 
   // Store TransitionGroup metadata on the DOM element for patchChildren to use
   if (vnode.props && (vnode.props as any)._transitionGroup) {
-    (el as any)._transitionGroup = (vnode.props as any)._transitionGroup;
+    setElementTransition(el, (vnode.props as any)._transitionGroup);
   }
 
   const { props = {}, attrs = {}, directives = {} } = vnode.props ?? {};
@@ -1675,8 +1685,8 @@ export function patchChildren(
   }
   const oldVNodes: VNode[] = Array.isArray(oldChildren) ? oldChildren : [];
 
-  // Check if parent has TransitionGroup metadata
-  const transitionGroup = (parent as any)._transitionGroup;
+  // Check if parent has TransitionGroup metadata (use WeakMap-backed accessor)
+  const transitionGroup = getElementTransition(parent as any as HTMLElement);
 
   // If TransitionGroup, flatten anchor blocks and handle as batch keyed diff
   if (transitionGroup) {
@@ -1738,15 +1748,8 @@ export function patchChildren(
       for (let i = 0; i < oldNodesCache.length; i++) {
         const node = oldNodesCache[i];
         
-        // Try multiple ways to find the key
-        let nodeKey = (node as any).key;
-
-        // If node has data-anchor-key, use that
-        if (!nodeKey && node instanceof Element) {
-          const anchorKey = node.getAttribute('data-anchor-key');
-          if (anchorKey) nodeKey = anchorKey;
-        }
-
+        // Try multiple ways to find the key (WeakMap-backed accessor + attribute fallback)
+        let nodeKey = getNodeKey(node);
         // Strip "each-" prefix from node keys to match flattened VNode keys
         nodeKey = stripKeyPrefix(nodeKey);
         
@@ -1803,19 +1806,14 @@ export function patchChildren(
           
           // Ensure the node has the correct key and attribute
           const keyStr = String(key);
-          (patched as any).key = keyStr;
-          if (patched instanceof Element) {
-            patched.setAttribute('data-anchor-key', keyStr);
-          }
+          setNodeKey(patched, keyStr);
           
           nodesToProcess.push({ node: patched, key, newVNode, oldVNode, isNew: false });
         } else {
           // Create new node and insert it immediately (but invisible via enterFrom classes)
           node = createElement(newVNode, context);
-          (node as any).key = key;
-          if (node instanceof Element) {
-            node.setAttribute('data-anchor-key', String(key));
-          }
+          setNodeKey(node, key as any);
+          
           
           // For new nodes, immediately insert them into DOM (at the end) and start enter transition
           // This ensures the transition can capture the correct FROM state
@@ -1840,7 +1838,7 @@ export function patchChildren(
       
       for (let i = 0; i < oldNodesCache.length; i++) {
         const node = oldNodesCache[i];
-        const nodeKey = (node as any).key;
+        const nodeKey = getNodeKey(node);
         const isUsed = usedFlat.has(node);
 
         if (!isUsed && nodeKey != null && node instanceof HTMLElement) {
@@ -1981,7 +1979,7 @@ export function patchChildren(
   // Scan DOM for keyed nodes including anchor boundaries
   for (let i = 0; i < oldNodesCache.length; i++) {
     const node = oldNodesCache[i];
-    const k = (node as any).key;
+    const k = getNodeKey(node);
     if (k != null) {
       oldNodeByKey.set(k, node);
     }
@@ -2030,7 +2028,7 @@ export function patchChildren(
         if (v && v.key != null) oldVNodeByKeyRange.set(v.key, v);
       }
       for (const node of oldNodesInRange) {
-        const k = (node as any).key;
+        const k = getNodeKey(node);
         if (k != null) oldNodeByKeyRange.set(k, node);
       }
 
@@ -2167,11 +2165,11 @@ export function patchChildren(
       // Create boundaries if they don't exist
       if (!start) {
         start = document.createTextNode("");
-        (start as any).key = startKey;
+        setNodeKey(start, startKey);
       }
       if (!end) {
         end = document.createTextNode("");
-        (end as any).key = endKey;
+        setNodeKey(end, endKey);
       }
 
       // Preserve anchor references on the new VNode
@@ -2310,8 +2308,8 @@ export function patch(
     const start = anchorVNode._startNode ?? document.createTextNode("");
     const end = anchorVNode._endNode ?? document.createTextNode("");
     if (anchorVNode.key != null) {
-      (start as any).key = `${anchorVNode.key}:start`;
-      (end as any).key = `${anchorVNode.key}:end`;
+      setNodeKey(start, `${anchorVNode.key}:start`);
+      setNodeKey(end, `${anchorVNode.key}:end`);
     }
     anchorVNode._startNode = start;
     anchorVNode._endNode = end;
@@ -2347,8 +2345,8 @@ export function patch(
     const end = (newVNode as any)._endNode ?? document.createTextNode("");
 
     if (newVNode.key != null) {
-      (start as any).key = `${newVNode.key}:start`;
-      (end as any).key = `${newVNode.key}:end`;
+      setNodeKey(start, `${newVNode.key}:start`);
+      setNodeKey(end, `${newVNode.key}:end`);
     }
 
     (newVNode as any)._startNode = start;
@@ -2509,6 +2507,10 @@ export function renderToString(vnode: VNode): string {
     return children.map(renderToString).join("");
   }
 
+  if (vnode.tag === "#raw") {
+    return typeof vnode.children === 'string' ? vnode.children : '';
+  }
+
   // Collect attributes from props.attrs
   let attrsString = "";
   if (vnode.props && vnode.props.attrs) {
@@ -2517,18 +2519,14 @@ export function renderToString(vnode: VNode): string {
       .join("");
   }
 
-  // Collect other props (excluding attrs, directives, ref, key)
-  let propsString = "";
-  if (vnode.props) {
-    propsString = Object.entries(vnode.props)
-      .filter(([k]) => k !== "attrs" && k !== "directives" && k !== "ref" && k !== "key")
-      .map(([k, v]) => ` ${k}="${escapeHTML(String(v))}"`)
-      .join("");
-  }
+  // Note: vnode.props may contain a nested `props` object for runtime-only
+  // values (functions, reactive state, directives). We intentionally only
+  // serialize HTML attributes collected under `props.attrs` above so that
+  // runtime-only values aren't emitted into SSR output.
 
   const children = Array.isArray(vnode.children)
     ? vnode.children.filter(Boolean).map(renderToString).join("")
     : (typeof vnode.children === "string" ? escapeHTML(vnode.children) : vnode.children ? renderToString(vnode.children) : "");
 
-  return `<${vnode.tag}${attrsString}${propsString}>${children}</${vnode.tag}>`;
+  return `<${vnode.tag}${attrsString}>${children}</${vnode.tag}>`;
 }

@@ -7,6 +7,7 @@
 - [🔒 Props and Type Safety](#-props-and-type-safety)
 - [🚀 Event Emission](#-event-emission)
 - [🔁 Lifecycle Hooks](#-lifecycle-hooks)
+- [🧾 Working with HTML entities and raw HTML](#-working-with-html-entities-and-raw-html)
 - [🧬 Reactive State Management](#-reactive-state-management)
 - [🎛️ Directives and Bindings](#-directives-and-bindings)
 - [🔀 Conditional Rendering and Lists](#-conditional-rendering-and-lists)
@@ -16,7 +17,6 @@
 - [⏳ Async Components](#-async-components)
 - [🧪 Testing Components](#-testing-components)
 - [🎯 Best Practices](#-best-practices)
-- [🔄 Migration from Old API](#-migration-from-old-api)
 - [🎉 Summary](#-summary)
 
 The Custom Elements Runtime provides a powerful, intuitive functional component API that emphasizes simplicity, type safety, and developer ergonomics. This API automatically handles reactive props, type inference, and event emission without requiring complex configuration objects.
@@ -293,6 +293,42 @@ component('api-data', () => {
   `;
 });
 ```
+
+## 🧾 Working with HTML entities and raw HTML
+
+The runtime escapes interpolated values by default to keep the DOM safe from XSS. Two utilities are available when you need finer control:
+
+- `decodeEntities(str)` — a small helper to decode common HTML entities (e.g. `&lt;`, `&gt;`, `&amp;`, numeric references) into their character equivalents.
+- `unsafeHTML(htmlString)` — an opt-in marker for inserting raw HTML into the template. Use this only with trusted HTML.
+
+### When to use each
+
+- Use `decodeEntities` when you receive encoded HTML-like strings from a trusted source and want to display the decoded text in a text node (without interpreting it as markup).
+- Use `unsafeHTML` only when you control or sanitize the HTML yourself and intentionally want the runtime to parse and insert DOM nodes from an HTML string.
+
+### Examples
+
+```ts
+import { html, unsafeHTML, decodeEntities } from '@jasonshimmy/custom-elements-runtime';
+
+// Literal entity decoding inside template text (the compiler decodes literal template text automatically)
+const vnode = html`<p>This template literal contains &lt;escaped&gt; text</p>`;
+
+// Interpolated values are preserved as-is. If you receive an encoded string, decode explicitly:
+const encoded = '&lt;3 &amp; hi';
+const decoded = decodeEntities(encoded); // '<3 & hi'
+const vnode2 = html`<p>${decoded}</p>`; // renders text '<3 & hi'
+
+// Insert raw HTML (opt-in):
+const raw = '<b>Important</b> <i>note</i>';
+const vnode3 = html`<div>${unsafeHTML(raw)}</div>`; // inserts <b> and <i> elements as nodes
+```
+
+### Security note ⚠️
+
+Inserting or rendering raw HTML can open your application to XSS vulnerabilities. The runtime never inserts raw HTML unless you explicitly opt into it using `unsafeHTML`. Always sanitize or otherwise validate any HTML that originates from users or untrusted sources before passing it to `unsafeHTML`.
+
+If you only want to display encoded HTML-like text (for example, to show `<script>` literally in UI), prefer decoding with `decodeEntities` and rendering as plain text nodes, not raw HTML.
 
 ## 🧬 Reactive State Management
 
@@ -660,7 +696,7 @@ component('focusable-input', () => {
   return html`
     <div class="input-container">
       <input
-        ref="${(el) => { 
+        :ref="${(el) => { 
           inputRef = el;
           if (props.autoFocus) el.focus();
         }}"
@@ -1583,35 +1619,6 @@ component('data-loader', () => {
       </div>
     `)}
     <!-- Rest of template -->
-  `;
-});
-```
-
-## 🔄 Migration from Old API
-
-The old configuration-based API has been completely removed in favor of the functional API. Here's how the patterns translate:
-
-### Before (Old Config-Based API - Removed)
-```typescript
-// ❌ This API no longer exists
-component('my-component', {
-  props: { message: { type: String, default: 'Hello' } },
-  state: { count: 0 },
-  render: (ctx) => html`
-    <div>${ctx.message} - ${ctx.count}</div>
-  `
-});
-```
-
-### After (Functional API)
-```typescript
-// ✅ Current streamlined functional API
-component('my-component', () => {
-  const props = useProps({ message: 'Hello' });
-  const count = ref(0);
-  
-  return html`
-    <div>${props.message} - ${count.value}</div>
   `;
 });
 ```

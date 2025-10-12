@@ -1,6 +1,6 @@
 import type { VNode } from "./types";
 import { contextStack } from "./render";
-import { toKebab, toCamel, getNestedValue, setNestedValue, safe } from "./helpers";
+import { toKebab, toCamel, getNestedValue, setNestedValue, safe, decodeEntities, isUnsafeHTML } from "./helpers";
 import { isReactiveState } from "./reactive";
 import { devWarn } from "./logger";
 
@@ -334,8 +334,19 @@ export function htmlImpl(
     if (cached) return cached;
   }
 
+  // Create a text VNode for interpolations (do NOT decode entity sequences)
   function textVNode(text: string, key: string): VNode {
     return h("#text", {}, text, key);
+  }
+
+  // Create a text VNode for literal template text (decode HTML entities so
+  // authors can write `&lt;` inside template bodies and get the literal
+  // character in the DOM). This should NOT be used for interpolated values
+  // where the runtime should preserve the original string provided by the
+  // consumer.
+  function decodedTextVNode(text: string, key: string): VNode {
+    const decoded = typeof text === 'string' ? decodeEntities(text) : text;
+    return h("#text", {}, decoded as any, key);
   }
 
   // Stitch template with interpolation markers
@@ -468,7 +479,12 @@ export function htmlImpl(
           // recurse or push without forcing a key
           pushInterpolation(v, `${baseKey}-${i}`);
         } else if (v !== null && typeof v === "object") {
-          mergeIntoCurrentProps(v);
+          // If the object is an unsafe HTML marker, push a raw vnode
+          if (isUnsafeHTML(v)) {
+            targetChildren.push(h('#raw', {}, (v as any).__rawHTML, `${baseKey}-${i}`));
+          } else {
+            mergeIntoCurrentProps(v);
+          }
         } else {
           targetChildren.push(textVNode(String(v), `${baseKey}-${i}`));
         }
@@ -477,6 +493,11 @@ export function htmlImpl(
     }
 
     if (val !== null && typeof val === "object") {
+      if (isUnsafeHTML(val)) {
+        const raw = (val as any).__rawHTML ?? '';
+        targetChildren.push(h('#raw', {}, raw, baseKey));
+        return;
+      }
       mergeIntoCurrentProps(val);
       return;
     }
@@ -827,10 +848,12 @@ export function htmlImpl(
           const val = values[idx];
           const baseKey = `interp-${idx}`;
           pushInterpolation(val, baseKey);
-        } else {
-          const key = `text-${nodeIndex++}`;
-          targetChildren.push(textVNode(part, key));
-        }
+          } else {
+            const key = `text-${nodeIndex++}`;
+            // This branch is for literal template text (not interpolation markers)
+            // so decode entity sequences here.
+            targetChildren.push(decodedTextVNode(part, key));
+          }
       }
     }
   }

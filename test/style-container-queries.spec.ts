@@ -59,7 +59,7 @@ describe("🔧 Container Queries", () => {
       const html = '<div class="@md:text-lg"></div>';
       const css = jitCSS(html);
       expect(css).toContain(
-        "@container (min-width:28rem){.\\@md\\:text-lg{font-size:1.125rem;line-height:1.75;}}",
+        "@container (min-width:28rem){.\\@md\\:text-lg{font-size:1.125rem;line-height:var(--ce-line-height,1.75);}}",
       );
     });
 
@@ -68,13 +68,13 @@ describe("🔧 Container Queries", () => {
         '<div class="@sm:text-base @lg:text-xl @2xl:text-2xl"></div>';
       const css = jitCSS(html);
       expect(css).toContain(
-        "@container (min-width:24rem){.\\@sm\\:text-base{font-size:1rem;line-height:1.5;}}",
+        "@container (min-width:24rem){.\\@sm\\:text-base{font-size:1rem;line-height:var(--ce-line-height,1.5);}}",
       );
       expect(css).toContain(
-        "@container (min-width:32rem){.\\@lg\\:text-xl{font-size:1.25rem;line-height:1.75;}}",
+        "@container (min-width:32rem){.\\@lg\\:text-xl{font-size:1.25rem;line-height:var(--ce-line-height,1.75);}}",
       );
       expect(css).toContain(
-        "@container (min-width:42rem){.\\@2xl\\:text-2xl{font-size:1.5rem;line-height:2;}}",
+        "@container (min-width:42rem){.\\@2xl\\:text-2xl{font-size:1.5rem;line-height:var(--ce-line-height,2);}}",
       );
     });
 
@@ -162,10 +162,10 @@ describe("🔧 Container Queries", () => {
       const html = '<div class="@[300px]:text-lg @[500px]:text-xl"></div>';
       const css = jitCSS(html);
       expect(css).toContain(
-        "@container (min-width:300px){.\\@\\[300px\\]\\:text-lg{font-size:1.125rem;line-height:1.75;}}",
+        "@container (min-width:300px){.\\@\\[300px\\]\\:text-lg{font-size:1.125rem;line-height:var(--ce-line-height,1.75);}}",
       );
       expect(css).toContain(
-        "@container (min-width:500px){.\\@\\[500px\\]\\:text-xl{font-size:1.25rem;line-height:1.75;}}",
+        "@container (min-width:500px){.\\@\\[500px\\]\\:text-xl{font-size:1.25rem;line-height:var(--ce-line-height,1.75);}}",
       );
     });
 
@@ -220,10 +220,10 @@ describe("🔧 Container Queries", () => {
       const html = '<div class="md:@lg:text-xl lg:@xl:text-2xl"></div>';
       const css = jitCSS(html);
       expect(css).toContain(
-        "@media (min-width:768px)@container (min-width:32rem){.md\\:\\@lg\\:text-xl{font-size:1.25rem;line-height:1.75;}}",
+        "@media (min-width:768px)@container (min-width:32rem){.md\\:\\\@lg\\:text-xl{font-size:1.25rem;line-height:var(--ce-line-height,1.75);}}",
       );
       expect(css).toContain(
-        "@media (min-width:1024px)@container (min-width:36rem){.lg\\:\\@xl\\:text-2xl{font-size:1.5rem;line-height:2;}}",
+        "@media (min-width:1024px)@container (min-width:36rem){.lg\\:\\\@xl\\:text-2xl{font-size:1.5rem;line-height:var(--ce-line-height,2);}}",
       );
     });
 
@@ -316,7 +316,7 @@ describe("🔧 Container Queries", () => {
       const html = '<div class="@md:!text-xl @lg:!bg-primary-500"></div>';
       const css = jitCSS(html);
       expect(css).toContain(
-        "@container (min-width:28rem){.\\@md\\:\\!text-xl{font-size:1.25rem !important;line-height:1.75 !important;}}",
+        "@container (min-width:28rem){.\\@md\\:\\!text-xl{font-size:1.25rem !important;line-height:var(--ce-line-height,1.75) !important;}}",
       );
       expect(css).toContain(
         "@container (min-width:32rem){.\\@lg\\:\\!bg-primary-500{background-color:var(--color-primary-500, #3b82f6) !important;}}",
@@ -350,10 +350,10 @@ describe("🔧 Container Queries", () => {
         '<div class="@md:text-lg @invalid:bg-red @lg:text-xl"></div>';
       const css = jitCSS(html);
       expect(css).toContain(
-        "@container (min-width:28rem){.\\@md\\:text-lg{font-size:1.125rem;line-height:1.75;}}",
+        "@container (min-width:28rem){.\\@md\\:text-lg{font-size:1.125rem;line-height:var(--ce-line-height,1.75);}}",
       );
       expect(css).toContain(
-        "@container (min-width:32rem){.\\@lg\\:text-xl{font-size:1.25rem;line-height:1.75;}}",
+        "@container (min-width:32rem){.\\@lg\\:text-xl{font-size:1.25rem;line-height:var(--ce-line-height,1.75);}}",
       );
       expect(css).not.toContain("@invalid");
     });
@@ -363,13 +363,13 @@ describe("🔧 Container Queries", () => {
         '<div class="@[16rem]:text-sm @[400px]:text-base @[25em]:text-lg"></div>';
       const css = jitCSS(html);
       expect(css).toContain(
-        "@container (min-width:16rem){.\\@\\[16rem\\]\\:text-sm{font-size:0.875rem;line-height:1.25;}}",
+        "@container (min-width:16rem){.\\@\\[16rem\\]\\:text-sm{font-size:0.875rem;line-height:var(--ce-line-height,1.25);}}",
       );
       expect(css).toContain(
-        "@container (min-width:400px){.\\@\\[400px\\]\\:text-base{font-size:1rem;line-height:1.5;}}",
+        "@container (min-width:400px){.\\@\\[400px\\]\\:text-base{font-size:1rem;line-height:var(--ce-line-height,1.5);}}",
       );
       expect(css).toContain(
-        "@container (min-width:25em){.\\@\\[25em\\]\\:text-lg{font-size:1.125rem;line-height:1.75;}}",
+        "@container (min-width:25em){.\\@\\[25em\\]\\:text-lg{font-size:1.125rem;line-height:var(--ce-line-height,1.75);}}",
       );
     });
   });

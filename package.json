@@ -42,7 +42,8 @@
   "types": "dist/index.d.ts",
   "files": [
     "dist",
-    "dist/index.d.ts"
+    "dist/index.d.ts",
+    "entities.json"
   ],
   "exports": {
     ".": {
@@ -51,6 +52,8 @@
       "require": "./dist/custom-elements-runtime.cjs.js",
       "default": "./dist/custom-elements-runtime.umd.js"
     }
+    ,
+    "./entities.json": "./entities.json"
   },
   "publishConfig": {
     "access": "public"

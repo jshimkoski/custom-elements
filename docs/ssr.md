@@ -27,10 +27,11 @@ Server-Side Rendering (SSR) is the process of generating HTML on the server, sen
 ## 🧩 SSR-Friendly Component Example
 
 ```typescript
-import { component, ref, html } from "@jasonshimmy/custom-elements-runtime";
-
-component("ssr-demo", ({ message = "Hello SSR!" }, { emit }) => {
-  const msg = ref(message);
+import { component, ref, html, useProps } from "@jasonshimmy/custom-elements-runtime";
+  
+component("ssr-demo", () => {
+  const props = useProps({ message: "Hello SSR!" });
+  const msg = ref(props.message);
   return html`<div>${msg.value}</div>`;
 });
 ```
@@ -104,10 +105,11 @@ On the client register the same component and let the runtime hydrate existing s
     <!-- server rendered -->
     <ssr-demo><div>Hello SSR!</div></ssr-demo>
     <script type="module">
-      import { component, ref, html } from "@jasonshimmy/custom-elements-runtime";
+      import { component, ref, html, useProps } from "@jasonshimmy/custom-elements-runtime";
 
-      component('ssr-demo', ({ message = 'Hello SSR!' }, { emit }) => {
-        const msg = ref(message);
+      component('ssr-demo', () => {
+        const props = useProps({ message: 'Hello SSR!' });
+        const msg = ref(props.message);
         return html`<div>${msg.value}</div>`;
       });
 
@@ -153,14 +155,64 @@ if (typeof window === "undefined") {
 ## 📚 Example: Universal Component
 
 ```typescript
-component("universal-greeting", ({ name = "World" }, { emit }) => {
-  const greeting = ref(name);
+component("universal-greeting", () => {
+  const props = useProps({ name: "World" });
+  const greeting = ref(props.name);
   return html`<h1>Hello, ${greeting.value}!</h1>`;
 });
 ```
 
 - Works in SSR and client environments
 - Hydrates seamlessly for interactivity
+
+## 🗺️ registerEntityMap (server-side entity map)
+
+When performing server-side rendering you may want full HTML5 named-entity decoding (e.g. `&rsquo;`, `&hellip;`, etc.). The library keeps the client bundle small by not shipping the full entity map to the browser. If your SSR pipeline needs complete decoding, register a full entity map at server startup.
+
+### Why register?
+- The full HTML5 entity map is large. Publishing it with the client bundle would bloat CDN and npm consumers.
+- This API lets server deployments opt in to the full map while keeping the library tiny for browsers.
+
+### API
+- `registerEntityMap(map: Record<string,string>, options?: { overwrite?: boolean })` — register the full map before rendering. First registration wins by default.
+- `clearRegisteredEntityMap()` — clear the registration (useful in tests).
+
+### Example (Express)
+
+```js
+// server.js
+import express from 'express';
+import { registerEntityMap } from 'your-lib';
+import entities from './entities.json'; // generated or copied by the server team
+
+registerEntityMap(entities);
+
+const app = express();
+app.get('*', (req, res) => {
+  // render using your library; decodeEntities will now use the full map
+});
+```
+
+### Example (Next.js custom server)
+
+Place `registerEntityMap` call in your server start file (before handling requests) so the map is available for all renders.
+
+```js
+// next-server.js (or similar startup entry)
+import { registerEntityMap } from 'your-lib';
+import entities from './entities.json';
+
+// register synchronously at startup — do this before handling any incoming requests
+registerEntityMap(entities);
+
+// start server afterwards
+// app.listen(...)
+```
+
+### Notes
+- If you don't register a map, the library falls back to a small inline map and numeric entity decoding — this keeps the runtime safe and compact.
+- For serverless deployments with strict memory or cold-start budgets, consider trimming the entity map to the subset your app uses.
+- Avoid importing the big JSON into client-side code — doing so will cause bundlers to include it in client bundles.
 
 ## ❓ FAQ
 

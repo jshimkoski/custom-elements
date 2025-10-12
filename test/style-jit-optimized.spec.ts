@@ -93,11 +93,21 @@ describe("Optimized JIT CSS Tests", () => {
     });
 
     it("should have line height utilities", () => {
-      expect(utilityMap["leading-3"]).toBe("line-height:0.75rem;");
-      expect(utilityMap["leading-none"]).toBe("line-height:1;");
-      expect(utilityMap["leading-tight"]).toBe("line-height:1.25;");
-      expect(utilityMap["leading-normal"]).toBe("line-height:1.5;");
-      expect(utilityMap["leading-loose"]).toBe("line-height:2;");
+      expect(utilityMap["leading-3"]).toBe(
+        "line-height:0.75rem;--ce-line-height:0.75rem;line-height:var(--ce-line-height,0.75rem);",
+      );
+      expect(utilityMap["leading-none"]).toBe(
+        "line-height:1;--ce-line-height:1;line-height:var(--ce-line-height,1);",
+      );
+      expect(utilityMap["leading-tight"]).toBe(
+        "line-height:1.25;--ce-line-height:1.25;line-height:var(--ce-line-height,1.25);",
+      );
+      expect(utilityMap["leading-normal"]).toBe(
+        "line-height:1.5;--ce-line-height:1.5;line-height:var(--ce-line-height,1.5);",
+      );
+      expect(utilityMap["leading-loose"]).toBe(
+        "line-height:2;--ce-line-height:2;line-height:var(--ce-line-height,2);",
+      );
     });
 
     it("should have transform utilities", () => {
@@ -260,7 +270,9 @@ describe("Optimized JIT CSS Tests", () => {
       const html = '<div class="tracking-wide leading-relaxed">Content</div>';
       const css = jitCSS(html);
       expect(css).toContain(".tracking-wide{letter-spacing:0.025em;}");
-      expect(css).toContain(".leading-relaxed{line-height:1.625;}");
+      expect(css).toContain(
+        ".leading-relaxed{line-height:1.625;--ce-line-height:1.625;line-height:var(--ce-line-height,1.625);}",
+      );
     });
 
     it("should generate CSS for transform utilities", () => {

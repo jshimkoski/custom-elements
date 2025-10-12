@@ -22,11 +22,11 @@ describe('Gradient Utilities', () => {
 
       // Gradient stops
       expect(css).toContain('.from-primary-500');
-      expect(css).toContain('--tw-gradient-from');
+      expect(css).toContain('--ce-gradient-from');
       expect(css).toContain('.to-secondary-500');
-      expect(css).toContain('--tw-gradient-to');
+      expect(css).toContain('--ce-gradient-to');
       expect(css).toContain('.via-warning-500');
-      expect(css).toContain('--tw-gradient-stops');
+      expect(css).toContain('--ce-gradient-stops');
     });
 
     it('generates all linear gradient directions', () => {
@@ -204,9 +204,9 @@ describe('Gradient Utilities', () => {
       expect(css).toContain('.to-transparent');
 
       // Check gradient variables
-      expect(css).toContain('--tw-gradient-from');
-      expect(css).toContain('--tw-gradient-to');
-      expect(css).toContain('--tw-gradient-stops');
+      expect(css).toContain('--ce-gradient-from');
+      expect(css).toContain('--ce-gradient-to');
+      expect(css).toContain('--ce-gradient-stops');
     });
 
     // Note: Opacity modifiers on gradient stops are not currently supported
@@ -224,9 +224,9 @@ describe('Gradient Utilities', () => {
       expect(css).toContain('.to-success-500\\/70');
       
       // Check that gradient variables are present
-      expect(css).toContain('--tw-gradient-from');
-      expect(css).toContain('--tw-gradient-to');
-      expect(css).toContain('--tw-gradient-stops');
+      expect(css).toContain('--ce-gradient-from');
+      expect(css).toContain('--ce-gradient-to');
+      expect(css).toContain('--ce-gradient-stops');
     });
   });
 

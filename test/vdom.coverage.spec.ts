@@ -7,6 +7,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { createElement, patch, patchChildren, patchProps, cleanupRefs, processModelDirective, assignKeysDeep } from "../src/lib/runtime/vdom";
 import type { VNode as VNodeType } from "../src/lib/runtime/types";
 import { ReactiveState } from "../src/lib/runtime/reactive";
+import { setElementTransition, setNodeKey } from "../src/lib/runtime/node-metadata";
 
 type VNode = VNodeType;
 
@@ -93,8 +94,8 @@ describe("VDOM Coverage - Edge Cases", () => {
       const refs: any = {
         myInput: null,
       };
-      const input = document.createElement("input");
-      (input as any).key = "myInput";
+  const input = document.createElement("input");
+  setNodeKey(input, "myInput");
       refs.myInput = input;
       container.appendChild(input);
 
@@ -499,14 +500,15 @@ describe("VDOM Coverage - Edge Cases", () => {
   describe("patchChildren - TransitionGroup", () => {
     it("should handle TransitionGroup metadata", () => {
       const parent = document.createElement("div");
-      (parent as any)._transitionGroup = {
+      // Use runtime helper to set transition metadata so WeakMap-backed storage is used
+      setElementTransition(parent, {
         css: true,
         classes: {
           enterFrom: "opacity-0",
           enterActive: "transition-opacity",
           enterTo: "opacity-100",
         },
-      };
+      });
 
       const oldChildren: VNode[] = [];
       const newChildren: VNode[] = [

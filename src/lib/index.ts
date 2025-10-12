@@ -25,6 +25,7 @@ export { ref, computed, watch } from "./runtime/reactive";
 // Template and styling
 export { html } from "./runtime/template-compiler";
 export { css } from "./runtime/style";
+export { unsafeHTML, decodeEntities } from "./runtime/helpers";
 
 // VDOM utilities
 export { renderToString } from "./runtime/vdom";
