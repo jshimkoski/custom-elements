@@ -1,7 +1,7 @@
 {
   "name": "@jasonshimmy/custom-elements-runtime",
   "description": "A powerful, modern, and lightweight runtime for creating reactive web components with TypeScript",
-  "version": "1.1.2",
+  "version": "1.2.0",
   "type": "module",
   "keywords": [
     "web-components",
@@ -51,8 +51,7 @@
       "import": "./dist/custom-elements-runtime.es.js",
       "require": "./dist/custom-elements-runtime.cjs.js",
       "default": "./dist/custom-elements-runtime.umd.js"
-    }
-    ,
+    },
     "./entities.json": "./entities.json"
   },
   "publishConfig": {
