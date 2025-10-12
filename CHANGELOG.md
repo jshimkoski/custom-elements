@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v1.2.0] - 2025-10-12
+
+- feat: add entity handling feat: add unsafeHTML function fix: semantic text sizes can now have their line height overridden (8479af9)
+- fix: add missing class and style props to TransitionGroup fix: add missing space-x-* and space-y-* utilities (a3751ee)
+
+
 ## [v1.1.2] - 2025-10-03
 
 - fix: add missing class and style props to TransitionGroup fix: add missing space-x-* and space-y-* utilities (a3751ee)
