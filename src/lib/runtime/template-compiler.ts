@@ -258,8 +258,11 @@ function transformWhenDirective(vnode: VNode): VNode {
   // Check if this VNode has a :when directive
   const directives = vnode.props?.directives;
   if (directives && directives.when) {
-    const whenCondition = directives.when.value;
-    
+    const rawWhen = directives.when.value;
+    // If the directive value is a ReactiveState, unwrap it so the condition
+    // reflects the current boolean value (e.g. ref(false) -> false).
+    const whenCondition = isReactiveState(rawWhen) ? (rawWhen as any).value : rawWhen;
+
     // Remove the :when directive from the VNode since we're handling it here
     const { when, ...remainingDirectives } = directives;
     const newProps = { ...vnode.props };

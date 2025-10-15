@@ -20,6 +20,7 @@ import {
   setCurrentComponentContext,
   clearCurrentComponentContext,
 } from "./hooks";
+import { devError, devWarn } from './logger';
 
 /**
  * @internal
@@ -406,10 +407,39 @@ export function createElementClass<
         fn();
       } catch (error) {
         this._hasError = true;
+
+        // DEV-only diagnostic: provide actionable context to help debugging
+        try {
+          const tag = (cfg && (cfg as any).tag) || this.tagName?.toLowerCase?.() || '<unknown>';
+          const compId = this._componentId || '<unknown-id>';
+          const safeProps: Record<string, any> = {};
+          if (cfg && (cfg as any).props) {
+            for (const k of Object.keys((cfg as any).props)) {
+              try {
+                const v = (this.context as any)[k];
+                if (v instanceof Node) {
+                  safeProps[k] = `[DOM Node: ${v.nodeName}]`;
+                } else if (typeof v === 'object' && v !== null) {
+                  safeProps[k] = Object.keys(v).length > 5 ? `[object(${Object.keys(v).length} keys)]` : v;
+                } else {
+                  safeProps[k] = v;
+                }
+              } catch (e) {
+                safeProps[k] = '[unreadable]';
+              }
+            }
+          }
+
+          devError(`Error rendering component <${tag}> (id=${compId}):`, error);
+          devError('Component props snapshot:', safeProps);
+          devWarn('Common causes: accessing properties of null/undefined inside template interpolations; expensive or throwing expressions inside templates that evaluate eagerly. Fixes: use optional chaining (obj?.prop), guard with ternary, or use the runtime lazy overload: when(cond, () => html`...`).');
+        } catch (e) {
+          // best-effort diagnostics - swallow failures here to preserve original behavior
+        }
+
         if (cfg.onError) {
           cfg.onError(error as Error | null, this.context);
         }
-        // Note: errorFallback was removed as it's handled by the functional API directly
       }
     }
 
@@ -669,7 +699,23 @@ export function component(
         setCurrentComponentContext(context);
 
         // Call render function with no arguments - use useProps() hook for props access
-        const result = renderFn();
+        // If renderFn throws synchronously (for example due to eager interpolation
+        // inside templates), invoke any useOnError hook that the component may
+        // have already registered during the render execution before rethrowing.
+        let result: any;
+        try {
+          result = renderFn();
+        } catch (err) {
+          try {
+            const hookCallbacks = (context as any)?._hookCallbacks;
+            if (hookCallbacks && typeof hookCallbacks.onError === 'function') {
+              try { hookCallbacks.onError(err); } catch (e) { /* swallow */ }
+            }
+          } catch (e) {
+            /* best-effort */
+          }
+          throw err;
+        }
 
         // Process hook callbacks that were set during render
         if ((context as any)._hookCallbacks) {
@@ -734,7 +780,27 @@ export function component(
         requestRender: () => {},
       };
       setCurrentComponentContext(discoveryContext);
-      renderFn(); // Execute once to trigger useProps() calls
+      try {
+        // Execute once to trigger useProps() calls. If this throws we want to
+        // surface the error to any useOnError hook that the component may have
+        // registered during discovery and emit DEV diagnostics so authors see
+        // what's going wrong (best-effort).
+        renderFn();
+      } catch (err) {
+        try {
+          const hookCallbacks = (discoveryContext as any)?._hookCallbacks;
+          if (hookCallbacks && typeof hookCallbacks.onError === 'function') {
+            try { hookCallbacks.onError(err); } catch (e) { /* swallow */ }
+          }
+          // DEV diagnostics for discovery-time failures
+          devError(`Error during component discovery render <${normalizedTag}>:`, err);
+          devWarn('Error occurred during initial component discovery render. Consider guarding expensive expressions or using lazy factories for directives like when().');
+        } catch (e) {
+          /* best-effort */
+        }
+        clearCurrentComponentContext();
+        throw err;
+      }
       clearCurrentComponentContext();
       
       // If useProps() was called during discovery, update config.props

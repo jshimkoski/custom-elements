@@ -241,7 +241,8 @@ export async function loadEntityMap(): Promise<Record<string, string>> {
   // reliable path. Make the specifier a runtime string to discourage bundlers from inlining.
   const pkgExport = ['@jasonshimmy', 'custom-elements-runtime', 'entities.json'].join('/');
   try {
-    const mPkg = await import(pkgExport as any);
+  // @vite-ignore: dynamic import specifier constructed at runtime
+  const mPkg = await import(/* @vite-ignore */ pkgExport as any);
     return (mPkg && (mPkg.default || mPkg)) as Record<string, string>;
   } catch {
     // Next try relative local JSON (useful during development or mono-repo installs)
@@ -255,7 +256,8 @@ export async function loadEntityMap(): Promise<Record<string, string>> {
       ];
       for (const p of localCandidates) {
         try {
-          const mLocal = await import(p as any);
+          // @vite-ignore: intentionally dynamic path candidates for dev/local resolution
+          const mLocal = await import(/* @vite-ignore */ p as any);
           if (mLocal) return (mLocal && (mLocal.default || mLocal)) as Record<string, string>;
         } catch {}
       }

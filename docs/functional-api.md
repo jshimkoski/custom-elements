@@ -752,6 +752,40 @@ component('conditional-content', () => {
 
 > **Note**: The `when` directive only accepts a condition and content. For if/else logic, use two separate `when` calls or the `match` directive below.
 
+#### 💤 Lazy `when` (runtime-only)
+
+If your conditional content includes expressions that are expensive or that may throw when evaluated, prefer the lazy factory overload which defers building the child VNode(s) until the condition becomes truthy:
+
+```ts
+// Use a factory to avoid evaluating `expensive()` while `isVisible` is falsy
+${when(isVisible, () => html`<div>${expensive()}</div>`) }
+```
+
+Key points:
+- This behavior is implemented entirely at runtime. There is no compile-time transform required or used.
+- Existing code using `when(cond, html`...`)` continues to work. Switch to the factory form when you need guarded evaluation.
+- The factory will only be executed when the condition is truthy. The runtime ensures stable anchor blocks so DOM updates remain predictable.
+
+##### Practical example: guarding a parse
+
+```ts
+component('safe-render', () => {
+  const props = useProps({ jsonText: '' });
+
+  return html`
+    ${when(props.jsonText, () => {
+      // parse may throw — run only when jsonText is present
+      const data = JSON.parse(props.jsonText);
+      return html`<pre>${JSON.stringify(data, null, 2)}</pre>`;
+    })}
+  `;
+});
+```
+
+##### Anchor normalization and falsy children
+
+The runtime preserves intentional falsy children inside conditional blocks. Values like `0`, `false`, and `''` are valid child nodes and will be rendered. Only `null` and `undefined` are treated as absent children and are filtered out when normalizing anchor block children.
+
 ### Using `match` for Complex Conditionals
 
 ```typescript
@@ -800,6 +834,17 @@ component('status-indicator', () => {
     </div>
   `;
 });
+```
+
+#### Lazy `match` branches
+
+`match()` supports the same runtime factory pattern as `when`. Provide a factory to defer creating branch content until the branch is selected:
+
+```ts
+const node = match()
+  .when(condA, () => html`<div>${expensiveA()}</div>`) // not called until condA is truthy
+  .when(condB, html`<div>simple</div>`) // pre-built
+  .done();
 ```
 
 ### Using `each` for List Rendering

@@ -41,6 +41,23 @@ ${match()
   .done()}
 ```
 
+### 💤 Lazy `when` (runtime-only)
+
+For safety and to avoid eager evaluation of expensive or throwing expressions, the `when` directive supports a runtime lazy overload that accepts a factory function as the second argument. This overload defers construction of the children until the condition is truthy.
+
+Example:
+
+```ts
+// factory is not called until `isVisible` is truthy
+${when(isVisible, () => html`<div>${computeExpensive()}</div>`) }
+```
+
+Why this exists (short): JavaScript evaluates template literal interpolations eagerly before the runtime/directive sees them. If the inner expression throws or performs expensive work, the only reliable way to avoid that evaluation at runtime is to defer constructing the VNode(s) with a function.
+
+Notes:
+- This is a runtime-only behavior. No build or compile-time transform is required or used.
+- Use the factory form when you need guarded/eager-avoidant behavior.
+
 ## 🔄 each Directive
 
 Render a list of items.
@@ -77,6 +94,32 @@ component('status-display', ({ status = 'loading' }: { status?: string }) => {
   `;
 });
 ```
+
+### Lazy `match` branches
+
+The `match` directive follows the same runtime-only lazy principle. Branch content passed to `match().when(...)` can be either pre-built VNode(s) or a factory function. Use a factory when branch content is expensive or may throw.
+
+Example:
+
+```ts
+match()
+  .when(false, () => html`<div>${expensive()}</div>`) // not evaluated
+  .when(true, html`<div>fallback</div>`) // evaluated and returned
+  .done();
+```
+
+Notes:
+- The factory is only executed for the branch that matches. This is a runtime-only mechanism (no compiler transforms).
+- Existing `match().when(cond, html`...`)` users are unaffected.
+
+### ✅ When to use the factory overload
+
+- When the interpolated expression may throw (parsing user input, calling a function that can throw).
+- When constructing the children is computationally expensive and you want to avoid that cost while the condition is falsy.
+
+### Anchor child normalization (preserving falsy children)
+
+The runtime's anchor block normalization preserves meaningful falsy children like `0`, `false`, and the empty string `''`. Only `null` and `undefined` are filtered out when an anchor block's children are normalized. This ensures you can reliably render intentionally falsy values inside conditional blocks.
 
 ## 🧪 Example: All Directives Together
 

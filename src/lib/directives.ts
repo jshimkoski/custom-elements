@@ -1,9 +1,14 @@
 import type { VNode } from "./runtime/types";
 
 /* --- When --- */
-export function when(cond: boolean, children: VNode | VNode[]): VNode {
+export function when(cond: boolean, children: VNode | VNode[]): VNode;
+export function when(cond: boolean, factory: () => VNode | VNode[]): VNode;
+export function when(cond: boolean, childrenOrFactory: any): VNode {
   const anchorKey = "when-block"; // stable key regardless of condition
-  return anchorBlock(cond ? children : [], anchorKey);
+  if (typeof childrenOrFactory === "function") {
+    return anchorBlock(cond ? childrenOrFactory() : [], anchorKey);
+  }
+  return anchorBlock(cond ? childrenOrFactory : [], anchorKey);
 }
 
 /* --- Each --- */
@@ -24,7 +29,7 @@ export function each<
 export function match() {
   const branches: Branch[] = [];
   return {
-    when(cond: any, content: VNode | VNode[]) {
+    when(cond: any, content: VNode | VNode[] | (() => VNode | VNode[])) {
       branches.push([cond, content]);
       return this;
     },
@@ -39,12 +44,15 @@ export function match() {
 }
 
 /* --- WhenChain --- */
-type Branch = [condition: any, content: VNode | VNode[]];
+type Branch = [condition: any, content: VNode | VNode[] | (() => VNode | VNode[])];
 
 function whenChain(...branches: Branch[]): VNode[] {
   for (let idx = 0; idx < branches.length; idx++) {
     const [cond, content] = branches[idx];
-    if (cond) return [anchorBlock(content, `whenChain-branch-${idx}`)];
+    if (cond) {
+      const payload = typeof content === 'function' ? (content as () => VNode | VNode[])() : content;
+      return [anchorBlock(payload, `whenChain-branch-${idx}`)];
+    }
   }
   return [anchorBlock([], "whenChain-empty")];
 }
@@ -57,12 +65,13 @@ export function anchorBlock(
   children: VNode | VNode[] | null | undefined,
   anchorKey: string,
 ): VNode {
-  // Normalize children to array, filtering out null/undefined
+  // Normalize children to array, filtering out only null/undefined values.
+  // Preserve meaningful falsy values such as 0, false, and empty string.
   const childArray = !children
     ? []
     : Array.isArray(children)
-      ? children.filter(Boolean)
-      : [children].filter(Boolean);
+      ? children.filter((c) => c !== null && c !== undefined)
+      : [children].filter((c) => c !== null && c !== undefined);
 
   return {
     tag: "#anchor",
