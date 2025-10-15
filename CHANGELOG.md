@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v1.2.1] - 2025-10-15
+
+- fix: improve error handling fix: allow for factory functions for when and match (32d1b2a)
+- feat: add entity handling feat: add unsafeHTML function fix: semantic text sizes can now have their line height overridden (8479af9)
+
+
 ## [v1.2.0] - 2025-10-12
 
 - feat: add entity handling feat: add unsafeHTML function fix: semantic text sizes can now have their line height overridden (8479af9)
