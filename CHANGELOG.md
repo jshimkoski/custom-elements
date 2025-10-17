@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v1.2.2] - 2025-10-17
+
+- fix: Preserve class-like attributes for custom elements (compiler + vdom) and add regression test for JIT CSS (fix router-link) (7754f01)
+- fix: improve error handling fix: allow for factory functions for when and match (32d1b2a)
+
+
 ## [v1.2.1] - 2025-10-15
 
 - fix: improve error handling fix: allow for factory functions for when and match (32d1b2a)
