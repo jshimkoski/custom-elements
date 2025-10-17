@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v1.2.3] - 2025-10-17
+
+- fix: fix router-link rendering issues (2cfb6ea)
+- fix: Preserve class-like attributes for custom elements (compiler + vdom) and add regression test for JIT CSS (fix router-link) (7754f01)
+
+
 ## [v1.2.2] - 2025-10-17
 
 - fix: Preserve class-like attributes for custom elements (compiler + vdom) and add regression test for JIT CSS (fix router-link) (7754f01)
