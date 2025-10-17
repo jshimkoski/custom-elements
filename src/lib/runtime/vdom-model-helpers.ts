@@ -3,14 +3,23 @@
  * Extracted to reduce code duplication and improve maintainability
  */
 
-import { getNestedValue, setNestedValue, toKebab, safe } from "./helpers";
+import {
+  getNestedValue,
+  setNestedValue,
+  toKebab,
+  safe,
+  safeSerializeAttr,
+} from "./helpers";
 
 /**
  * Check if two values have changed, handling arrays specially
  */
 export function hasValueChanged(newValue: any, currentValue: any): boolean {
   if (Array.isArray(newValue) && Array.isArray(currentValue)) {
-    return JSON.stringify([...newValue].sort()) !== JSON.stringify([...currentValue].sort());
+    return (
+      JSON.stringify([...newValue].sort()) !==
+      JSON.stringify([...currentValue].sort())
+    );
   }
   return newValue !== currentValue;
 }
@@ -26,7 +35,7 @@ export function updateStateValue(
   arg?: string
 ): void {
   if (isReactive) {
-    if (arg && typeof value.value === 'object' && value.value !== null) {
+    if (arg && typeof value.value === "object" && value.value !== null) {
       // For :model:prop, update the specific property
       const updated = { ...value.value };
       updated[arg] = newValue;
@@ -54,9 +63,9 @@ export function triggerStateUpdate(
   if (context._requestRender) {
     context._requestRender();
   }
-  
+
   if (context._triggerWatchers) {
-    const watchKey = isReactive ? 'reactiveState' : value as string;
+    const watchKey = isReactive ? "reactiveState" : (value as string);
     context._triggerWatchers(watchKey, newValue);
   }
 }
@@ -71,19 +80,19 @@ export function emitUpdateEvents(
 ): void {
   const customEventNameKebab = `update:${toKebab(propName)}`;
   const customEventNameCamel = `update:${propName}`;
-  
+
   const customEventKebab = new CustomEvent(customEventNameKebab, {
     detail: newValue,
     bubbles: true,
-    composed: true
+    composed: true,
   });
-  
+
   const customEventCamel = new CustomEvent(customEventNameCamel, {
     detail: newValue,
     bubbles: true,
-    composed: true
+    composed: true,
   });
-  
+
   target.dispatchEvent(customEventKebab);
   target.dispatchEvent(customEventCamel);
 }
@@ -98,25 +107,39 @@ export function syncElementWithState(
   isReactive: boolean
 ): void {
   const propToSet = isReactive ? propValue : propValue;
-  
+
   // Set property
-  safe(() => { target[propName] = propToSet; });
-  
+  safe(() => {
+    target[propName] = propToSet;
+  });
+
   // Sync attributes for primitive/boolean values
   safe(() => {
     const attrName = toKebab(propName);
-    if (typeof propToSet === 'boolean') {
-      propToSet ? target.setAttribute(attrName, 'true') : target.setAttribute(attrName, 'false');
-    } else if (propToSet != null && (typeof propToSet === 'string' || typeof propToSet === 'number')) {
+    if (typeof propToSet === "boolean") {
+      const serialized = safeSerializeAttr(propToSet);
+      if (serialized !== null) target.setAttribute(attrName, serialized);
+      else target.removeAttribute?.(attrName);
+    } else if (
+      propToSet != null &&
+      (typeof propToSet === "string" || typeof propToSet === "number")
+    ) {
       target.setAttribute(attrName, String(propToSet));
     } else {
-      target.removeAttribute?.(attrName);
+      // For anything else, attempt safe serialization and only set when safe
+      const serialized = safeSerializeAttr(propToSet);
+      if (serialized !== null) target.setAttribute(attrName, serialized);
+      else target.removeAttribute?.(attrName);
     }
   });
-  
+
   // Trigger component's internal handling
-  safe(() => { target._applyProps?.(target._cfg); });
-  safe(() => { target._requestRender?.(); });
+  safe(() => {
+    target._applyProps?.(target._cfg);
+  });
+  safe(() => {
+    target._requestRender?.();
+  });
 }
 
 /**
@@ -130,7 +153,7 @@ export function getCurrentStateValue(
 ): any {
   if (isReactive) {
     const unwrapped = value.value;
-    if (arg && typeof unwrapped === 'object' && unwrapped !== null) {
+    if (arg && typeof unwrapped === "object" && unwrapped !== null) {
       return unwrapped[arg];
     }
     return unwrapped;

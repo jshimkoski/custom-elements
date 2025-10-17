@@ -1,7 +1,11 @@
 /**
  * Safe execution helper - silently ignores errors
  */
-export const safe = (fn: () => void): void => { try { fn(); } catch {} };
+export const safe = (fn: () => void): void => {
+  try {
+    fn();
+  } catch {}
+};
 
 import { isReactiveState } from "./reactive";
 import { devWarn } from "./logger";
@@ -34,7 +38,11 @@ let _decodeEl: HTMLDivElement | undefined;
 // the exported `decodeEntities` function rather than inspecting internal
 // function properties.
 // Use globalThis to avoid TypeScript requiring Node typings for `process`.
-const _isNode = !!((globalThis as any).process && (globalThis as any).process.versions && (globalThis as any).process.versions.node);
+const _isNode = !!(
+  (globalThis as any).process &&
+  (globalThis as any).process.versions &&
+  (globalThis as any).process.versions.node
+);
 
 /**
  * Convert camelCase to kebab-case with caching
@@ -43,14 +51,14 @@ export function toKebab(str: string): string {
   if (KEBAB_CASE_CACHE.has(str)) {
     return KEBAB_CASE_CACHE.get(str)!;
   }
-  
+
   const result = str.replace(/([a-z])([A-Z])/g, "$1-$2").toLowerCase();
-  
+
   // Prevent memory bloat with size limit
   if (KEBAB_CASE_CACHE.size < MAX_CACHE_SIZE) {
     KEBAB_CASE_CACHE.set(str, result);
   }
-  
+
   return result;
 }
 
@@ -61,13 +69,13 @@ export function toCamel(str: string): string {
   if (CAMEL_CASE_CACHE.has(str)) {
     return CAMEL_CASE_CACHE.get(str)!;
   }
-  
+
   const result = str.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
-  
+
   if (CAMEL_CASE_CACHE.size < MAX_CACHE_SIZE) {
     CAMEL_CASE_CACHE.set(str, result);
   }
-  
+
   return result;
 }
 
@@ -95,13 +103,15 @@ export function getStringCacheStats(): {
   };
 }
 
-export function escapeHTML(str: string | number | boolean): string | number | boolean {
+export function escapeHTML(
+  str: string | number | boolean
+): string | number | boolean {
   if (typeof str === "string") {
     // Check cache first for frequently escaped strings
     if (HTML_ESCAPE_CACHE.has(str)) {
       return HTML_ESCAPE_CACHE.get(str)!;
     }
-    
+
     const result = str.replace(
       /[&<>"']/g,
       (c) =>
@@ -111,14 +121,14 @@ export function escapeHTML(str: string | number | boolean): string | number | bo
           ">": "&gt;",
           '"': "&quot;",
           "'": "&#39;",
-        })[c]!,
+        }[c]!)
     );
-    
+
     // Only cache strings that contain entities to escape
     if (result !== str && HTML_ESCAPE_CACHE.size < MAX_CACHE_SIZE) {
       HTML_ESCAPE_CACHE.set(str, result);
     }
-    
+
     return result;
   }
   return str;
@@ -135,30 +145,44 @@ export function escapeHTML(str: string | number | boolean): string | number | bo
  * @returns decoded string
  */
 export function decodeEntities(str: string): string {
-  if (!str) return '';
+  if (!str) return "";
   const s = String(str);
 
   // Browser environment: use a DOM element to decode the full set of named entities.
-  if (typeof document !== 'undefined' && typeof document.createElement === 'function') {
-    const SENTINEL_L = '\uF000';
-    const SENTINEL_G = '\uF001';
+  if (
+    typeof document !== "undefined" &&
+    typeof document.createElement === "function"
+  ) {
+    const SENTINEL_L = "\uF000";
+    const SENTINEL_G = "\uF001";
     // Protect existing literal tags so they won't be parsed as HTML by innerHTML
     const protectedStr = s.replace(/</g, SENTINEL_L).replace(/>/g, SENTINEL_G);
 
     // Prefer module-level el to avoid relying on function-attached properties
     // which can be renamed/mangled by some minifiers. Keep function-attached
     // `_el` for backward compatibility but do not depend on it.
-    const el = _decodeEl || (_decodeEl = document.createElement('div'));
-    try { (decodeEntities as any)._el = el; } catch {}
+    const el = _decodeEl || (_decodeEl = document.createElement("div"));
+    try {
+      (decodeEntities as any)._el = el;
+    } catch {}
 
     el.innerHTML = protectedStr;
-    const decoded = el.textContent || '';
-    return decoded.replace(new RegExp(SENTINEL_L, 'g'), '<').replace(new RegExp(SENTINEL_G, 'g'), '>');
+    const decoded = el.textContent || "";
+    return decoded
+      .replace(new RegExp(SENTINEL_L, "g"), "<")
+      .replace(new RegExp(SENTINEL_G, "g"), ">");
   }
 
   // SSR / non-DOM fallback: handle numeric refs and named entities via an external JSON map.
   // Keep a tiny inline map for the most common entities so decodeEntities remains sync.
-  const tinyMap: Record<string, string> = { lt: '<', gt: '>', amp: '&', quot: '"', apos: "'", nbsp: '\u00A0' };
+  const tinyMap: Record<string, string> = {
+    lt: "<",
+    gt: ">",
+    amp: "&",
+    quot: '"',
+    apos: "'",
+    nbsp: "\u00A0",
+  };
 
   // Prefer module-level registered map first (minifier-safe). Keep function
   // attached map as a fallback for backward compatibility only.
@@ -172,19 +196,22 @@ export function decodeEntities(str: string): string {
     try {
       // Use globalThis to avoid referencing `require` directly (prevents TS needing node types)
       const maybeRequire = (globalThis as any).require;
-      if (typeof maybeRequire === 'function') {
+      if (typeof maybeRequire === "function") {
         // Try several common require paths (installed package, dist layout, src layout)
         const candidates = [
-          '@jasonshimmy/custom-elements-runtime/entities.json', // installed package export
-          '../../entities.json', // dist/runtime -> ../../entities.json
-          '../../../entities.json', // src/lib/runtime -> ../../../entities.json
-          '../entities.json',
-          './entities.json'
+          "@jasonshimmy/custom-elements-runtime/entities.json", // installed package export
+          "../../entities.json", // dist/runtime -> ../../entities.json
+          "../../../entities.json", // src/lib/runtime -> ../../../entities.json
+          "../entities.json",
+          "./entities.json",
         ];
         for (const p of candidates) {
           try {
             const m = maybeRequire(p);
-            if (m) { namedMap = m; break; }
+            if (m) {
+              namedMap = m;
+              break;
+            }
           } catch {}
         }
       }
@@ -197,14 +224,21 @@ export function decodeEntities(str: string): string {
     // Keep both module and function-level flags in sync for backward compatibility.
     // Mark fallback usage primarily on module-level flags (minifier-safe).
     _usedEntityFallback = true;
-    try { (decodeEntities as any)._usedFallback = true; } catch {}
-    const loader = (decodeEntities as any)._namedMapLoader ?? _namedEntityMapLoader;
+    try {
+      (decodeEntities as any)._usedFallback = true;
+    } catch {}
+    const loader =
+      (decodeEntities as any)._namedMapLoader ?? _namedEntityMapLoader;
     if (loader) {
       // Load asynchronously; when ready, cache it for future sync calls and sync to function props.
-      loader().then((m: Record<string, string>) => {
-        _namedEntityMap = m;
-        try { (decodeEntities as any)._namedMap = m; } catch {}
-      }).catch(() => {});
+      loader()
+        .then((m: Record<string, string>) => {
+          _namedEntityMap = m;
+          try {
+            (decodeEntities as any)._namedMap = m;
+          } catch {}
+        })
+        .catch(() => {});
     }
   }
 
@@ -212,20 +246,33 @@ export function decodeEntities(str: string): string {
   // Prefer module-level flags first, then function-attached fallbacks for
   // backward compatibility. This avoids depending on function property names
   // which some minifiers may mangle.
-  if ((_usedEntityFallback || (decodeEntities as any)._usedFallback) && !(_warnedEntityFallback || (decodeEntities as any)._warnedFallback)) {
+  if (
+    (_usedEntityFallback || (decodeEntities as any)._usedFallback) &&
+    !(_warnedEntityFallback || (decodeEntities as any)._warnedFallback)
+  ) {
     _warnedEntityFallback = true;
-    try { (decodeEntities as any)._warnedFallback = true; } catch {}
-    try { devWarn('decodeEntities: using small SSR fallback entity map. Register the full entities.json via registerEntityMap(entities) on the server to enable full HTML5 named-entity decoding.'); } catch {}
+    try {
+      (decodeEntities as any)._warnedFallback = true;
+    } catch {}
+    try {
+      devWarn(
+        "decodeEntities: using small SSR fallback entity map. Register the full entities.json via registerEntityMap(entities) on the server to enable full HTML5 named-entity decoding."
+      );
+    } catch {}
   }
 
   // Replace entities: numeric (hex/dec) or named.
   return s.replace(/&(#x?[0-9a-fA-F]+|[a-zA-Z]+);/g, (_, entity) => {
-    if (entity.charCodeAt(0) === 35) { // '#'
-      const isHex = (entity.charAt(1) || '').toLowerCase() === 'x';
-      const num = isHex ? parseInt(entity.slice(2), 16) : parseInt(entity.slice(1), 10);
+    if (entity.charCodeAt(0) === 35) {
+      // '#'
+      const isHex = (entity.charAt(1) || "").toLowerCase() === "x";
+      const num = isHex
+        ? parseInt(entity.slice(2), 16)
+        : parseInt(entity.slice(1), 10);
       return Number.isNaN(num) ? `&${entity};` : String.fromCodePoint(num);
     }
-    const mapped = (namedMap as any)[entity] ?? (registered && registered[entity]);
+    const mapped =
+      (namedMap as any)[entity] ?? (registered && registered[entity]);
     return mapped !== undefined ? mapped : `&${entity};`;
   });
 }
@@ -239,10 +286,14 @@ export async function loadEntityMap(): Promise<Record<string, string>> {
   // Prefer dynamic import so bundlers can code-split or ignore this file for browser bundles.
   // Try the published package export first; in installed packages this is usually the most
   // reliable path. Make the specifier a runtime string to discourage bundlers from inlining.
-  const pkgExport = ['@jasonshimmy', 'custom-elements-runtime', 'entities.json'].join('/');
+  const pkgExport = [
+    "@jasonshimmy",
+    "custom-elements-runtime",
+    "entities.json",
+  ].join("/");
   try {
-  // @vite-ignore: dynamic import specifier constructed at runtime
-  const mPkg = await import(/* @vite-ignore */ pkgExport as any);
+    // @vite-ignore: dynamic import specifier constructed at runtime
+    const mPkg = await import(/* @vite-ignore */ pkgExport as any);
     return (mPkg && (mPkg.default || mPkg)) as Record<string, string>;
   } catch {
     // Next try relative local JSON (useful during development or mono-repo installs)
@@ -250,22 +301,40 @@ export async function loadEntityMap(): Promise<Record<string, string>> {
       // Try several reasonable local import paths (development vs built layouts)
       const localCandidates = [
         pkgExport, // try package export via dynamic import too (best for installed packages)
-        './entities.json',
-        '../../entities.json',
-        '../../../entities.json'
+        "./entities.json",
+        "../../entities.json",
+        "../../../entities.json",
       ];
       for (const p of localCandidates) {
         try {
           // @vite-ignore: intentionally dynamic path candidates for dev/local resolution
           const mLocal = await import(/* @vite-ignore */ p as any);
-          if (mLocal) return (mLocal && (mLocal.default || mLocal)) as Record<string, string>;
+          if (mLocal)
+            return (mLocal && (mLocal.default || mLocal)) as Record<
+              string,
+              string
+            >;
         } catch {}
       }
       // If none of the dynamic imports succeeded, fall back to the small map.
-      return { lt: '<', gt: '>', amp: '&', quot: '"', apos: "'", nbsp: '\u00A0' };
+      return {
+        lt: "<",
+        gt: ">",
+        amp: "&",
+        quot: '"',
+        apos: "'",
+        nbsp: "\u00A0",
+      };
     } catch {
       // Final small fallback
-      return { lt: '<', gt: '>', amp: '&', quot: '"', apos: "'", nbsp: '\u00A0' };
+      return {
+        lt: "<",
+        gt: ">",
+        amp: "&",
+        quot: '"',
+        apos: "'",
+        nbsp: "\u00A0",
+      };
     }
   }
 }
@@ -284,8 +353,11 @@ _namedEntityMapLoader = loadEntityMap;
  *
  * registerEntityMap should be called once at server startup prior to rendering.
  */
-export function registerEntityMap(map: Record<string, string>, options?: { overwrite?: boolean }): void {
-  if (!map || typeof map !== 'object') return;
+export function registerEntityMap(
+  map: Record<string, string>,
+  options?: { overwrite?: boolean }
+): void {
+  if (!map || typeof map !== "object") return;
   const existing = _namedEntityMap;
   if (existing && !options?.overwrite) return; // first registration wins by default
   _namedEntityMap = map;
@@ -303,15 +375,24 @@ export function clearRegisteredEntityMap(): void {
  * sanitize untrusted input before using this. The returned object provides
  * two property names to be compatible with different parts of the runtime.
  */
-export function unsafeHTML(html: string): { __unsafeHTML: string; __rawHTML: string } {
+export function unsafeHTML(html: string): {
+  __unsafeHTML: string;
+  __rawHTML: string;
+} {
   const s = String(html);
   // Provide both property names to be compatible with compiler/renderer expectations
   return { __unsafeHTML: s, __rawHTML: s };
 }
 
 /** Type-guard for unsafeHTML wrapper */
-export function isUnsafeHTML(value: unknown): value is { __unsafeHTML?: string; __rawHTML?: string } {
-  return !!value && (typeof (value as any).__unsafeHTML === 'string' || typeof (value as any).__rawHTML === 'string');
+export function isUnsafeHTML(
+  value: unknown
+): value is { __unsafeHTML?: string; __rawHTML?: string } {
+  return (
+    !!value &&
+    (typeof (value as any).__unsafeHTML === "string" ||
+      typeof (value as any).__rawHTML === "string")
+  );
 }
 
 /**
@@ -319,7 +400,9 @@ export function isUnsafeHTML(value: unknown): value is { __unsafeHTML?: string; 
  */
 export function getNestedValue(obj: any, path: string): any {
   if (typeof path === "string") {
-    const result = path.split(".").reduce((current, key) => current?.[key], obj);
+    const result = path
+      .split(".")
+      .reduce((current, key) => current?.[key], obj);
     // If the result is a ReactiveState object, return its value
     if (isReactiveState(result)) {
       return result.value;
@@ -340,11 +423,70 @@ export function setNestedValue(obj: any, path: string, value: any): void {
     if (current[key] == null) current[key] = {};
     return current[key];
   }, obj);
-  
+
   // If target[lastKey] is a ReactiveState object, set its value property
   if (isReactiveState(target[lastKey])) {
     target[lastKey].value = value;
   } else {
     target[lastKey] = value;
   }
+}
+
+/**
+ * Safely unwrap reactive-like wrappers to their inner primitive when safe.
+ * Returns the original value when it's not safe to coerce to a primitive.
+ */
+export function unwrapIfPrimitive(v: any): any {
+  try {
+    if (v && typeof v === "object") {
+      if (isReactiveState(v)) return (v as any).value;
+      if ("value" in v) {
+        const maybe = (v as any).value;
+        // Only return primitive inner values; otherwise return original
+        if (
+          maybe === null ||
+          maybe === undefined ||
+          typeof maybe === "string" ||
+          typeof maybe === "number" ||
+          typeof maybe === "boolean"
+        ) {
+          return maybe;
+        }
+        return v;
+      }
+    }
+  } catch (e) {}
+  return v;
+}
+
+/**
+ * Return a serialized string for an attribute value when safe to write to DOM.
+ * Returns `null` when the value should not be written as an attribute.
+ */
+export function safeSerializeAttr(val: any): string | null {
+  const v = unwrapIfPrimitive(val);
+  if (v === null || v === undefined) return null;
+  const t = typeof v;
+  if (t === "string" || t === "number" || t === "boolean") return String(v);
+  return null; // complex objects, nodes, functions -> do not serialize
+}
+
+/**
+ * Determine if an attribute name is class-like and should be preserved on hosts.
+ * Class-like: exactly 'class', camelCase ending with 'Class', or kebab-case ending with '-class'.
+ */
+export function isClassLikeAttr(name: string): boolean {
+  if (!name || typeof name !== "string") return false;
+  if (name === "class") return true;
+  if (name.endsWith("Class")) return true;
+  // Kebab-case: consider attributes where one of the hyphen-separated tokens is 'class'
+  if (name.includes("-")) {
+    try {
+      const parts = name.split("-");
+      if (parts.some((p) => p === "class")) return true;
+    } catch (e) {
+      // fallthrough
+    }
+  }
+  return false;
 }

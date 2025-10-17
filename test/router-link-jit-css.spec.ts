@@ -44,6 +44,8 @@ describe('router-link JIT CSS integration', () => {
     expect(el.shadowRoot).toBeTruthy();
     
     const shadowHTML = el.shadowRoot!.innerHTML;
+
+    console.log('Rendered shadow DOM:', shadowHTML);
     
     // Verify JIT CSS classes are present in the rendered HTML
     expect(shadowHTML).toContain('text-blue-500');

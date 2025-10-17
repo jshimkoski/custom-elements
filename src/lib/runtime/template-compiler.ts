@@ -1,6 +1,16 @@
 import type { VNode } from "./types";
 import { contextStack } from "./render";
-import { toKebab, toCamel, getNestedValue, setNestedValue, safe, decodeEntities, isUnsafeHTML } from "./helpers";
+import {
+  toKebab,
+  toCamel,
+  getNestedValue,
+  setNestedValue,
+  safe,
+  decodeEntities,
+  isUnsafeHTML,
+  safeSerializeAttr,
+  isClassLikeAttr,
+} from "./helpers";
 import { isReactiveState } from "./reactive";
 import { devWarn } from "./logger";
 
@@ -8,7 +18,9 @@ import { devWarn } from "./logger";
 class LRUCache<K, V> {
   private map = new Map<K, V>();
   private maxSize: number;
-  constructor(maxSize: number) { this.maxSize = maxSize; }
+  constructor(maxSize: number) {
+    this.maxSize = maxSize;
+  }
   get(key: K): V | undefined {
     const v = this.map.get(key);
     if (v === undefined) return undefined;
@@ -27,8 +39,12 @@ class LRUCache<K, V> {
       if (firstKey !== undefined) this.map.delete(firstKey);
     }
   }
-  has(key: K): boolean { return this.map.has(key); }
-  clear() { this.map.clear(); }
+  has(key: K): boolean {
+    return this.map.has(key);
+  }
+  clear() {
+    this.map.clear();
+  }
 }
 
 const TEMPLATE_COMPILE_CACHE = new LRUCache<string, VNode | VNode[]>(500);
@@ -41,8 +57,8 @@ function validateEventHandler(value: any, eventName: string): void {
   if (value === null || value === undefined) {
     devWarn(
       `⚠️ Event handler for '@${eventName}' is ${value}. ` +
-      `This will prevent the event from working. ` +
-      `Use a function reference instead: @${eventName}="\${functionName}"`
+        `This will prevent the event from working. ` +
+        `Use a function reference instead: @${eventName}="\${functionName}"`
     );
     return;
   }
@@ -51,9 +67,9 @@ function validateEventHandler(value: any, eventName: string): void {
   if (typeof value !== "function") {
     devWarn(
       `🚨 Potential infinite loop detected! Event handler for '@${eventName}' appears to be ` +
-      `the result of a function call (${typeof value}) instead of a function reference. ` +
-      `Change @${eventName}="\${functionName()}" to @${eventName}="\${functionName}" ` +
-      `to pass the function reference instead of calling it immediately.`
+        `the result of a function call (${typeof value}) instead of a function reference. ` +
+        `Change @${eventName}="\${functionName()}" to @${eventName}="\${functionName}" ` +
+        `to pass the function reference instead of calling it immediately.`
     );
   }
 
@@ -61,7 +77,7 @@ function validateEventHandler(value: any, eventName: string): void {
   if (value === undefined && typeof value !== "function") {
     devWarn(
       `💡 Tip: If your event handler function returns undefined, make sure you're passing ` +
-      `the function reference, not calling it. Use @${eventName}="\${fn}" not @${eventName}="\${fn()}"`
+        `the function reference, not calling it. Use @${eventName}="\${fn}" not @${eventName}="\${fn()}"`
     );
   }
 }
@@ -70,7 +86,7 @@ export function h(
   tag: string,
   props: Record<string, any> = {},
   children?: VNode[] | string,
-  key?: string | number,
+  key?: string | number
 ): VNode {
   // Do NOT invent keys here; use only what the caller passes (or props.key).
   const finalKey = key ?? props.key;
@@ -109,7 +125,10 @@ export function parseProps(
 ): ParsePropsResult {
   const props: Record<string, any> = {};
   const attrs: Record<string, any> = {};
-  const directives: Record<string, { value: any; modifiers: string[]; arg?: string }> = {};
+  const directives: Record<
+    string,
+    { value: any; modifiers: string[]; arg?: string }
+  > = {};
   const bound: string[] = [];
 
   // Match attributes with optional prefix and support for single/double quotes
@@ -123,14 +142,14 @@ export function parseProps(
     const prefix = match[1];
     const rawName = match[2];
     const rawVal = (match[4] || match[6]) ?? "";
-    
+
     // If no value was provided (standalone attribute), treat as boolean true
     const isStandalone = match[3] === undefined && match[6] === undefined;
 
     // Interpolation detection
     const interpMatch = rawVal.match(/^{{(\d+)}}$/);
     let value: any = isStandalone
-      ? true  // Standalone attributes are boolean true
+      ? true // Standalone attributes are boolean true
       : interpMatch
       ? values[Number(interpMatch[1])] ?? null
       : rawVal;
@@ -144,7 +163,15 @@ export function parseProps(
     }
 
     // Known directive names
-    const knownDirectives = ["model", "bind", "show", "class", "style", "ref", "when"];
+    const knownDirectives = [
+      "model",
+      "bind",
+      "show",
+      "class",
+      "style",
+      "ref",
+      "when",
+    ];
     if (prefix === ":") {
       // Support :model:checked (directive with argument) and :class.foo (modifiers)
       const [nameAndModifiers, argPart] = rawName.split(":");
@@ -154,7 +181,10 @@ export function parseProps(
         // Allow multiple :model directives on the same tag by keying them with
         // their argument when present (e.g. 'model:test'). This preserves both
         // plain :model and :model:prop simultaneously.
-        const directiveKey = maybeDirective === 'model' && argPart ? `model:${argPart}` : maybeDirective;
+        const directiveKey =
+          maybeDirective === "model" && argPart
+            ? `model:${argPart}`
+            : maybeDirective;
         directives[directiveKey] = {
           value,
           modifiers,
@@ -164,19 +194,26 @@ export function parseProps(
         // Special-case certain boolean-like attributes to promote them to
         // props so runtime property assignment and coercion behave correctly
         // for native elements (e.g. :disabled should affect el.disabled).
-        if (rawName === 'disabled') {
+        if (rawName === "disabled") {
           // Be conservative: only promote disabled to props at compile-time
           // when the bound value is an explicit boolean-ish primitive
           // (boolean, empty-string presence, literal 'true'/'false', null, or number).
           // Otherwise leave it in attrs so the runtime can apply safer coercion.
           let propValue = value;
-          if (propValue && isReactiveState(propValue)) propValue = (propValue as any).value;
+          if (propValue && isReactiveState(propValue))
+            propValue = (propValue as any).value;
           const t = typeof propValue;
-          const isBoolStr = t === 'string' && (propValue === 'true' || propValue === 'false');
-          const shouldPromote = propValue === '' || t === 'boolean' || isBoolStr || propValue == null || t === 'number';
+          const isBoolStr =
+            t === "string" && (propValue === "true" || propValue === "false");
+          const shouldPromote =
+            propValue === "" ||
+            t === "boolean" ||
+            isBoolStr ||
+            propValue == null ||
+            t === "number";
           if (shouldPromote) {
             props[rawName] = propValue;
-          } else{
+          } else {
             // Unwrap reactive state objects for bound attributes and keep in attrs
             let attrValue = value;
             if (attrValue && isReactiveState(attrValue)) {
@@ -199,17 +236,18 @@ export function parseProps(
       // Parse event modifiers: @click.prevent.stop
       const [eventName, ...modifierParts] = rawName.split(".");
       const modifiers = modifierParts;
-      
+
       // Validate event handler to prevent common mistakes
       validateEventHandler(value, eventName);
-      
+
       // Create wrapped event handler that applies modifiers
-      const originalHandler = typeof value === "function"
-        ? value
-        : typeof context[value] === "function"
-        ? context[value]
-        : undefined;
-        
+      const originalHandler =
+        typeof value === "function"
+          ? value
+          : typeof context[value] === "function"
+          ? context[value]
+          : undefined;
+
       if (originalHandler) {
         const wrappedHandler = (event: Event) => {
           // Apply event modifiers
@@ -219,21 +257,28 @@ export function parseProps(
           if (modifiers.includes("stop")) {
             event.stopPropagation();
           }
-          if (modifiers.includes("self") && event.target !== event.currentTarget) {
+          if (
+            modifiers.includes("self") &&
+            event.target !== event.currentTarget
+          ) {
             return;
           }
-          
+
           // For .once modifier, we need to remove the listener after first call
           if (modifiers.includes("once")) {
-            (event.currentTarget as Element)?.removeEventListener(eventName, wrappedHandler);
+            (event.currentTarget as Element)?.removeEventListener(
+              eventName,
+              wrappedHandler
+            );
           }
-          
+
           // Call the original handler
           return originalHandler(event);
         };
-        
+
         // Map @event to an `on<Event>` prop (DOM-first event listener convention)
-        const onName = "on" + eventName.charAt(0).toUpperCase() + eventName.slice(1);
+        const onName =
+          "on" + eventName.charAt(0).toUpperCase() + eventName.slice(1);
         props[onName] = wrappedHandler;
       }
     } else if (rawName === "ref") {
@@ -261,7 +306,9 @@ function transformWhenDirective(vnode: VNode): VNode {
     const rawWhen = directives.when.value;
     // If the directive value is a ReactiveState, unwrap it so the condition
     // reflects the current boolean value (e.g. ref(false) -> false).
-    const whenCondition = isReactiveState(rawWhen) ? (rawWhen as any).value : rawWhen;
+    const whenCondition = isReactiveState(rawWhen)
+      ? (rawWhen as any).value
+      : rawWhen;
 
     // Remove the :when directive from the VNode since we're handling it here
     const { when, ...remainingDirectives } = directives;
@@ -271,40 +318,45 @@ function transformWhenDirective(vnode: VNode): VNode {
     } else {
       delete newProps.directives;
     }
-    
+
     // Create a new VNode without the :when directive
     const elementVNode: VNode = {
       ...vnode,
       props: newProps,
     };
-    
+
     // Recursively transform children if they exist
     if (Array.isArray(elementVNode.children)) {
-      elementVNode.children = elementVNode.children.map(child => 
-        typeof child === 'object' && child !== null ? transformWhenDirective(child as VNode) : child
+      elementVNode.children = elementVNode.children.map((child) =>
+        typeof child === "object" && child !== null
+          ? transformWhenDirective(child as VNode)
+          : child
       );
     }
-    
+
     // Wrap in an anchor block with the condition
-    const anchorKey = vnode.key != null ? `when-${vnode.key}` : `when-${vnode.tag}`;
+    const anchorKey =
+      vnode.key != null ? `when-${vnode.key}` : `when-${vnode.tag}`;
     return {
       tag: "#anchor",
       key: anchorKey,
       children: whenCondition ? [elementVNode] : [],
     };
   }
-  
+
   // Recursively transform children if they exist
   if (Array.isArray(vnode.children)) {
-    const transformedChildren = vnode.children.map(child => 
-      typeof child === 'object' && child !== null ? transformWhenDirective(child as VNode) : child
+    const transformedChildren = vnode.children.map((child) =>
+      typeof child === "object" && child !== null
+        ? transformWhenDirective(child as VNode)
+        : child
     );
     return {
       ...vnode,
       children: transformedChildren,
     };
   }
-  
+
   return vnode;
 }
 
@@ -319,19 +371,20 @@ function transformWhenDirective(vnode: VNode): VNode {
 export function htmlImpl(
   strings: TemplateStringsArray,
   values: unknown[],
-  context?: Record<string, any>,
+  context?: Record<string, any>
 ): VNode | VNode[] {
   // Retrieve current context from stack (transparent injection)
-  const injectedContext = contextStack.length > 0 ? contextStack[contextStack.length - 1] : undefined;
-  
+  const injectedContext =
+    contextStack.length > 0 ? contextStack[contextStack.length - 1] : undefined;
+
   // Use injected context if no explicit context provided
   const effectiveContext = context ?? injectedContext;
 
   // Conservative caching: only cache templates that have no interpolations
   // (values.length === 0) and no explicit context. This avoids incorrectly
   // reusing parsed structures that depend on runtime values or context.
-  const canCache = (!context && values.length === 0);
-  const cacheKey = canCache ? strings.join('<!--TEMPLATE_DELIM-->') : null;
+  const canCache = !context && values.length === 0;
+  const cacheKey = canCache ? strings.join("<!--TEMPLATE_DELIM-->") : null;
   if (canCache && cacheKey) {
     const cached = TEMPLATE_COMPILE_CACHE.get(cacheKey);
     if (cached) return cached;
@@ -348,7 +401,7 @@ export function htmlImpl(
   // where the runtime should preserve the original string provided by the
   // consumer.
   function decodedTextVNode(text: string, key: string): VNode {
-    const decoded = typeof text === 'string' ? decodeEntities(text) : text;
+    const decoded = typeof text === "string" ? decodeEntities(text) : text;
     return h("#text", {}, decoded as any, key);
   }
 
@@ -422,7 +475,7 @@ export function htmlImpl(
             // Merge style attributes by concatenating with semicolon
             const existingStyle = currentProps.attrs.style.replace(
               /;?\s*$/,
-              "",
+              ""
             );
             const newStyle = maybe.attrs.style.replace(/^;?\s*/, "");
             currentProps.attrs.style = existingStyle + "; " + newStyle;
@@ -484,7 +537,9 @@ export function htmlImpl(
         } else if (v !== null && typeof v === "object") {
           // If the object is an unsafe HTML marker, push a raw vnode
           if (isUnsafeHTML(v)) {
-            targetChildren.push(h('#raw', {}, (v as any).__rawHTML, `${baseKey}-${i}`));
+            targetChildren.push(
+              h("#raw", {}, (v as any).__rawHTML, `${baseKey}-${i}`)
+            );
           } else {
             mergeIntoCurrentProps(v);
           }
@@ -497,8 +552,8 @@ export function htmlImpl(
 
     if (val !== null && typeof val === "object") {
       if (isUnsafeHTML(val)) {
-        const raw = (val as any).__rawHTML ?? '';
-        targetChildren.push(h('#raw', {}, raw, baseKey));
+        const raw = (val as any).__rawHTML ?? "";
+        targetChildren.push(h("#raw", {}, raw, baseKey));
         return;
       }
       mergeIntoCurrentProps(val);
@@ -509,13 +564,25 @@ export function htmlImpl(
   }
 
   const voidElements = new Set([
-    'area','base','br','col','embed','hr','img','input',
-    'link','meta','param','source','track','wbr'
+    "area",
+    "base",
+    "br",
+    "col",
+    "embed",
+    "hr",
+    "img",
+    "input",
+    "link",
+    "meta",
+    "param",
+    "source",
+    "track",
+    "wbr",
   ]);
 
   while ((match = tagRegex.exec(template))) {
     // Skip HTML comments (they are matched by the regex but ignored)
-    if (match[0].startsWith('<!--') && match[0].endsWith('-->')) {
+    if (match[0].startsWith("<!--") && match[0].endsWith("-->")) {
       continue;
     }
 
@@ -523,14 +590,19 @@ export function htmlImpl(
       // Tag token
       const tagName = match[1];
       const isClosing = match[0][1] === "/";
-      const isSelfClosing = match[0][match[0].length - 2] === "/" || voidElements.has(tagName);
+      const isSelfClosing =
+        match[0][match[0].length - 2] === "/" || voidElements.has(tagName);
 
       const {
         props: rawProps,
         attrs: rawAttrs,
         directives,
         bound: boundList,
-      } = parseProps(match[2] || "", values, effectiveContext) as ParsePropsResult;
+      } = parseProps(
+        match[2] || "",
+        values,
+        effectiveContext
+      ) as ParsePropsResult;
 
       // No runtime registration here; compiler will set `isCustomElement`
       // on vnodeProps where appropriate. Runtime will consult that flag or
@@ -540,22 +612,64 @@ export function htmlImpl(
       const vnodeProps: {
         props: Record<string, unknown>;
         attrs: Record<string, unknown>;
-        directives?: Record<string, { value: any, modifiers: string[] }>;
+        directives?: Record<string, { value: any; modifiers: string[] }>;
         isCustomElement?: boolean;
       } = { props: {}, attrs: {} };
 
       for (const k in rawProps) vnodeProps.props[k] = rawProps[k];
       for (const k in rawAttrs) vnodeProps.attrs[k] = rawAttrs[k];
 
+      // No debug logging in compiler output to keep test runs clean.
+
+      // Heuristic: for router-link, ensure class-like attributes that are
+      // intended to carry utility-class tokens (class, activeClass,
+      // exactActiveClass) are available on the host vnode attrs as a
+      // plain string when possible. This is a compile-time convenience to
+      // make JIT extraction deterministic without runtime scraping.
+      try {
+        if (tagName === "router-link") {
+          const clsParts: string[] = [];
+          const pick = (k: string) => {
+            try {
+              let v = vnodeProps.attrs && (vnodeProps.attrs as any)[k];
+              if (v && isReactiveState(v)) v = (v as any).value;
+              if (typeof v === "string" && v.trim())
+                clsParts.push(...v.trim().split(/\s+/));
+            } catch (e) {}
+          };
+          pick("class");
+          pick("activeClass");
+          pick("exactActiveClass");
+          if (clsParts.length > 0) {
+            // Merge deduplicated tokens into vnodeProps.attrs.class
+            const existing =
+              (vnodeProps.attrs && (vnodeProps.attrs as any).class) || "";
+            const existingParts =
+              typeof existing === "string" && existing.trim()
+                ? existing.trim().split(/\s+/)
+                : [];
+            const merged = Array.from(new Set([...existingParts, ...clsParts]));
+            (vnodeProps.attrs as any).class = merged.join(" ");
+          }
+        }
+      } catch (e) {
+        // best-effort
+      }
+
       // If a `key` attribute was provided, surface it as a vnode prop so the
       // renderer/assignKeysDeep can use it as the vnode's key and avoid
       // unnecessary remounts when children order/state changes.
       if (
         vnodeProps.attrs &&
-        Object.prototype.hasOwnProperty.call(vnodeProps.attrs, 'key') &&
-        !(vnodeProps.props && Object.prototype.hasOwnProperty.call(vnodeProps.props, 'key'))
+        Object.prototype.hasOwnProperty.call(vnodeProps.attrs, "key") &&
+        !(
+          vnodeProps.props &&
+          Object.prototype.hasOwnProperty.call(vnodeProps.props, "key")
+        )
       ) {
-        safe(() => { vnodeProps.props.key = vnodeProps.attrs['key']; });
+        safe(() => {
+          vnodeProps.props.key = vnodeProps.attrs["key"];
+        });
       }
 
       // Ensure native form control properties are set as JS props when the
@@ -573,14 +687,29 @@ export function htmlImpl(
         // wrapper proxies evaluate to truthy values. The runtime already
         // performs defensive coercion for boolean-like values; prefer that.
         const nativePromoteMap: Record<string, string[]> = {
-          input: ['value', 'checked', 'readonly', 'required', 'placeholder', 'maxlength', 'minlength'],
-          textarea: ['value', 'readonly', 'required', 'placeholder', 'maxlength', 'minlength'],
-          select: ['value', 'required', 'multiple'],
-          option: ['selected', 'value'],
-          video: ['muted', 'autoplay', 'controls', 'loop', 'playsinline'],
-          audio: ['muted', 'autoplay', 'controls', 'loop'],
-          img: ['src', 'alt', 'width', 'height'],
-          button: ['type', 'name', 'value', 'autofocus', 'form'],
+          input: [
+            "value",
+            "checked",
+            "readonly",
+            "required",
+            "placeholder",
+            "maxlength",
+            "minlength",
+          ],
+          textarea: [
+            "value",
+            "readonly",
+            "required",
+            "placeholder",
+            "maxlength",
+            "minlength",
+          ],
+          select: ["value", "required", "multiple"],
+          option: ["selected", "value"],
+          video: ["muted", "autoplay", "controls", "loop", "playsinline"],
+          audio: ["muted", "autoplay", "controls", "loop"],
+          img: ["src", "alt", "width", "height"],
+          button: ["type", "name", "value", "autofocus", "form"],
         };
 
         const lname = tagName.toLowerCase();
@@ -588,66 +717,85 @@ export function htmlImpl(
 
         if (vnodeProps.attrs) {
           for (const propName of promotable) {
-            if (boundList && boundList.includes(propName) && propName in vnodeProps.attrs && !(vnodeProps.props && propName in vnodeProps.props)) {
+            if (
+              boundList &&
+              boundList.includes(propName) &&
+              propName in vnodeProps.attrs &&
+              !(vnodeProps.props && propName in vnodeProps.props)
+            ) {
               let attrValue = vnodeProps.attrs[propName];
-                // Unwrap reactive state objects during promotion
-                if (attrValue && isReactiveState(attrValue)) {
-                  attrValue = (attrValue as any).value; // This triggers dependency tracking
-                  // Promote the unwrapped primitive value
-                  vnodeProps.props[propName] = attrValue;
-                  delete vnodeProps.attrs[propName];
-                } else {
-                  // Only promote primitive values to native element properties.
-                  // For most attributes we accept string/number/boolean/empty-string
-                  // but for boolean-like attributes such as `disabled` be more
-                  // conservative: only promote when the value is a real boolean,
-                  // an explicit empty-string (attribute presence), or the
-                  // literal strings 'true'/'false'. This avoids promoting other
-                  // non-boolean strings which could be misinterpreted as
-                  // truthy and accidentally enable native controls.
-                  const t = typeof attrValue;
-                  if (propName === 'disabled') {
-                    const isBoolStr = t === 'string' && (attrValue === 'true' || attrValue === 'false');
-                    const shouldPromote = attrValue === '' || t === 'boolean' || isBoolStr || attrValue == null || t === 'number';
-                    if (shouldPromote) {
-                        vnodeProps.props[propName] = attrValue;
-                        // DEV INSTRUMENTATION: record compiler-time promotions of disabled
-                        safe(() => {
-                          const w = (globalThis as any) as any;
-                          if (!w.__VDOM_DISABLED_PROMOTIONS) w.__VDOM_DISABLED_PROMOTIONS = [];
-                          w.__VDOM_DISABLED_PROMOTIONS.push({ phase: 'compiler-promotion', tag: tagName, propName, value: attrValue, time: Date.now(), stack: (new Error()).stack });
-                        });
-                      delete vnodeProps.attrs[propName];
-                    } else {
-                      // leave complex objects/unknown strings in attrs so the
-                      // runtime can make a safer decision when applying props
-                    }
+              // Unwrap reactive state objects during promotion
+              if (attrValue && isReactiveState(attrValue)) {
+                attrValue = (attrValue as any).value; // This triggers dependency tracking
+                // Promote the unwrapped primitive value
+                vnodeProps.props[propName] = attrValue;
+                delete vnodeProps.attrs[propName];
+              } else {
+                // Only promote primitive values to native element properties.
+                // For most attributes we accept string/number/boolean/empty-string
+                // but for boolean-like attributes such as `disabled` be more
+                // conservative: only promote when the value is a real boolean,
+                // an explicit empty-string (attribute presence), or the
+                // literal strings 'true'/'false'. This avoids promoting other
+                // non-boolean strings which could be misinterpreted as
+                // truthy and accidentally enable native controls.
+                const t = typeof attrValue;
+                if (propName === "disabled") {
+                  const isBoolStr =
+                    t === "string" &&
+                    (attrValue === "true" || attrValue === "false");
+                  const shouldPromote =
+                    attrValue === "" ||
+                    t === "boolean" ||
+                    isBoolStr ||
+                    attrValue == null ||
+                    t === "number";
+                  if (shouldPromote) {
+                    vnodeProps.props[propName] = attrValue;
+                    // DEV INSTRUMENTATION: record compiler-time promotions of disabled
+                    // (dev instrumentation removed)
+                    delete vnodeProps.attrs[propName];
                   } else {
-                    if (attrValue === '' || t === 'string' || t === 'number' || t === 'boolean' || attrValue == null) {
-                      vnodeProps.props[propName] = attrValue;
-                      delete vnodeProps.attrs[propName];
-                    } else {
-                      // leave complex objects in attrs so the runtime can decide how
-                      // to apply them (for example, :bind object form or custom handling)
-                    }
+                    // leave complex objects/unknown strings in attrs so the
+                    // runtime can make a safer decision when applying props
+                  }
+                } else {
+                  if (
+                    attrValue === "" ||
+                    t === "string" ||
+                    t === "number" ||
+                    t === "boolean" ||
+                    attrValue == null
+                  ) {
+                    vnodeProps.props[propName] = attrValue;
+                    delete vnodeProps.attrs[propName];
+                  } else {
+                    // leave complex objects in attrs so the runtime can decide how
+                    // to apply them (for example, :bind object form or custom handling)
                   }
                 }
+              }
             }
           }
         }
         // If this looks like a custom element (hyphenated tag), promote all bound attrs to props
-        const isCustom = tagName.includes('-') || Boolean((effectiveContext as any)?.__customElements?.has?.(tagName));
+        const isCustom =
+          tagName.includes("-") ||
+          Boolean((effectiveContext as any)?.__customElements?.has?.(tagName));
         if (isCustom) {
           // Always mark custom elements, regardless of bound attributes
           vnodeProps.isCustomElement = true;
-          
+
           if (boundList && vnodeProps.attrs) {
             // Preserve attributes that may be used for stable key generation
-            const keyAttrs = new Set(['id', 'name', 'data-key', 'key']);
+            const keyAttrs = new Set(["id", "name", "data-key", "key"]);
             for (const b of boundList) {
-              if (b in vnodeProps.attrs && !(vnodeProps.props && b in vnodeProps.props)) {
+              if (
+                b in vnodeProps.attrs &&
+                !(vnodeProps.props && b in vnodeProps.props)
+              ) {
                 // Convert kebab-case to camelCase for JS property names on custom elements
-                const camel = b.includes('-') ? toCamel(b) : b;
+                const camel = b.includes("-") ? toCamel(b) : b;
                 let attrValue = vnodeProps.attrs[b];
                 // Preserve ReactiveState instances for custom elements so the
                 // runtime can assign the live ReactiveState to the element
@@ -655,7 +803,23 @@ export function htmlImpl(
                 // unwrap here; let the renderer/runtime decide how to apply.
                 vnodeProps.props[camel] = attrValue;
                 // Preserve potential key attributes in attrs to avoid unstable keys
-                if (!keyAttrs.has(b)) {
+                // For custom elements, preserve host-visible class-like attributes
+                // so that compile-time HTML serialization (shadowRoot.innerHTML)
+                // contains utility-class tokens for the JIT extractor. We treat
+                // the following as class-like and attempt to keep them in attrs:
+                //  - `class`
+                //  - any camelCase that ends with `Class` (e.g. activeClass)
+                //  - any kebab-case that ends with `-class` (e.g. active-class)
+                const preserveInAttrs = keyAttrs.has(b) || isClassLikeAttr(b);
+                if (preserveInAttrs) {
+                  try {
+                    const serialized = safeSerializeAttr(vnodeProps.attrs[b]);
+                    if (serialized === null) delete vnodeProps.attrs[b];
+                    else vnodeProps.attrs[b] = serialized as any;
+                  } catch (e) {
+                    delete vnodeProps.attrs[b];
+                  }
+                } else {
                   delete vnodeProps.attrs[b];
                 }
               }
@@ -670,39 +834,64 @@ export function htmlImpl(
       // custom elements into explicit prop + event handler so runtime hosts
       // that don't process directives can still work. Support multiple
       // :model variants on the same tag by iterating directive keys.
-      if (directives && Object.keys(directives).some(k => k === 'model' || k.startsWith('model:'))) {
+      if (
+        directives &&
+        Object.keys(directives).some(
+          (k) => k === "model" || k.startsWith("model:")
+        )
+      ) {
         try {
-          const GLOBAL_REG_KEY = Symbol.for('cer.registry');
-          const globalRegistry = (globalThis as any)[GLOBAL_REG_KEY] as Set<string> | Map<string, any> | undefined;
-          const isInGlobalRegistry = Boolean(globalRegistry && typeof globalRegistry.has === 'function' && globalRegistry.has(tagName));
-
-          const isInContext = Boolean(
-            effectiveContext && (
-              ((effectiveContext as any).__customElements instanceof Set && (effectiveContext as any).__customElements.has(tagName)) ||
-              (Array.isArray((effectiveContext as any).__isCustomElements) && (effectiveContext as any).__isCustomElements.includes(tagName))
-            )
+          const GLOBAL_REG_KEY = Symbol.for("cer.registry");
+          const globalRegistry = (globalThis as any)[GLOBAL_REG_KEY] as
+            | Set<string>
+            | Map<string, any>
+            | undefined;
+          const isInGlobalRegistry = Boolean(
+            globalRegistry &&
+              typeof globalRegistry.has === "function" &&
+              globalRegistry.has(tagName)
           );
 
-          const isHyphenated = tagName.includes('-');
+          const isInContext = Boolean(
+            effectiveContext &&
+              (((effectiveContext as any).__customElements instanceof Set &&
+                (effectiveContext as any).__customElements.has(tagName)) ||
+                (Array.isArray((effectiveContext as any).__isCustomElements) &&
+                  (effectiveContext as any).__isCustomElements.includes(
+                    tagName
+                  )))
+          );
 
-          const isCustomFromContext = Boolean(isHyphenated || isInContext || isInGlobalRegistry);
+          const isHyphenated = tagName.includes("-");
+
+          const isCustomFromContext = Boolean(
+            isHyphenated || isInContext || isInGlobalRegistry
+          );
 
           if (isCustomFromContext) {
             for (const dk of Object.keys(directives)) {
-              if (dk !== 'model' && !dk.startsWith('model:')) continue;
-              const model = directives[dk] as { value: any; modifiers: string[]; arg?: string };
-              const arg = model.arg ?? (dk.includes(':') ? dk.split(':', 2)[1] : undefined);
+              if (dk !== "model" && !dk.startsWith("model:")) continue;
+              const model = directives[dk] as {
+                value: any;
+                modifiers: string[];
+                arg?: string;
+              };
+              const arg =
+                model.arg ??
+                (dk.includes(":") ? dk.split(":", 2)[1] : undefined);
               const modelVal = model.value;
 
-              const argToUse = arg ?? 'modelValue';
+              const argToUse = arg ?? "modelValue";
 
               const getNested = getNestedValue;
               const setNested = setNestedValue;
 
-              const actualState = effectiveContext ? ((effectiveContext as any)._state || effectiveContext) : undefined;
+              const actualState = effectiveContext
+                ? (effectiveContext as any)._state || effectiveContext
+                : undefined;
 
               let initial: any = undefined;
-              if (typeof modelVal === 'string' && effectiveContext) {
+              if (typeof modelVal === "string" && effectiveContext) {
                 initial = getNested(actualState, modelVal);
               } else {
                 initial = modelVal;
@@ -719,7 +908,13 @@ export function htmlImpl(
                 const attrName = toKebab(argToUse);
                 if (!vnodeProps.attrs) vnodeProps.attrs = {} as any;
                 // Only set attributes for primitive values; skip objects/refs
-                if (initial !== undefined && initial !== null && (typeof initial === 'string' || typeof initial === 'number' || typeof initial === 'boolean')) {
+                if (
+                  initial !== undefined &&
+                  initial !== null &&
+                  (typeof initial === "string" ||
+                    typeof initial === "number" ||
+                    typeof initial === "boolean")
+                ) {
                   vnodeProps.attrs[attrName] = initial;
                 }
               } catch (e) {
@@ -730,35 +925,65 @@ export function htmlImpl(
 
               const eventName = `update:${toKebab(argToUse)}`;
               // Convert kebab-case event name to camelCase handler key
-              const camelEventName = eventName.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
-              const handlerKey = 'on' + camelEventName.charAt(0).toUpperCase() + camelEventName.slice(1);
+              const camelEventName = eventName.replace(
+                /-([a-z])/g,
+                (_, letter) => letter.toUpperCase()
+              );
+              const handlerKey =
+                "on" +
+                camelEventName.charAt(0).toUpperCase() +
+                camelEventName.slice(1);
 
-              vnodeProps.props[handlerKey] = function (ev: Event & { detail?: any }) {
-                const newVal = (ev as any).detail !== undefined ? (ev as any).detail : (ev.target ? (ev.target as any).value : undefined);
+              vnodeProps.props[handlerKey] = function (
+                ev: Event & { detail?: any }
+              ) {
+                const newVal =
+                  (ev as any).detail !== undefined
+                    ? (ev as any).detail
+                    : ev.target
+                    ? (ev.target as any).value
+                    : undefined;
                 if (!actualState) return;
-                
+
                 // Handle reactive state objects (functional API)
                 if (modelVal && isReactiveState(modelVal)) {
                   // Compiled handler: update reactive modelVal when event received
                   const current = modelVal.value;
-                  const changed = Array.isArray(newVal) && Array.isArray(current)
-                    ? JSON.stringify([...newVal].sort()) !== JSON.stringify([...current].sort())
-                    : newVal !== current;
+                  const changed =
+                    Array.isArray(newVal) && Array.isArray(current)
+                      ? JSON.stringify([...newVal].sort()) !==
+                        JSON.stringify([...current].sort())
+                      : newVal !== current;
                   if (changed) {
                     modelVal.value = newVal;
-                    if ((effectiveContext as any)?.requestRender) (effectiveContext as any).requestRender();
-                    else if ((effectiveContext as any)?._requestRender) (effectiveContext as any)._requestRender();
+                    if ((effectiveContext as any)?.requestRender)
+                      (effectiveContext as any).requestRender();
+                    else if ((effectiveContext as any)?._requestRender)
+                      (effectiveContext as any)._requestRender();
                   }
                 } else {
                   // Legacy string-based state handling
-                  const current = getNested(actualState, typeof modelVal === 'string' ? modelVal : String(modelVal));
-                  const changed = Array.isArray(newVal) && Array.isArray(current)
-                    ? JSON.stringify([...newVal].sort()) !== JSON.stringify([...current].sort())
-                    : newVal !== current;
+                  const current = getNested(
+                    actualState,
+                    typeof modelVal === "string" ? modelVal : String(modelVal)
+                  );
+                  const changed =
+                    Array.isArray(newVal) && Array.isArray(current)
+                      ? JSON.stringify([...newVal].sort()) !==
+                        JSON.stringify([...current].sort())
+                      : newVal !== current;
                   if (changed) {
-                    setNested(actualState, typeof modelVal === 'string' ? modelVal : String(modelVal), newVal);
-                    if ((effectiveContext as any)?.requestRender) (effectiveContext as any).requestRender();
-                    else if ((effectiveContext as any)?._requestRender) (effectiveContext as any)._requestRender();
+                    setNested(
+                      actualState,
+                      typeof modelVal === "string"
+                        ? modelVal
+                        : String(modelVal),
+                      newVal
+                    );
+                    if ((effectiveContext as any)?.requestRender)
+                      (effectiveContext as any).requestRender();
+                    else if ((effectiveContext as any)?._requestRender)
+                      (effectiveContext as any)._requestRender();
                   }
                 }
               };
@@ -788,9 +1013,9 @@ export function htmlImpl(
               ? currentChildren[0].children
               : ""
             : currentChildren.length
-              ? currentChildren
-              : undefined,
-          currentKey,
+            ? currentChildren
+            : undefined,
+          currentKey
         );
         const prev = stack.pop();
         if (prev) {
@@ -851,12 +1076,12 @@ export function htmlImpl(
           const val = values[idx];
           const baseKey = `interp-${idx}`;
           pushInterpolation(val, baseKey);
-          } else {
-            const key = `text-${nodeIndex++}`;
-            // This branch is for literal template text (not interpolation markers)
-            // so decode entity sequences here.
-            targetChildren.push(decodedTextVNode(part, key));
-          }
+        } else {
+          const key = `text-${nodeIndex++}`;
+          // This branch is for literal template text (not interpolation markers)
+          // so decode entity sequences here.
+          targetChildren.push(decodedTextVNode(part, key));
+        }
       }
     }
   }
@@ -871,7 +1096,9 @@ export function htmlImpl(
   const cleanedFragments = fragmentChildren.filter((child): child is VNode => {
     if (isElementVNode(child)) {
       if (child.tag === "#text") {
-        return typeof child.children === "string" && child.children.trim() !== "";
+        return (
+          typeof child.children === "string" && child.children.trim() !== ""
+        );
       }
       return true;
     }
@@ -880,12 +1107,14 @@ export function htmlImpl(
   });
 
   // Transform nodes with :when directive into anchor blocks
-  const transformedFragments = cleanedFragments.map(child => transformWhenDirective(child));
+  const transformedFragments = cleanedFragments.map((child) =>
+    transformWhenDirective(child)
+  );
 
   if (transformedFragments.length === 1) {
     // Single non-empty root node
     const out = transformedFragments[0];
-      if (canCache && cacheKey) TEMPLATE_COMPILE_CACHE.set(cacheKey, out);
+    if (canCache && cacheKey) TEMPLATE_COMPILE_CACHE.set(cacheKey, out);
     return out;
   } else if (transformedFragments.length > 1) {
     // True multi-root: return array

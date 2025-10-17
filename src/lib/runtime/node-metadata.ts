@@ -45,7 +45,7 @@ export function getNodeKey(node: Node | null | undefined): string | undefined {
     if (anyNode && anyNode.key != null) return anyNode.key;
   } catch (e) {}
   if (node instanceof Element) {
-    const attr = node.getAttribute('data-anchor-key');
+    const attr = node.getAttribute("data-anchor-key");
     if (attr) return attr;
   }
   return undefined;
@@ -60,10 +60,21 @@ export function getNodeKey(node: Node | null | undefined): string | undefined {
  *
  * @internal
  */
+import { safeSerializeAttr } from "./helpers";
+
 export function setNodeKey(node: Node, key: string): void {
-  try { nodeKeyMap.set(node, key); } catch (e) {}
-  try { (node as any).key = key; } catch (e) {}
-  try { if (node instanceof Element) node.setAttribute('data-anchor-key', String(key)); } catch (e) {}
+  try {
+    nodeKeyMap.set(node, key);
+  } catch (e) {}
+  try {
+    (node as any).key = key;
+  } catch (e) {}
+  try {
+    if (node instanceof Element) {
+      const s = safeSerializeAttr(key);
+      if (s !== null) node.setAttribute("data-anchor-key", s);
+    }
+  } catch (e) {}
 }
 
 /**
@@ -78,7 +89,10 @@ export function getElementTransition(el: HTMLElement | null | undefined): any {
   if (!el) return undefined;
   const wm = elementTransitionMap.get(el);
   if (wm !== undefined) return wm;
-  try { const anyEl = el as any; if (anyEl && anyEl._transitionGroup != null) return anyEl._transitionGroup; } catch (e) {}
+  try {
+    const anyEl = el as any;
+    if (anyEl && anyEl._transitionGroup != null) return anyEl._transitionGroup;
+  } catch (e) {}
   return undefined;
 }
 
@@ -91,8 +105,12 @@ export function getElementTransition(el: HTMLElement | null | undefined): any {
  * @internal
  */
 export function setElementTransition(el: HTMLElement, val: any): void {
-  try { elementTransitionMap.set(el, val); } catch (e) {}
-  try { (el as any)._transitionGroup = val; } catch (e) {}
+  try {
+    elementTransitionMap.set(el, val);
+  } catch (e) {}
+  try {
+    (el as any)._transitionGroup = val;
+  } catch (e) {}
 }
 
 export default {

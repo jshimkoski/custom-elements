@@ -4,18 +4,17 @@
  * - Integrates with createStore and lib/index.ts
  */
 
-import { html } from './runtime/template-compiler';
-import { component } from './runtime/component';
-import { createStore, type Store } from './store';
-import { devError } from './runtime/logger';
-import { match } from './directives';
+import { html } from "./runtime/template-compiler";
+import { component } from "./runtime/component";
+import { useProps, useOnConnected } from "./runtime/hooks";
+import { ref, computed } from "./runtime/reactive";
+import { createStore, type Store } from "./store";
+import { devError } from "./runtime/logger";
+import { match } from "./directives";
 
-export interface RouteComponent {
-  // Can be any renderable type — adjust as needed for your framework
-  new (...args: any[]): any; // class components
-  // OR functional components
-  (...args: any[]): any;
-}
+export type RouteComponent =
+  | { new (...args: any[]): any } // class components
+  | ((...args: any[]) => any); // functional components
 
 export interface RouteState {
   path: string;
@@ -37,7 +36,6 @@ export interface Route {
    * Lazy loader that resolves to something renderable
    */
   load?: () => Promise<{ default: string | HTMLElement | Function }>;
-
 
   /**
    * Runs before matching — return false to cancel,
@@ -87,25 +85,21 @@ export interface RouterConfig {
   initialUrl?: string; // For SSR: explicitly pass the URL
 }
 
-export interface RouteState {
-  path: string;
-  params: Record<string, string>;
-  query: Record<string, string>;
-}
-
-
 export const parseQuery = (search: string): Record<string, string> => {
   if (!search) return {};
-  if (typeof URLSearchParams === 'undefined') return {};
+  if (typeof URLSearchParams === "undefined") return {};
   return Object.fromEntries(new URLSearchParams(search));
 };
 
-export const matchRoute = (routes: Route[], path: string): { route: Route | null; params: Record<string, string> } => {
+export const matchRoute = (
+  routes: Route[],
+  path: string
+): { route: Route | null; params: Record<string, string> } => {
   for (const route of routes) {
     const paramNames: string[] = [];
     const regexPath = route.path.replace(/:[^/]+/g, (m) => {
       paramNames.push(m.slice(1));
-      return '([^/]+)';
+      return "([^/]+)";
     });
     const regex = new RegExp(`^${regexPath}$`);
     const match = path.match(regex);
@@ -144,7 +138,7 @@ export async function resolveRouteComponent(route: Route): Promise<any> {
 }
 
 export function useRouter(config: RouterConfig) {
-  const { routes, base = '', initialUrl } = config;
+  const { routes, base = "", initialUrl } = config;
 
   let getLocation: () => { path: string; query: Record<string, string> };
   let initial: { path: string; query: Record<string, string> };
@@ -156,18 +150,18 @@ export function useRouter(config: RouterConfig) {
 
   // Run matching route guards/hooks
   const runBeforeEnter = async (to: RouteState, from: RouteState) => {
-    const matched = routes.find(r => matchRoute([r], to.path).route !== null);
+    const matched = routes.find((r) => matchRoute([r], to.path).route !== null);
     if (matched?.beforeEnter) {
       try {
         const result = await matched.beforeEnter(to, from);
-        if (typeof result === 'string') {
+        if (typeof result === "string") {
           // Redirect
           await navigate(result, true);
           return false;
         }
         return result !== false;
       } catch (err) {
-        devError('beforeEnter error', err);
+        devError("beforeEnter error", err);
         return false;
       }
     }
@@ -175,17 +169,17 @@ export function useRouter(config: RouterConfig) {
   };
 
   const runOnEnter = async (to: RouteState, from: RouteState) => {
-    const matched = routes.find(r => matchRoute([r], to.path).route !== null);
+    const matched = routes.find((r) => matchRoute([r], to.path).route !== null);
     if (matched?.onEnter) {
       try {
         const result = await matched.onEnter(to, from);
-        if (typeof result === 'string') {
+        if (typeof result === "string") {
           await navigate(result, true);
           return false;
         }
         return result !== false;
       } catch (err) {
-        devError('onEnter error', err);
+        devError("onEnter error", err);
         return false;
       }
     }
@@ -193,12 +187,12 @@ export function useRouter(config: RouterConfig) {
   };
 
   const runAfterEnter = (to: RouteState, from: RouteState) => {
-    const matched = routes.find(r => matchRoute([r], to.path).route !== null);
+    const matched = routes.find((r) => matchRoute([r], to.path).route !== null);
     if (matched?.afterEnter) {
       try {
         matched.afterEnter(to, from);
       } catch (err) {
-        devError('afterEnter error', err);
+        devError("afterEnter error", err);
       }
     }
   };
@@ -206,8 +200,8 @@ export function useRouter(config: RouterConfig) {
   const navigate = async (path: string, replace = false) => {
     try {
       const loc = {
-        path: path.replace(base, '') || '/',
-        query: {}
+        path: path.replace(base, "") || "/",
+        query: {},
       };
       const match = matchRoute(routes, loc.path);
       if (!match) throw new Error(`No route found for ${loc.path}`);
@@ -216,7 +210,7 @@ export function useRouter(config: RouterConfig) {
       const to: RouteState = {
         path: loc.path,
         params: match.params,
-        query: loc.query
+        query: loc.query,
       };
 
       // beforeEnter guard
@@ -227,11 +221,11 @@ export function useRouter(config: RouterConfig) {
       const allowedOn = await runOnEnter(to, from);
       if (!allowedOn) return;
 
-      if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+      if (typeof window !== "undefined" && typeof document !== "undefined") {
         if (replace) {
-          window.history.replaceState({}, '', base + path);
+          window.history.replaceState({}, "", base + path);
         } else {
-          window.history.pushState({}, '', base + path);
+          window.history.pushState({}, "", base + path);
         }
       }
 
@@ -239,20 +233,23 @@ export function useRouter(config: RouterConfig) {
 
       // afterEnter hook (post commit)
       runAfterEnter(to, from);
-
     } catch (err) {
-      devError('Navigation error:', err);
+      devError("Navigation error:", err);
     }
   };
 
   // If an explicit `initialUrl` is provided we treat this as SSR/static rendering
   // even if a `window` exists (useful for hydration tests). Browser mode only
   // applies when `initialUrl` is undefined.
-  if (typeof window !== 'undefined' && typeof document !== 'undefined' && typeof initialUrl === 'undefined') {
+  if (
+    typeof window !== "undefined" &&
+    typeof document !== "undefined" &&
+    typeof initialUrl === "undefined"
+  ) {
     // Browser mode
     getLocation = () => {
       const url = new URL(window.location.href);
-      const path = url.pathname.replace(base, '') || '/';
+      const path = url.pathname.replace(base, "") || "/";
       const query = parseQuery(url.search);
       return { path, query };
     };
@@ -262,7 +259,7 @@ export function useRouter(config: RouterConfig) {
     store = createStore<RouteState>({
       path: initial.path,
       params: match.params,
-      query: initial.query
+      query: initial.query,
     });
 
     update = async (replace = false) => {
@@ -270,17 +267,16 @@ export function useRouter(config: RouterConfig) {
       await navigate(loc.path, replace);
     };
 
-    window.addEventListener('popstate', () => update(true));
+    window.addEventListener("popstate", () => update(true));
 
     push = (path: string) => navigate(path, false);
     replaceFn = (path: string) => navigate(path, true);
     back = () => window.history.back();
-
   } else {
     // SSR mode
     getLocation = () => {
-      const url = new URL(initialUrl || '/', 'http://localhost');
-      const path = url.pathname.replace(base, '') || '/';
+      const url = new URL(initialUrl || "/", "http://localhost");
+      const path = url.pathname.replace(base, "") || "/";
       const query = parseQuery(url.search);
       return { path, query };
     };
@@ -290,7 +286,7 @@ export function useRouter(config: RouterConfig) {
     store = createStore<RouteState>({
       path: initial.path,
       params: match.params,
-      query: initial.query
+      query: initial.query,
     });
 
     update = async () => {
@@ -301,8 +297,8 @@ export function useRouter(config: RouterConfig) {
     const navigateSSR = async (path: string) => {
       try {
         const loc = {
-          path: path.replace(base, '') || '/',
-          query: {}
+          path: path.replace(base, "") || "/",
+          query: {},
         };
         const match = matchRoute(routes, loc.path);
         if (!match) throw new Error(`No route found for ${loc.path}`);
@@ -311,15 +307,17 @@ export function useRouter(config: RouterConfig) {
         const to: RouteState = {
           path: loc.path,
           params: match.params,
-          query: loc.query
+          query: loc.query,
         };
 
         // beforeEnter guard
-        const matched = routes.find(r => matchRoute([r], to.path).route !== null);
+        const matched = routes.find(
+          (r) => matchRoute([r], to.path).route !== null
+        );
         if (matched?.beforeEnter) {
           try {
             const result = await matched.beforeEnter(to, from);
-            if (typeof result === 'string') {
+            if (typeof result === "string") {
               // Redirect
               await navigateSSR(result);
               return;
@@ -334,7 +332,7 @@ export function useRouter(config: RouterConfig) {
         if (matched?.onEnter) {
           try {
             const result = await matched.onEnter(to, from);
-            if (typeof result === 'string') {
+            if (typeof result === "string") {
               await navigateSSR(result);
               return;
             }
@@ -368,10 +366,9 @@ export function useRouter(config: RouterConfig) {
     subscribe: store.subscribe,
     matchRoute: (path: string) => matchRoute(routes, path),
     getCurrent: (): RouteState => store.getState(),
-    resolveRouteComponent
+    resolveRouteComponent,
   };
 }
-
 
 // SSR/static site support: match route for a given path
 export function matchRouteSSR(routes: Route[], path: string) {
@@ -380,159 +377,192 @@ export function matchRouteSSR(routes: Route[], path: string) {
 
 /**
  * Singleton router instance for global access.
- * 
+ *
  * Define here to prevent circular dependency
  * issue with component.
  */
 
 export function initRouter(config: RouterConfig) {
   const router = useRouter(config);
-  
-  component('router-view', (_props = {}, hooks: any = {}) => {
-    const { onConnected } = hooks;
-    // Set up router subscription on component connection
-    if (onConnected) {
-      onConnected(() => {
-        if (router && typeof router.subscribe === 'function') {
-          router.subscribe(() => {
-            // The component will auto-rerender when router state changes
+
+  component("router-view", () => {
+    // Reactive current route so the component re-renders when router updates
+    if (!router) return html`<div>Router not initialized.</div>`;
+
+    const current = ref(router.getCurrent());
+
+    useOnConnected(() => {
+      // Subscribe to router updates and update the reactive ref
+      try {
+        if (router && typeof router.subscribe === "function") {
+          router.subscribe((s) => {
+            try {
+              current.value = s;
+            } catch (e) {
+              /* best-effort */
+            }
           });
         }
-      });
-    }
+      } catch (e) {
+        // swallow
+      }
+    });
 
-    if (!router) return html`<div>Router not initialized.</div>`;
-    const current = router.getCurrent();
-    const { path } = current;
-    const match = router.matchRoute(path);
-    if (!match.route) return html`<div>Not found</div>`;
+    const match = router.matchRoute(current.value.path);
+    if (!match || !match.route) return html`<div>Not found</div>`;
 
     // Resolve the component (supports cached async loaders)
-    return router.resolveRouteComponent(match.route).then((comp: any) => {
-      // String tag (custom element) -> render as VNode
-      if (typeof comp === 'string') {
-        return { tag: comp, props: {}, children: [] };
-      }
+    return router
+      .resolveRouteComponent(match.route)
+      .then((comp: any) => {
+        // String tag (custom element) -> render as VNode
+        if (typeof comp === "string") {
+          return { tag: comp, props: {}, children: [] };
+        }
 
-      // Function component (sync or async) -> call and return its VNode(s)
-      if (typeof comp === 'function') {
-        const out = comp();
-        const resolved = out instanceof Promise ? out : Promise.resolve(out);
-        return resolved.then((resolvedComp: any) => {
-          // If the function returned a string tag, render that element
-          if (typeof resolvedComp === 'string') return { tag: resolvedComp, props: {}, children: [] };
-          // Otherwise assume it's a VNode or VNode[] and return it directly
-          return resolvedComp as any;
-        });
-      }
+        // Function component (sync or async) -> call and return its VNode(s)
+        if (typeof comp === "function") {
+          const out = comp();
+          const resolved = out instanceof Promise ? out : Promise.resolve(out);
+          return resolved.then((resolvedComp: any) => {
+            if (typeof resolvedComp === "string")
+              return { tag: resolvedComp, props: {}, children: [] };
+            return resolvedComp as any;
+          });
+        }
 
-      // Unknown component type
-      return html`<div>Invalid route component</div>`;
-    }).catch(() => {
-      // Propagate as an invalid route component to show a clear message in the view
-      return html`<div>Invalid route component</div>`;
-    });
+        return html`<div>Invalid route component</div>`;
+      })
+      .catch(() => html`<div>Invalid route component</div>`);
   });
 
-  component('router-link', (props: {
-    to?: string;
-    tag?: string;
-    replace?: boolean;
-    exact?: boolean;
-    activeClass?: string;
-    exactActiveClass?: string;
-    ariaCurrentValue?: string;
-    disabled?: boolean;
-    external?: boolean;
-    class?: string;
-  } = {}, _hooks = {}) => {
-    const {
-      to = '',
-      tag = 'a',
-      replace = false,
-      exact = false,
-      activeClass = 'active',
-      exactActiveClass = 'exact-active',
-      ariaCurrentValue = 'page',
-      disabled = false,
-      external = false,
-      class: userClass = ''
-    } = props;
-    // Recalculate computed values in render
-    const current = router.getCurrent();
-    
-    // Computed
-    const isExactActive = current.path === to;
-    const isActive = exact
-      ? isExactActive
-      : current && typeof current.path === 'string'
-        ? current.path.startsWith(to)
-        : false;
-    const ariaCurrent = isExactActive ? `aria-current="${ariaCurrentValue}"` : '';
-    
-    // Build class object so JIT CSS can see the literal class names.
-    const userClassList = (userClass || '').split(/\s+/).filter(Boolean);
+  component("router-link", () => {
+    // Declare props via useProps so observedAttributes are correct
+    const props = useProps<Partial<RouterLinkProps>>({
+      to: "",
+      tag: "a",
+      replace: false,
+      exact: false,
+      activeClass: "active",
+      exactActiveClass: "exact-active",
+      ariaCurrentValue: "page",
+      disabled: false,
+      external: false,
+      class: "",
+      style: "",
+    });
+
+    // Reactive current state so link updates when route changes
+    const current = ref(router.getCurrent());
+    useOnConnected(() => {
+      try {
+        if (router && typeof router.subscribe === "function") {
+          router.subscribe((s) => {
+            try {
+              current.value = s;
+            } catch (e) {}
+          });
+        }
+      } catch (e) {}
+    });
+
+    const isExactActive = computed(
+      () => current.value.path === (props.to as string)
+    );
+    const isActive = computed(() =>
+      props.exact
+        ? isExactActive.value
+        : current.value && typeof current.value.path === "string"
+        ? current.value.path.startsWith(props.to as string)
+        : false
+    );
+    const ariaCurrent = computed(() =>
+      isExactActive.value
+        ? `aria-current="${props.ariaCurrentValue as string}"`
+        : ""
+    );
+
+    const userClassList = ((props.class as string) || "")
+      .split(/\s+/)
+      .filter(Boolean);
     const userClasses: Record<string, boolean> = {};
     for (const c of userClassList) userClasses[c] = true;
-    const classObject = {
+
+    const classObject = computed(() => ({
       ...userClasses,
-      // Also include the configurable names (may duplicate the above)
-      [activeClass]: isActive,
-      [exactActiveClass]: isExactActive,
-    };
-    
-    const isButton = tag === 'button';
-    const disabledAttr = disabled
-      ? isButton
-        ? 'disabled aria-disabled="true" tabindex="-1"'
-        : 'aria-disabled="true" tabindex="-1"'
-      : '';
-    const externalAttr = external && (tag === 'a' || !tag)
-      ? 'target="_blank" rel="noopener noreferrer"'
-      : '';
+      [(props.activeClass as string) || "active"]: isActive.value,
+      [(props.exactActiveClass as string) || "exact-active"]:
+        isExactActive.value,
+    }));
+
+    const isButton = computed(() => (props.tag as string) === "button");
+    const disabledAttr = computed(() =>
+      props.disabled
+        ? isButton.value
+          ? 'disabled aria-disabled="true" tabindex="-1"'
+          : 'aria-disabled="true" tabindex="-1"'
+        : ""
+    );
+    const externalAttr = computed(() =>
+      props.external &&
+      ((props.tag as string) === "a" || !(props.tag as string))
+        ? 'target="_blank" rel="noopener noreferrer"'
+        : ""
+    );
 
     const navigate = (e: MouseEvent) => {
-      if (disabled) {
+      if (props.disabled) {
         e.preventDefault();
         return;
       }
-      if (external && (tag === 'a' || !tag)) {
+      if (
+        props.external &&
+        ((props.tag as string) === "a" || !(props.tag as string))
+      ) {
         return;
       }
       e.preventDefault();
-      if (replace) {
-        router.replace(to);
+      if (props.replace) {
+        router.replace(props.to as string);
       } else {
-        router.push(to);
+        router.push(props.to as string);
       }
     };
-      
+
     return html`
       ${match()
-        .when(isButton, html`
-          <button
-            part="button"
-            :class="${classObject}"
-            ${ariaCurrent}
-            ${disabledAttr}
-            ${externalAttr}
-            @click="${navigate}"
-          ><slot></slot></button>
-        `)
-        .otherwise(html`
-          <a
-            part="link"
-            href="${to}"
-            :class="${classObject}"
-            ${ariaCurrent}
-            ${disabledAttr}
-            ${externalAttr}
-            @click="${navigate}"
-          ><slot></slot></a>
-        `)
+        .when(
+          isButton.value,
+          html`
+            <button
+              part="button"
+              :class="${classObject.value}"
+              ${ariaCurrent.value}
+              ${disabledAttr.value}
+              ${externalAttr.value}
+              @click="${navigate}"
+            >
+              <slot></slot>
+            </button>
+          `
+        )
+        .otherwise(
+          html`
+            <a
+              part="link"
+              href="${props.to}"
+              :class="${classObject.value}"
+              ${ariaCurrent.value}
+              ${disabledAttr.value}
+              ${externalAttr.value}
+              @click="${navigate}"
+              ><slot></slot
+            ></a>
+          `
+        )
         .done()}
     `;
   });
-  
+
   return router;
 }

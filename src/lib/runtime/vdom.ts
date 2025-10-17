@@ -5,7 +5,16 @@
  */
 
 import type { VNode, VDomRefs, AnchorBlockVNode } from "./types";
-import { escapeHTML, getNestedValue, setNestedValue, toKebab, toCamel, safe } from "./helpers";
+import {
+  escapeHTML,
+  getNestedValue,
+  setNestedValue,
+  toKebab,
+  toCamel,
+  safe,
+  safeSerializeAttr,
+  isClassLikeAttr,
+} from "./helpers";
 import { SecureExpressionEvaluator } from "./secure-expression-evaluator";
 import { EventManager } from "./event-manager";
 import { isReactiveState } from "./reactive";
@@ -15,17 +24,31 @@ import {
   triggerStateUpdate,
   emitUpdateEvents,
   syncElementWithState,
-  getCurrentStateValue
+  getCurrentStateValue,
 } from "./vdom-model-helpers";
-import { performEnterTransition, performLeaveTransition } from "./transition-utils";
+import {
+  performEnterTransition,
+  performLeaveTransition,
+} from "./transition-utils";
 import { devError } from "./logger";
-import { getNodeKey, setNodeKey, getElementTransition, setElementTransition } from "./node-metadata";
+import {
+  getNodeKey,
+  setNodeKey,
+  getElementTransition,
+  setElementTransition,
+} from "./node-metadata";
 
 /**
  * Helper: determine whether an element is a native form control we treat
  * specially for boolean-like attributes (disabled, checked, value).
  */
-function isNativeControl(el?: any): el is HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | HTMLButtonElement {
+function isNativeControl(
+  el?: any
+): el is
+  | HTMLInputElement
+  | HTMLSelectElement
+  | HTMLTextAreaElement
+  | HTMLButtonElement {
   return (
     el instanceof HTMLInputElement ||
     el instanceof HTMLSelectElement ||
@@ -41,19 +64,19 @@ function isNativeControl(el?: any): el is HTMLInputElement | HTMLSelectElement |
  */
 function coerceBooleanForNative(val: any): boolean {
   // Explicit empty-string => presence boolean true (attribute presence)
-  if (val === '') return true;
+  if (val === "") return true;
 
   // Strings: treat 'true'/'false' specially, otherwise non-empty string is presence
-  if (typeof val === 'string') {
-    if (val === 'false') return false;
-    if (val === 'true') return true;
-    return val !== '';
+  if (typeof val === "string") {
+    if (val === "false") return false;
+    if (val === "true") return true;
+    return val !== "";
   }
 
   // Objects: only treat known reactive wrappers as booleans by unwrapping
-  if (val && typeof val === 'object') {
+  if (val && typeof val === "object") {
     if (isReactiveState(val)) return !!(val as any).value;
-    if ('value' in val) return !!(val as any).value;
+    if ("value" in val) return !!(val as any).value;
     // Defensive: do not coerce arbitrary objects (including proxies) to true
     // as they may represent rich prop wrappers (useProps proxy, etc.).
     return false;
@@ -67,21 +90,21 @@ function coerceBooleanForNative(val: any): boolean {
  * Recursively clean up refs and event listeners for all descendants of a node
  * @param node The node to clean up.
  * @param refs The refs to clean up.
- * @returns 
+ * @returns
  */
 export function cleanupRefs(node: Node, refs?: VDomRefs) {
   if (!refs || !(node instanceof HTMLElement)) return;
-  
+
   // Clean up event listeners for this element
   EventManager.cleanup(node);
-  
+
   // Clean up refs
   for (const refKey in refs) {
     if (refs[refKey] === node) {
       delete refs[refKey];
     }
   }
-  
+
   // Clean up child nodes
   const children = node.childNodes;
   for (let i = 0; i < children.length; i++) {
@@ -92,16 +115,15 @@ export function cleanupRefs(node: Node, refs?: VDomRefs) {
 /**
  * Assign a ref to an element, supporting both string refs and reactive state objects
  */
-function assignRef(
-  vnode: VNode,
-  element: HTMLElement,
-  refs?: VDomRefs
-): void {
+function assignRef(vnode: VNode, element: HTMLElement, refs?: VDomRefs): void {
   if (typeof vnode === "string") return;
-  
-  const reactiveRef = vnode.props?.reactiveRef ?? (vnode.props?.props && vnode.props.props.reactiveRef);
-  const refKey = vnode.props?.ref ?? (vnode.props?.props && vnode.props.props.ref);
-  
+
+  const reactiveRef =
+    vnode.props?.reactiveRef ??
+    (vnode.props?.props && vnode.props.props.reactiveRef);
+  const refKey =
+    vnode.props?.ref ?? (vnode.props?.props && vnode.props.props.ref);
+
   if (reactiveRef) {
     // For reactive state objects, assign the element to the .value property
     reactiveRef.value = element;
@@ -113,14 +135,14 @@ function assignRef(
 
 /**
  * Process :model directive for two-way data binding
- * @param value 
- * @param modifiers 
- * @param props 
- * @param attrs 
- * @param listeners 
- * @param context 
- * @param el 
- * @returns 
+ * @param value
+ * @param modifiers
+ * @param props
+ * @param attrs
+ * @param listeners
+ * @param context
+ * @param el
+ * @returns
  */
 export function processModelDirective(
   value: string | any,
@@ -130,7 +152,7 @@ export function processModelDirective(
   listeners: Record<string, EventListener>,
   context?: any,
   el?: HTMLElement,
-  arg?: string,
+  arg?: string
 ): void {
   if (!context) return;
 
@@ -139,15 +161,25 @@ export function processModelDirective(
   const hasNumber = modifiers.includes("number");
 
   // Enhanced support for reactive state objects (functional API)
-  const isReactiveState = value && typeof value === 'object' && 'value' in value && typeof value.value !== 'undefined';
+  const isReactiveState =
+    value &&
+    typeof value === "object" &&
+    "value" in value &&
+    typeof value.value !== "undefined";
 
   const getCurrentValue = () => {
     if (isReactiveState) {
       const unwrapped = value.value;
       // If this is a native input and an arg was provided (e.g. :model:name),
       // we should bind the nested property to the input's value.
-      if (arg && el && (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement)) {
-        if (typeof unwrapped === 'object' && unwrapped !== null) {
+      if (
+        arg &&
+        el &&
+        (el instanceof HTMLInputElement ||
+          el instanceof HTMLTextAreaElement ||
+          el instanceof HTMLSelectElement)
+      ) {
+        if (typeof unwrapped === "object" && unwrapped !== null) {
           return unwrapped[arg];
         }
       }
@@ -157,23 +189,30 @@ export function processModelDirective(
     // Fallback to string-based lookup (legacy config API)
     return getNestedValue(context._state || context, value as string);
   };
-  
+
   const currentValue = getCurrentValue();
 
   // determine element/input type
   let inputType = "text";
-  if (el instanceof HTMLInputElement) inputType = (attrs?.type as string) || el.type || "text";
+  if (el instanceof HTMLInputElement)
+    inputType = (attrs?.type as string) || el.type || "text";
   else if (el instanceof HTMLSelectElement) inputType = "select";
   else if (el instanceof HTMLTextAreaElement) inputType = "textarea";
 
-  const isNativeInput = el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement;
-  const defaultPropName = inputType === "checkbox" || inputType === "radio" ? "checked" : "value";
-  const propName = isNativeInput ? defaultPropName : (arg ?? "modelValue");
+  const isNativeInput =
+    el instanceof HTMLInputElement ||
+    el instanceof HTMLTextAreaElement ||
+    el instanceof HTMLSelectElement;
+  const defaultPropName =
+    inputType === "checkbox" || inputType === "radio" ? "checked" : "value";
+  const propName = isNativeInput ? defaultPropName : arg ?? "modelValue";
 
   // Initial sync: set prop/attrs so renderer can apply proper DOM state
   if (inputType === "checkbox") {
     if (Array.isArray(currentValue)) {
-      props[propName] = currentValue.includes(String(el?.getAttribute("value") ?? attrs?.value ?? ""));
+      props[propName] = currentValue.includes(
+        String(el?.getAttribute("value") ?? attrs?.value ?? "")
+      );
     } else {
       const trueValue = el?.getAttribute("true-value") ?? true;
       props[propName] = currentValue === trueValue;
@@ -214,18 +253,29 @@ export function processModelDirective(
   }
 
   // event type to listen for
-  const eventType = hasLazy || inputType === "checkbox" || inputType === "radio" || inputType === "select" ? "change" : "input";
+  const eventType =
+    hasLazy ||
+    inputType === "checkbox" ||
+    inputType === "radio" ||
+    inputType === "select"
+      ? "change"
+      : "input";
 
   const eventListener: EventListener = (event: Event) => {
     if ((event as any).isComposing || (listeners as any)._isComposing) return;
     // Allow synthetic events during testing (when isTrusted is false)
     // but ignore them in production unless it's a synthetic test event
-    const isTestEnv = typeof (globalThis as any).process !== 'undefined' && 
-                      (globalThis as any).process.env?.NODE_ENV === 'test' ||
-                      typeof window !== 'undefined' && (window as any).__vitest__;
+    const isTestEnv =
+      (typeof (globalThis as any).process !== "undefined" &&
+        (globalThis as any).process.env?.NODE_ENV === "test") ||
+      (typeof window !== "undefined" && (window as any).__vitest__);
     if ((event as any).isTrusted === false && !isTestEnv) return;
 
-    const target = event.target as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null;
+    const target = event.target as
+      | HTMLInputElement
+      | HTMLTextAreaElement
+      | HTMLSelectElement
+      | null;
     if (!target || (target as any)._modelUpdating) return;
 
     let newValue: any = (target as any).value;
@@ -249,8 +299,13 @@ export function processModelDirective(
       }
     } else if (inputType === "radio") {
       newValue = target.getAttribute("value") ?? (target as any).value;
-    } else if (inputType === "select" && (target as HTMLSelectElement).multiple) {
-      newValue = Array.from((target as HTMLSelectElement).selectedOptions).map((o) => o.value);
+    } else if (
+      inputType === "select" &&
+      (target as HTMLSelectElement).multiple
+    ) {
+      newValue = Array.from((target as HTMLSelectElement).selectedOptions).map(
+        (o) => o.value
+      );
     } else {
       if (hasTrim && typeof newValue === "string") newValue = newValue.trim();
       if (hasNumber) {
@@ -267,7 +322,7 @@ export function processModelDirective(
       try {
         updateStateValue(isReactiveState, value, newValue, context, arg);
         triggerStateUpdate(context, isReactiveState, value, newValue);
-        
+
         // Emit custom event for update:* listeners (emit both kebab and camel forms)
         if (target) {
           emitUpdateEvents(target, propName, newValue);
@@ -293,64 +348,103 @@ export function processModelDirective(
     }
 
     listeners[eventNameKebab] = (event: Event) => {
-      const newVal = (event as CustomEvent).detail !== undefined ? (event as CustomEvent).detail : (event.target as any)?.value;
+      const newVal =
+        (event as CustomEvent).detail !== undefined
+          ? (event as CustomEvent).detail
+          : (event.target as any)?.value;
       // Determine current state value depending on reactive-state vs string path
-      const currentStateValue = getCurrentStateValue(isReactiveState, value, context, arg);
+      const currentStateValue = getCurrentStateValue(
+        isReactiveState,
+        value,
+        context,
+        arg
+      );
       const changed = hasValueChanged(newVal, currentStateValue);
-      
+
       if (changed) {
-        try { /* nested handler invoked */ } catch(e) {}
-        
+        try {
+          /* nested handler invoked */
+        } catch (e) {}
+
         updateStateValue(isReactiveState, value, newVal, context, arg);
         triggerStateUpdate(context, isReactiveState, value, newVal);
 
         // Update the custom element's property to maintain sync
         const target = event.target as any;
         if (target) {
-          syncElementWithState(target, propName, isReactiveState ? value : newVal, isReactiveState);
+          syncElementWithState(
+            target,
+            propName,
+            isReactiveState ? value : newVal,
+            isReactiveState
+          );
         }
       }
     };
-  // primary listener registered
-  // If the bound reactive value is an object, also listen for nested
-  // update events emitted by the child like `update:name` so the parent
-  // can apply the change to the corresponding nested property on the
-  // reactive state. This allows children to emit `update:<field>` when
-  // they want to update a nested field of a bound object.
-  if (isReactiveState && typeof value.value === 'object' && value.value !== null) {
-    // Use Reflect.ownKeys to be robust across proxies; filter out internal keys
-    let keys: Array<string | symbol> = [];
-    try { keys = Reflect.ownKeys(value.value); } catch (e) { keys = Object.keys(value.value); }
-    const userKeys = (keys as Array<any>).filter(k => typeof k === 'string' && !String(k).startsWith('_') && k !== 'constructor');
-    // preparing nested listeners
-    for (const nestedKey of userKeys) {
-      const nestedKebab = `update:${toKebab(nestedKey as string)}`;
-      const nestedCamel = `update:${nestedKey as string}`;
-      // Avoid overwriting the primary handler for the main prop
-      // and avoid registering internal keys
-      if (listeners[nestedKebab]) continue;
-      listeners[nestedKebab] = (event: Event) => {
-        const newVal = (event as CustomEvent).detail !== undefined ? (event as CustomEvent).detail : (event.target as any)?.value;
-        const currentStateValue = isReactiveState ? (value.value as any)[nestedKey] : getNestedValue(context._state || context, value as string);
-        const changed = hasValueChanged(newVal, currentStateValue);
-        if (!changed) return;
+    // primary listener registered
+    // If the bound reactive value is an object, also listen for nested
+    // update events emitted by the child like `update:name` so the parent
+    // can apply the change to the corresponding nested property on the
+    // reactive state. This allows children to emit `update:<field>` when
+    // they want to update a nested field of a bound object.
+    if (
+      isReactiveState &&
+      typeof value.value === "object" &&
+      value.value !== null
+    ) {
+      // Use Reflect.ownKeys to be robust across proxies; filter out internal keys
+      let keys: Array<string | symbol> = [];
+      try {
+        keys = Reflect.ownKeys(value.value);
+      } catch (e) {
+        keys = Object.keys(value.value);
+      }
+      const userKeys = (keys as Array<any>).filter(
+        (k) =>
+          typeof k === "string" &&
+          !String(k).startsWith("_") &&
+          k !== "constructor"
+      );
+      // preparing nested listeners
+      for (const nestedKey of userKeys) {
+        const nestedKebab = `update:${toKebab(nestedKey as string)}`;
+        const nestedCamel = `update:${nestedKey as string}`;
+        // Avoid overwriting the primary handler for the main prop
+        // and avoid registering internal keys
+        if (listeners[nestedKebab]) continue;
+        listeners[nestedKebab] = (event: Event) => {
+          const newVal =
+            (event as CustomEvent).detail !== undefined
+              ? (event as CustomEvent).detail
+              : (event.target as any)?.value;
+          const currentStateValue = isReactiveState
+            ? (value.value as any)[nestedKey]
+            : getNestedValue(context._state || context, value as string);
+          const changed = hasValueChanged(newVal, currentStateValue);
+          if (!changed) return;
 
-        // Update the ReactiveState with a shallow copy so reactivity triggers
-        if (isReactiveState) {
-          const updated = { ...(value.value as any) };
-          updated[nestedKey] = newVal;
-          value.value = updated;
-        } else {
-          setNestedValue(context._state || context, value as string, newVal);
-        }
+          // Update the ReactiveState with a shallow copy so reactivity triggers
+          if (isReactiveState) {
+            const updated = { ...(value.value as any) };
+            updated[nestedKey] = newVal;
+            value.value = updated;
+          } else {
+            setNestedValue(context._state || context, value as string, newVal);
+          }
 
-        triggerStateUpdate(context, isReactiveState, value, newVal);
+          triggerStateUpdate(context, isReactiveState, value, newVal);
 
-        const host = (event.currentTarget as any) || el || (event.target as any);
-        if (host) {
-          syncElementWithState(host, propName, isReactiveState ? value : newVal, isReactiveState);
-        }
-      };
+          const host =
+            (event.currentTarget as any) || el || (event.target as any);
+          if (host) {
+            syncElementWithState(
+              host,
+              propName,
+              isReactiveState ? value : newVal,
+              isReactiveState
+            );
+          }
+        };
         listeners[nestedCamel] = listeners[nestedKebab];
       }
     }
@@ -369,10 +463,13 @@ export function processModelDirective(
 
   // IME composition handling for text-like inputs
   if (inputType === "text" || inputType === "textarea") {
-    listeners.compositionstart = (() => ((listeners as any)._isComposing = true));
+    listeners.compositionstart = () => ((listeners as any)._isComposing = true);
     listeners.compositionend = (event: Event) => {
       (listeners as any)._isComposing = false;
-      const target = event.target as HTMLInputElement | HTMLTextAreaElement | null;
+      const target = event.target as
+        | HTMLInputElement
+        | HTMLTextAreaElement
+        | null;
       if (!target) return;
       setTimeout(() => {
         const val = target.value;
@@ -414,37 +511,45 @@ function eventNameFromKey(key: string): string {
 
 /**
  * Process :bind directive for attribute/property binding
- * @param value 
- * @param props 
- * @param attrs 
- * @param context 
- * @returns 
+ * @param value
+ * @param props
+ * @param attrs
+ * @param context
+ * @returns
  */
 export function processBindDirective(
   value: any,
   props: Record<string, any>,
   attrs: Record<string, any>,
   context?: any,
-  el?: HTMLElement,
+  el?: HTMLElement
 ): void {
   // Support both object and string syntax for :bind
-    if (typeof value === "object" && value !== null) {
+  if (typeof value === "object" && value !== null) {
     for (const [key, val] of Object.entries(value)) {
       // Only put clearly HTML-only attributes in attrs, everything else in props
       // For native input/select/textarea elements, boolean-like attributes
       // such as `disabled` should be applied as attributes rather than
       // props to avoid placing wrapper/complex values into props which
       // can later be misinterpreted as truthy and disable the control.
-      if (key.startsWith('data-') || key.startsWith('aria-') || key === 'class') {
+      if (
+        key.startsWith("data-") ||
+        key.startsWith("aria-") ||
+        key === "class"
+      ) {
         attrs[key] = val;
-  } else if (key === 'disabled' && el && isNativeControl(el)) {
+      } else if (key === "disabled" && el && isNativeControl(el)) {
         // For native controls, prefer promoting reactive/wrapper values to props
         // so property assignment keeps a live reference and updates via reactivity.
         // For primitive booleans/strings prefer attrs to avoid placing arbitrary
         // objects into props which can be misinterpreted.
-        const isWrapper = val && typeof val === 'object' && 'value' in val;
+        const isWrapper = val && typeof val === "object" && "value" in val;
         const isReactiveVal = (() => {
-          try { return isReactiveState(val); } catch (e) { return false; }
+          try {
+            return isReactiveState(val);
+          } catch (e) {
+            return false;
+          }
         })();
         if (isReactiveVal || isWrapper) {
           props[key] = val;
@@ -465,11 +570,21 @@ export function processBindDirective(
           // Mirror the object branch handling but we don't have access to
           // the element here; prefer attrs for booleanish disabled when
           // the expression produced primitive booleans or strings.
-          if (key.startsWith('data-') || key.startsWith('aria-') || key === 'class') {
+          if (
+            key.startsWith("data-") ||
+            key.startsWith("aria-") ||
+            key === "class"
+          ) {
             attrs[key] = val;
-          } else if (key === 'disabled' && el && isNativeControl(el)) {
-            const isWrapper = val && typeof val === 'object' && 'value' in val;
-            const isReactiveVal = (() => { try { return isReactiveState(val); } catch(e) { return false; } })();
+          } else if (key === "disabled" && el && isNativeControl(el)) {
+            const isWrapper = val && typeof val === "object" && "value" in val;
+            const isReactiveVal = (() => {
+              try {
+                return isReactiveState(val);
+              } catch (e) {
+                return false;
+              }
+            })();
             if (isReactiveVal || isWrapper) {
               props[key] = val;
             } else {
@@ -495,15 +610,15 @@ export function processBindDirective(
 
 /**
  * Process :show directive for conditional display
- * @param value 
- * @param attrs 
- * @param context 
- * @returns 
+ * @param value
+ * @param attrs
+ * @param context
+ * @returns
  */
 export function processShowDirective(
   value: any,
   attrs: Record<string, any>,
-  context?: any,
+  context?: any
 ): void {
   let isVisible: any;
 
@@ -524,7 +639,7 @@ export function processShowDirective(
     if (currentStyle) {
       const styleRules = currentStyle.split(";").filter(Boolean);
       const displayIndex = styleRules.findIndex((rule: string) =>
-        rule.trim().startsWith("display:"),
+        rule.trim().startsWith("display:")
       );
 
       if (displayIndex >= 0) {
@@ -540,9 +655,12 @@ export function processShowDirective(
   } else {
     // Element should be visible - only remove display: none, don't interfere with other display values
     if (currentStyle) {
-      const styleRules = currentStyle.split(";").map((rule: string) => rule.trim()).filter(Boolean);
+      const styleRules = currentStyle
+        .split(";")
+        .map((rule: string) => rule.trim())
+        .filter(Boolean);
       const displayIndex = styleRules.findIndex((rule: string) =>
-        rule.startsWith("display:"),
+        rule.startsWith("display:")
       );
 
       if (displayIndex >= 0) {
@@ -571,17 +689,17 @@ export function processShowDirective(
 
 /**
  * Process :class directive for conditional CSS classes
- * @param value 
- * @param attrs 
- * @param context 
- * @returns 
+ * @param value
+ * @param attrs
+ * @param context
+ * @returns
  */
 /**
  * Evaluate a JavaScript-like object literal string in the given context
  * Uses secure AST-based evaluation instead of Function() constructor
- * @param expression 
- * @param context 
- * @returns 
+ * @param expression
+ * @param context
+ * @returns
  */
 function evaluateExpression(expression: string, context: any): any {
   return SecureExpressionEvaluator.evaluate(expression, context);
@@ -590,7 +708,7 @@ function evaluateExpression(expression: string, context: any): any {
 export function processClassDirective(
   value: any,
   attrs: Record<string, any>,
-  context?: any,
+  context?: any
 ): void {
   let classValue: any;
 
@@ -600,6 +718,27 @@ export function processClassDirective(
     classValue = evaluateExpression(value, context);
   } else {
     classValue = value;
+  }
+
+  // Unwrap reactive/computed wrappers (ReactiveState) to get the inner value
+  try {
+    if (classValue && typeof classValue === "object") {
+      if (isReactiveState(classValue)) {
+        classValue = (classValue as any).value;
+      } else if (
+        "value" in classValue &&
+        typeof (classValue as any).value !== "undefined"
+      ) {
+        // Best-effort unwrap for objects with a `.value` property that
+        // are not DOM nodes (avoid unwrapping nodes that expose `.value`).
+        const maybe = (classValue as any).value;
+        if (!(maybe instanceof Node)) {
+          classValue = maybe;
+        }
+      }
+    }
+  } catch (e) {
+    // ignore
   }
 
   let classes: string[] = [];
@@ -638,13 +777,14 @@ function isBooleanishForProps(v: any): boolean {
   if (v === true || v === false) return true;
   if (v === undefined || v === null) return false;
   const t = typeof v;
-  if (t === 'string') return v === '' || v === 'true' || v === 'false';
+  if (t === "string") return v === "" || v === "true" || v === "false";
   try {
-    if (v && typeof v === 'object' && 'value' in v) {
+    if (v && typeof v === "object" && "value" in v) {
       const inner = (v as any).value;
       const it = typeof inner;
-      if (it === 'boolean') return true;
-      if (it === 'string') return inner === '' || inner === 'true' || inner === 'false';
+      if (it === "boolean") return true;
+      if (it === "string")
+        return inner === "" || inner === "true" || inner === "false";
       return false;
     }
   } catch (e) {}
@@ -653,15 +793,15 @@ function isBooleanishForProps(v: any): boolean {
 
 /**
  * Process :style directive for dynamic inline styles
- * @param value 
- * @param attrs 
- * @param context 
- * @returns 
+ * @param value
+ * @param attrs
+ * @param context
+ * @returns
  */
 export function processStyleDirective(
   value: any,
   attrs: Record<string, any>,
-  context?: any,
+  context?: any
 ): void {
   let styleValue: any;
 
@@ -682,7 +822,7 @@ export function processStyleDirective(
       if (val != null && val !== "") {
         const kebabProperty = property.replace(
           /[A-Z]/g,
-          (match) => `-${match.toLowerCase()}`,
+          (match) => `-${match.toLowerCase()}`
         );
         const needsPx = [
           "width",
@@ -729,23 +869,23 @@ export function processStyleDirective(
 
 /**
  * Process :ref directive for element references
- * @param value 
- * @param props 
- * @param context 
- * @returns 
+ * @param value
+ * @param props
+ * @param context
+ * @returns
  */
 export function processRefDirective(
   value: any,
   props: Record<string, any>,
-  context?: any,
+  context?: any
 ): void {
   let resolvedValue = value;
-  
+
   // If value is a string, evaluate it in the context to resolve variables
-  if (typeof value === 'string' && context) {
+  if (typeof value === "string" && context) {
     resolvedValue = evaluateExpression(value, context);
   }
-  
+
   // Support both reactive state objects (functional API) and string refs (legacy)
   if (isReactiveState(resolvedValue)) {
     // For reactive state objects, store the reactive state object itself as the ref
@@ -759,17 +899,17 @@ export function processRefDirective(
 
 /**
  * Process directives and return merged props, attrs, and event listeners
- * @param directives 
- * @param context 
- * @param el 
- * @param vnodeAttrs 
- * @returns 
+ * @param directives
+ * @param context
+ * @param el
+ * @param vnodeAttrs
+ * @returns
  */
 export function processDirectives(
   directives: Record<string, { value: any; modifiers: string[]; arg?: string }>,
   context?: any,
   el?: HTMLElement,
-  vnodeAttrs?: Record<string, any>,
+  vnodeAttrs?: Record<string, any>
 ): {
   props: Record<string, any>;
   attrs: Record<string, any>;
@@ -782,7 +922,7 @@ export function processDirectives(
   for (const [directiveName, directive] of Object.entries(directives)) {
     const { value, modifiers, arg } = directive;
 
-    if (directiveName === 'model' || directiveName.startsWith('model:')) {
+    if (directiveName === "model" || directiveName.startsWith("model:")) {
       // Extract arg from directiveName if present (model:prop)
       const parts = directiveName.split(":");
       const runtimeArg = parts.length > 1 ? parts[1] : arg;
@@ -794,7 +934,7 @@ export function processDirectives(
         listeners,
         context,
         el,
-        runtimeArg,
+        runtimeArg
       );
       continue;
     }
@@ -833,20 +973,32 @@ export function processDirectives(
   // the target element is a native input/select/textarea, move it to attrs
   // so the final disabled decision uses attribute/coercion rules instead.
   try {
-    const had = Object.prototype.hasOwnProperty.call(props, 'disabled');
-  if (had && el && isNativeControl(el)) {
-      const candidate = props['disabled'];
-      const isWrapper = candidate && typeof candidate === 'object' && 'value' in candidate;
+    const had = Object.prototype.hasOwnProperty.call(props, "disabled");
+    if (had && el && isNativeControl(el)) {
+      const candidate = props["disabled"];
+      const isWrapper =
+        candidate && typeof candidate === "object" && "value" in candidate;
       let isReactiveVal = false;
-      try { isReactiveVal = isReactiveState(candidate); } catch (e) { isReactiveVal = false; }
+      try {
+        isReactiveVal = isReactiveState(candidate);
+      } catch (e) {
+        isReactiveVal = false;
+      }
       // If it's NOT reactive/wrapper, prefer attrs to avoid accidental truthiness
-  if (!isWrapper && !isReactiveVal) {
+      if (!isWrapper && !isReactiveVal) {
         try {
-          attrs['disabled'] = candidate;
-          delete props['disabled'];
-          const w = (globalThis as any) as any;
+          attrs["disabled"] = candidate;
+          delete props["disabled"];
+          const w = globalThis as any as any;
           if (!w.__VDOM_DISABLED_PROMOTIONS) w.__VDOM_DISABLED_PROMOTIONS = [];
-          w.__VDOM_DISABLED_PROMOTIONS.push({ phase: 'bind-directive:postfix-move', location: 'attrs', key: 'disabled', value: candidate, time: Date.now(), stack: (new Error()).stack });
+          w.__VDOM_DISABLED_PROMOTIONS.push({
+            phase: "bind-directive:postfix-move",
+            location: "attrs",
+            key: "disabled",
+            value: candidate,
+            time: Date.now(),
+            stack: new Error().stack,
+          });
         } catch (e) {
           // ignore
         }
@@ -859,13 +1011,13 @@ export function processDirectives(
 
 /**
  * Assign unique keys to VNodes for efficient rendering
- * @param nodeOrNodes 
- * @param baseKey 
- * @returns 
+ * @param nodeOrNodes
+ * @param baseKey
+ * @returns
  */
 export function assignKeysDeep(
   nodeOrNodes: VNode | VNode[],
-  baseKey: string,
+  baseKey: string
 ): VNode | VNode[] {
   if (Array.isArray(nodeOrNodes)) {
     const usedKeys = new Set<string>();
@@ -894,7 +1046,8 @@ export function assignKeysDeep(
           child.props?.props?.dataKey,
           child.props?.props?.["data-key"],
         ];
-        const idPart = idAttrCandidates.find((v) => v !== undefined && v !== null) ?? "";
+        const idPart =
+          idAttrCandidates.find((v) => v !== undefined && v !== null) ?? "";
         key = idPart
           ? `${baseKey}:${tagPart}:${idPart}`
           : `${baseKey}:${tagPart}`;
@@ -933,16 +1086,16 @@ export function assignKeysDeep(
 /**
  * Patch props on an element.
  * Only update changed props, remove old, add new.
- * @param el 
- * @param oldProps 
- * @param newProps 
- * @param context 
+ * @param el
+ * @param oldProps
+ * @param newProps
+ * @param context
  */
 export function patchProps(
   el: HTMLElement,
   oldProps: Record<string, any>,
   newProps: Record<string, any>,
-  context?: any,
+  context?: any
 ) {
   // Process directives first
   const newDirectives = newProps.directives ?? {};
@@ -950,7 +1103,7 @@ export function patchProps(
     newDirectives,
     context,
     el,
-    newProps.attrs,
+    newProps.attrs
   );
 
   // Merge processed directive results with existing props/attrs
@@ -969,7 +1122,10 @@ export function patchProps(
   const newPropProps = mergedProps;
   // Detect whether this vnode represents a custom element so we can
   // trigger its internal prop application lifecycle after patching.
-  const elIsCustom = (newProps as any)?.isCustomElement ?? (oldProps as any)?.isCustomElement ?? false;
+  const elIsCustom =
+    (newProps as any)?.isCustomElement ??
+    (oldProps as any)?.isCustomElement ??
+    false;
   let anyChange = false;
   for (const key in { ...oldPropProps, ...newPropProps }) {
     const oldVal = oldPropProps[key];
@@ -982,11 +1138,13 @@ export function patchProps(
     let newUnwrapped: any = newVal;
     safe(() => {
       if (isReactiveState(oldVal)) oldUnwrapped = (oldVal as any).value;
-      else if (oldVal && typeof oldVal === 'object' && 'value' in oldVal) oldUnwrapped = (oldVal as any).value;
+      else if (oldVal && typeof oldVal === "object" && "value" in oldVal)
+        oldUnwrapped = (oldVal as any).value;
     });
     safe(() => {
       if (isReactiveState(newVal)) newUnwrapped = (newVal as any).value;
-      else if (newVal && typeof newVal === 'object' && 'value' in newVal) newUnwrapped = (newVal as any).value;
+      else if (newVal && typeof newVal === "object" && "value" in newVal)
+        newUnwrapped = (newVal as any).value;
     });
 
     // Consider changed when either the wrapper identity changed or the
@@ -1004,57 +1162,84 @@ export function patchProps(
           el instanceof HTMLSelectElement)
       ) {
         // Unwrap reactive-like wrappers before assigning to .value
-        const unwrapped = (typeof newVal === 'object' && newVal !== null && isReactiveState(newVal))
-          ? (newVal as any).value
-          : (newVal && typeof newVal === 'object' && 'value' in newVal ? (newVal as any).value : newVal);
+        const unwrapped =
+          typeof newVal === "object" &&
+          newVal !== null &&
+          isReactiveState(newVal)
+            ? (newVal as any).value
+            : newVal && typeof newVal === "object" && "value" in newVal
+            ? (newVal as any).value
+            : newVal;
         if (el.value !== unwrapped) el.value = unwrapped ?? "";
       } else if (key === "checked" && el instanceof HTMLInputElement) {
-        const unwrapped = (typeof newVal === 'object' && newVal !== null && isReactiveState(newVal))
-          ? (newVal as any).value
-          : (newVal && typeof newVal === 'object' && 'value' in newVal ? (newVal as any).value : newVal);
+        const unwrapped =
+          typeof newVal === "object" &&
+          newVal !== null &&
+          isReactiveState(newVal)
+            ? (newVal as any).value
+            : newVal && typeof newVal === "object" && "value" in newVal
+            ? (newVal as any).value
+            : newVal;
         el.checked = !!unwrapped;
-    } else if (key.startsWith("on") && typeof newVal === "function") {
-      // DOM-first listener: onClick -> click
-      const ev = eventNameFromKey(key);
-      if (typeof oldVal === "function") {
-        EventManager.removeListener(el, ev, oldVal);
-      }
-      EventManager.addListener(el, ev, newVal);
-      // If this is an update:* handler for a bound object prop, also
-      // register nested update:<field> listeners that call the same
-      // handler with a shallow-copied object so compiled handlers that
-      // expect the full object will work with child-emitted nested events.
-      try {
-        if (ev && ev.startsWith('update:')) {
-          const propName = ev.split(':', 2)[1];
-          const propVal = newPropProps[propName];
-          // Determine nested keys robustly: if propVal is a ReactiveState,
-          // inspect its .value, otherwise inspect the object itself.
-          let candidateKeys: string[] = [];
-          try {
-              if (isReactiveState(propVal)) {
-                  const v = (propVal as any).value;
-                  candidateKeys = v && typeof v === 'object' ? Object.keys(v) : [];
-                } else if (propVal && typeof propVal === 'object') {
-                  candidateKeys = Object.keys(propVal);
-                }
-          } catch (ee) {
-            candidateKeys = [];
-          }
-          // Filter out internal keys
-          const userKeys = candidateKeys.filter(k => typeof k === 'string' && !k.startsWith('_') && k !== 'constructor');
-          for (const nestedKey of userKeys) {
-            const nestedEvent = `update:${nestedKey}`;
-            const nestedHandler = (e: Event) => {
-              const nestedNew = (e as CustomEvent).detail !== undefined ? (e as CustomEvent).detail : (e.target as any)?.value;
-              const current = isReactiveState(propVal) ? ((propVal as any).value || {}) : ((newPropProps[propName] as any) || {});
-              const updated = { ...current, [nestedKey]: nestedNew };
-              safe(() => { (newVal as any)({ detail: updated } as any); });
-            };
-            safe(() => { EventManager.addListener(el, nestedEvent, nestedHandler); });
-          }
+      } else if (key.startsWith("on") && typeof newVal === "function") {
+        // DOM-first listener: onClick -> click
+        const ev = eventNameFromKey(key);
+        if (typeof oldVal === "function") {
+          EventManager.removeListener(el, ev, oldVal);
         }
-      } catch (e) { /* ignore */ }
+        EventManager.addListener(el, ev, newVal);
+        // If this is an update:* handler for a bound object prop, also
+        // register nested update:<field> listeners that call the same
+        // handler with a shallow-copied object so compiled handlers that
+        // expect the full object will work with child-emitted nested events.
+        try {
+          if (ev && ev.startsWith("update:")) {
+            const propName = ev.split(":", 2)[1];
+            const propVal = newPropProps[propName];
+            // Determine nested keys robustly: if propVal is a ReactiveState,
+            // inspect its .value, otherwise inspect the object itself.
+            let candidateKeys: string[] = [];
+            try {
+              if (isReactiveState(propVal)) {
+                const v = (propVal as any).value;
+                candidateKeys =
+                  v && typeof v === "object" ? Object.keys(v) : [];
+              } else if (propVal && typeof propVal === "object") {
+                candidateKeys = Object.keys(propVal);
+              }
+            } catch (ee) {
+              candidateKeys = [];
+            }
+            // Filter out internal keys
+            const userKeys = candidateKeys.filter(
+              (k) =>
+                typeof k === "string" &&
+                !k.startsWith("_") &&
+                k !== "constructor"
+            );
+            for (const nestedKey of userKeys) {
+              const nestedEvent = `update:${nestedKey}`;
+              const nestedHandler = (e: Event) => {
+                const nestedNew =
+                  (e as CustomEvent).detail !== undefined
+                    ? (e as CustomEvent).detail
+                    : (e.target as any)?.value;
+                const current = isReactiveState(propVal)
+                  ? (propVal as any).value || {}
+                  : (newPropProps[propName] as any) || {};
+                const updated = { ...current, [nestedKey]: nestedNew };
+                safe(() => {
+                  (newVal as any)({ detail: updated } as any);
+                });
+              };
+              safe(() => {
+                EventManager.addListener(el, nestedEvent, nestedHandler);
+              });
+            }
+          }
+        } catch (e) {
+          /* ignore */
+        }
       } else if (newVal === undefined || newVal === null) {
         el.removeAttribute(key);
       } else {
@@ -1067,14 +1252,22 @@ export function patchProps(
         // Rely only on compiler/runtime-provided hint. Do not perform implicit
         // dash-based heuristics here: callers/tests should set isCustomElement on
         // the vnode props when a tag is a custom element.
-        const elIsCustom = (newProps as any)?.isCustomElement ?? (oldProps as any)?.isCustomElement ?? false;
+        const elIsCustom =
+          (newProps as any)?.isCustomElement ??
+          (oldProps as any)?.isCustomElement ??
+          false;
         if (elIsCustom || key in el) {
           try {
             (el as any)[key] = newVal;
             // For native form controls, also remove the disabled attribute when setting disabled=false
             // The browser doesn't automatically sync the attribute when the property changes
-            if (key === 'disabled' && newVal === false && !elIsCustom && isNativeControl(el)) {
-              el.removeAttribute('disabled');
+            if (
+              key === "disabled" &&
+              newVal === false &&
+              !elIsCustom &&
+              isNativeControl(el)
+            ) {
+              el.removeAttribute("disabled");
             }
           } catch (err) {
             // Enforce property-only binding: skip silently on failure.
@@ -1093,13 +1286,17 @@ export function patchProps(
 
   // Handle directive event listeners
   for (const [eventType, listener] of Object.entries(
-    processedDirectives.listeners || {},
+    processedDirectives.listeners || {}
   )) {
     EventManager.addListener(el, eventType, listener as EventListener);
     try {
       const parentEl = el && (el.parentElement as HTMLElement | null);
       if (parentEl && parentEl !== el) {
-        EventManager.addListener(parentEl, eventType, listener as EventListener);
+        EventManager.addListener(
+          parentEl,
+          eventType,
+          listener as EventListener
+        );
       }
     } catch (e) {}
   }
@@ -1109,101 +1306,164 @@ export function patchProps(
   for (const key in { ...oldAttrs, ...newAttrs }) {
     const oldVal = oldAttrs[key];
     const newVal = newAttrs[key];
-    
+
     // For reactive state objects, compare the unwrapped values
     let oldUnwrapped = oldVal;
     let newUnwrapped = newVal;
-    
+
     if (isReactiveState(oldVal)) {
       oldUnwrapped = oldVal.value; // This triggers dependency tracking
     }
     if (isReactiveState(newVal)) {
       newUnwrapped = newVal.value; // This triggers dependency tracking
     }
-    
+
     if (oldUnwrapped !== newUnwrapped) {
       anyChange = true;
       // Handle removal/null/false: remove attribute and clear corresponding
       // DOM property for native controls where Vue treats null/undefined as ''
-      if (newUnwrapped === undefined || newUnwrapped === null || newUnwrapped === false) {
-        safe(() => { el.removeAttribute(key); });
+      if (
+        newUnwrapped === undefined ||
+        newUnwrapped === null ||
+        newUnwrapped === false
+      ) {
+        safe(() => {
+          el.removeAttribute(key);
+        });
 
         // Clear value for native controls when value is removed
-        if (key === 'value') {
-          if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
-            safe(() => { (el as any).value = ""; });
+        if (key === "value") {
+          if (
+            el instanceof HTMLInputElement ||
+            el instanceof HTMLTextAreaElement
+          ) {
+            safe(() => {
+              (el as any).value = "";
+            });
           } else if (el instanceof HTMLSelectElement) {
-            safe(() => { (el as any).value = ""; });
+            safe(() => {
+              (el as any).value = "";
+            });
           } else if (el instanceof HTMLProgressElement) {
-            safe(() => { (el as any).value = 0; });
+            safe(() => {
+              (el as any).value = 0;
+            });
           }
         }
 
         // Clear checked for checkbox/radio
-        if (key === 'checked' && el instanceof HTMLInputElement) {
-          safe(() => { el.checked = false; });
+        if (key === "checked" && el instanceof HTMLInputElement) {
+          safe(() => {
+            el.checked = false;
+          });
         }
 
         // Ensure disabled property is unset for native controls
-        if (key === 'disabled' && isNativeControl(el)) {
-          safe(() => { (el as any).disabled = false; });
+        if (key === "disabled" && isNativeControl(el)) {
+          safe(() => {
+            (el as any).disabled = false;
+          });
         }
       } else {
         // New value present: for native controls prefer assigning .value/.checked
-        if (key === 'value') {
-          if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
-            safe(() => { (el as any).value = newUnwrapped ?? ""; });
+        if (key === "value") {
+          if (
+            el instanceof HTMLInputElement ||
+            el instanceof HTMLTextAreaElement
+          ) {
+            safe(() => {
+              (el as any).value = newUnwrapped ?? "";
+            });
             continue;
           } else if (el instanceof HTMLSelectElement) {
-            safe(() => { (el as any).value = newUnwrapped ?? ""; });
+            safe(() => {
+              (el as any).value = newUnwrapped ?? "";
+            });
             continue;
           } else if (el instanceof HTMLProgressElement) {
-            safe(() => { (el as any).value = Number(newUnwrapped); });
+            safe(() => {
+              (el as any).value = Number(newUnwrapped);
+            });
             continue;
           }
         }
-        if (key === 'checked' && el instanceof HTMLInputElement) {
-          safe(() => { el.checked = !!newUnwrapped; });
+        if (key === "checked" && el instanceof HTMLInputElement) {
+          safe(() => {
+            el.checked = !!newUnwrapped;
+          });
           continue;
         }
 
         // Special handling for style attribute - always use setAttribute
-        if (key === 'style') {
-          el.setAttribute(key, String(newUnwrapped));
+        if (key === "style") {
+          const serialized = safeSerializeAttr(newUnwrapped);
+          if (serialized !== null) el.setAttribute(key, serialized);
           continue;
         }
 
         // Defensive handling for disabled when a new value is present
-        if (key === 'disabled' && isNativeControl(el)) {
-          safe(() => { (el as any).disabled = coerceBooleanForNative(newUnwrapped); });
-          if (!coerceBooleanForNative(newUnwrapped)) safe(() => { el.removeAttribute(key); });
-          else safe(() => { el.setAttribute(key, ''); });
+        if (key === "disabled" && isNativeControl(el)) {
+          safe(() => {
+            (el as any).disabled = coerceBooleanForNative(newUnwrapped);
+          });
+          if (!coerceBooleanForNative(newUnwrapped))
+            safe(() => {
+              el.removeAttribute(key);
+            });
+          else
+            safe(() => {
+              el.setAttribute(key, "");
+            });
           continue;
         }
 
         // Non-native or generic attributes: prefer property when available
-        const isSVG = (el as any).namespaceURI === 'http://www.w3.org/2000/svg';
-        
+        const isSVG = (el as any).namespaceURI === "http://www.w3.org/2000/svg";
+
         // For custom elements, convert kebab-case attributes to camelCase properties
         // and prefer assigning ReactiveState instances directly to element
         // properties so child components that call useProps receive the
         // live ReactiveState (with .value) instead of a stale plain object.
-        if (elIsCustom && !isSVG && key.includes('-')) {
-          const camelKey = toCamel(key);
-          try {
-            if (isReactiveState(newVal)) (el as any)[camelKey] = newVal;
-            else (el as any)[camelKey] = newUnwrapped;
-          } catch (e) {
-            // If property assignment fails, fall back to attribute
-            el.setAttribute(key, String(newUnwrapped));
+        // However, preserve kebab-case class-like attributes (ending with
+        // `-class`) as attributes so they remain visible in serialized
+        // HTML (important for JIT CSS extraction). Only non-class-like
+        // kebab attributes are promoted to camelCase props.
+        if (elIsCustom && !isSVG && key.includes("-")) {
+          // For custom elements, prefer promoting kebab attributes to properties
+          // except for class-like attributes which should remain attributes
+          // for reliable HTML serialization. Use helpers to ensure safe string
+          // serialization.
+          if (isClassLikeAttr(key)) {
+            const serialized = safeSerializeAttr(newVal ?? newUnwrapped);
+            if (serialized !== null) {
+              try {
+                el.setAttribute(key, serialized);
+              } catch (e) {
+                /* best-effort */
+              }
+            }
+          } else {
+            const camelKey = toCamel(key);
+            try {
+              if (isReactiveState(newVal)) (el as any)[camelKey] = newVal;
+              else (el as any)[camelKey] = newUnwrapped;
+            } catch (e) {
+              // If property assignment fails, fall back to attribute
+              const serialized = safeSerializeAttr(newVal ?? newUnwrapped);
+              if (serialized !== null) el.setAttribute(key, serialized);
+            }
           }
         } else if (!isSVG && key in el) {
           try {
             if (isReactiveState(newVal)) (el as any)[key] = newVal;
             else (el as any)[key] = newUnwrapped;
-          } catch (e) { el.setAttribute(key, String(newUnwrapped)); }
+          } catch (e) {
+            const serialized = safeSerializeAttr(newUnwrapped);
+            if (serialized !== null) el.setAttribute(key, serialized);
+          }
         } else {
-          el.setAttribute(key, String(newUnwrapped));
+          const serialized = safeSerializeAttr(newUnwrapped);
+          if (serialized !== null) el.setAttribute(key, serialized);
         }
       }
     }
@@ -1215,7 +1475,7 @@ export function patchProps(
   // newly created custom elements are told to apply props and render.
   // Defensive: ensure native disabled property matches the intended source
   try {
-  if (isNativeControl(el)) {
+    if (isNativeControl(el)) {
       const propCandidate = (mergedProps as any).disabled;
       // Only treat the propCandidate as the authoritative source when it's
       // a clear boolean-ish primitive or a reactive/wrapper we can unwrap.
@@ -1231,10 +1491,18 @@ export function patchProps(
         // the attribute source to avoid arbitrary objects (proxies, wrapper
         // containers) from being treated as truthy and disabling native
         // controls.
-        const hasDisabledInProcessed = Object.prototype.hasOwnProperty.call(processedDirectives.props || {}, 'disabled');
-        const isWrapper = propCandidate && typeof propCandidate === 'object' && 'value' in propCandidate;
+        const hasDisabledInProcessed = Object.prototype.hasOwnProperty.call(
+          processedDirectives.props || {},
+          "disabled"
+        );
+        const isWrapper =
+          propCandidate &&
+          typeof propCandidate === "object" &&
+          "value" in propCandidate;
         let isReactive = false;
-        safe(() => { isReactive = !!isReactiveState(propCandidate); });
+        safe(() => {
+          isReactive = !!isReactiveState(propCandidate);
+        });
         const isBooleanish = isBooleanishForProps(propCandidate);
         if (isReactive || isWrapper || hasDisabledInProcessed || isBooleanish) {
           sourceVal = propCandidate;
@@ -1245,26 +1513,38 @@ export function patchProps(
         sourceVal = (mergedAttrs as any).disabled;
       }
       const finalDisabled = coerceBooleanForNative(sourceVal);
-      safe(() => { (el as any).disabled = finalDisabled; });
-      finalDisabled ? safe(() => { el.setAttribute('disabled', ''); }) : safe(() => { el.removeAttribute('disabled'); });
+      safe(() => {
+        (el as any).disabled = finalDisabled;
+      });
+      finalDisabled
+        ? safe(() => {
+            el.setAttribute("disabled", "");
+          })
+        : safe(() => {
+            el.removeAttribute("disabled");
+          });
     }
   } catch (e) {}
 
   if (elIsCustom && anyChange) {
-    safe(() => { (el as any)._applyProps?.((el as any)._cfg); });
     safe(() => {
-      if (typeof (el as any).requestRender === 'function') (el as any).requestRender();
-      else if (typeof (el as any)._render === 'function') (el as any)._render((el as any)._cfg);
+      (el as any)._applyProps?.((el as any)._cfg);
+    });
+    safe(() => {
+      if (typeof (el as any).requestRender === "function")
+        (el as any).requestRender();
+      else if (typeof (el as any)._render === "function")
+        (el as any)._render((el as any)._cfg);
     });
   }
 }
 
 /**
  * Create a DOM element from a VNode.
- * @param vnode 
- * @param context 
- * @param refs 
- * @returns 
+ * @param vnode
+ * @param context
+ * @param refs
+ * @returns
  */
 export function createElement(
   vnode: VNode | string,
@@ -1279,7 +1559,7 @@ export function createElement(
   // Text VNode
   if (vnode.tag === "#text") {
     const textNode = document.createTextNode(
-      typeof vnode.children === "string" ? vnode.children : "",
+      typeof vnode.children === "string" ? vnode.children : ""
     );
     if (vnode.key != null) setNodeKey(textNode, vnode.key); // attach key
     return textNode;
@@ -1287,7 +1567,7 @@ export function createElement(
 
   // Raw HTML vnode - insert provided HTML as nodes (unsafe: caller must opt-in)
   if (vnode.tag === "#raw") {
-    const html = typeof vnode.children === 'string' ? vnode.children : '';
+    const html = typeof vnode.children === "string" ? vnode.children : "";
     const range = document.createRange();
     // createContextualFragment is broadly supported and safe when used with
     // controlled input. We intentionally call it for opt-in raw HTML insertion.
@@ -1315,15 +1595,22 @@ export function createElement(
 
     const frag = document.createDocumentFragment();
     frag.appendChild(start);
-    
+
     for (const child of children) {
       const childNode = createElement(child, context);
       // Propagate anchor block's key to child elements ONLY if child doesn't have its own key
       // This allows keyed lists (each()) to preserve their own keys
-      if (anchorVNode.key != null && childNode instanceof Element && !childNode.hasAttribute('data-anchor-key')) {
+      if (
+        anchorVNode.key != null &&
+        childNode instanceof Element &&
+        !childNode.hasAttribute("data-anchor-key")
+      ) {
         const childVNode = child as VNode;
-        const childHasOwnKey = childVNode && typeof childVNode === 'object' && childVNode.key != null;
-        
+        const childHasOwnKey =
+          childVNode &&
+          typeof childVNode === "object" &&
+          childVNode.key != null;
+
         if (!childHasOwnKey) {
           setNodeKey(childNode, anchorVNode.key as any);
         }
@@ -1358,22 +1645,47 @@ export function createElement(
     ...processedDirectives.attrs,
   };
 
+  // Ensure any explicit string `class` provided on the vnode (static class)
+  // is applied to the host element as a plain attribute. This guarantees
+  // that parent serialized `innerHTML` includes user-specified utility
+  // classes (important for JIT CSS extraction and tests). Use a safe
+  // string coercion and ignore non-string values to avoid assigning
+  // complex objects to DOM attributes which can throw in jsdom.
+  try {
+    const hostClass =
+      (mergedAttrs && mergedAttrs.class) ??
+      (mergedProps && mergedProps.class) ??
+      (vnode.props && vnode.props.attrs && vnode.props.attrs.class) ??
+      (vnode.props && vnode.props.props && vnode.props.props.class);
+    const serializedHostClass = safeSerializeAttr(hostClass);
+    if (serializedHostClass !== null) {
+      const cls = String(serializedHostClass).trim();
+      if (cls) el.setAttribute("class", cls);
+    }
+  } catch (e) {}
+
   // Defensive: if the compiler (vnode.props) or earlier processing placed
   // a primitive `disabled` into props for a native input, move it to attrs
   // to avoid accidental truthiness causing native controls to be disabled.
   try {
-    if ((mergedProps as any).disabled !== undefined && el && isNativeControl(el)) {
+    if (
+      (mergedProps as any).disabled !== undefined &&
+      el &&
+      isNativeControl(el)
+    ) {
       const candidate = (mergedProps as any).disabled;
-      const isWrapper = candidate && typeof candidate === 'object' && 'value' in candidate;
+      const isWrapper =
+        candidate && typeof candidate === "object" && "value" in candidate;
       let isReactiveVal = false;
-      try { isReactiveVal = isReactiveState(candidate); } catch (e) { isReactiveVal = false; }
+      try {
+        isReactiveVal = isReactiveState(candidate);
+      } catch (e) {
+        isReactiveVal = false;
+      }
       if (!isWrapper && !isReactiveVal) {
         safe(() => {
           (mergedAttrs as any).disabled = candidate;
           delete (mergedProps as any).disabled;
-          const w = (globalThis as any) as any;
-          if (!w.__VDOM_DISABLED_PROMOTIONS) w.__VDOM_DISABLED_PROMOTIONS = [];
-          w.__VDOM_DISABLED_PROMOTIONS.push({ phase: 'createElement:move-prop-to-attr', location: 'attrs', key: 'disabled', value: candidate, time: Date.now(), stack: (new Error()).stack });
         });
       }
     }
@@ -1383,79 +1695,115 @@ export function createElement(
   // Prefer property assignment for certain attributes (value/checked) and
   // when the element exposes a corresponding property. SVG elements should
   // keep attributes only.
-  const isSVG = (el as any).namespaceURI === 'http://www.w3.org/2000/svg';
+  const isSVG = (el as any).namespaceURI === "http://www.w3.org/2000/svg";
   for (const key in mergedAttrs) {
     const val = mergedAttrs[key];
     // Only allow valid attribute names (string, not object)
-    if (typeof key !== 'string' || /\[object Object\]/.test(key)) {
+    if (typeof key !== "string" || /\[object Object\]/.test(key)) {
       continue;
     }
     // Unwrap reactive-like wrappers (ReactiveState or { value }) to primitives
-    const unwrappedVal = (typeof val === 'object' && val !== null && isReactiveState(val))
-      ? (val as any).value
-      : (val && typeof val === 'object' && 'value' in val ? (val as any).value : val);
+    const unwrappedVal =
+      typeof val === "object" && val !== null && isReactiveState(val)
+        ? (val as any).value
+        : val && typeof val === "object" && "value" in val
+        ? (val as any).value
+        : val;
 
-      if (typeof unwrappedVal === "boolean") {
+    if (typeof unwrappedVal === "boolean") {
       // Use the unwrapped boolean to decide presence of boolean attributes
       if (unwrappedVal) {
-  el.setAttribute(key, "");
+        el.setAttribute(key, "");
       } else {
-        safe(() => { el.removeAttribute(key); });
+        safe(() => {
+          el.removeAttribute(key);
+        });
       }
     } else if (unwrappedVal !== undefined && unwrappedVal !== null) {
       // For disabled attr on native inputs, coerce to boolean and set property
-  if (key === 'disabled' && isNativeControl(el)) {
-  // Prefer props over attrs when deciding disabled state, but only when
-  // the prop value is explicitly booleanish (boolean, numeric, or wrapper).
-  // This avoids treating empty-string or arbitrary objects on props as
-  // truthy which would incorrectly disable native controls.
-  const propCandidate = (mergedProps as any).disabled;
-  const sourceVal = isBooleanishForProps(propCandidate) ? propCandidate : unwrappedVal;
+      if (key === "disabled" && isNativeControl(el)) {
+        // Prefer props over attrs when deciding disabled state, but only when
+        // the prop value is explicitly booleanish (boolean, numeric, or wrapper).
+        // This avoids treating empty-string or arbitrary objects on props as
+        // truthy which would incorrectly disable native controls.
+        const propCandidate = (mergedProps as any).disabled;
+        const sourceVal = isBooleanishForProps(propCandidate)
+          ? propCandidate
+          : unwrappedVal;
         const final = coerceBooleanForNative(sourceVal);
-        safe(() => { (el as any).disabled = final; });
-        final ? safe(() => { el.setAttribute(key, ''); }) : safe(() => { el.removeAttribute(key); });
+        safe(() => {
+          (el as any).disabled = final;
+        });
+        final
+          ? safe(() => {
+              el.setAttribute(key, "");
+            })
+          : safe(() => {
+              el.removeAttribute(key);
+            });
         // keep going (do not fallthrough to attribute string path)
         continue;
       }
       // Special-case value/checked for native inputs so .value/.checked are set
-      if (!isSVG && key === 'value' && (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement || el instanceof HTMLProgressElement)) {
+      if (
+        !isSVG &&
+        key === "value" &&
+        (el instanceof HTMLInputElement ||
+          el instanceof HTMLTextAreaElement ||
+          el instanceof HTMLSelectElement ||
+          el instanceof HTMLProgressElement)
+      ) {
         try {
           // Progress expects numeric value
-          if (el instanceof HTMLProgressElement) (el as any).value = Number(unwrappedVal);
+          if (el instanceof HTMLProgressElement)
+            (el as any).value = Number(unwrappedVal);
           else el.value = unwrappedVal ?? "";
         } catch (e) {
-          el.setAttribute(key, String(unwrappedVal));
+          const serialized = safeSerializeAttr(unwrappedVal);
+          if (serialized !== null) el.setAttribute(key, serialized);
         }
-      } else if (!isSVG && key === 'checked' && el instanceof HTMLInputElement) {
+      } else if (
+        !isSVG &&
+        key === "checked" &&
+        el instanceof HTMLInputElement
+      ) {
         try {
           el.checked = !!unwrappedVal;
         } catch (e) {
-          el.setAttribute(key, String(unwrappedVal));
+          const serialized = safeSerializeAttr(unwrappedVal);
+          if (serialized !== null) el.setAttribute(key, serialized);
         }
       } else if (!isSVG && key in el) {
         try {
           (el as any)[key] = unwrappedVal;
           // For native form controls, also remove the disabled attribute when setting disabled=false
           // The browser doesn't automatically sync the attribute when the property changes
-          if (key === 'disabled' && unwrappedVal === false && isNativeControl(el)) {
-            el.removeAttribute('disabled');
+          if (
+            key === "disabled" &&
+            unwrappedVal === false &&
+            isNativeControl(el)
+          ) {
+            el.removeAttribute("disabled");
           }
         } catch (e) {
-          el.setAttribute(key, String(unwrappedVal));
+          const serialized = safeSerializeAttr(unwrappedVal);
+          if (serialized !== null) el.setAttribute(key, serialized);
         }
       } else {
         // For custom elements, convert kebab-case attributes to camelCase properties
         const vnodeIsCustom = vnode.props?.isCustomElement ?? false;
-          if (vnodeIsCustom && !isSVG && key.includes('-')) {
+        if (vnodeIsCustom && !isSVG && key.includes("-")) {
           const camelKey = toCamel(key);
           try {
             (el as any)[camelKey] = unwrappedVal;
           } catch (e) {
             // If property assignment fails, fall back to attribute
-            el.setAttribute(key, String(unwrappedVal));
+            const serialized = safeSerializeAttr(unwrappedVal);
+            if (serialized !== null) el.setAttribute(key, serialized);
           }
         } else {
-          el.setAttribute(key, String(unwrappedVal));
+          const serialized = safeSerializeAttr(unwrappedVal);
+          if (serialized !== null) el.setAttribute(key, serialized);
         }
       }
     }
@@ -1465,7 +1813,7 @@ export function createElement(
   for (const key in mergedProps) {
     const val = mergedProps[key];
     // Only allow valid attribute names (string, not object)
-    if (typeof key !== 'string' || /\[object Object\]/.test(key)) {
+    if (typeof key !== "string" || /\[object Object\]/.test(key)) {
       // Skip invalid prop keys silently to keep runtime minimal
       continue;
     }
@@ -1477,8 +1825,15 @@ export function createElement(
     ) {
       // Check if val is a reactive state object and extract its value
       // Use the getter to ensure dependency tracking happens
-      const propValue = (typeof val === "object" && val !== null && typeof val.value !== "undefined") ? val.value : val;
-      safe(() => { (el as any).value = propValue ?? ""; });
+      const propValue =
+        typeof val === "object" &&
+        val !== null &&
+        typeof val.value !== "undefined"
+          ? val.value
+          : val;
+      safe(() => {
+        (el as any).value = propValue ?? "";
+      });
     } else if (key.startsWith("on") && typeof val === "function") {
       // If a directive already provided a listener for this event (for
       // example :model produced update:prop handlers), prefer the directive
@@ -1487,18 +1842,31 @@ export function createElement(
       // variables and later do nothing when events fire.
       const eventType = eventNameFromKey(key);
       // Also consider alternate camel/kebab variant when checking directive provided listeners
-      const altEventType = eventType.includes(':') ? (() => {
-        const parts = eventType.split(':');
-        const prop = parts[1];
-        if (prop.includes('-')) {
-          const camel = prop.split('-').map((p,i)=> i===0? p : p.charAt(0).toUpperCase()+p.slice(1)).join('');
-          return `${parts[0]}:${camel}`;
-        } else {
-          const kebab = prop.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
-          return `${parts[0]}:${kebab}`;
-        }
-      })() : eventType;
-      if (processedDirectives.listeners && (processedDirectives.listeners[eventType] || processedDirectives.listeners[altEventType])) {
+      const altEventType = eventType.includes(":")
+        ? (() => {
+            const parts = eventType.split(":");
+            const prop = parts[1];
+            if (prop.includes("-")) {
+              const camel = prop
+                .split("-")
+                .map((p, i) =>
+                  i === 0 ? p : p.charAt(0).toUpperCase() + p.slice(1)
+                )
+                .join("");
+              return `${parts[0]}:${camel}`;
+            } else {
+              const kebab = prop
+                .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
+                .toLowerCase();
+              return `${parts[0]}:${kebab}`;
+            }
+          })()
+        : eventType;
+      if (
+        processedDirectives.listeners &&
+        (processedDirectives.listeners[eventType] ||
+          processedDirectives.listeners[altEventType])
+      ) {
         // skip prop handler in favor of directive-provided listener
       } else {
         EventManager.addListener(el, eventType, val);
@@ -1511,50 +1879,81 @@ export function createElement(
       // Prefer setting DOM properties for custom elements or when the
       // property already exists on the element. This ensures JS properties
       // (and reactive custom element props) receive the value instead of
-      // only an HTML attribute string.
-      // Use the compiler-provided hint when available, otherwise fall back
-      // to a conservative tag-name test. Prefer property assignment for
-      // custom elements or when the property exists on the element.
+      // only an HTML attribute string. However, certain attributes like
+      // `class` and `style` should remain HTML attributes on the host so
+      // they show up in serialized `innerHTML` (important for JIT CSS
+      // extraction and tests). Handle those as attributes explicitly.
       const vnodeIsCustom = vnode.props?.isCustomElement ?? false;
+      // Compute propValue once for use in attribute/property assignment.
+      const propValue =
+        typeof val === "object" && val !== null && isReactiveState(val)
+          ? val
+          : typeof val === "object" &&
+            val !== null &&
+            typeof (val as any).value !== "undefined"
+          ? (val as any).value
+          : val;
+
+      if (key === "class" || key === "style") {
+        try {
+          const serialized = safeSerializeAttr(propValue);
+          if (serialized !== null) el.setAttribute(key, serialized);
+        } catch (e) {}
+        continue;
+      }
       if (vnodeIsCustom || key in el) {
         try {
-              // If this is a ReactiveState instance, assign the instance itself
-              // to custom element properties so child components can call
-              // useProps and receive the live ReactiveState (with .value).
-              const propValue = (typeof val === 'object' && val !== null && isReactiveState(val))
-                ? val
-                : (typeof val === "object" && val !== null && typeof val.value !== "undefined")
-                  ? val.value
-                  : val;
-              // For native elements and the disabled prop, coerce to a boolean
-                    if (key === 'disabled' && isNativeControl(el)) {
-                      const sourceVal = (mergedProps as any).disabled !== undefined ? (mergedProps as any).disabled : propValue;
-                      const final = coerceBooleanForNative(sourceVal);
-                      safe(() => { (el as any).disabled = final; });
-                      final ? safe(() => { el.setAttribute(key, ''); }) : safe(() => { el.removeAttribute(key); });
-                      continue;
-                    }
-              // Coerce boolean DOM properties to real booleans. This prevents
-              // empty-string or 'false' string values from incorrectly enabling
-              // properties like `disabled` during SSR/attribute promotions.
-              try {
-                const existingProp = (el as any)[key];
-                if (typeof existingProp === 'boolean') {
-                  let assignValue: any = propValue;
-                  if (typeof propValue === 'string') {
-                    if (propValue === 'false') assignValue = false;
-                    else if (propValue === 'true') assignValue = true;
-                    else assignValue = !!propValue && propValue !== '';
-                  } else {
-                    assignValue = !!propValue;
-                  }
-                  (el as any)[key] = assignValue;
-                } else {
-                  (el as any)[key] = propValue;
-                }
-              } catch (e) {
-                (el as any)[key] = propValue;
+          // If this is a ReactiveState instance, assign the instance itself
+          // to custom element properties so child components can call
+          // useProps and receive the live ReactiveState (with .value).
+          const propValue =
+            typeof val === "object" && val !== null && isReactiveState(val)
+              ? val
+              : typeof val === "object" &&
+                val !== null &&
+                typeof val.value !== "undefined"
+              ? val.value
+              : val;
+          // For native elements and the disabled prop, coerce to a boolean
+          if (key === "disabled" && isNativeControl(el)) {
+            const sourceVal =
+              (mergedProps as any).disabled !== undefined
+                ? (mergedProps as any).disabled
+                : propValue;
+            const final = coerceBooleanForNative(sourceVal);
+            safe(() => {
+              (el as any).disabled = final;
+            });
+            final
+              ? safe(() => {
+                  el.setAttribute(key, "");
+                })
+              : safe(() => {
+                  el.removeAttribute(key);
+                });
+            continue;
+          }
+          // Coerce boolean DOM properties to real booleans. This prevents
+          // empty-string or 'false' string values from incorrectly enabling
+          // properties like `disabled` during SSR/attribute promotions.
+          try {
+            const existingProp = (el as any)[key];
+            if (typeof existingProp === "boolean") {
+              let assignValue: any = propValue;
+              if (typeof propValue === "string") {
+                if (propValue === "false") assignValue = false;
+                else if (propValue === "true") assignValue = true;
+                else assignValue = !!propValue && propValue !== "";
+              } else {
+                assignValue = !!propValue;
               }
+              (el as any)[key] = assignValue;
+            } else {
+              (el as any)[key] = propValue;
+            }
+          } catch (e) {
+            (el as any)[key] = propValue;
+          }
         } catch (err) {
           // silently skip on failure
         }
@@ -1566,7 +1965,7 @@ export function createElement(
 
   // Handle directive event listeners
   for (const [eventType, listener] of Object.entries(
-    processedDirectives.listeners || {},
+    processedDirectives.listeners || {}
   )) {
     EventManager.addListener(el, eventType, listener as EventListener);
   }
@@ -1576,8 +1975,8 @@ export function createElement(
     ...vnode,
     props: {
       ...vnode.props,
-      ...processedDirectives.props
-    }
+      ...processedDirectives.props,
+    },
   };
   assignRef(vnodeWithProcessedProps, el as HTMLElement, refs);
 
@@ -1592,16 +1991,16 @@ export function createElement(
     // component's reactive context picks up attributes/properties that were
     // just applied by the renderer. This is necessary when the component
     // constructor performs an initial render before the renderer sets props.
-    if (typeof (el as any)._applyProps === 'function') {
+    if (typeof (el as any)._applyProps === "function") {
       try {
         (el as any)._applyProps((el as any)._cfg);
       } catch (e) {
         // ignore
       }
     }
-    if (typeof (el as any).requestRender === 'function') {
+    if (typeof (el as any).requestRender === "function") {
       (el as any).requestRender();
-    } else if (typeof (el as any)._render === 'function') {
+    } else if (typeof (el as any)._render === "function") {
       (el as any)._render((el as any)._cfg);
     }
   } catch (e) {
@@ -1619,9 +2018,13 @@ export function createElement(
 
   // After children are appended, reapply select value selection if necessary.
   try {
-    if (el instanceof HTMLSelectElement && mergedAttrs && mergedAttrs.hasOwnProperty('value')) {
+    if (
+      el instanceof HTMLSelectElement &&
+      mergedAttrs &&
+      mergedAttrs.hasOwnProperty("value")
+    ) {
       try {
-        el.value = mergedAttrs['value'] ?? "";
+        el.value = mergedAttrs["value"] ?? "";
       } catch (e) {
         // ignore
       }
@@ -1639,16 +2042,32 @@ export function createElement(
     if (isNativeControl(el)) {
       const propCandidate = (mergedProps as any).disabled;
       const attrCandidate = (mergedAttrs as any).disabled;
-      const isWrapper = propCandidate && typeof propCandidate === 'object' && 'value' in propCandidate;
+      const isWrapper =
+        propCandidate &&
+        typeof propCandidate === "object" &&
+        "value" in propCandidate;
       let isReactive = false;
-      try { isReactive = !!isReactiveState(propCandidate); } catch (e) { isReactive = false; }
+      try {
+        isReactive = !!isReactiveState(propCandidate);
+      } catch (e) {
+        isReactive = false;
+      }
       // choose authoritative source: prefer reactive/wrapper/booleanish propCandidate
-      const useProp = isReactive || isWrapper || isBooleanishForProps(propCandidate);
+      const useProp =
+        isReactive || isWrapper || isBooleanishForProps(propCandidate);
       const sourceVal = useProp ? propCandidate : attrCandidate;
       const final = coerceBooleanForNative(sourceVal);
-      safe(() => { (el as any).disabled = final; });
-      if (!final) safe(() => { el.removeAttribute('disabled'); });
-      else safe(() => { el.setAttribute('disabled', ''); });
+      safe(() => {
+        (el as any).disabled = final;
+      });
+      if (!final)
+        safe(() => {
+          el.removeAttribute("disabled");
+        });
+      else
+        safe(() => {
+          el.setAttribute("disabled", "");
+        });
     }
   } catch (e) {}
 
@@ -1657,12 +2076,12 @@ export function createElement(
 
 /**
  * Patch children using keys for node matching.
- * @param parent 
- * @param oldChildren 
- * @param newChildren 
- * @param context 
- * @param refs 
- * @returns 
+ * @param parent
+ * @param oldChildren
+ * @param newChildren
+ * @param context
+ * @param refs
+ * @returns
  */
 export function patchChildren(
   parent: HTMLElement,
@@ -1692,19 +2111,25 @@ export function patchChildren(
   if (transitionGroup) {
     // Helper to strip 'each-' prefix from keys for proper keyed diffing
     const stripKeyPrefix = (key: any): any => {
-      return typeof key === 'string' && key.startsWith('each-') ? key.substring(5) : key;
+      return typeof key === "string" && key.startsWith("each-")
+        ? key.substring(5)
+        : key;
     };
-    
+
     const flattenedNew: VNode[] = [];
     const flattenedOldVNodes: VNode[] = [];
-    
+
     // Flatten new children (extract from anchor blocks)
     for (const child of newChildren) {
-      if (child && child.tag === '#anchor') {
-        const anchorChildren = Array.isArray(child.children) ? child.children : [];
+      if (child && child.tag === "#anchor") {
+        const anchorChildren = Array.isArray(child.children)
+          ? child.children
+          : [];
         for (const anchorChild of anchorChildren) {
           // Extract the actual item key from the anchor key
-          const actualKey = stripKeyPrefix(anchorChild.key || child.key || 'unknown');
+          const actualKey = stripKeyPrefix(
+            anchorChild.key || child.key || "unknown"
+          );
           flattenedNew.push({ ...anchorChild, key: actualKey });
         }
       } else if (child) {
@@ -1712,30 +2137,39 @@ export function patchChildren(
         flattenedNew.push({ ...child, key: stripKeyPrefix(child.key) });
       }
     }
-    
+
     // Flatten old VNodes (extract from anchor blocks)
     for (const oldVNode of oldVNodes) {
-      if (oldVNode && oldVNode.tag === '#anchor') {
-        const anchorChildren = Array.isArray(oldVNode.children) ? oldVNode.children : [];
+      if (oldVNode && oldVNode.tag === "#anchor") {
+        const anchorChildren = Array.isArray(oldVNode.children)
+          ? oldVNode.children
+          : [];
         for (const anchorChild of anchorChildren) {
           // Extract the actual item key from the anchor key
-          const actualKey = stripKeyPrefix(anchorChild.key || oldVNode.key || 'unknown');
+          const actualKey = stripKeyPrefix(
+            anchorChild.key || oldVNode.key || "unknown"
+          );
           flattenedOldVNodes.push({ ...anchorChild, key: actualKey });
         }
       } else if (oldVNode) {
         // Handle already-flattened children (from previous renders)
-        flattenedOldVNodes.push({ ...oldVNode, key: stripKeyPrefix(oldVNode.key) });
+        flattenedOldVNodes.push({
+          ...oldVNode,
+          key: stripKeyPrefix(oldVNode.key),
+        });
       }
     }
 
     // Now perform keyed diffing on flattened lists
-    const hasKeys = flattenedNew.some(c => c && c.key != null) || flattenedOldVNodes.some(c => c && c.key != null);
+    const hasKeys =
+      flattenedNew.some((c) => c && c.key != null) ||
+      flattenedOldVNodes.some((c) => c && c.key != null);
 
     if (hasKeys) {
       // Build maps for keyed diffing
       const oldVNodeByKeyFlat = new Map<string | number, VNode>();
       const oldNodeByKeyFlat = new Map<string | number, Node>();
-      
+
       for (const v of flattenedOldVNodes) {
         if (v && v.key != null) {
           // Ensure key is a string for consistent comparison
@@ -1743,38 +2177,43 @@ export function patchChildren(
           oldVNodeByKeyFlat.set(key, v);
         }
       }
-      
+
       // Map old DOM nodes by their keys with dual mapping for numeric/string keys
       for (let i = 0; i < oldNodesCache.length; i++) {
         const node = oldNodesCache[i];
-        
+
         // Try multiple ways to find the key (WeakMap-backed accessor + attribute fallback)
         let nodeKey = getNodeKey(node);
         // Strip "each-" prefix from node keys to match flattened VNode keys
         nodeKey = stripKeyPrefix(nodeKey);
-        
+
         // Skip text nodes and comment nodes without keys
-        if (nodeKey != null && node instanceof Element && node.nodeType === Node.ELEMENT_NODE) {
+        if (
+          nodeKey != null &&
+          node instanceof Element &&
+          node.nodeType === Node.ELEMENT_NODE
+        ) {
           // Extract the base key (remove :tagname suffix if present)
-          let baseKey = typeof nodeKey === 'string' && nodeKey.includes(':') 
-            ? nodeKey.substring(0, nodeKey.lastIndexOf(':'))
-            : nodeKey;
-          
+          let baseKey =
+            typeof nodeKey === "string" && nodeKey.includes(":")
+              ? nodeKey.substring(0, nodeKey.lastIndexOf(":"))
+              : nodeKey;
+
           // Ensure key is a string for consistent comparison with VNode keys
           baseKey = String(baseKey);
-          
+
           // Store with the base key (stripped of "each-" prefix to match VNode keys)
           oldNodeByKeyFlat.set(baseKey, node);
         }
       }
 
       const usedFlat = new Set<Node>();
-      
+
       // PHASE 0: Record positions BEFORE any DOM modifications for FLIP animation
       // Only record if we have existing nodes to animate from
       const positionsBefore = new Map<Node, DOMRect>();
       const hadPreviousContent = oldNodesCache.length > 0;
-      
+
       if (transitionGroup.moveClass && hadPreviousContent) {
         for (let i = 0; i < oldNodesCache.length; i++) {
           const node = oldNodesCache[i];
@@ -1785,48 +2224,60 @@ export function patchChildren(
           }
         }
       }
-      
+
       // PHASE 1: Identify which nodes to keep, create new nodes, but DON'T move anything yet
-      const nodesToProcess: Array<{ node: Node; key: string; newVNode: VNode; oldVNode?: VNode; isNew: boolean }> = [];
-      
+      const nodesToProcess: Array<{
+        node: Node;
+        key: string;
+        newVNode: VNode;
+        oldVNode?: VNode;
+        isNew: boolean;
+      }> = [];
+
       for (const newVNode of flattenedNew) {
         let key = newVNode.key;
         if (key == null) continue;
-        
+
         // Ensure key is a string for consistent comparison
         key = String(key);
-        
+
         const oldVNode = oldVNodeByKeyFlat.get(key);
         let node = oldNodeByKeyFlat.get(key);
-        
+
         if (node && oldVNode) {
           // Existing node - patch it but don't move yet
           const patched = patch(node, oldVNode, newVNode, context);
           usedFlat.add(node);
-          
+
           // Ensure the node has the correct key and attribute
           const keyStr = String(key);
           setNodeKey(patched, keyStr);
-          
-          nodesToProcess.push({ node: patched, key, newVNode, oldVNode, isNew: false });
+
+          nodesToProcess.push({
+            node: patched,
+            key,
+            newVNode,
+            oldVNode,
+            isNew: false,
+          });
         } else {
           // Create new node and insert it immediately (but invisible via enterFrom classes)
           node = createElement(newVNode, context);
           setNodeKey(node, key as any);
-          
-          
+
           // For new nodes, immediately insert them into DOM (at the end) and start enter transition
           // This ensures the transition can capture the correct FROM state
           parent.appendChild(node);
-          
+
           // Only animate if: we had previous content to transition from OR appear is true
           // This prevents initial render items from animating (unless appear: true explicitly set)
           // but allows subsequent additions to animate
-          const shouldAnimate = hadPreviousContent || transitionGroup.appear === true;
+          const shouldAnimate =
+            hadPreviousContent || transitionGroup.appear === true;
 
           if (node instanceof HTMLElement && shouldAnimate) {
-            performEnterTransition(node, transitionGroup).catch(err => {
-              devError('Enter transition error:', err);
+            performEnterTransition(node, transitionGroup).catch((err) => {
+              devError("Enter transition error:", err);
             });
           }
 
@@ -1835,7 +2286,7 @@ export function patchChildren(
       }
 
       const leaveTransitions: Promise<void>[] = [];
-      
+
       for (let i = 0; i < oldNodesCache.length; i++) {
         const node = oldNodesCache[i];
         const nodeKey = getNodeKey(node);
@@ -1848,8 +2299,8 @@ export function patchChildren(
                 parent.removeChild(node);
               }
             })
-            .catch(err => {
-              devError('Leave transition error:', err);
+            .catch((err) => {
+              devError("Leave transition error:", err);
               if (parent.contains(node)) {
                 parent.removeChild(node);
               }
@@ -1857,7 +2308,7 @@ export function patchChildren(
           leaveTransitions.push(leavePromise);
         }
       }
-      
+
       // PHASE 3: Move nodes to correct positions and apply FLIP animations
       // SKIP if there are active leave transitions to prevent visual jumps
       if (leaveTransitions.length === 0) {
@@ -1876,8 +2327,13 @@ export function patchChildren(
         // Apply FLIP animation for moved items
         if (transitionGroup.moveClass && positionsBefore.size > 0) {
           // Collect elements that need to be animated
-          const elementsToAnimate: Array<{ node: HTMLElement; deltaX: number; deltaY: number; moveClasses: string[] }> = [];
-          
+          const elementsToAnimate: Array<{
+            node: HTMLElement;
+            deltaX: number;
+            deltaY: number;
+            moveClasses: string[];
+          }> = [];
+
           for (const { node, isNew } of nodesToProcess) {
             if (!isNew && node instanceof HTMLElement) {
               const oldPos = positionsBefore.get(node);
@@ -1888,7 +2344,9 @@ export function patchChildren(
 
                 // If position changed, prepare for animation
                 if (deltaX !== 0 || deltaY !== 0) {
-                  const moveClasses = transitionGroup.moveClass.split(/\s+/).filter((c: string) => c);
+                  const moveClasses = transitionGroup.moveClass
+                    .split(/\s+/)
+                    .filter((c: string) => c);
                   elementsToAnimate.push({ node, deltaX, deltaY, moveClasses });
                 }
               }
@@ -1901,7 +2359,7 @@ export function patchChildren(
             // Step 1: Apply inverted transforms (without transition)
             for (const { node, deltaX, deltaY } of elementsToAnimate) {
               node.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
-              node.style.transitionProperty = 'none';
+              node.style.transitionProperty = "none";
             }
 
             // Step 2: Force reflow to ensure transforms are applied
@@ -1919,28 +2377,34 @@ export function patchChildren(
                     node.classList.add(cls);
                   }
                 }
-                
+
                 // One more RAF to ensure transition classes are processed
                 requestAnimationFrame(() => {
                   // Set transition directly on each element
                   // Parse moveClass to extract duration and timing
-                  const moveClassStr = transitionGroup.moveClass || '';
+                  const moveClassStr = transitionGroup.moveClass || "";
                   const durationMatch = moveClassStr.match(/duration-(\d+)/);
-                  const duration = durationMatch ? `${durationMatch[1]}ms` : '300ms';
-                  const easingMatch = moveClassStr.match(/ease-(out|in|in-out|linear)/);
-                  const easing = easingMatch ? `ease-${easingMatch[1]}` : 'ease-out';
-                  
+                  const duration = durationMatch
+                    ? `${durationMatch[1]}ms`
+                    : "300ms";
+                  const easingMatch = moveClassStr.match(
+                    /ease-(out|in|in-out|linear)/
+                  );
+                  const easing = easingMatch
+                    ? `ease-${easingMatch[1]}`
+                    : "ease-out";
+
                   for (const { node } of elementsToAnimate) {
                     // Set transition inline to override everything
                     // This sets transition-property, transition-duration, and transition-timing-function
                     node.style.transition = `transform ${duration} ${easing}`;
                   }
-                  
+
                   // One final RAF before removing transform
                   requestAnimationFrame(() => {
                     // Now remove transforms to trigger animation
                     for (const { node, moveClasses } of elementsToAnimate) {
-                      node.style.removeProperty('transform');
+                      node.style.removeProperty("transform");
                       // Clean up moveClass after transition completes
                       const cleanup = () => {
                         for (const cls of moveClasses) {
@@ -1948,12 +2412,16 @@ export function patchChildren(
                         }
                         // Also remove the inline transition we set for move animation
                         // This allows leave transitions to work properly
-                        node.style.removeProperty('transition');
-                        node.removeEventListener('transitionend', cleanup);
-                        node.removeEventListener('transitioncancel', cleanup);
+                        node.style.removeProperty("transition");
+                        node.removeEventListener("transitionend", cleanup);
+                        node.removeEventListener("transitioncancel", cleanup);
                       };
-                      node.addEventListener('transitionend', cleanup, { once: true });
-                      node.addEventListener('transitioncancel', cleanup, { once: true });
+                      node.addEventListener("transitionend", cleanup, {
+                        once: true,
+                      });
+                      node.addEventListener("transitioncancel", cleanup, {
+                        once: true,
+                      });
                     }
                   });
                 });
@@ -1962,7 +2430,7 @@ export function patchChildren(
           }
         }
       }
-      
+
       return; // Done with TransitionGroup keyed diffing
     }
   }
@@ -2003,7 +2471,7 @@ export function patchChildren(
     oldChildren: VNode[] | undefined,
     newChildren: VNode[],
     transition?: any,
-    shouldAnimate = true,
+    shouldAnimate = true
   ) {
     const oldNodesInRange: Node[] = [];
     let cur: Node | null = start.nextSibling;
@@ -2033,8 +2501,11 @@ export function patchChildren(
       }
 
       // Calculate if this is initial visible render (for appear transitions)
-      const isInitialVisible = transition && transition.state === 'visible' && 
-                                oldVNodesInRange.length === 0 && newChildren.length > 0;
+      const isInitialVisible =
+        transition &&
+        transition.state === "visible" &&
+        oldVNodesInRange.length === 0 &&
+        newChildren.length > 0;
 
       const usedInRange = new Set<Node>();
       let next: Node | null = start.nextSibling;
@@ -2047,17 +2518,22 @@ export function patchChildren(
             oldNodeByKeyRange.get(newVNode.key)!,
             oldVNode,
             newVNode,
-            context,
+            context
           );
           usedInRange.add(node);
-          
+
           // Apply enter transition to patched nodes if this is initial visible render with appear: true
-          if (transition && node instanceof HTMLElement && isInitialVisible && transition.appear) {
-            performEnterTransition(node, transition).catch(err => {
-              devError('Transition enter error (appear):', err);
+          if (
+            transition &&
+            node instanceof HTMLElement &&
+            isInitialVisible &&
+            transition.appear
+          ) {
+            performEnterTransition(node, transition).catch((err) => {
+              devError("Transition enter error (appear):", err);
             });
           }
-          
+
           if (node !== next && parent.contains(node)) {
             parent.insertBefore(node, next);
           }
@@ -2065,11 +2541,11 @@ export function patchChildren(
           node = createElement(newVNode, context);
           parent.insertBefore(node, next);
           usedInRange.add(node);
-          
+
           // Apply enter transition to new nodes ONLY if shouldAnimate is true
           if (transition && node instanceof HTMLElement && shouldAnimate) {
-            performEnterTransition(node, transition).catch(err => {
-              devError('Transition enter error:', err);
+            performEnterTransition(node, transition).catch((err) => {
+              devError("Transition enter error:", err);
             });
           }
         }
@@ -2080,16 +2556,18 @@ export function patchChildren(
         if (!usedInRange.has(node) && parent.contains(node)) {
           if (transition && node instanceof HTMLElement && shouldAnimate) {
             // Apply leave transition before removing
-            performLeaveTransition(node, transition).then(() => {
-              if (parent.contains(node)) {
-                parent.removeChild(node);
-              }
-            }).catch(err => {
-              devError('Transition leave error:', err);
-              if (parent.contains(node)) {
-                parent.removeChild(node);
-              }
-            });
+            performLeaveTransition(node, transition)
+              .then(() => {
+                if (parent.contains(node)) {
+                  parent.removeChild(node);
+                }
+              })
+              .catch((err) => {
+                devError("Transition leave error:", err);
+                if (parent.contains(node)) {
+                  parent.removeChild(node);
+                }
+              });
           } else {
             parent.removeChild(node);
           }
@@ -2099,7 +2577,7 @@ export function patchChildren(
       // Keyless: fall back to index-based patch
       const commonLength = Math.min(
         oldVNodesInRange.length,
-        newChildren.length,
+        newChildren.length
       );
 
       for (let i = 0; i < commonLength; i++) {
@@ -2116,11 +2594,11 @@ export function patchChildren(
       for (let i = commonLength; i < newChildren.length; i++) {
         const node = createElement(newChildren[i], context);
         parent.insertBefore(node, end);
-        
+
         // Apply enter transition to new nodes ONLY if shouldAnimate is true
         if (transition && node instanceof HTMLElement && shouldAnimate) {
-          performEnterTransition(node, transition).catch(err => {
-            devError('Transition enter error:', err);
+          performEnterTransition(node, transition).catch((err) => {
+            devError("Transition enter error:", err);
           });
         }
       }
@@ -2130,16 +2608,18 @@ export function patchChildren(
         const node = oldNodesInRange[i];
         if (transition && node instanceof HTMLElement && shouldAnimate) {
           // Apply leave transition before removing
-          performLeaveTransition(node, transition).then(() => {
-            if (parent.contains(node)) {
-              parent.removeChild(node);
-            }
-          }).catch(err => {
-            devError('Transition leave error:', err);
-            if (parent.contains(node)) {
-              parent.removeChild(node);
-            }
-          });
+          performLeaveTransition(node, transition)
+            .then(() => {
+              if (parent.contains(node)) {
+                parent.removeChild(node);
+              }
+            })
+            .catch((err) => {
+              devError("Transition leave error:", err);
+              if (parent.contains(node)) {
+                parent.removeChild(node);
+              }
+            });
         } else {
           parent.removeChild(node);
         }
@@ -2184,21 +2664,22 @@ export function patchChildren(
         // Determine if we should animate:
         // - If transition.state === 'visible' and children.length > 0, this is initial visible state
         //   → only animate if appear: true
-        // - If transition.state === 'hidden' and children.length === 0, this is initial hidden state  
+        // - If transition.state === 'hidden' and children.length === 0, this is initial hidden state
         //   → don't animate (nothing to animate)
         // - Otherwise, this is a state change → always animate
-        const isInitialVisible = transition && transition.state === 'visible' && children.length > 0;
+        const isInitialVisible =
+          transition && transition.state === "visible" && children.length > 0;
         const shouldAnimate = !isInitialVisible || transition.appear;
 
         for (const child of children) {
           const childNode = createElement(child, context);
           parent.insertBefore(childNode, nextSibling);
-          
+
           // Apply enter transitions to new nodes ONLY if shouldAnimate is true
           if (transition && childNode instanceof HTMLElement) {
             if (shouldAnimate) {
-              performEnterTransition(childNode, transition).catch(err => {
-                devError('Transition enter error:', err);
+              performEnterTransition(childNode, transition).catch((err) => {
+                devError("Transition enter error:", err);
               });
             }
           }
@@ -2209,13 +2690,19 @@ export function patchChildren(
         const transition = (newVNode as any)._transition;
         const oldVNode = oldVNodeByKey.get(aKey) as VNode;
         const oldTransition = (oldVNode as any)?._transition;
-        
+
         // Determine if we should animate:
         // - If this is a state change (hidden → visible or visible → hidden), always animate
         // - If this is initial render with state='visible', only animate if appear: true
-        const isStateChange = oldTransition && oldTransition.state !== transition?.state;
-        const isInitialVisible = transition && transition.state === 'visible' && children.length > 0 && !isStateChange;
-        const shouldAnimate = isStateChange || !isInitialVisible || (transition?.appear === true);
+        const isStateChange =
+          oldTransition && oldTransition.state !== transition?.state;
+        const isInitialVisible =
+          transition &&
+          transition.state === "visible" &&
+          children.length > 0 &&
+          !isStateChange;
+        const shouldAnimate =
+          isStateChange || !isInitialVisible || transition?.appear === true;
 
         patchChildrenBetween(
           start as Comment,
@@ -2223,7 +2710,7 @@ export function patchChildren(
           (oldVNodeByKey.get(aKey) as VNode)?.children as VNode[] | undefined,
           children,
           transition,
-          shouldAnimate,
+          shouldAnimate
         );
       }
 
@@ -2269,12 +2756,12 @@ export function patchChildren(
 
 /**
  * Patch a node using keys for node matching.
- * @param dom 
- * @param oldVNode 
- * @param newVNode 
- * @param context 
- * @param refs 
- * @returns 
+ * @param dom
+ * @param oldVNode
+ * @param newVNode
+ * @param context
+ * @param refs
+ * @returns
  */
 export function patch(
   dom: Node,
@@ -2384,7 +2871,10 @@ export function patch(
     typeof newVNode !== "string" &&
     oldVNode.tag === newVNode.tag
   ) {
-    const isCustomTag = (oldVNode.tag && String(oldVNode.tag).includes('-')) || (newVNode.props && (newVNode.props as any).isCustomElement) || (oldVNode.props && (oldVNode.props as any).isCustomElement);
+    const isCustomTag =
+      (oldVNode.tag && String(oldVNode.tag).includes("-")) ||
+      (newVNode.props && (newVNode.props as any).isCustomElement) ||
+      (oldVNode.props && (oldVNode.props as any).isCustomElement);
     if (isCustomTag) {
       try {
         const el = dom as HTMLElement;
@@ -2441,8 +2931,10 @@ export function vdomRenderer(
     newVNode = {
       tag: "div",
       key: "__anchor_root__",
-      props: { attrs: { 'data-anchor-block-root': '', key: "__anchor_root__" } },
-      children: [newVNode]
+      props: {
+        attrs: { "data-anchor-block-root": "", key: "__anchor_root__" },
+      },
+      children: [newVNode],
     };
   }
 
@@ -2499,16 +2991,20 @@ export function renderToString(vnode: VNode): string {
   if (typeof vnode === "string") return escapeHTML(vnode) as string;
 
   if (vnode.tag === "#text") {
-    return typeof vnode.children === "string" ? escapeHTML(vnode.children) as string : "";
+    return typeof vnode.children === "string"
+      ? (escapeHTML(vnode.children) as string)
+      : "";
   }
 
   if (vnode.tag === "#anchor") {
-    const children = Array.isArray(vnode.children) ? vnode.children.filter(Boolean) : [];
+    const children = Array.isArray(vnode.children)
+      ? vnode.children.filter(Boolean)
+      : [];
     return children.map(renderToString).join("");
   }
 
   if (vnode.tag === "#raw") {
-    return typeof vnode.children === 'string' ? vnode.children : '';
+    return typeof vnode.children === "string" ? vnode.children : "";
   }
 
   // Collect attributes from props.attrs
@@ -2526,7 +3022,11 @@ export function renderToString(vnode: VNode): string {
 
   const children = Array.isArray(vnode.children)
     ? vnode.children.filter(Boolean).map(renderToString).join("")
-    : (typeof vnode.children === "string" ? escapeHTML(vnode.children) : vnode.children ? renderToString(vnode.children) : "");
+    : typeof vnode.children === "string"
+    ? escapeHTML(vnode.children)
+    : vnode.children
+    ? renderToString(vnode.children)
+    : "";
 
   return `<${vnode.tag}${attrsString}>${children}</${vnode.tag}>`;
 }
