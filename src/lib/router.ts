@@ -1,15 +1,14 @@
-/**
- * Lightweight, scalable router for Custom Elements Runtime
- * - Functional API, zero dependencies, SSR/static site compatible
- * - Integrates with createStore and lib/index.ts
- */
-
 import { html } from "./runtime/template-compiler";
 import { component } from "./runtime/component";
-import { useProps, useOnConnected } from "./runtime/hooks";
+import {
+  useProps,
+  useOnConnected,
+  useOnDisconnected,
+  useStyle,
+} from "./runtime/hooks";
 import { ref, computed } from "./runtime/reactive";
 import { createStore, type Store } from "./store";
-import { devError } from "./runtime/logger";
+import { devError, devWarn } from "./runtime/logger";
 import { match } from "./directives";
 
 export type RouteComponent =
@@ -64,8 +63,8 @@ export interface RouterLinkProps {
   ariaCurrentValue: string;
   disabled: boolean;
   external: boolean;
-  class?: string;
-  style: string;
+  linkClass?: string;
+  linkStyle?: string;
 }
 
 export interface RouterLinkComputed {
@@ -114,6 +113,17 @@ export const matchRoute = (
   return { route: null, params: {} };
 };
 
+/**
+ * Find the first route that matches the given path.
+ * Consolidates repeated inline checks like `routes.find(r => matchRoute([r], path).route !== null)`
+ */
+function findMatchedRoute(routes: Route[], path: string): Route | null {
+  for (const r of routes) {
+    if (matchRoute([r], path).route !== null) return r;
+  }
+  return null;
+}
+
 // Async component loader cache
 const componentCache: Record<string, any> = {};
 
@@ -150,50 +160,45 @@ export function useRouter(config: RouterConfig) {
 
   // Run matching route guards/hooks
   const runBeforeEnter = async (to: RouteState, from: RouteState) => {
-    const matched = routes.find((r) => matchRoute([r], to.path).route !== null);
-    if (matched?.beforeEnter) {
-      try {
-        const result = await matched.beforeEnter(to, from);
-        if (typeof result === "string") {
-          // Redirect
-          await navigate(result, true);
-          return false;
-        }
-        return result !== false;
-      } catch (err) {
-        devError("beforeEnter error", err);
+    const matched = findMatchedRoute(routes, to.path);
+    if (!matched || !matched.beforeEnter) return true;
+    try {
+      const result = await matched.beforeEnter(to, from);
+      if (typeof result === "string") {
+        // Redirect
+        await navigate(result, true);
         return false;
       }
+      return result !== false;
+    } catch (err) {
+      devError("beforeEnter error", err);
+      return false;
     }
-    return true;
   };
 
   const runOnEnter = async (to: RouteState, from: RouteState) => {
-    const matched = routes.find((r) => matchRoute([r], to.path).route !== null);
-    if (matched?.onEnter) {
-      try {
-        const result = await matched.onEnter(to, from);
-        if (typeof result === "string") {
-          await navigate(result, true);
-          return false;
-        }
-        return result !== false;
-      } catch (err) {
-        devError("onEnter error", err);
+    const matched = findMatchedRoute(routes, to.path);
+    if (!matched || !matched.onEnter) return true;
+    try {
+      const result = await matched.onEnter(to, from);
+      if (typeof result === "string") {
+        await navigate(result, true);
         return false;
       }
+      return result !== false;
+    } catch (err) {
+      devError("onEnter error", err);
+      return false;
     }
-    return true;
   };
 
   const runAfterEnter = (to: RouteState, from: RouteState) => {
-    const matched = routes.find((r) => matchRoute([r], to.path).route !== null);
-    if (matched?.afterEnter) {
-      try {
-        matched.afterEnter(to, from);
-      } catch (err) {
-        devError("afterEnter error", err);
-      }
+    const matched = findMatchedRoute(routes, to.path);
+    if (!matched || !matched.afterEnter) return;
+    try {
+      matched.afterEnter(to, from);
+    } catch (err) {
+      devError("afterEnter error", err);
     }
   };
 
@@ -311,9 +316,7 @@ export function useRouter(config: RouterConfig) {
         };
 
         // beforeEnter guard
-        const matched = routes.find(
-          (r) => matchRoute([r], to.path).route !== null
-        );
+        const matched = findMatchedRoute(routes, to.path);
         if (matched?.beforeEnter) {
           try {
             const result = await matched.beforeEnter(to, from);
@@ -375,6 +378,11 @@ export function matchRouteSSR(routes: Route[], path: string) {
   return matchRoute(routes, path);
 }
 
+// Module-level reference to the latest initialized router. Tests and
+// components may rely on re-initializing the router during their setup,
+// so exposing this lets components pick up the most recent instance.
+let activeRouter: ReturnType<typeof useRouter> | null = null;
+
 /**
  * Singleton router instance for global access.
  *
@@ -384,35 +392,57 @@ export function matchRouteSSR(routes: Route[], path: string) {
 
 export function initRouter(config: RouterConfig) {
   const router = useRouter(config);
+  // Expose the most recently initialized router to components defined
+  // earlier in the process (tests may call initRouter multiple times).
+  // Components reference `activeRouter` so re-calling initRouter updates
+  // the router instance they use.
+  activeRouter = router;
 
   component("router-view", () => {
+    // Prefer the latest initialized router (tests may re-init). Fallback
+    // to the router captured at init time.
+    const r = activeRouter || router;
     // Reactive current route so the component re-renders when router updates
-    if (!router) return html`<div>Router not initialized.</div>`;
+    if (!r) return html`<div>Router not initialized.</div>`;
 
-    const current = ref(router.getCurrent());
+    const current = ref(r.getCurrent());
+
+    // We'll capture the unsubscribe function when the component connects
+    // and register a disconnect cleanup during render-time (useOnDisconnected
+    // must be called during the component render/execution).
+    let unsubRouterView: (() => void) | undefined;
 
     useOnConnected(() => {
-      // Subscribe to router updates and update the reactive ref
       try {
-        if (router && typeof router.subscribe === "function") {
-          router.subscribe((s) => {
+        if (r && typeof r.subscribe === "function") {
+          unsubRouterView = r.subscribe((s) => {
             try {
               current.value = s;
             } catch (e) {
-              /* best-effort */
+              devWarn("router-view subscription update failed", e);
             }
           });
         }
       } catch (e) {
-        // swallow
+        devWarn("router-view subscribe failed", e);
       }
     });
 
-    const match = router.matchRoute(current.value.path);
+    useOnDisconnected(() => {
+      if (typeof unsubRouterView === "function") {
+        try {
+          unsubRouterView();
+        } catch (e) {
+          devWarn("router-view unsubscribe failed", e);
+        }
+      }
+    });
+
+    const match = r.matchRoute(current.value.path);
     if (!match || !match.route) return html`<div>Not found</div>`;
 
     // Resolve the component (supports cached async loaders)
-    return router
+    return r
       .resolveRouteComponent(match.route)
       .then((comp: any) => {
         // String tag (custom element) -> render as VNode
@@ -448,22 +478,47 @@ export function initRouter(config: RouterConfig) {
       ariaCurrentValue: "page",
       disabled: false,
       external: false,
-      class: "",
-      style: "",
+      linkClass: "",
+      linkStyle: "",
     });
 
+    // Prefer the latest initialized router (tests may re-init). Fallback
+    // to the router captured at init time.
+    const r = activeRouter || router;
     // Reactive current state so link updates when route changes
-    const current = ref(router.getCurrent());
+    const current = ref(r.getCurrent());
+    // Capture unsubscribe for link subscriptions and register disconnect
+    // cleanup during render time.
+    let unsubRouterLink: (() => void) | undefined;
+
+    useStyle(
+      () => (`a,button{display:inline-block;}` + props.linkStyle) as string
+    );
+
     useOnConnected(() => {
       try {
-        if (router && typeof router.subscribe === "function") {
-          router.subscribe((s) => {
+        if (r && typeof r.subscribe === "function") {
+          unsubRouterLink = r.subscribe((s) => {
             try {
               current.value = s;
-            } catch (e) {}
+            } catch (e) {
+              devWarn("router-link subscription update failed", e);
+            }
           });
         }
-      } catch (e) {}
+      } catch (e) {
+        devWarn("router-link subscribe failed", e);
+      }
+    });
+
+    useOnDisconnected(() => {
+      if (typeof unsubRouterLink === "function") {
+        try {
+          unsubRouterLink();
+        } catch (e) {
+          devWarn("router-link unsubscribe failed", e);
+        }
+      }
     });
 
     const isExactActive = computed(
@@ -476,38 +531,38 @@ export function initRouter(config: RouterConfig) {
         ? current.value.path.startsWith(props.to as string)
         : false
     );
-    const ariaCurrent = computed(() =>
-      isExactActive.value
-        ? `aria-current="${props.ariaCurrentValue as string}"`
-        : ""
-    );
 
-    const userClassList = ((props.class as string) || "")
-      .split(/\s+/)
-      .filter(Boolean);
-    const userClasses: Record<string, boolean> = {};
-    for (const c of userClassList) userClasses[c] = true;
+    // Build user classes reactively from the `linkClass` prop.
+    // We intentionally do NOT read the host `class` attribute to avoid
+    // duplicate styling applied to both host and inner element.
+    const userClasses = computed(() => {
+      const raw = (props.linkClass as string) || "";
+      const list = raw.split(/\s+/).filter(Boolean);
+      const map: Record<string, boolean> = {};
+      for (const c of list) map[c] = true;
+      return map;
+    });
 
     const classObject = computed(() => ({
-      ...userClasses,
+      ...userClasses.value,
       [(props.activeClass as string) || "active"]: isActive.value,
       [(props.exactActiveClass as string) || "exact-active"]:
         isExactActive.value,
     }));
 
     const isButton = computed(() => (props.tag as string) === "button");
-    const disabledAttr = computed(() =>
-      props.disabled
-        ? isButton.value
-          ? 'disabled aria-disabled="true" tabindex="-1"'
-          : 'aria-disabled="true" tabindex="-1"'
-        : ""
+    // Instead of pre-building attribute fragments as strings (which can
+    // accidentally inject invalid attribute names into the template and
+    // cause DOMExceptions), compute simple booleans/values and apply
+    // attributes explicitly in the template below.
+    const ariaCurrentValue = computed(() =>
+      isExactActive.value ? (props.ariaCurrentValue as string) : ""
     );
-    const externalAttr = computed(() =>
-      props.external &&
-      ((props.tag as string) === "a" || !(props.tag as string))
-        ? 'target="_blank" rel="noopener noreferrer"'
-        : ""
+    const isDisabled = computed(() => !!props.disabled);
+    const isExternal = computed(
+      () =>
+        !!props.external &&
+        ((props.tag as string) === "a" || !(props.tag as string))
     );
 
     const navigate = (e: MouseEvent) => {
@@ -523,9 +578,9 @@ export function initRouter(config: RouterConfig) {
       }
       e.preventDefault();
       if (props.replace) {
-        router.replace(props.to as string);
+        r.replace(props.to as string);
       } else {
-        router.push(props.to as string);
+        r.push(props.to as string);
       }
     };
 
@@ -537,9 +592,10 @@ export function initRouter(config: RouterConfig) {
             <button
               part="button"
               :class="${classObject.value}"
-              ${ariaCurrent.value}
-              ${disabledAttr.value}
-              ${externalAttr.value}
+              aria-current="${ariaCurrentValue.value}"
+              disabled="${isDisabled.value ? "" : null}"
+              aria-disabled="${isDisabled.value ? "true" : null}"
+              tabindex="${isDisabled.value ? "-1" : null}"
               @click="${navigate}"
             >
               <slot></slot>
@@ -552,9 +608,11 @@ export function initRouter(config: RouterConfig) {
               part="link"
               href="${props.to}"
               :class="${classObject.value}"
-              ${ariaCurrent.value}
-              ${disabledAttr.value}
-              ${externalAttr.value}
+              aria-current="${ariaCurrentValue.value}"
+              aria-disabled="${isDisabled.value ? "true" : null}"
+              tabindex="${isDisabled.value ? "-1" : null}"
+              target="${isExternal.value ? "_blank" : null}"
+              rel="${isExternal.value ? "noopener noreferrer" : null}"
               @click="${navigate}"
               ><slot></slot
             ></a>

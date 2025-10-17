@@ -20,10 +20,7 @@ describe('unsafeHTML and entity decoding', () => {
 
   it('inserts raw HTML via unsafeHTML in DOM serializer', () => {
     const vnode = html`<div>${unsafeHTML('<b>bold</b>')}</div>` as any;
-    // debug
-    // console.log(JSON.stringify(vnode, null, 2));
     const out = renderToString(vnode as any);
-    // console.log(out);
     expect(out).toBe('<div><b>bold</b></div>');
   });
 });

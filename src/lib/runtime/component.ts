@@ -20,7 +20,7 @@ import {
   setCurrentComponentContext,
   clearCurrentComponentContext,
 } from "./hooks";
-import { devError, devWarn } from './logger';
+import { devError, devWarn } from "./logger";
 
 /**
  * @internal
@@ -76,10 +76,10 @@ export function createElementClass<
   S extends object,
   C extends object,
   P extends object,
-  T extends object = any,
+  T extends object = any
 >(
   tag: string,
-  config: ComponentConfig<S, C, P, T>,
+  config: ComponentConfig<S, C, P, T>
 ): CustomElementConstructor | { new (): object } {
   // Validate that render is provided
   if (!config.render) {
@@ -149,15 +149,28 @@ export function createElementClass<
 
       // Helper to define non-enumerable properties
       const defineNonEnum = (obj: any, key: string, value: any) => {
-        Object.defineProperty(obj, key, { value, writable: false, enumerable: false, configurable: false });
+        Object.defineProperty(obj, key, {
+          value,
+          writable: false,
+          enumerable: false,
+          configurable: false,
+        });
       };
 
       // Inject refs into context (non-enumerable to avoid proxy traps)
       defineNonEnum(reactiveContext, "refs", this._refs);
-      defineNonEnum(reactiveContext, "requestRender", () => this.requestRender());
-      defineNonEnum(reactiveContext, "_requestRender", () => this._requestRender());
+      defineNonEnum(reactiveContext, "requestRender", () =>
+        this.requestRender()
+      );
+      defineNonEnum(reactiveContext, "_requestRender", () =>
+        this._requestRender()
+      );
       defineNonEnum(reactiveContext, "_componentId", this._componentId);
-      defineNonEnum(reactiveContext, "_triggerWatchers", (path: string, newValue: any) => this._triggerWatchers(path, newValue));
+      defineNonEnum(
+        reactiveContext,
+        "_triggerWatchers",
+        (path: string, newValue: any) => this._triggerWatchers(path, newValue)
+      );
 
       // --- Apply props BEFORE wiring listeners and emit ---
       this.context = reactiveContext;
@@ -165,7 +178,9 @@ export function createElementClass<
       // can fallback to reading element properties when attributes were
       // serialized (e.g., objects became "[object Object]"). This is added
       // as a non-enumerable field to avoid interfering with reactive proxy.
-      safe(() => { defineNonEnum(reactiveContext, '_host', this); });
+      safe(() => {
+        defineNonEnum(reactiveContext, "_host", this);
+      });
       // Defer applying props until connectedCallback so attributes that are
       // set by the parent renderer (after element construction) are available.
       // applyProps will still be invoked from attributeChangedCallback when
@@ -174,33 +189,46 @@ export function createElementClass<
 
       // Inject emit helper for custom events (single canonical event API).
       // Emits a DOM CustomEvent and returns whether it was not defaultPrevented.
-      defineNonEnum(this.context, "emit", (eventName: string, detail?: any, options?: CustomEventInit) => {
-            const eventOptions = {
-              detail,
-              bubbles: true,
-              composed: true,
-              ...(options || {}),
-            };
-            const ev = new CustomEvent(eventName, eventOptions);
-            
-            // Primary event dispatch
-            this.dispatchEvent(ev);
-            
-            // Dispatch alternate camel/kebab variation for compatibility
-            const colonIndex = eventName.indexOf(":");
-            if (colonIndex > 0) {
-              const prefix = eventName.substring(0, colonIndex);
-              const prop = eventName.substring(colonIndex + 1);
-              const altName = prop.includes("-")
-                ? `${prefix}:${prop.split("-").map((p, i) => i === 0 ? p : p.charAt(0).toUpperCase() + p.slice(1)).join("")}`
-                : `${prefix}:${prop.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase()}`;
-              if (altName !== eventName) {
-                safe(() => { this.dispatchEvent(new CustomEvent(altName, eventOptions)); });
-              }
+      defineNonEnum(
+        this.context,
+        "emit",
+        (eventName: string, detail?: any, options?: CustomEventInit) => {
+          const eventOptions = {
+            detail,
+            bubbles: true,
+            composed: true,
+            ...(options || {}),
+          };
+          const ev = new CustomEvent(eventName, eventOptions);
+
+          // Primary event dispatch
+          this.dispatchEvent(ev);
+
+          // Dispatch alternate camel/kebab variation for compatibility
+          const colonIndex = eventName.indexOf(":");
+          if (colonIndex > 0) {
+            const prefix = eventName.substring(0, colonIndex);
+            const prop = eventName.substring(colonIndex + 1);
+            const altName = prop.includes("-")
+              ? `${prefix}:${prop
+                  .split("-")
+                  .map((p, i) =>
+                    i === 0 ? p : p.charAt(0).toUpperCase() + p.slice(1)
+                  )
+                  .join("")}`
+              : `${prefix}:${prop
+                  .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
+                  .toLowerCase()}`;
+            if (altName !== eventName) {
+              safe(() => {
+                this.dispatchEvent(new CustomEvent(altName, eventOptions));
+              });
             }
-            
-            return !ev.defaultPrevented;
-      });
+          }
+
+          return !ev.defaultPrevented;
+        }
+      );
 
       // --- Inject config methods into context ---
       // Expose config functions on the context as callable helpers. Event
@@ -296,7 +324,7 @@ export function createElementClass<
           },
           (val) => {
             this._mounted = val;
-          },
+          }
         );
       });
     }
@@ -304,7 +332,7 @@ export function createElementClass<
     attributeChangedCallback(
       name: string,
       oldValue: string | null,
-      newValue: string | null,
+      newValue: string | null
     ) {
       this._runLogicWithinErrorBoundary(config, () => {
         this._applyProps(config);
@@ -350,7 +378,7 @@ export function createElementClass<
               (this as any).onErrorStateChange(err);
             }
           },
-          (html) => this._applyStyle(cfg, html),
+          (html) => this._applyStyle(cfg, html)
         );
       });
     }
@@ -376,7 +404,7 @@ export function createElementClass<
             this._renderTimeoutId,
             (id) => {
               this._renderTimeoutId = id;
-            },
+            }
           );
         }, this._componentId);
       });
@@ -392,7 +420,7 @@ export function createElementClass<
           this._styleSheet,
           (sheet) => {
             this._styleSheet = sheet;
-          },
+          }
         );
       });
     }
@@ -400,7 +428,7 @@ export function createElementClass<
     // --- Error Boundary function ---
     private _runLogicWithinErrorBoundary(
       cfg: ComponentConfig<S, C, P, T>,
-      fn: () => void,
+      fn: () => void
     ) {
       if (this._hasError) this._hasError = false;
       try {
@@ -410,8 +438,11 @@ export function createElementClass<
 
         // DEV-only diagnostic: provide actionable context to help debugging
         try {
-          const tag = (cfg && (cfg as any).tag) || this.tagName?.toLowerCase?.() || '<unknown>';
-          const compId = this._componentId || '<unknown-id>';
+          const tag =
+            (cfg && (cfg as any).tag) ||
+            this.tagName?.toLowerCase?.() ||
+            "<unknown>";
+          const compId = this._componentId || "<unknown-id>";
           const safeProps: Record<string, any> = {};
           if (cfg && (cfg as any).props) {
             for (const k of Object.keys((cfg as any).props)) {
@@ -419,20 +450,25 @@ export function createElementClass<
                 const v = (this.context as any)[k];
                 if (v instanceof Node) {
                   safeProps[k] = `[DOM Node: ${v.nodeName}]`;
-                } else if (typeof v === 'object' && v !== null) {
-                  safeProps[k] = Object.keys(v).length > 5 ? `[object(${Object.keys(v).length} keys)]` : v;
+                } else if (typeof v === "object" && v !== null) {
+                  safeProps[k] =
+                    Object.keys(v).length > 5
+                      ? `[object(${Object.keys(v).length} keys)]`
+                      : v;
                 } else {
                   safeProps[k] = v;
                 }
               } catch (e) {
-                safeProps[k] = '[unreadable]';
+                safeProps[k] = "[unreadable]";
               }
             }
           }
 
           devError(`Error rendering component <${tag}> (id=${compId}):`, error);
-          devError('Component props snapshot:', safeProps);
-          devWarn('Common causes: accessing properties of null/undefined inside template interpolations; expensive or throwing expressions inside templates that evaluate eagerly. Fixes: use optional chaining (obj?.prop), guard with ternary, or use the runtime lazy overload: when(cond, () => html`...`).');
+          devError("Component props snapshot:", safeProps);
+          devWarn(
+            "Common causes: accessing properties of null/undefined inside template interpolations; expensive or throwing expressions inside templates that evaluate eagerly. Fixes: use optional chaining (obj?.prop), guard with ternary, or use the runtime lazy overload: when(cond, () => html`...`)."
+          );
         } catch (e) {
           // best-effort diagnostics - swallow failures here to preserve original behavior
         }
@@ -445,7 +481,7 @@ export function createElementClass<
 
     // --- State, props, computed ---
     private _initContext(
-      cfg: ComponentConfig<S, C, P, T>,
+      cfg: ComponentConfig<S, C, P, T>
     ): ComponentContext<S, C, P, T> {
       try {
         const self = this;
@@ -476,7 +512,7 @@ export function createElementClass<
                         self._triggerWatchers(fullPath, target);
                         scheduleDOMUpdate(
                           () => self._render(cfg),
-                          self._componentId,
+                          self._componentId
                         );
                       }
 
@@ -548,7 +584,7 @@ export function createElementClass<
                 Object.entries(cfg.props).map(([key, def]) => [
                   key,
                   def.default,
-                ]),
+                ])
               )
             : {}),
         }) as ComponentContext<S, C, P, T>;
@@ -562,7 +598,7 @@ export function createElementClass<
         initWatchers(
           this.context,
           this._watchers,
-          {}, // Watchers are now handled by the watch() function in functional API
+          {} // Watchers are now handled by the watch() function in functional API
         );
       });
     }
@@ -605,7 +641,7 @@ export function createElementClass<
  * component('my-switch', () => {
  *   const { modelValue, label } = useProps({ modelValue: false, label: '' });
  *   const emit = useEmit();
- *   
+ *
  *   useOnConnected(() => console.log('Switch connected!'));
  *   useOnDisconnected(() => console.log('Switch disconnected!'));
  *
@@ -626,13 +662,13 @@ export function createElementClass<
 // Overload: No parameters - use useProps() hook for props access
 export function component(
   tag: string,
-  renderFn: () => VNode | VNode[] | Promise<VNode | VNode[]>,
+  renderFn: () => VNode | VNode[] | Promise<VNode | VNode[]>
 ): void;
 
 // Implementation
 export function component(
   tag: string,
-  renderFn: () => VNode | VNode[] | Promise<VNode | VNode[]>,
+  renderFn: () => VNode | VNode[] | Promise<VNode | VNode[]>
 ): void {
   let normalizedTag = toKebab(tag);
   if (!normalizedTag.includes("-")) {
@@ -646,7 +682,7 @@ export function component(
     onAttributeChanged?: (
       name: string,
       oldValue: string | null,
-      newValue: string | null,
+      newValue: string | null
     ) => void;
     onError?: (error: Error) => void;
   } = {};
@@ -708,8 +744,12 @@ export function component(
         } catch (err) {
           try {
             const hookCallbacks = (context as any)?._hookCallbacks;
-            if (hookCallbacks && typeof hookCallbacks.onError === 'function') {
-              try { hookCallbacks.onError(err); } catch (e) { /* swallow */ }
+            if (hookCallbacks && typeof hookCallbacks.onError === "function") {
+              try {
+                hookCallbacks.onError(err);
+              } catch (e) {
+                /* swallow */
+              }
             }
           } catch (e) {
             /* best-effort */
@@ -746,12 +786,15 @@ export function component(
                   typeof defaultValue === "boolean"
                     ? Boolean
                     : typeof defaultValue === "number"
-                      ? Number
-                      : typeof defaultValue === "string"
-                        ? String
-                        : Function; // Use Function for complex types
-                return [key, { type, default: defaultValue as string | number | boolean }];
-              }),
+                    ? Number
+                    : typeof defaultValue === "string"
+                    ? String
+                    : Function; // Use Function for complex types
+                return [
+                  key,
+                  { type, default: defaultValue as string | number | boolean },
+                ];
+              })
             );
             // Update the registry so future instances and observedAttributes use the updated config
             registry.set(normalizedTag, config);
@@ -789,12 +832,21 @@ export function component(
       } catch (err) {
         try {
           const hookCallbacks = (discoveryContext as any)?._hookCallbacks;
-          if (hookCallbacks && typeof hookCallbacks.onError === 'function') {
-            try { hookCallbacks.onError(err); } catch (e) { /* swallow */ }
+          if (hookCallbacks && typeof hookCallbacks.onError === "function") {
+            try {
+              hookCallbacks.onError(err);
+            } catch (e) {
+              /* swallow */
+            }
           }
           // DEV diagnostics for discovery-time failures
-          devError(`Error during component discovery render <${normalizedTag}>:`, err);
-          devWarn('Error occurred during initial component discovery render. Consider guarding expensive expressions or using lazy factories for directives like when().');
+          devError(
+            `Error during component discovery render <${normalizedTag}>:`,
+            err
+          );
+          devWarn(
+            "Error occurred during initial component discovery render. Consider guarding expensive expressions or using lazy factories for directives like when()."
+          );
         } catch (e) {
           /* best-effort */
         }
@@ -802,7 +854,7 @@ export function component(
         throw err;
       }
       clearCurrentComponentContext();
-      
+
       // If useProps() was called during discovery, update config.props
       if (discoveryContext._hookCallbacks?.props) {
         const propsDefaults = discoveryContext._hookCallbacks.props;
@@ -812,12 +864,15 @@ export function component(
               typeof defaultValue === "boolean"
                 ? Boolean
                 : typeof defaultValue === "number"
-                  ? Number
-                  : typeof defaultValue === "string"
-                    ? String
-                    : Function;
-            return [key, { type, default: defaultValue as string | number | boolean }];
-          }),
+                ? Number
+                : typeof defaultValue === "string"
+                ? String
+                : Function;
+            return [
+              key,
+              { type, default: defaultValue as string | number | boolean },
+            ];
+          })
         );
         // Update registry with discovered props
         registry.set(normalizedTag, config);
@@ -829,7 +884,7 @@ export function component(
     if (!customElements.get(normalizedTag)) {
       customElements.define(
         normalizedTag,
-        createElementClass(normalizedTag, config) as CustomElementConstructor,
+        createElementClass(normalizedTag, config) as CustomElementConstructor
       );
     }
   }

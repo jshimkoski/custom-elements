@@ -1,5 +1,5 @@
 import { toKebab } from "./helpers";
-import { isReactiveState } from './reactive';
+import { isReactiveState } from "./reactive";
 import type { ComponentConfig, ComponentContext } from "./types";
 
 export type PropDefinition = {
@@ -30,7 +30,7 @@ function parseProp(val: string, type: any) {
 export function applyPropsFromDefinitions(
   element: HTMLElement,
   propDefinitions: Record<string, PropDefinition>,
-  context: any,
+  context: any
 ): void {
   if (!propDefinitions) return;
 
@@ -51,7 +51,20 @@ export function applyPropsFromDefinitions(
         try {
           const propValue = (element as any)[key];
           // If the property value is already the correct type, use it directly
-          if (def.type === Boolean && typeof propValue === "boolean") {
+          // For string props, attempt to convert object-like host properties to string.
+          // If conversion throws, preserve the original object value on the context
+          if (
+            def.type === String &&
+            propValue &&
+            typeof propValue === "object"
+          ) {
+            try {
+              (context as any)[key] = parseProp(String(propValue), def.type);
+            } catch (e) {
+              // If conversion fails, fallback to assigning the original object value
+              (context as any)[key] = propValue;
+            }
+          } else if (def.type === Boolean && typeof propValue === "boolean") {
             (context as any)[key] = propValue;
           } else if (def.type === Number && typeof propValue === "number") {
             (context as any)[key] = propValue;
@@ -83,11 +96,11 @@ export function applyProps<
   S extends object,
   C extends object,
   P extends object,
-  T extends object,
+  T extends object
 >(
   element: HTMLElement,
   cfg: ComponentConfig<S, C, P, T>,
-  context: ComponentContext<S, C, P, T>,
+  context: ComponentContext<S, C, P, T>
 ): void {
   if (!cfg.props) {
     // When there are no explicit prop definitions, define dynamic getters
@@ -96,18 +109,32 @@ export function applyProps<
     // so components that call useProps see live host properties even if the
     // host hasn't created an own enumerable property yet.
     try {
-      const declared = (context && (context as any)._hookCallbacks && (context as any)._hookCallbacks.props) || {};
-      const keys = Array.from(new Set([...Object.keys(element as any), ...Object.keys(declared)]));
+      const declared =
+        (context &&
+          (context as any)._hookCallbacks &&
+          (context as any)._hookCallbacks.props) ||
+        {};
+      const keys = Array.from(
+        new Set([...Object.keys(element as any), ...Object.keys(declared)])
+      );
       for (const key of keys) {
         // Skip internal/private fields and functions
-        if (typeof key !== 'string' || key.startsWith('_')) continue;
+        if (typeof key !== "string" || key.startsWith("_")) continue;
         // Avoid overwriting existing descriptors on context
         const existing = Object.getOwnPropertyDescriptor(context, key);
-        const isDeclaredProp = Object.prototype.hasOwnProperty.call(declared, key);
+        const isDeclaredProp = Object.prototype.hasOwnProperty.call(
+          declared,
+          key
+        );
         // If it's a declared prop via useProps, allow overriding the context
         // property with a dynamic getter so the component sees live host
         // prop values. Otherwise, avoid replacing existing accessors.
-        if (!isDeclaredProp && existing && (existing.get || existing.set || !existing.configurable)) continue;
+        if (
+          !isDeclaredProp &&
+          existing &&
+          (existing.get || existing.set || !existing.configurable)
+        )
+          continue;
         try {
           Object.defineProperty(context, key, {
             enumerable: true,
@@ -121,19 +148,25 @@ export function applyProps<
                   // Return attribute value if present
                   return attr;
                 }
-                
+
                 // Fall back to property value
                 const hostVal = (element as any)[key];
                 let ret;
                 if (isReactiveState(hostVal)) ret = (hostVal as any).value;
-                else if (hostVal && typeof hostVal === 'object' && 'value' in hostVal && !(hostVal instanceof Node)) ret = (hostVal as any).value;
+                else if (
+                  hostVal &&
+                  typeof hostVal === "object" &&
+                  "value" in hostVal &&
+                  !(hostVal instanceof Node)
+                )
+                  ret = (hostVal as any).value;
                 else ret = hostVal;
                 // intentionally silent in production/test runs
                 return ret;
               } catch (e) {
                 return (element as any)[key];
               }
-            }
+            },
           });
         } catch (e) {
           // ignore assignment errors

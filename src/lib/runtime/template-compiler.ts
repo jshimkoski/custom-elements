@@ -619,43 +619,6 @@ export function htmlImpl(
       for (const k in rawProps) vnodeProps.props[k] = rawProps[k];
       for (const k in rawAttrs) vnodeProps.attrs[k] = rawAttrs[k];
 
-      // No debug logging in compiler output to keep test runs clean.
-
-      // Heuristic: for router-link, ensure class-like attributes that are
-      // intended to carry utility-class tokens (class, activeClass,
-      // exactActiveClass) are available on the host vnode attrs as a
-      // plain string when possible. This is a compile-time convenience to
-      // make JIT extraction deterministic without runtime scraping.
-      try {
-        if (tagName === "router-link") {
-          const clsParts: string[] = [];
-          const pick = (k: string) => {
-            try {
-              let v = vnodeProps.attrs && (vnodeProps.attrs as any)[k];
-              if (v && isReactiveState(v)) v = (v as any).value;
-              if (typeof v === "string" && v.trim())
-                clsParts.push(...v.trim().split(/\s+/));
-            } catch (e) {}
-          };
-          pick("class");
-          pick("activeClass");
-          pick("exactActiveClass");
-          if (clsParts.length > 0) {
-            // Merge deduplicated tokens into vnodeProps.attrs.class
-            const existing =
-              (vnodeProps.attrs && (vnodeProps.attrs as any).class) || "";
-            const existingParts =
-              typeof existing === "string" && existing.trim()
-                ? existing.trim().split(/\s+/)
-                : [];
-            const merged = Array.from(new Set([...existingParts, ...clsParts]));
-            (vnodeProps.attrs as any).class = merged.join(" ");
-          }
-        }
-      } catch (e) {
-        // best-effort
-      }
-
       // If a `key` attribute was provided, surface it as a vnode prop so the
       // renderer/assignKeysDeep can use it as the vnode's key and avoid
       // unnecessary remounts when children order/state changes.

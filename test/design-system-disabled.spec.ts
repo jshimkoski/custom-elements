@@ -49,13 +49,7 @@ describe('🐛 Design System - Disabled Attribute Bug', () => {
       
       const input = dsInput.shadowRoot?.querySelector('input');
       expect(input).toBeDefined();
-      
-      // Debug: log the actual state
-      console.log('[TEST] input.hasAttribute("disabled"):', input.hasAttribute('disabled'));
-      console.log('[TEST] input.disabled:', input.disabled);
-      console.log('[TEST] input.getAttribute("disabled"):', input.getAttribute('disabled'));
-      console.log('[TEST] input.outerHTML:', input.outerHTML);
-      
+
       // The internal input should NOT have disabled attribute
       expect(input.hasAttribute('disabled')).toBe(false);
       

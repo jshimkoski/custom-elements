@@ -131,7 +131,7 @@ The `<router-link>` component supports the following props:
 
 ### Styling Props
 
-- **`class`** (string) - Additional CSS classes to apply (JIT CSS supported)
+- **`linkClass`** (string) - Additional CSS classes to apply (JIT CSS supported)
 
 ### Examples
 
@@ -182,7 +182,7 @@ The `<router-link>` component supports the following props:
 ```html
 <router-link 
   to="/profile" 
-  class="nav-link"
+  linkClass="nav-link"
   activeClass="nav-link-active"
 >
   Profile
