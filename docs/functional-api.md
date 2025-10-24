@@ -1685,8 +1685,9 @@ component('user-badge', () => {
 });
 
 // ❌ Avoid
-component('user-badge', ({ a, b, c }: any, { emit }) => {
-  // Hard to understand and no type safety
+component('user-badge', () => {
+  // Hard to understand
+  const props = useProps({ a: '', b: '', c: '' });
 });
 ```
 

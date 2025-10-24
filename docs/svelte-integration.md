@@ -11,11 +11,13 @@ import {
   component,
   ref,
   html,
+  useProps,
   useEmit,
 } from '@jasonshimmy/custom-elements-runtime';
 
-component('my-counter', ({ initialCount = 0 }: { initialCount?: number }) => {
-  const count = ref(initialCount);
+component('my-counter', () => {
+  const props = useProps({ initialCount: 0 });
+  const count = ref(props.initialCount);
   const emit = useEmit();
 
   const handleClick = () => {

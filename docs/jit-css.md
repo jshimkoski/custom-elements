@@ -422,9 +422,11 @@ import {
   css,
   useStyle,
   ref,
+  useProps,
 } from '@jasonshimmy/custom-elements-runtime';
 
-component('dynamic-card', ({ theme = 'light', size = 'md' }) => {
+component('dynamic-card', () => {
+  const props = useProps({ theme: 'light', size: 'md' });
   const isExpanded = ref(false);
 
   useStyle(
@@ -467,7 +469,8 @@ component('dynamic-card', ({ theme = 'light', size = 'md' }) => {
 ### **Advanced Patterns**
 
 ```typescript
-component('chart-widget', ({ data, colorScheme = 'blue' }) => {
+component('chart-widget', () => {
+  const props = useProps({ data: [], colorScheme: 'blue' });
   const hoveredIndex = ref(-1);
 
   useStyle(
@@ -518,7 +521,8 @@ component('chart-widget', ({ data, colorScheme = 'blue' }) => {
 You can mix `useStyle` with utility classes for maximum flexibility:
 
 ```typescript
-component('hybrid-button', ({ variant = 'primary', loading = false }) => {
+component('hybrid-button', () => {
+  const props = useProps({ variant: 'primary', loading: false });
   useStyle(
     () => css`
       .btn-custom {
@@ -530,7 +534,7 @@ component('hybrid-button', ({ variant = 'primary', loading = false }) => {
         content: '';
         position: absolute;
         top: 0;
-        left: ${loading ? '0%' : '-100%'};
+        left: ${props.loading ? '0%' : '-100%'};
         width: 100%;
         height: 100%;
         background: linear-gradient(
@@ -557,13 +561,13 @@ component('hybrid-button', ({ variant = 'primary', loading = false }) => {
   return html`
     <button
       class="btn-custom px-4 py-2 rounded-lg font-medium transition-colors
-                   ${variant === 'primary'
+                   ${props.variant === 'primary'
         ? 'bg-primary-500 hover:bg-primary-600 text-white'
-        : variant === 'secondary'
+        : props.variant === 'secondary'
           ? 'bg-secondary-500 hover:bg-secondary-600 text-white'
           : 'bg-neutral-200 hover:bg-neutral-300 text-neutral-800'}"
     >
-      ${loading
+      ${props.loading
         ? html`<span
             class="loading-spinner inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full"
           ></span>`
@@ -579,10 +583,11 @@ component('hybrid-button', ({ variant = 'primary', loading = false }) => {
 ### **Complex Layout with Mixed Approaches**
 
 ```typescript
-component('dashboard-layout', ({ sidebarWidth = 280, headerHeight = 64 }) => {
+component('dashboard-layout', () => {
+  const props = useProps({ sidebarWidth: 280, headerHeight: 64 });
   const sidebarCollapsed = ref(false);
   const currentWidth = computed(() =>
-    sidebarCollapsed.value ? 80 : sidebarWidth,
+    sidebarCollapsed.value ? 80 : props.sidebarWidth,
   );
 
   useStyle(
@@ -593,7 +598,7 @@ component('dashboard-layout', ({ sidebarWidth = 280, headerHeight = 64 }) => {
           'sidebar header'
           'sidebar main';
         grid-template-columns: ${currentWidth.value}px 1fr;
-        grid-template-rows: ${headerHeight}px 1fr;
+        grid-template-rows: ${props.headerHeight}px 1fr;
         height: 100vh;
         transition: grid-template-columns 0.3s ease;
       }

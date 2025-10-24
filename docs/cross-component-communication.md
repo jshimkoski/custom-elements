@@ -34,8 +34,9 @@ Pass data from parent to child using props and attributes (string, number, boole
   ```
 
   ```typescript
-  component('user-card', ({ name = '', age = 0 }) => {
-    return html`<div>${name} (${age})</div>`;
+  component('user-card', () => {
+    const props = useProps({ name: '', age: 0 });
+    return html`<div>${props.name} (${props.age})</div>`;
   });
   ```
 

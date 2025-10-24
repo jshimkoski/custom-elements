@@ -45,8 +45,9 @@ if (
 ## 🧩 HMR-Friendly Component Example
 
 ```typescript
-component('hmr-demo', ({ initialCount = 0 }, emit) => {
-  const count = ref(initialCount);
+component('hmr-demo', () => {
+  const props = useProps({ initialCount: 0 });
+  const count = ref(props.initialCount);
 
   const handleClick = () => {
     count.value++;
