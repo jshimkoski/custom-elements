@@ -25,7 +25,17 @@
  * @internal
  */
 const nodeKeyMap = new WeakMap<Node, string>();
-const elementTransitionMap = new WeakMap<HTMLElement, any>();
+export interface TransitionMetadata {
+  name?: string;
+  appear?: boolean;
+  mode?: 'out-in' | 'in-out' | 'default';
+  enterClass?: string;
+  leaveClass?: string;
+  moveClass?: string;
+  [key: string]: unknown;
+}
+
+const elementTransitionMap = new WeakMap<HTMLElement, TransitionMetadata>();
 
 /**
  * Retrieve the stored node key for a Node.
@@ -41,11 +51,13 @@ export function getNodeKey(node: Node | null | undefined): string | undefined {
   const wm = nodeKeyMap.get(node);
   if (wm !== undefined) return wm as string;
   try {
-    const anyNode = node as any;
-    if (anyNode && anyNode.key != null) return anyNode.key;
-  } catch (e) {}
+    const nodeWithKey = node as { key?: string | number };
+    if (nodeWithKey && nodeWithKey.key != null) return String(nodeWithKey.key);
+  } catch {
+    void 0;
+  }
   if (node instanceof Element) {
-    const attr = node.getAttribute("data-anchor-key");
+    const attr = node.getAttribute('data-anchor-key');
     if (attr) return attr;
   }
   return undefined;
@@ -60,21 +72,27 @@ export function getNodeKey(node: Node | null | undefined): string | undefined {
  *
  * @internal
  */
-import { safeSerializeAttr } from "./helpers";
+import { safeSerializeAttr } from './helpers';
 
 export function setNodeKey(node: Node, key: string): void {
   try {
     nodeKeyMap.set(node, key);
-  } catch (e) {}
+  } catch {
+    void 0;
+  }
   try {
-    (node as any).key = key;
-  } catch (e) {}
+    (node as { key?: string | number }).key = key;
+  } catch {
+    void 0;
+  }
   try {
     if (node instanceof Element) {
       const s = safeSerializeAttr(key);
-      if (s !== null) node.setAttribute("data-anchor-key", s);
+      if (s !== null) node.setAttribute('data-anchor-key', s);
     }
-  } catch (e) {}
+  } catch {
+    void 0;
+  }
 }
 
 /**
@@ -85,14 +103,19 @@ export function setNodeKey(node: Node, key: string): void {
  *
  * @internal
  */
-export function getElementTransition(el: HTMLElement | null | undefined): any {
+export function getElementTransition(
+  el: HTMLElement | null | undefined,
+): TransitionMetadata | undefined {
   if (!el) return undefined;
   const wm = elementTransitionMap.get(el);
   if (wm !== undefined) return wm;
   try {
-    const anyEl = el as any;
-    if (anyEl && anyEl._transitionGroup != null) return anyEl._transitionGroup;
-  } catch (e) {}
+    const elWithTransition = el as { _transitionGroup?: unknown };
+    if (elWithTransition && elWithTransition._transitionGroup != null)
+      return elWithTransition._transitionGroup as TransitionMetadata;
+  } catch {
+    void 0;
+  }
   return undefined;
 }
 
@@ -104,13 +127,20 @@ export function getElementTransition(el: HTMLElement | null | undefined): any {
  *
  * @internal
  */
-export function setElementTransition(el: HTMLElement, val: any): void {
+export function setElementTransition(
+  el: HTMLElement,
+  value: TransitionMetadata,
+): void {
   try {
-    elementTransitionMap.set(el, val);
-  } catch (e) {}
+    elementTransitionMap.set(el, value);
+  } catch {
+    void 0;
+  }
   try {
-    (el as any)._transitionGroup = val;
-  } catch (e) {}
+    (el as { _transitionGroup?: unknown })._transitionGroup = value;
+  } catch {
+    void 0;
+  }
 }
 
 export default {

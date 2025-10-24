@@ -28,7 +28,7 @@ Bind refs or props to element attributes or DOM properties. The template syntax 
 
 Note: the compiler/runtime will promote many bound values into JS properties so they are observed by the element immediately. For native elements a curated promotable list exists (value, checked, disabled, etc.); for custom elements any bound attribute is promoted and kebab-case is converted to camelCase when applied to the instance.
 
-Runtime note: the renderer optimizes updates and will only notify a custom element (call its internal update hooks such as _applyProps/requestRender) when a prop or attribute actually changes. Re-rendering a parent without prop/attr differences will not retrigger the child's apply/update lifecycle.
+Runtime note: the renderer optimizes updates and will only notify a custom element (call its internal update hooks such as \_applyProps/requestRender) when a prop or attribute actually changes. Re-rendering a parent without prop/attr differences will not retrigger the child's apply/update lifecycle.
 
 ### Object form — `:bind` (guaranteed JS property assignment)
 
@@ -53,6 +53,7 @@ Bind event listeners to DOM events.
 <button @click="${() => count++}">Increment</button>
 <button @click="${increment}">Increment</button>
 ```
+
 - Use `@eventName` to bind a handler function.
 - Handler can access and update refs, props, or call component methods.
 
@@ -69,6 +70,7 @@ Bind dynamic classes to your elements using `:class`. This enables conditional, 
 ```
 
 ### Best Practices
+
 - Use object syntax for conditional classes.
 - Use array syntax for multiple dynamic classes.
 - Avoid empty strings or falsy values in arrays/objects.
@@ -77,11 +79,16 @@ Bind dynamic classes to your elements using `:class`. This enables conditional, 
 ### Example
 
 ```typescript
-component('class-binding-demo', ({ isActive = true, hasError = false }) => {
+component('class-binding-demo', () => {
+  const props = useProps({ isActive: true, hasError: false });
   return html`
-    <div :class="${{ active: isActive, error: hasError }}">Status</div>
-    <div :class="${['foo', isActive ? 'active' : '', hasError && 'error']}">Multi</div>
-    <div :class="${'static' + (isActive ? ' active' : '')}">Static + Dynamic</div>
+    <div :class="${{ active: props.isActive, error: props.hasError }}">
+      Status
+    </div>
+    <div :class="${['foo', props.isActive ? 'active' : '']}">Multi</div>
+    <div :class="${'static' + (props.isActive ? ' active' : '')}">
+      Static + Dynamic
+    </div>
   `;
 });
 ```
@@ -93,11 +100,14 @@ Bind dynamic styles to your elements using `:style`. This enables conditional, o
 ### Usage
 
 ```html
-<div :style="${{ color: isActive ? 'green' : 'red', fontWeight: 'bold' }}"></div>
+<div
+  :style="${{ color: isActive ? 'green' : 'red', fontWeight: 'bold' }}"
+></div>
 <div :style="${'background: yellow; border: 1px solid #ccc;'}"></div>
 ```
 
 ### Best Practices
+
 - Use object syntax for conditional and multiple styles.
 - Use string syntax for static or precomputed style strings.
 - Prefer camelCase keys in objects (e.g., `fontWeight`), which are auto-converted to kebab-case.
@@ -109,20 +119,29 @@ Bind dynamic styles to your elements using `:style`. This enables conditional, o
 component('style-binding-demo', () => {
   const isActive = ref(true);
   const color = ref('blue');
-  
+
   return html`
-    <div :style="${{ color: color.value, fontWeight: isActive.value ? 'bold' : 'normal' }}">Styled</div>
+    <div
+      :style="${{
+        color: color.value,
+        fontWeight: isActive.value ? 'bold' : 'normal',
+      }}"
+    >
+      Styled
+    </div>
     <div :style="${'background: #eee; padding: 10px;'}">Static + Dynamic</div>
   `;
 });
 ```
 
 ### How It Works
+
 - Object syntax: `{ color: 'red', fontWeight: 'bold' }` → `color: red; font-weight: bold;`
 - String syntax: `'background: yellow; border: 1px solid #ccc;'` → used as-is.
 - All styles are merged and applied as inline styles.
 
 ### Tips
+
 - Use conditional logic for dynamic styles.
 - Combine with static styles using string concatenation if needed.
 - Avoid setting styles that conflict with your CSS classes.
@@ -141,22 +160,22 @@ component('form-example', () => {
   const email = ref('');
   const isSubscribed = ref(false);
   const selectedFruit = ref('apple');
-  
+
   return html`
     <form>
       <!-- Text input -->
       <input :model="${username}" placeholder="Username" />
       <p>Username: ${username.value}</p>
-      
+
       <!-- Email input -->
       <input type="email" :model="${email}" placeholder="Email" />
-      
+
       <!-- Checkbox -->
       <label>
         <input type="checkbox" :model="${isSubscribed}" />
         Subscribe to newsletter
       </label>
-      
+
       <!-- Select dropdown -->
       <select :model="${selectedFruit}">
         <option value="apple">Apple</option>
@@ -171,7 +190,7 @@ component('form-example', () => {
 ### Modifiers
 
 - `lazy` — Use change event instead of input event
-- `trim` — Automatically trim whitespace  
+- `trim` — Automatically trim whitespace
 - `number` — Convert to number type
 
 ### Custom Elements with `:model`
@@ -183,7 +202,12 @@ For custom elements, `:model` follows Vue.js conventions. For detailed informati
 Use `:ref` to get direct access to DOM elements in the functional API. Bind a reactive ref directly to `:ref` for automatic element assignment:
 
 ```typescript
-import { component, html, ref, useOnConnected } from '@jasonshimmy/custom-elements-runtime';
+import {
+  component,
+  html,
+  ref,
+  useOnConnected,
+} from '@jasonshimmy/custom-elements-runtime';
 
 component('ref-example', () => {
   const inputRef = ref<HTMLInputElement | null>(null);
@@ -194,7 +218,7 @@ component('ref-example', () => {
     inputRef.value?.focus();
     console.log('Button element:', buttonRef.value);
   });
-  
+
   return html`
     <input :ref="${inputRef}" type="text" placeholder="Type here..." />
     <button :ref="${buttonRef}">Submit</button>
@@ -231,12 +255,12 @@ Toggle element visibility using `display: none` based on a boolean condition.
 import { component, html, ref } from '@jasonshimmy/custom-elements-runtime';
 
 component('toggle-content', () => {
-  const { showDetails } = useProps({ showDetails: false });
-  const isExpanded = ref(showDetails);
-  
+  const props = useProps({ showDetails: false });
+  const isExpanded = ref(props.showDetails);
+
   return html`
     <div>
-      <button @click="${() => isExpanded.value = !isExpanded.value}">
+      <button @click="${() => (isExpanded.value = !isExpanded.value)}">
         ${isExpanded.value ? 'Hide' : 'Show'} Details
       </button>
       <div :show="${isExpanded.value}" class="details">
@@ -277,11 +301,13 @@ Conditionally render elements using the `:when` directive. Elements are added or
 Both approaches work identically under the hood:
 
 **Function approach**:
+
 ```typescript
 ${when(isVisible, html`<div>Content</div>`)}
 ```
 
 **Directive approach**:
+
 ```html
 <div :when="${isVisible}">Content</div>
 ```
@@ -299,9 +325,9 @@ ${when(isVisible, html`<div>Content</div>`)}
 import { component, html, ref } from '@jasonshimmy/custom-elements-runtime';
 
 component('conditional-message', () => {
-  const { loggedIn } = useProps({ loggedIn: false });
+  const props = useProps({ loggedIn: false });
   const messageCount = ref(0);
-  
+
   return html`
     <div>
       <div :when="${loggedIn}">
@@ -328,37 +354,40 @@ component('conditional-message', () => {
 
 ### `:show` vs `:when` Comparison
 
-| Feature | `:show` | `:when` |
-|---------|---------|---------|
-| **DOM Presence** | Always in DOM | Added/removed from DOM |
-| **Method** | `display: none` | Complete removal |
-| **Performance** | Better for frequent toggling | Better for rarely shown content |
-| **State Preservation** | Preserves element state | Recreates element each time |
-| **Use Case** | Visibility toggles | Conditional rendering |
-
+| Feature                | `:show`                      | `:when`                         |
+| ---------------------- | ---------------------------- | ------------------------------- |
+| **DOM Presence**       | Always in DOM                | Added/removed from DOM          |
+| **Method**             | `display: none`              | Complete removal                |
+| **Performance**        | Better for frequent toggling | Better for rarely shown content |
+| **State Preservation** | Preserves element state      | Recreates element each time     |
+| **Use Case**           | Visibility toggles           | Conditional rendering           |
 
 ## 🧩 Example: All Bindings Together
 
 ```typescript
-import { component, html, ref, useOnConnected } from '@jasonshimmy/custom-elements-runtime';
+import {
+  component,
+  html,
+  ref,
+  useOnConnected,
+} from '@jasonshimmy/custom-elements-runtime';
 
-component('binding-demo', ({ 
-  initialName = '',
-  initialCount = 0 
-}: {
-  initialName?: string;
-  initialCount?: number;
-}) => {
-  const name = ref(initialName);
-  const count = ref(initialCount);
+component('binding-demo', () => {
+  const props = useProps({ initialName: '', initialCount: 0 });
+  const name = ref(props.initialName);
+  const count = ref(props.initialCount);
   const inputRef = ref<HTMLInputElement | null>(null);
-  
+
   return html`
     <div>
       <input :model="${name}" :ref="${inputRef}" placeholder="Name" />
-      <button @click="${() => count.value++}">Clicked ${count.value} times</button>
+      <button @click="${() => count.value++}">
+        Clicked ${count.value} times
+      </button>
       <div :data-name="${name.value}">Hello, ${name.value}</div>
-      <button @click="${() => inputRef.value?.focus()}">Focus Name Input</button>
+      <button @click="${() => inputRef.value?.focus()}">
+        Focus Name Input
+      </button>
     </div>
   `;
 });

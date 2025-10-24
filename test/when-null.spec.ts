@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { component, html, ref, when } from '../src/lib/index';
+import { component, html, ref } from '../src/lib/index';
 
 describe('when directive - null/undefined/false handling', () => {
   let container: HTMLDivElement;
@@ -16,16 +16,16 @@ describe('when directive - null/undefined/false handling', () => {
   it('confirms ternary guards evaluation but when(...) with pre-evaluated html does not', async () => {
     // Use an explicit throwing expression so we can reliably detect eager
     // evaluation. The IIFE will throw when evaluated.
-    const thrower = () => { throw new Error('EVAL'); };
+    const thrower = () => {
+      throw new Error('EVAL');
+    };
 
     // Ternary guards evaluation: the throwing IIFE should not be called
     // when the condition is falsy.
     component('when-ternary-safe', () => {
       const curr = ref(false);
       return html`
-        <div>
-          ${curr.value ? html`<p id="safe">${thrower()}</p>` : ""}
-        </div>
+        <div>${curr.value ? html`<p id="safe">${thrower()}</p>` : ''}</div>
       `;
     });
 
@@ -52,7 +52,8 @@ describe('when directive - null/undefined/false handling', () => {
 
     // Toggle to true -> inner node should be rendered
     const ctx = (bugEl as any).context;
-    ctx.refs; // touch refs to satisfy typings in some environments
+    // touch refs to satisfy typings in some environments
+    void ctx.refs;
     ctx.requestRender();
     // Set the reactive ref value and request a render
     // Note: we access the component context to update the ref used in template

@@ -31,7 +31,9 @@ describe('smoke: native inputs and HMR re-registration', () => {
     document.body.appendChild(el);
     await new Promise((r) => setTimeout(r, 10));
 
-    const checkbox = el.shadowRoot?.querySelector('#c') as HTMLInputElement | null;
+    const checkbox = el.shadowRoot?.querySelector(
+      '#c',
+    ) as HTMLInputElement | null;
     expect(checkbox).toBeTruthy();
     // Initially checked because 'A' is in items
     expect(checkbox!.checked).toBe(true);
@@ -40,7 +42,7 @@ describe('smoke: native inputs and HMR re-registration', () => {
   });
 
   it.skip('re-registering a component updates existing instances (HMR style)', async () => {
-    // This test is skipped because HMR-style component updates may not be 
+    // This test is skipped because HMR-style component updates may not be
     // implemented in the functional API yet
     component('hmr-dog', () => html`<div id="v">one</div>`);
     const el = document.createElement('hmr-dog') as HTMLElement;

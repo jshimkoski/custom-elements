@@ -7,16 +7,21 @@ describe('MinimalExample Component', () => {
   });
 
   it('renders the minimal example with correct content', () => {
-    cy.get('minimal-example').should('exist').shadow().within(() => {
-      cy.get('div').should('not.exist');
-      cy.get('button').should('exist').should('contain', 'Count: 0');
-    });
+    cy.get('minimal-example')
+      .should('exist')
+      .shadow()
+      .within(() => {
+        cy.get('div').should('not.exist');
+        cy.get('button').should('exist').should('contain', 'Count: 0');
+      });
   });
 
   it('responds to user interaction and updates state', () => {
-    cy.get('minimal-example').shadow().within(() => {
-      cy.get('button').click();
-      cy.get('button').should('contain', 'Count: 1');
-    });
+    cy.get('minimal-example')
+      .shadow()
+      .within(() => {
+        cy.get('button').click();
+        cy.get('button').should('contain', 'Count: 1');
+      });
   });
 });

@@ -8,7 +8,7 @@ describe('vdom custom element property assignment', () => {
       props: {
         props: { value: 'hello', custom: 42 },
         attrs: {},
-  isCustomElement: true,
+        isCustomElement: true,
       },
       children: undefined,
     };

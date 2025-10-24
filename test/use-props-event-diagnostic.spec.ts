@@ -6,7 +6,12 @@ describe('useProps event propagation diagnostic', () => {
     component('diag-child-a', () => {
       const { modelValue } = useProps({ modelValue: false });
       const emit = useEmit();
-      return html`<button id="cbtn" @click="${() => emit('update:model-value', !modelValue)}">T</button>`;
+      return html`<button
+        id="cbtn"
+        @click="${() => emit('update:model-value', !modelValue)}"
+      >
+        T
+      </button>`;
     });
 
     component('diag-parent-a', () => {
@@ -18,19 +23,30 @@ describe('useProps event propagation diagnostic', () => {
     document.body.appendChild(p);
     await new Promise((r) => setTimeout(r, 20));
 
-    const child = p.shadowRoot?.querySelector('diag-child-a') as HTMLElement | null;
+    const child = p.shadowRoot?.querySelector(
+      'diag-child-a',
+    ) as HTMLElement | null;
     expect(child).not.toBeNull();
     const btn = child!.shadowRoot?.querySelector('#cbtn') as HTMLElement | null;
-    btn!.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
+    btn!.dispatchEvent(
+      new MouseEvent('click', { bubbles: true, composed: true }),
+    );
     await new Promise((r) => setTimeout(r, 20));
 
     // Parent's child should reflect the toggled value (original true -> false)
-    const childAfter = p.shadowRoot?.querySelector('diag-child-a') as HTMLElement | null;
+    const childAfter = p.shadowRoot?.querySelector(
+      'diag-child-a',
+    ) as HTMLElement | null;
     expect(childAfter).not.toBeNull();
     const ctxVal = (childAfter as any).context?.modelValue;
     // diagnostic logging
-    // eslint-disable-next-line no-console
-    console.log('[test-diagnostic] childAfter.context.modelValue ->', ctxVal, 'typeof=', typeof ctxVal);
+
+    console.log(
+      '[test-diagnostic] childAfter.context.modelValue ->',
+      ctxVal,
+      'typeof=',
+      typeof ctxVal,
+    );
     expect(ctxVal === false || ctxVal === 'false' || ctxVal === '').toBe(true);
   });
 
@@ -38,7 +54,12 @@ describe('useProps event propagation diagnostic', () => {
     component('diag-child-b', () => {
       const props = useProps({ modelValue: false });
       const emit = useEmit();
-      return html`<button id="cbtnb" @click="${() => emit('update:model-value', !props.modelValue)}">T</button>`;
+      return html`<button
+        id="cbtnb"
+        @click="${() => emit('update:model-value', !props.modelValue)}"
+      >
+        T
+      </button>`;
     });
 
     component('diag-parent-b', () => {
@@ -50,13 +71,21 @@ describe('useProps event propagation diagnostic', () => {
     document.body.appendChild(p);
     await new Promise((r) => setTimeout(r, 20));
 
-    const child = p.shadowRoot?.querySelector('diag-child-b') as HTMLElement | null;
+    const child = p.shadowRoot?.querySelector(
+      'diag-child-b',
+    ) as HTMLElement | null;
     expect(child).not.toBeNull();
-    const btn = child!.shadowRoot?.querySelector('#cbtnb') as HTMLElement | null;
-    btn!.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
+    const btn = child!.shadowRoot?.querySelector(
+      '#cbtnb',
+    ) as HTMLElement | null;
+    btn!.dispatchEvent(
+      new MouseEvent('click', { bubbles: true, composed: true }),
+    );
     await new Promise((r) => setTimeout(r, 20));
 
-    const childAfter = p.shadowRoot?.querySelector('diag-child-b') as HTMLElement | null;
+    const childAfter = p.shadowRoot?.querySelector(
+      'diag-child-b',
+    ) as HTMLElement | null;
     expect(childAfter).not.toBeNull();
     const ctxVal = (childAfter as any).context?.modelValue;
     expect(ctxVal === false || ctxVal === 'false' || ctxVal === '').toBe(true);

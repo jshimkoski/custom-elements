@@ -27,10 +27,15 @@ Server-Side Rendering (SSR) is the process of generating HTML on the server, sen
 ## 🧩 SSR-Friendly Component Example
 
 ```typescript
-import { component, ref, html, useProps } from "@jasonshimmy/custom-elements-runtime";
-  
-component("ssr-demo", () => {
-  const props = useProps({ message: "Hello SSR!" });
+import {
+  component,
+  ref,
+  html,
+  useProps,
+} from '@jasonshimmy/custom-elements-runtime';
+
+component('ssr-demo', () => {
+  const props = useProps({ message: 'Hello SSR!' });
   const msg = ref(props.message);
   return html`<div>${msg.value}</div>`;
 });
@@ -41,14 +46,15 @@ component("ssr-demo", () => {
 
 ## ✉️ Rendering to string with `renderToString`
 
-The runtime exports `renderToString` (see `src/lib/index.ts`) which serializes VNode trees to HTML for server output. Use `html` to build VNodes on the server and `renderToString` to produce markup.
+The runtime provides `renderToString` for SSR. The small SSR entrypoint is `src/lib/ssr.ts` (it re-exports the internal `runtime/vdom-ssr` helper) — import `renderToString` from the SSR entry so bundlers don't pull server-only code into the client bundle. Use `html` to build VNodes on the server and `renderToString` to produce markup.
 
 Basic usage
 
 ```typescript
-import { html, renderToString } from "@jasonshimmy/custom-elements-runtime";
+import { html } from '@jasonshimmy/custom-elements-runtime';
+import { renderToString } from '@jasonshimmy/custom-elements-runtime/ssr';
 
-const vnode = html`<div>Hello ${"world"}</div>`;
+const vnode = html`<div>Hello ${'world'}</div>`;
 const htmlString = renderToString(vnode);
 // -> '<div>Hello world</div>'
 ```
@@ -62,10 +68,10 @@ export function renderHello(ctx: { name: string }) {
 }
 
 // server.js
-import { renderToString } from "@jasonshimmy/custom-elements-runtime";
-import { renderHello } from "./components/hello";
+import { renderToString } from '@jasonshimmy/custom-elements-runtime/ssr';
+import { renderHello } from './components/hello';
 
-const vnode = renderHello({ name: "Alice" });
+const vnode = renderHello({ name: 'Alice' });
 const html = renderToString(vnode);
 ```
 
@@ -81,16 +87,18 @@ const html = renderToString(vnode);
 Minimal server example
 
 ```js
-import http from "node:http";
-import { renderToString } from "@jasonshimmy/custom-elements-runtime";
-import { renderHello } from "./components/hello";
+import http from 'node:http';
+import { renderToString } from '@jasonshimmy/custom-elements-runtime/ssr';
+import { renderHello } from './components/hello';
 
-http.createServer((req, res) => {
-  const vnode = renderHello({ name: "Server" });
-  const body = renderToString(vnode);
-  res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-  res.end(`<!doctype html><html><head></head><body>${body}</body></html>`);
-}).listen(3000);
+http
+  .createServer((req, res) => {
+    const vnode = renderHello({ name: 'Server' });
+    const body = renderToString(vnode);
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end(`<!doctype html><html><head></head><body>${body}</body></html>`);
+  })
+  .listen(3000);
 ```
 
 Client-side hydration example
@@ -105,7 +113,12 @@ On the client register the same component and let the runtime hydrate existing s
     <!-- server rendered -->
     <ssr-demo><div>Hello SSR!</div></ssr-demo>
     <script type="module">
-      import { component, ref, html, useProps } from "@jasonshimmy/custom-elements-runtime";
+      import {
+        component,
+        ref,
+        html,
+        useProps,
+      } from '@jasonshimmy/custom-elements-runtime';
 
       component('ssr-demo', () => {
         const props = useProps({ message: 'Hello SSR!' });
@@ -120,6 +133,7 @@ On the client register the same component and let the runtime hydrate existing s
 ```
 
 Notes
+
 - `renderToString` serializes HTML only; Adopted StyleSheets / JIT CSS are not automatically included server-side — collect and inline styles if needed.
 - Server rendering does not execute client lifecycle hooks.
 - Ensure server and client render shapes match to avoid hydration mismatches.
@@ -131,10 +145,13 @@ Notes
 - No `this` ctx or browser APIs are accessed.
 
 **Example:**
+
 ```typescript
-if (typeof window === "undefined") {
+if (typeof window === 'undefined') {
   // SSR fallback: minimal class, no DOM, no lifecycle
-  return class { constructor() {} };
+  return class {
+    constructor() {}
+  };
 }
 ```
 
@@ -155,8 +172,8 @@ if (typeof window === "undefined") {
 ## 📚 Example: Universal Component
 
 ```typescript
-component("universal-greeting", () => {
-  const props = useProps({ name: "World" });
+component('universal-greeting', () => {
+  const props = useProps({ name: 'World' });
   const greeting = ref(props.name);
   return html`<h1>Hello, ${greeting.value}!</h1>`;
 });
@@ -170,10 +187,12 @@ component("universal-greeting", () => {
 When performing server-side rendering you may want full HTML5 named-entity decoding (e.g. `&rsquo;`, `&hellip;`, etc.). The library keeps the client bundle small by not shipping the full entity map to the browser. If your SSR pipeline needs complete decoding, register a full entity map at server startup.
 
 ### Why register?
+
 - The full HTML5 entity map is large. Publishing it with the client bundle would bloat CDN and npm consumers.
 - This API lets server deployments opt in to the full map while keeping the library tiny for browsers.
 
 ### API
+
 - `registerEntityMap(map: Record<string,string>, options?: { overwrite?: boolean })` — register the full map before rendering. First registration wins by default.
 - `clearRegisteredEntityMap()` — clear the registration (useful in tests).
 
@@ -210,6 +229,7 @@ registerEntityMap(entities);
 ```
 
 ### Notes
+
 - If you don't register a map, the library falls back to a small inline map and numeric entity decoding — this keeps the runtime safe and compact.
 - For serverless deployments with strict memory or cold-start budgets, consider trimming the entity map to the subset your app uses.
 - Avoid importing the big JSON into client-side code — doing so will cause bundlers to include it in client bundles.
@@ -232,4 +252,4 @@ A: Yes, the runtime escapes HTML and sanitizes styles to prevent XSS and injecti
 
 SSR support in the custom elements runtime enables fast, SEO-friendly, and universal web components. By leveraging VNode trees, pure functions, and hydration, you can build components that work seamlessly on both server and client.
 
-For more details, see the SSR fallback logic in `src/lib/index.ts` and explore universal component examples in the documentation.
+For more details, see the SSR entrypoint and helper in `src/lib/ssr.ts` (which re-exports the runtime SSR helpers) and inspect the SSR fallback logic in `src/lib/runtime/component.ts`.

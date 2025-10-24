@@ -25,7 +25,7 @@ describe(':when directive', () => {
 
     const el = document.createElement('when-test-1') as any;
     container.appendChild(el);
-    await new Promise(resolve => setTimeout(resolve, 10));
+    await new Promise((resolve) => setTimeout(resolve, 10));
 
     const p = el.shadowRoot?.querySelector('p');
     expect(p).toBeTruthy();
@@ -44,7 +44,7 @@ describe(':when directive', () => {
 
     const el = document.createElement('when-test-2') as any;
     container.appendChild(el);
-    await new Promise(resolve => setTimeout(resolve, 10));
+    await new Promise((resolve) => setTimeout(resolve, 10));
 
     const p = el.shadowRoot?.querySelector('p');
     expect(p).toBeNull();
@@ -66,7 +66,7 @@ describe(':when directive', () => {
 
     const el = document.createElement('when-test-3') as any;
     container.appendChild(el);
-    await new Promise(resolve => setTimeout(resolve, 10));
+    await new Promise((resolve) => setTimeout(resolve, 10));
 
     // Initially visible
     let p = el.shadowRoot?.querySelector('p');
@@ -76,14 +76,14 @@ describe(':when directive', () => {
     // Click to hide
     const button = el.shadowRoot?.querySelector('button');
     button?.click();
-    await new Promise(resolve => setTimeout(resolve, 10));
+    await new Promise((resolve) => setTimeout(resolve, 10));
 
     p = el.shadowRoot?.querySelector('p');
     expect(p).toBeNull();
 
     // Click to show again
     button?.click();
-    await new Promise(resolve => setTimeout(resolve, 10));
+    await new Promise((resolve) => setTimeout(resolve, 10));
 
     p = el.shadowRoot?.querySelector('p');
     expect(p).toBeTruthy();
@@ -105,7 +105,7 @@ describe(':when directive', () => {
 
     const el = document.createElement('when-test-4') as any;
     container.appendChild(el);
-    await new Promise(resolve => setTimeout(resolve, 10));
+    await new Promise((resolve) => setTimeout(resolve, 10));
 
     const section = el.shadowRoot?.querySelector('section');
     expect(section).toBeTruthy();
@@ -129,7 +129,7 @@ describe(':when directive', () => {
 
     const el = document.createElement('when-test-5') as any;
     container.appendChild(el);
-    await new Promise(resolve => setTimeout(resolve, 10));
+    await new Promise((resolve) => setTimeout(resolve, 10));
 
     const paragraphs = el.shadowRoot?.querySelectorAll('p');
     expect(paragraphs?.length).toBe(1);
@@ -149,7 +149,7 @@ describe(':when directive', () => {
 
     const el = document.createElement('when-test-6') as any;
     container.appendChild(el);
-    await new Promise(resolve => setTimeout(resolve, 10));
+    await new Promise((resolve) => setTimeout(resolve, 10));
 
     const paragraphs = el.shadowRoot?.querySelectorAll('p');
     expect(paragraphs?.length).toBe(1);
@@ -178,7 +178,7 @@ describe(':when directive', () => {
 
     const el = document.createElement('when-test-7') as any;
     container.appendChild(el);
-    await new Promise(resolve => setTimeout(resolve, 10));
+    await new Promise((resolve) => setTimeout(resolve, 10));
 
     const paragraphs = el.shadowRoot?.querySelectorAll('p');
     expect(paragraphs?.length).toBe(0);
@@ -197,7 +197,7 @@ describe(':when directive', () => {
 
     const el = document.createElement('when-test-8') as any;
     container.appendChild(el);
-    await new Promise(resolve => setTimeout(resolve, 10));
+    await new Promise((resolve) => setTimeout(resolve, 10));
 
     const input = el.shadowRoot?.querySelector('input') as HTMLInputElement;
     expect(input).toBeTruthy();
@@ -221,14 +221,14 @@ describe(':when directive', () => {
 
     const el = document.createElement('when-test-9') as any;
     container.appendChild(el);
-    await new Promise(resolve => setTimeout(resolve, 10));
+    await new Promise((resolve) => setTimeout(resolve, 10));
 
     let p = el.shadowRoot?.querySelector('p');
     expect(p?.textContent).toBe('Count: 0');
 
     const button = el.shadowRoot?.querySelector('button');
     button?.click();
-    await new Promise(resolve => setTimeout(resolve, 10));
+    await new Promise((resolve) => setTimeout(resolve, 10));
 
     p = el.shadowRoot?.querySelector('p');
     expect(p?.textContent).toBe('Count: 1');
@@ -247,7 +247,7 @@ describe(':when directive', () => {
 
     const el = document.createElement('when-test-10') as any;
     container.appendChild(el);
-    await new Promise(resolve => setTimeout(resolve, 10));
+    await new Promise((resolve) => setTimeout(resolve, 10));
 
     const hr = el.shadowRoot?.querySelector('hr');
     const br = el.shadowRoot?.querySelector('br');

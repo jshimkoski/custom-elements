@@ -1,11 +1,11 @@
-import { vdomRenderer } from "./vdom";
-import { minifyCSS, getBaseResetSheet, sanitizeCSS, jitCSS } from "./style";
-import { getTransitionStyleSheet } from "../transitions";
-import type { ComponentConfig, ComponentContext, VNode, Refs } from "./types";
-import { devWarn, devError } from "./logger";
+import { vdomRenderer } from './vdom';
+import { minifyCSS, getBaseResetSheet, sanitizeCSS, jitCSS } from './style';
+import { getTransitionStyleSheet } from '../transitions';
+import type { ComponentConfig, ComponentContext, VNode, Refs } from './types';
+import { devWarn, devError } from './logger';
 
 // Module-level stack for context injection (scoped to render cycle, no global pollution)
-export const contextStack: any[] = [];
+export const contextStack: unknown[] = [];
 
 /**
  * Renders the component output.
@@ -14,16 +14,16 @@ export function renderComponent<
   S extends object,
   C extends object,
   P extends object,
-  T extends object
+  T extends object,
 >(
   shadowRoot: ShadowRoot | null,
   cfg: ComponentConfig<S, C, P, T>,
   context: ComponentContext<S, C, P, T>,
-  refs: Refs["refs"],
+  refs: Refs['refs'],
   setHtmlString: (html: string) => void,
   setLoading: (val: boolean) => void,
   setError: (err: Error | null) => void,
-  applyStyle: (html: string) => void
+  applyStyle: (html: string) => void,
 ): void {
   if (!shadowRoot) return;
 
@@ -70,20 +70,20 @@ export function renderOutput<
   S extends object,
   C extends object,
   P extends object,
-  T extends object
+  T extends object,
 >(
   shadowRoot: ShadowRoot | null,
   output: VNode | VNode[],
   context: ComponentContext<S, C, P, T>,
-  refs: Refs["refs"],
-  setHtmlString: (html: string) => void
+  refs: Refs['refs'],
+  setHtmlString: (html: string) => void,
 ): void {
   if (!shadowRoot) return;
   vdomRenderer(
     shadowRoot,
     Array.isArray(output) ? output : [output],
     context,
-    refs
+    refs,
   );
   setHtmlString(shadowRoot.innerHTML);
 }
@@ -98,7 +98,7 @@ export function requestRender(
   setLastRenderTime: (t: number) => void,
   setRenderCount: (c: number) => void,
   renderTimeoutId: ReturnType<typeof setTimeout> | null,
-  setRenderTimeoutId: (id: ReturnType<typeof setTimeout> | null) => void
+  setRenderTimeoutId: (id: ReturnType<typeof setTimeout> | null) => void,
 ): void {
   if (renderTimeoutId !== null) clearTimeout(renderTimeoutId);
 
@@ -110,20 +110,20 @@ export function requestRender(
     // Progressive warnings and limits
     if (renderCount === 15) {
       devWarn(
-        "⚠️ Component is re-rendering rapidly. This might indicate:\n" +
-          "  Common causes:\n" +
+        '⚠️ Component is re-rendering rapidly. This might indicate:\n' +
+          '  Common causes:\n' +
           '  • Event handler calling a function immediately: @click="${fn()}" should be @click="${fn}"\n' +
-          "  • State modification during render\n" +
-          "  • Missing dependencies in computed/watch\n" +
-          "  Component rendering will be throttled to prevent browser freeze."
+          '  • State modification during render\n' +
+          '  • Missing dependencies in computed/watch\n' +
+          '  Component rendering will be throttled to prevent browser freeze.',
       );
     } else if (renderCount > 20) {
       // More aggressive limit for severe infinite loops
       devError(
-        "🛑 Infinite loop detected in component render:\n" +
-          "  • This might be caused by state updates during render\n" +
-          "  • Ensure all state modifications are done in event handlers or effects\n" +
-          "Stopping runaway component render to prevent browser freeze"
+        '🛑 Infinite loop detected in component render:\n' +
+          '  • This might be caused by state updates during render\n' +
+          '  • Ensure all state modifications are done in event handlers or effects\n' +
+          'Stopping runaway component render to prevent browser freeze',
       );
       setRenderTimeoutId(null);
       return;
@@ -138,7 +138,7 @@ export function requestRender(
       renderFn();
       setRenderTimeoutId(null);
     },
-    renderCount > 10 ? 100 : 0
+    renderCount > 10 ? 100 : 0,
   ); // Add delay for rapid renders
   setRenderTimeoutId(timeoutId);
 }
@@ -150,40 +150,46 @@ export function applyStyle<
   S extends object,
   C extends object,
   P extends object,
-  T extends object
+  T extends object,
 >(
   shadowRoot: ShadowRoot | null,
   context: ComponentContext<S, C, P, T>,
   htmlString: string,
   styleSheet: CSSStyleSheet | null,
-  setStyleSheet: (sheet: CSSStyleSheet | null) => void
+  setStyleSheet: (sheet: CSSStyleSheet | null) => void,
 ): void {
   if (!shadowRoot) return;
 
   // Include rendered HTML from child component instances (if available)
   // so JIT CSS can find utility classes rendered inside child shadow DOM.
-  let aggregatedHtml = htmlString || "";
+  let aggregatedHtml = htmlString || '';
   try {
     if (shadowRoot) {
       const allEls = Array.from(
-        shadowRoot.querySelectorAll("*")
+        shadowRoot.querySelectorAll('*'),
       ) as HTMLElement[];
       for (const el of allEls) {
         try {
-          const childHtml = (el as any).lastHtmlStringForJitCSS;
-          if (childHtml && typeof childHtml === "string" && childHtml.trim()) {
-            aggregatedHtml += "\n" + childHtml;
+          const childHtml = (el as { lastHtmlStringForJitCSS?: string })
+            .lastHtmlStringForJitCSS;
+          if (childHtml && typeof childHtml === 'string' && childHtml.trim()) {
+            aggregatedHtml += '\n' + childHtml;
           }
-        } catch (e) {
+        } catch {
           // best-effort: ignore errors while reading child's cached HTML
         }
       }
     }
-  } catch (e) {}
+  } catch {
+    void 0;
+  }
 
   const jitCss = jitCSS(aggregatedHtml);
 
-  if ((!jitCss || jitCss.trim() === "") && !(context as any)._computedStyle) {
+  if (
+    (!jitCss || jitCss.trim() === '') &&
+    !(context as { _computedStyle?: string })._computedStyle
+  ) {
     setStyleSheet(null);
     shadowRoot.adoptedStyleSheets = [
       getBaseResetSheet(),
@@ -192,11 +198,11 @@ export function applyStyle<
     return;
   }
 
-  let userStyle = "";
+  let userStyle = '';
 
   // Check for precomputed style from useStyle hook
-  if ((context as any)._computedStyle) {
-    userStyle = (context as any)._computedStyle;
+  if ((context as { _computedStyle?: string })._computedStyle) {
+    userStyle = (context as { _computedStyle?: string })._computedStyle ?? '';
   }
 
   let finalStyle = sanitizeCSS(`${userStyle}\n${jitCss}\n`);
@@ -212,7 +218,7 @@ export function applyStyle<
     (sheet.cssRules.length > 0 &&
       Array.from(sheet.cssRules)
         .map((r) => r.cssText)
-        .join("") !== finalStyle);
+        .join('') !== finalStyle);
 
   if (needsUpdate) {
     sheet.replaceSync(finalStyle);

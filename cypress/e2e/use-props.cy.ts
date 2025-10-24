@@ -13,17 +13,23 @@ describe('ce-test-props E2E', () => {
 
     // Ensure value/count exist and assert their content (use first to be robust)
     cy.get('ce-test-props').should('exist');
-    cy.get('ce-test-props').shadow().find('.value').first().should('have.text', 'default');
-    cy.get('ce-test-props').shadow().find('.count').first().should('have.text', '0');
+    cy.get('ce-test-props')
+      .shadow()
+      .find('.value')
+      .first()
+      .should('have.text', 'default');
+    cy.get('ce-test-props')
+      .shadow()
+      .find('.count')
+      .first()
+      .should('have.text', '0');
 
     // Click the first increment button and ensure it doesn't error when multiple hosts exist
     cy.get('ce-test-props').shadow().find('button.inc').first().click();
 
     // We can listen for the custom event on the host element
-    cy.get('ce-test-props').then(($el) => {
-      const el = $el[0] as HTMLElement;
-      // Attach a listener and assert later (just ensure it exists)
-      expect(el).to.exist;
-    });
+    cy.get('ce-test-props')
+      .should('exist')
+      .should('have.length.greaterThan', 0);
   });
 });

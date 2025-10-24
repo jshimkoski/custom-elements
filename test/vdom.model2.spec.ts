@@ -31,9 +31,20 @@ describe('vdom.model.extra', () => {
     const listeners: any = {};
     const el = document.createElement('input');
     el.type = 'text';
-    processModelDirective('name', ['trim','number'], props, attrs, listeners, ctx, el);
+    processModelDirective(
+      'name',
+      ['trim', 'number'],
+      props,
+      attrs,
+      listeners,
+      ctx,
+      el,
+    );
     // Should create input or change listeners
-    expect(typeof listeners.input === 'function' || typeof listeners.change === 'function').toBe(true);
+    expect(
+      typeof listeners.input === 'function' ||
+        typeof listeners.change === 'function',
+    ).toBe(true);
     // Should also register composition handlers
     expect(typeof listeners.compositionstart === 'function').toBe(true);
     expect(typeof listeners.compositionend === 'function').toBe(true);

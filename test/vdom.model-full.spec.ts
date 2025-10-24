@@ -14,11 +14,18 @@ describe('vdom model full behaviors', () => {
     processModelDirective('title', [], props, attrs, listeners, ctx, el);
 
     // runtime should register an input listener
-    expect(typeof listeners.input === 'function' || typeof listeners.change === 'function').toBe(true);
+    expect(
+      typeof listeners.input === 'function' ||
+        typeof listeners.change === 'function',
+    ).toBe(true);
 
     // simulate typing
     (el as HTMLInputElement).value = 'world';
-    (listeners.input || listeners.change)({ target: el, isTrusted: true, isComposing: false });
+    (listeners.input || listeners.change)({
+      target: el,
+      isTrusted: true,
+      isComposing: false,
+    });
 
     expect(ctx._state.title).toBe('world');
   });
@@ -30,16 +37,32 @@ describe('vdom model full behaviors', () => {
     const attrs: any = {};
     const listeners: any = {};
     // Create a custom element (non-native)
-    const el = document.createElement('my-custom') as HTMLElement & { dispatchEvent: Function };
+    const el = document.createElement('my-custom') as HTMLElement & {
+      dispatchEvent: (event: Event) => boolean;
+    };
 
     // Call with arg 'value' so runtime expects update:value events
-    processModelDirective('label', [], props, attrs, listeners, ctx, el, 'value');
+    processModelDirective(
+      'label',
+      [],
+      props,
+      attrs,
+      listeners,
+      ctx,
+      el,
+      'value',
+    );
 
     // No native input listener should be registered on a custom element
-    expect(listeners.input === undefined && listeners.change === undefined).toBe(true);
+    expect(
+      listeners.input === undefined && listeners.change === undefined,
+    ).toBe(true);
 
     // Simulate the custom element dispatching the expected update event
-    const ev = new CustomEvent('update:value', { detail: 'two', bubbles: true });
+    const ev = new CustomEvent('update:value', {
+      detail: 'two',
+      bubbles: true,
+    });
     el.dispatchEvent(ev);
 
     // The implementation expects the event to have been handled by runtime wiring.

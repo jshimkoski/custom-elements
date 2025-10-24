@@ -26,9 +26,10 @@ The Custom Elements Runtime provides a powerful, intuitive functional component 
 - **🔧 Zero Configuration** - No complex setup required
 - **⚡ Automatic Reactivity** - All props are automatically reactive
 - **🎯 Type Safety** - Full TypeScript inference from function signatures
-- **📦 Destructured Props** - Clean destructuring syntax with default values
+- **📦 Props (avoid destructuring)** - Props are provided via `useProps()` with defaults and type inference. Avoid destructuring into local variables if you need reactivity — read from the `props` object or use `computed`/`watch` for derived reactive values.
 - **🚀 Strongly Typed Hooks** - React-style hooks with perfect TypeScript inference
 - **🔄 Automatic Prop Parsing** - Runtime extracts prop defaults from function signature
+- **🔄 Automatic Prop Parsing** - Runtime extracts prop defaults from your `useProps()` calls (via a short discovery render in the browser) and uses them to infer prop types and observed attributes
 - **💡 Intuitive API** - Familiar patterns similar to modern React/Vue components
 
 ## 🏗️ Basic Component Structure
@@ -36,33 +37,36 @@ The Custom Elements Runtime provides a powerful, intuitive functional component 
 The functional API follows a simple, intuitive pattern using context-based hooks:
 
 ```typescript
-import { 
-  component, 
-  html, 
+import {
+  component,
+  html,
   css,
   useProps,
-  useEmit, 
-  useOnConnected, 
-  useOnDisconnected, 
-  useOnAttributeChanged, 
+  useEmit,
+  useOnConnected,
+  useOnDisconnected,
+  useOnAttributeChanged,
   useOnError,
   useStyle,
-  when, 
-  each, 
-  ref, 
-  computed, 
-  watch, 
-  match, 
-  eventBus 
+  ref,
+  computed,
+  watch,
 } from '@jasonshimmy/custom-elements-runtime';
+
+import {
+  when,
+  each,
+  match,
+} from '@jasonshimmy/custom-elements-runtime/directives';
+import { eventBus } from '@jasonshimmy/custom-elements-runtime/event-bus';
 
 component('component-name', () => {
   // Access reactive props via useProps hook
   const props = useProps({ prop1: 'default', prop2: 0 });
-  
+
   // Get hooks with perfect TypeScript inference
   const emit = useEmit();
-  
+
   // Set up lifecycle hooks
   useOnConnected(() => console.log('Component connected!'));
   useOnDisconnected(() => console.log('Component disconnected!'));
@@ -70,7 +74,7 @@ component('component-name', () => {
     console.log(`Attribute ${name} changed from ${oldValue} to ${newValue}`);
   });
   useOnError((error) => console.error('Component error:', error));
-  
+
   // Component logic and rendering
   return html`<div>Your template</div>`;
 });
@@ -82,7 +86,6 @@ component('component-name', () => {
 component(
   tag: string,
   renderFn: () => VNode | VNode[] | Promise<VNode | VNode[]>,
-  options?: ComponentOptions
 )
 ```
 
@@ -93,7 +96,7 @@ All hooks must be called during component render and provide perfect TypeScript 
 - **`useProps(defaults)`**: Get reactive props with default values and type inference
 - **`useEmit()`**: Get the emit function for dispatching custom events
 - **`useOnConnected(callback)`**: Set up lifecycle hook for when component connects to DOM
-- **`useOnDisconnected(callback)`**: Set up lifecycle hook for when component disconnects from DOM  
+- **`useOnDisconnected(callback)`**: Set up lifecycle hook for when component disconnects from DOM
 - **`useOnAttributeChanged(callback)`**: Set up lifecycle hook for when attributes change
 - **`useOnError(callback)`**: Set up lifecycle hook for error handling
 
@@ -110,9 +113,9 @@ component('user-card', () => {
     age: 0,
     email: '',
     isActive: true,
-    tags: [] as string[]
+    tags: [] as string[],
   });
-  
+
   return html`
     <div class="user-card">
       <h3>${props.name}</h3>
@@ -120,17 +123,19 @@ component('user-card', () => {
       <p>Email: ${props.email}</p>
       <p>Status: ${props.isActive ? 'Active' : 'Inactive'}</p>
       <ul>
-        ${props.tags.map(tag => html`<li>${tag}</li>`)}
+        ${props.tags.map((tag) => html`<li>${tag}</li>`)}
       </ul>
     </div>
   `;
 });
 ```
 
+> Implementation note: The runtime performs a lightweight "discovery render" in browser environments to detect `useProps()` default values and populate the component config (including `observedAttributes`). This discovery step is skipped during SSR (no `window`), so defaults may be discovered on the first real render server-side. Always call `useProps()` during the component render (not at module top-level) so the runtime can pick up defaults correctly.
+
 ### Usage in HTML
 
 ```html
-<user-card 
+<user-card
   name="John Doe"
   age="30"
   email="john@example.com"
@@ -142,11 +147,16 @@ component('user-card', () => {
 ### Automatic Type Inference
 
 The runtime automatically:
+
 - ✅ Extracts default values from useProps defaults object
 - ✅ Infers prop types from default values and TypeScript annotations
 - ✅ Creates reactive Proxy for all props with automatic dependency tracking
 - ✅ Converts attribute names (kebab-case) to prop names (camelCase)
 - ✅ Handles type conversion (String, Number, Boolean)
+
+Note about destructuring props
+
+- ⚠️ If you destructure props (for example `const { foo } = useProps({ foo: 0 })`) you receive a copy of the current value. That local variable will not stay reactive — updates to the prop will not update the previously-destructured variable. To keep reactivity, access props via the returned `props` object (for example `props.foo`) or use `computed`/`watch` to derive reactive values.
 
 ## 🚀 Event Emission
 
@@ -156,7 +166,7 @@ Use the `useEmit()` hook to get a strongly typed emit function:
 component('interactive-button', () => {
   const props = useProps({ label: 'Click me', disabled: false });
   const emit = useEmit();
-  
+
   const handleClick = () => {
     if (!props.disabled) {
       // Emit with type safety
@@ -166,10 +176,7 @@ component('interactive-button', () => {
   };
 
   return html`
-    <button 
-      :disabled="${props.disabled}"
-      @click="${handleClick}"
-    >
+    <button :disabled="${props.disabled}" @click="${handleClick}">
       ${props.label}
     </button>
   `;
@@ -195,27 +202,29 @@ component('lifecycle-demo', () => {
   const emit = useEmit();
 
   const props = useProps({ data: [] });
-  
+
   // Set up lifecycle hooks
   useOnConnected(() => {
     console.log('Component mounted to DOM');
     // Initialize external resources, start timers, etc.
     emit('component-ready');
   });
-  
+
   useOnDisconnected(() => {
     console.log('Component removed from DOM');
     // Clean up resources, stop timers, etc.
     emit('component-destroyed');
   });
-  
+
   useOnAttributeChanged((name, oldValue, newValue) => {
-    console.log(`Attribute '${name}' changed from '${oldValue}' to '${newValue}'`);
+    console.log(
+      `Attribute '${name}' changed from '${oldValue}' to '${newValue}'`,
+    );
     if (name === 'data') {
       emit('data-attribute-changed', { oldValue, newValue });
     }
   });
-  
+
   useOnError((error) => {
     console.error('Component error:', error);
     emit('component-error', { error: error.message });
@@ -226,7 +235,7 @@ component('lifecycle-demo', () => {
       <h3>Lifecycle Demo</h3>
       <p>Data items: ${props.data.length}</p>
       <ul>
-        ${props.data.map(item => html`<li>${item}</li>`)}
+        ${props.data.map((item) => html`<li>${item}</li>`)}
       </ul>
     </div>
   `;
@@ -252,10 +261,10 @@ component('api-data', () => {
   const fetchData = async () => {
     abortController = new AbortController();
     loading.value = true;
-    
+
     try {
       const response = await fetch(props.endpoint, {
-        signal: abortController.signal
+        signal: abortController.signal,
       });
       data.value = await response.json();
       emit('data-loaded', data.value);
@@ -271,13 +280,13 @@ component('api-data', () => {
   useOnConnected(() => {
     fetchData();
   });
-  
+
   useOnDisconnected(() => {
     if (abortController) {
       abortController.abort();
     }
   });
-  
+
   useOnError((error) => {
     console.error('API component error:', error);
     loading.value = false;
@@ -286,9 +295,10 @@ component('api-data', () => {
   return html`
     <div class="api-data">
       ${when(loading.value, html`<p>Loading...</p>`)}
-      ${when(data.value, html`
-        <pre>${JSON.stringify(data.value, null, 2)}</pre>
-      `)}
+      ${when(
+        data.value,
+        html` <pre>${JSON.stringify(data.value, null, 2)}</pre> `,
+      )}
     </div>
   `;
 });
@@ -309,7 +319,11 @@ The runtime escapes interpolated values by default to keep the DOM safe from XSS
 ### Examples
 
 ```ts
-import { html, unsafeHTML, decodeEntities } from '@jasonshimmy/custom-elements-runtime';
+import {
+  html,
+  unsafeHTML,
+  decodeEntities,
+} from '@jasonshimmy/custom-elements-runtime';
 
 // Literal entity decoding inside template text (the compiler decodes literal template text automatically)
 const vnode = html`<p>This template literal contains &lt;escaped&gt; text</p>`;
@@ -337,31 +351,31 @@ If you only want to display encoded HTML-like text (for example, to show `<scrip
 Create reactive state outside components that can be shared:
 
 ```typescript
-
 // Shared reactive state
 const userState = ref({
   name: 'John',
   email: 'john@example.com',
   preferences: {
     theme: 'dark',
-    notifications: true
-  }
+    notifications: true,
+  },
 });
 
 // Computed values
-const displayName = computed(() => 
-  userState.value.name || 'Anonymous'
-);
+const displayName = computed(() => userState.value.name || 'Anonymous');
 
 // Watchers
-watch(() => userState.value.email, (newEmail, oldEmail) => {
-  console.log(`Email changed from ${oldEmail} to ${newEmail}`);
-});
+watch(
+  () => userState.value.email,
+  (newEmail, oldEmail) => {
+    console.log(`Email changed from ${oldEmail} to ${newEmail}`);
+  },
+);
 
 // Components can access and modify shared state
 component('user-profile', () => {
   const emit = useEmit();
-  
+
   const updateName = (newName: string) => {
     userState.value.name = newName;
     emit('name-updated', { name: newName });
@@ -370,8 +384,8 @@ component('user-profile', () => {
   return html`
     <div>
       <h2>${displayName.value}</h2>
-      <input 
-        type="text" 
+      <input
+        type="text"
         :value="${userState.value.name}"
         @input="${(e) => updateName(e.target.value)}"
         placeholder="Enter your name"
@@ -390,14 +404,14 @@ For component-specific state, create reactive state within the component:
 component('counter', () => {
   const props = useProps({ initialValue: 0, step: 1 });
   const emit = useEmit();
-  
+
   // Component-scoped reactive state
   const count = ref(props.initialValue);
   const increment = () => {
     count.value += props.step;
     emit('count-changed', { count: count.value });
   };
-  
+
   const decrement = () => {
     count.value -= props.step;
     emit('count-changed', { count: count.value });
@@ -428,7 +442,7 @@ component('dynamic-input', () => {
     type: 'text',
     value: '',
     placeholder: 'Enter text...',
-    disabled: false
+    disabled: false,
   });
 
   return html`
@@ -453,15 +467,16 @@ component('complex-props', () => {
   const props = useProps({
     config: {},
     items: [] as any[],
-    onItemClick: null as ((item: any) => void) | null
+    onItemClick: null as ((item: any) => void) | null,
   });
-  
+
   return html`
-    <custom-element 
-      :bind="${{ 
-        config: props.config, 
+    <custom-element
+      :bind="${{
+        config: props.config,
         items: props.items,
-        onItemClick: props.onItemClick || ((item) => emit('item-clicked', item))
+        onItemClick:
+          props.onItemClick || ((item) => emit('item-clicked', item)),
       }}"
     ></custom-element>
   `;
@@ -477,17 +492,17 @@ component('status-card', () => {
   const props = useProps({
     status: 'normal',
     size: 'medium',
-    interactive: false
+    interactive: false,
   });
   const emit = useEmit();
   return html`
-    <div 
+    <div
       :class="${{
         'status-card': true,
         [`status-${props.status}`]: true,
         [`size-${props.size}`]: true,
-        'interactive': props.interactive,
-        'clickable': props.interactive
+        interactive: props.interactive,
+        clickable: props.interactive,
       }}"
       @click="${props.interactive ? () => emit('card-clicked') : null}"
     >
@@ -507,20 +522,17 @@ component('progress-bar', () => {
     progress: 0,
     color: '#007bff',
     height: '8px',
-    animated: false
+    animated: false,
   });
   return html`
-    <div 
-      class="progress-container"
-      :style="${{ height: props.height }}"
-    >
-      <div 
+    <div class="progress-container" :style="${{ height: props.height }}">
+      <div
         class="progress-bar"
         :class="${{ animated: props.animated }}"
         :style="${{
           width: `${Math.min(100, Math.max(0, props.progress))}%`,
           backgroundColor: props.color,
-          transition: props.animated ? 'width 0.3s ease' : 'none'
+          transition: props.animated ? 'width 0.3s ease' : 'none',
         }}"
       ></div>
     </div>
@@ -538,7 +550,7 @@ component('form-field', () => {
   const props = useProps({
     label: 'Name',
     type: 'text',
-    initialValue: ''
+    initialValue: '',
   });
   const value = ref(props.initialValue);
 
@@ -565,7 +577,7 @@ component('controlled-input', () => {
   const emit = useEmit();
   const props = useProps({
     modelValue: '',
-    label: ''
+    label: '',
   });
 
   return html`
@@ -573,7 +585,8 @@ component('controlled-input', () => {
       ${props.label}
       <input
         value="${props.modelValue}"
-        @input="${(e: Event) => emit('update:modelValue', (e.target as HTMLInputElement).value)}"
+        @input="${(e: Event) =>
+          emit('update:modelValue', (e.target as HTMLInputElement).value)}"
       />
     </label>
   `;
@@ -589,7 +602,7 @@ component('multi-select', () => {
   const emit = useEmit();
   const props = useProps({
     options: [] as { label: string; value: string }[],
-    selectedValues: [] as string[]
+    selectedValues: [] as string[],
   });
   const selectedItems = ref<string[]>([]);
   const multiple = ref(true);
@@ -597,7 +610,7 @@ component('multi-select', () => {
   const isSelected = (value: string) => props.selectedValues.includes(value);
   const toggleSelection = (value: string) => {
     const newSelection = isSelected(value)
-      ? props.selectedValues.filter(item => item !== value)
+      ? props.selectedValues.filter((item) => item !== value)
       : [...props.selectedValues, value];
     props.selectedValues = newSelection;
     emit('selection-changed', newSelection);
@@ -605,16 +618,19 @@ component('multi-select', () => {
 
   return html`
     <div class="multi-select">
-      ${each(props.options, (option) => html`
-        <label class="option">
-          <input
-            type="checkbox"
-            checked="${isSelected(option.value)}"
-            @change="${() => toggleSelection(option.value)}"
-          />
-          ${option.label}
-        </label>
-      `)}
+      ${each(
+        props.options,
+        (option) => html`
+          <label class="option">
+            <input
+              type="checkbox"
+              checked="${isSelected(option.value)}"
+              @change="${() => toggleSelection(option.value)}"
+            />
+            ${option.label}
+          </label>
+        `,
+      )}
       <p>Selected: ${props.selectedValues.join(', ')}</p>
     </div>
   `;
@@ -629,7 +645,7 @@ Comprehensive event handling with modifiers:
 component('event-demo', () => {
   const props = useProps({ disabled: false });
   const emit = useEmit();
-  
+
   const handleKeydown = (e: KeyboardEvent) => {
     if (e.key === 'Enter') {
       emit('enter-pressed', { value: (e.target as HTMLInputElement).value });
@@ -656,8 +672,8 @@ component('event-demo', () => {
         @blur="${() => emit('input-blurred')}"
         @input="${(e) => emit('input-changed', e.target.value)}"
       />
-      <button 
-        type="submit" 
+      <button
+        type="submit"
         :disabled="${props.disabled}"
         @click="${() => emit('submit-clicked')}"
       >
@@ -696,7 +712,7 @@ component('focusable-input', () => {
   return html`
     <div class="input-container">
       <input
-        :ref="${(el) => { 
+        :ref="${(el) => {
           inputRef = el;
           if (props.autoFocus) el.focus();
         }}"
@@ -715,36 +731,49 @@ component('focusable-input', () => {
 ### Using `when` for Conditional Rendering
 
 ```typescript
-
 component('conditional-content', () => {
   const props = useProps({
     isLoggedIn: false,
     userRole: 'guest',
-    showAdvanced: false
+    showAdvanced: false,
   });
   const emit = useEmit();
-  
+
   return html`
     <div>
-      ${when(props.isLoggedIn, html`
-        <h2>Welcome back!</h2>
-        <p>Role: ${props.userRole}</p>
-        ${when(props.userRole === 'admin', html`
-          <button @click="${() => emit('admin-action')}">Admin Panel</button>
-        `)}
-        ${when(props.showAdvanced, html`
-          <div class="advanced-settings">
-            <h3>Advanced Settings</h3>
-            <!-- Advanced content -->
+      ${when(
+        props.isLoggedIn,
+        html`
+          <h2>Welcome back!</h2>
+          <p>Role: ${props.userRole}</p>
+          ${when(
+            props.userRole === 'admin',
+            html`
+              <button @click="${() => emit('admin-action')}">
+                Admin Panel
+              </button>
+            `,
+          )}
+          ${when(
+            props.showAdvanced,
+            html`
+              <div class="advanced-settings">
+                <h3>Advanced Settings</h3>
+                <!-- Advanced content -->
+              </div>
+            `,
+          )}
+        `,
+      )}
+      ${when(
+        !props.isLoggedIn,
+        html`
+          <div class="login-prompt">
+            <h2>Please log in</h2>
+            <button @click="${() => emit('login-requested')}">Login</button>
           </div>
-        `)}
-      `)}
-      ${when(!props.isLoggedIn, html`
-        <div class="login-prompt">
-          <h2>Please log in</h2>
-          <button @click="${() => emit('login-requested')}">Login</button>
-        </div>
-      `)}
+        `,
+      )}
     </div>
   `;
 });
@@ -762,6 +791,7 @@ ${when(isVisible, () => html`<div>${expensive()}</div>`) }
 ```
 
 Key points:
+
 - This behavior is implemented entirely at runtime. There is no compile-time transform required or used.
 - Existing code using `when(cond, html`...`)` continues to work. Switch to the factory form when you need guarded evaluation.
 - The factory will only be executed when the condition is truthy. The runtime ensures stable anchor blocks so DOM updates remain predictable.
@@ -789,42 +819,53 @@ The runtime preserves intentional falsy children inside conditional blocks. Valu
 ### Using `match` for Complex Conditionals
 
 ```typescript
-
 component('status-indicator', () => {
   const props = useProps({
     status: 'pending' as 'pending' | 'success' | 'error' | 'warning',
-    message: ''
+    message: '',
   });
   const emit = useEmit();
-  
+
   return html`
     <div class="status-indicator">
       ${match()
-        .when(props.status === 'pending', html`
-          <div class="pending">
-            <span class="icon">⏳</span>
-            <span>Processing...</span>
-          </div>
-        `)
-        .when(props.status === 'success', html`
-          <div class="success">
-            <span class="icon">✅</span>
-            <span>Success: ${props.message}</span>
-          </div>
-        `)
-        .when(props.status === 'error', html`
-          <div class="error">
-            <span class="icon">❌</span>
-            <span>Error: ${props.message}</span>
-            <button @click="${() => emit('retry')}">Retry</button>
-          </div>
-        `)
-        .when(props.status === 'warning', html`
-          <div class="warning">
-            <span class="icon">⚠️</span>
-            <span>Warning: ${props.message}</span>
-          </div>
-        `)
+        .when(
+          props.status === 'pending',
+          html`
+            <div class="pending">
+              <span class="icon">⏳</span>
+              <span>Processing...</span>
+            </div>
+          `,
+        )
+        .when(
+          props.status === 'success',
+          html`
+            <div class="success">
+              <span class="icon">✅</span>
+              <span>Success: ${props.message}</span>
+            </div>
+          `,
+        )
+        .when(
+          props.status === 'error',
+          html`
+            <div class="error">
+              <span class="icon">❌</span>
+              <span>Error: ${props.message}</span>
+              <button @click="${() => emit('retry')}">Retry</button>
+            </div>
+          `,
+        )
+        .when(
+          props.status === 'warning',
+          html`
+            <div class="warning">
+              <span class="icon">⚠️</span>
+              <span>Warning: ${props.message}</span>
+            </div>
+          `,
+        )
         .otherwise(html`
           <div class="unknown">
             <span>Unknown status: ${props.status}</span>
@@ -850,20 +891,19 @@ const node = match()
 ### Using `each` for List Rendering
 
 ```typescript
-
 component('todo-list', () => {
   const props = useProps({
     todos: [] as Array<{ id: string; text: string; completed: boolean }>,
-    filter: 'all' as 'all' | 'active' | 'completed'
+    filter: 'all' as 'all' | 'active' | 'completed',
   });
   const emit = useEmit();
-  
+
   const filteredTodos = computed(() => {
     switch (props.filter) {
       case 'active':
-        return props.todos.filter(todo => !todo.completed);
+        return props.todos.filter((todo) => !todo.completed);
       case 'completed':
-        return props.todos.filter(todo => todo.completed);
+        return props.todos.filter((todo) => todo.completed);
       default:
         return props.todos;
     }
@@ -880,51 +920,49 @@ component('todo-list', () => {
   return html`
     <div class="todo-list">
       <div class="filters">
-        <button 
+        <button
           :class="${{ active: props.filter === 'all' }}"
           @click="${() => emit('filter-changed', 'all')}"
         >
           All
         </button>
-        <button 
+        <button
           :class="${{ active: props.filter === 'active' }}"
           @click="${() => emit('filter-changed', 'active')}"
         >
           Active
         </button>
-        <button 
+        <button
           :class="${{ active: props.filter === 'completed' }}"
           @click="${() => emit('filter-changed', 'completed')}"
         >
           Completed
         </button>
       </div>
-      
+
       <ul class="todo-items">
-        ${each(filteredTodos.value, (todo) => html`
-          <li 
-            key="${todo.id}"
-            :class="${{ completed: todo.completed }}"
-          >
-            <input
-              type="checkbox"
-              :checked="${todo.completed}"
-              @change="${() => toggleTodo(todo.id)}"
-            />
-            <span class="todo-text">${todo.text}</span>
-            <button 
-              class="delete-btn"
-              @click="${() => deleteTodo(todo.id)}"
-            >
-              Delete
-            </button>
-          </li>
-        `)}
+        ${each(
+          filteredTodos.value,
+          (todo) => html`
+            <li key="${todo.id}" :class="${{ completed: todo.completed }}">
+              <input
+                type="checkbox"
+                :checked="${todo.completed}"
+                @change="${() => toggleTodo(todo.id)}"
+              />
+              <span class="todo-text">${todo.text}</span>
+              <button class="delete-btn" @click="${() => deleteTodo(todo.id)}">
+                Delete
+              </button>
+            </li>
+          `,
+        )}
       </ul>
-      
-      ${when(filteredTodos.value.length === 0, html`
-        <p class="empty-state">No todos found</p>
-      `)}
+
+      ${when(
+        filteredTodos.value.length === 0,
+        html` <p class="empty-state">No todos found</p> `,
+      )}
     </div>
   `;
 });
@@ -935,55 +973,71 @@ component('todo-list', () => {
 ### Static Styles
 
 ```typescript
-import { component, html, css, useStyle } from '@jasonshimmy/custom-elements-runtime';
+import {
+  component,
+  html,
+  css,
+  useStyle,
+} from '@jasonshimmy/custom-elements-runtime';
 
 component('styled-button', () => {
   const props = useProps({
     variant: 'primary' as 'primary' | 'secondary' | 'danger',
-    size: 'medium' as 'small' | 'medium' | 'large'
+    size: 'medium' as 'small' | 'medium' | 'large',
   });
   const emit = useEmit();
-  
-  useStyle(() => css`
-    :host {
-      display: inline-block;
-    }
-    
-    .btn {
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      font-family: inherit;
-      transition: all 0.2s ease;
-    }
-    
-    .btn-small { padding: 4px 8px; font-size: 12px; }
-    .btn-medium { padding: 8px 16px; font-size: 14px; }
-    .btn-large { padding: 12px 24px; font-size: 16px; }
-    
-    .btn-primary {
-      background: #007bff;
-      color: white;
-    }
-    
-    .btn-secondary {
-      background: #6c757d;
-      color: white;
-    }
-    
-    .btn-danger {
-      background: #dc3545;
-      color: white;
-    }
-    
-    .btn:hover {
-      opacity: 0.9;
-      transform: translateY(-1px);
-    }
-  `);
-  
+
+  useStyle(
+    () => css`
+      :host {
+        display: inline-block;
+      }
+
+      .btn {
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-family: inherit;
+        transition: all 0.2s ease;
+      }
+
+      .btn-small {
+        padding: 4px 8px;
+        font-size: 12px;
+      }
+      .btn-medium {
+        padding: 8px 16px;
+        font-size: 14px;
+      }
+      .btn-large {
+        padding: 12px 24px;
+        font-size: 16px;
+      }
+
+      .btn-primary {
+        background: #007bff;
+        color: white;
+      }
+
+      .btn-secondary {
+        background: #6c757d;
+        color: white;
+      }
+
+      .btn-danger {
+        background: #dc3545;
+        color: white;
+      }
+
+      .btn:hover {
+        opacity: 0.9;
+        transform: translateY(-1px);
+      }
+    `,
+  );
+
   return html`
-    <button 
+    <button
       class="btn btn-${props.variant} btn-${props.size}"
       @click="${() => emit('click')}"
     >
@@ -999,40 +1053,46 @@ component('styled-button', () => {
 component('themed-card', () => {
   const props = useProps({
     theme: 'light' as 'light' | 'dark',
-    accentColor: '#007bff'
+    accentColor: '#007bff',
   });
   const emit = useEmit();
-  
-  useStyle(() => css`
-    :host {
-      display: block;
-      --accent-color: ${props.accentColor};
-      --bg-color: ${props.theme === 'dark' ? '#2d3748' : '#ffffff'};
-      --text-color: ${props.theme === 'dark' ? '#e2e8f0' : '#2d3748'};
-      --border-color: ${props.theme === 'dark' ? '#4a5568' : '#e2e8f0'};
-    }
-    
-    .card {
-      background: var(--bg-color);
-      color: var(--text-color);
-      border: 1px solid var(--border-color);
-      border-radius: 8px;
-      overflow: hidden;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    
-    .card-header {
-      padding: 16px;
-      border-bottom: 1px solid var(--border-color);
-      background: linear-gradient(135deg, var(--accent-color), color-mix(in srgb, var(--accent-color) 80%, white));
-      color: white;
-    }
-    
-    .card-content {
-      padding: 16px;
-    }
-  `);
-  
+
+  useStyle(
+    () => css`
+      :host {
+        display: block;
+        --accent-color: ${props.accentColor};
+        --bg-color: ${props.theme === 'dark' ? '#2d3748' : '#ffffff'};
+        --text-color: ${props.theme === 'dark' ? '#e2e8f0' : '#2d3748'};
+        --border-color: ${props.theme === 'dark' ? '#4a5568' : '#e2e8f0'};
+      }
+
+      .card {
+        background: var(--bg-color);
+        color: var(--text-color);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+
+      .card-header {
+        padding: 16px;
+        border-bottom: 1px solid var(--border-color);
+        background: linear-gradient(
+          135deg,
+          var(--accent-color),
+          color-mix(in srgb, var(--accent-color) 80%, white)
+        );
+        color: white;
+      }
+
+      .card-content {
+        padding: 16px;
+      }
+    `,
+  );
+
   return html`
     <div class="card">
       <div class="card-header">
@@ -1063,14 +1123,16 @@ The `useStyle` hook provides a powerful way to apply styles reactively based on 
 ```typescript
 component('styled-component', () => {
   const props = useProps({ color: 'blue' });
-  
-  useStyle(() => css`
-    :host {
-      background-color: ${props.color};
-      border: 1px solid ${props.color};
-    }
-  `);
-  
+
+  useStyle(
+    () => css`
+      :host {
+        background-color: ${props.color};
+        border: 1px solid ${props.color};
+      }
+    `,
+  );
+
   return html`<div>Styled content</div>`;
 });
 ```
@@ -1081,31 +1143,34 @@ component('styled-component', () => {
 component('interactive-button', () => {
   const props = useProps({ initialColor: 'blue' });
   const buttonState = ref({ color: props.initialColor, hovered: false });
-  
-  useStyle(() => css`
-    :host {
-      --button-color: ${buttonState.color};
-      --opacity: ${buttonState.hovered ? '0.8' : '1'};
-    }
-    
-    .button {
-      background: var(--button-color);
-      opacity: var(--opacity);
-      transition: all 0.2s ease;
-      border: none;
-      padding: 12px 24px;
-      border-radius: 4px;
-      color: white;
-      cursor: pointer;
-    }
-  `);
-  
+
+  useStyle(
+    () => css`
+      :host {
+        --button-color: ${buttonState.color};
+        --opacity: ${buttonState.hovered ? '0.8' : '1'};
+      }
+
+      .button {
+        background: var(--button-color);
+        opacity: var(--opacity);
+        transition: all 0.2s ease;
+        border: none;
+        padding: 12px 24px;
+        border-radius: 4px;
+        color: white;
+        cursor: pointer;
+      }
+    `,
+  );
+
   return html`
-    <button 
+    <button
       class="button"
-      @mouseenter="${() => buttonState.hovered = true}"
-      @mouseleave="${() => buttonState.hovered = false}"
-      @click="${() => buttonState.color = buttonState.color === 'blue' ? 'green' : 'blue'}"
+      @mouseenter="${() => (buttonState.hovered = true)}"
+      @mouseleave="${() => (buttonState.hovered = false)}"
+      @click="${() =>
+        (buttonState.color = buttonState.color === 'blue' ? 'green' : 'blue')}"
     >
       Toggle Color
     </button>
@@ -1117,45 +1182,50 @@ component('interactive-button', () => {
 
 ```typescript
 component('adaptive-card', () => {
-  const props = useProps({ 
+  const props = useProps({
     theme: 'light' as 'light' | 'dark',
     size: 'medium' as 'small' | 'medium' | 'large',
-    highlighted: false
+    highlighted: false,
   });
   const cardState = ref({ expanded: false });
-  
+
   useStyle(() => {
     const isDark = props.theme === 'dark';
     const isLarge = props.size === 'large';
     const isHighlighted = props.highlighted;
-    
+
     return css`
       :host {
         display: block;
         transition: all 0.3s ease;
         transform: ${cardState.expanded ? 'scale(1.02)' : 'scale(1)'};
       }
-      
+
       .card {
         background: ${isDark ? '#2d3748' : '#ffffff'};
         color: ${isDark ? '#e2e8f0' : '#2d3748'};
-        border: 2px solid ${isHighlighted ? '#007bff' : (isDark ? '#4a5568' : '#e2e8f0')};
+        border: 2px solid
+          ${isHighlighted ? '#007bff' : isDark ? '#4a5568' : '#e2e8f0'};
         border-radius: ${isLarge ? '12px' : '8px'};
         padding: ${isLarge ? '24px' : '16px'};
-        box-shadow: ${isHighlighted ? '0 4px 12px rgba(0,123,255,0.3)' : '0 2px 4px rgba(0,0,0,0.1)'};
+        box-shadow: ${isHighlighted
+          ? '0 4px 12px rgba(0,123,255,0.3)'
+          : '0 2px 4px rgba(0,0,0,0.1)'};
         font-size: ${isLarge ? '18px' : '14px'};
       }
-      
+
       .card:hover {
-        box-shadow: ${isHighlighted ? '0 6px 20px rgba(0,123,255,0.4)' : '0 4px 8px rgba(0,0,0,0.2)'};
+        box-shadow: ${isHighlighted
+          ? '0 6px 20px rgba(0,123,255,0.4)'
+          : '0 4px 8px rgba(0,0,0,0.2)'};
       }
     `;
   });
-  
+
   return html`
-    <div 
+    <div
       class="card"
-      @click="${() => cardState.expanded = !cardState.expanded}"
+      @click="${() => (cardState.expanded = !cardState.expanded)}"
     >
       <slot></slot>
     </div>
@@ -1174,18 +1244,26 @@ component('adaptive-card', () => {
 // Good: Using CSS custom properties for consistency
 component('themed-component', () => {
   const props = useProps({ primaryColor: '#007bff' });
-  
-  useStyle(() => css`
-    :host {
-      --primary: ${props.primaryColor};
-      --primary-hover: color-mix(in srgb, var(--primary) 80%, black);
-      --primary-light: color-mix(in srgb, var(--primary) 20%, white);
-    }
-    
-    .button { background: var(--primary); }
-    .button:hover { background: var(--primary-hover); }
-    .badge { background: var(--primary-light); }
-  `);
+
+  useStyle(
+    () => css`
+      :host {
+        --primary: ${props.primaryColor};
+        --primary-hover: color-mix(in srgb, var(--primary) 80%, black);
+        --primary-light: color-mix(in srgb, var(--primary) 20%, white);
+      }
+
+      .button {
+        background: var(--primary);
+      }
+      .button:hover {
+        background: var(--primary-hover);
+      }
+      .badge {
+        background: var(--primary-light);
+      }
+    `,
+  );
 });
 ```
 
@@ -1201,14 +1279,14 @@ component('form-input', () => {
     value: '',
     type: 'text',
     required: false,
-    error: ''
+    error: '',
   });
   const emit = useEmit();
-  
+
   const handleInput = (e: Event) => {
     const input = e.target as HTMLInputElement;
     emit('update:value', input.value);
-    
+
     // Emit validation event
     if (props.required && !input.value.trim()) {
       emit('validation-error', 'This field is required');
@@ -1231,9 +1309,10 @@ component('form-input', () => {
         @input="${handleInput}"
         @blur="${handleInput}"
       />
-      ${when(props.error, html`
-        <span class="error-message">${props.error}</span>
-      `)}
+      ${when(
+        props.error,
+        html` <span class="error-message">${props.error}</span> `,
+      )}
     </div>
   `;
 });
@@ -1244,13 +1323,13 @@ component('contact-form', () => {
   const formData = ref({
     name: '',
     email: '',
-    message: ''
+    message: '',
   });
-  
+
   const errors = ref({
     name: '',
     email: '',
-    message: ''
+    message: '',
   });
 
   const handleInputChange = (field: string, value: string) => {
@@ -1267,14 +1346,19 @@ component('contact-form', () => {
 
   const submitForm = () => {
     // Validate all fields
-    const hasErrors = Object.values(errors.value).some(error => error);
+    const hasErrors = Object.values(errors.value).some((error) => error);
     if (!hasErrors) {
       emit('form-submitted', formData.value);
     }
   };
 
   return html`
-    <form @submit="${(e) => { e.preventDefault(); submitForm(); }}">
+    <form
+      @submit="${(e) => {
+        e.preventDefault();
+        submitForm();
+      }}"
+    >
       <form-input
         label="Name"
         :value="${formData.value.name}"
@@ -1284,7 +1368,7 @@ component('contact-form', () => {
         @validation-error="${(error) => handleValidationError('name', error)}"
         @validation-success="${() => handleValidationError('name', '')}"
       ></form-input>
-      
+
       <form-input
         label="Email"
         type="email"
@@ -1295,17 +1379,18 @@ component('contact-form', () => {
         @validation-error="${(error) => handleValidationError('email', error)}"
         @validation-success="${() => handleValidationError('email', '')}"
       ></form-input>
-      
+
       <form-input
         label="Message"
         :value="${formData.value.message}"
         required="true"
         :error="${errors.value.message}"
         @update:value="${(value) => handleInputChange('message', value)}"
-        @validation-error="${(error) => handleValidationError('message', error)}"
+        @validation-error="${(error) =>
+          handleValidationError('message', error)}"
         @validation-success="${() => handleValidationError('message', '')}"
       ></form-input>
-      
+
       <button type="submit">Send Message</button>
     </form>
   `;
@@ -1315,12 +1400,11 @@ component('contact-form', () => {
 ### Global State Management
 
 ```typescript
-
 // Global state store
 const appState = ref({
   user: null,
   notifications: [],
-  theme: 'light'
+  theme: 'light',
 });
 
 // Global actions
@@ -1336,59 +1420,69 @@ const userActions = {
   addNotification: (notification: any) => {
     appState.value.notifications.push({
       id: Date.now(),
-      ...notification
+      ...notification,
     });
-  }
+  },
 };
 
 // Components can access global state
 component('user-avatar', () => {
   const emit = useEmit();
-  
+
   return html`
     <div class="user-avatar">
-      ${when(appState.value.user, html`
-        <img 
-          src="${appState.value.user.avatar}" 
-          alt="${appState.value.user.name}"
-          @click="${() => emit('profile-clicked')}"
-        />
-        <span>${appState.value.user.name}</span>
-      `, html`
-        <button @click="${() => emit('login-requested')}">
-          Login
-        </button>
-      `)}
+      ${when(
+        appState.value.user,
+        html`
+          <img
+            src="${appState.value.user.avatar}"
+            alt="${appState.value.user.name}"
+            @click="${() => emit('profile-clicked')}"
+          />
+          <span>${appState.value.user.name}</span>
+        `,
+        html`
+          <button @click="${() => emit('login-requested')}">Login</button>
+        `,
+      )}
     </div>
   `;
 });
 
 component('notification-center', () => {
   const emit = useEmit();
-  
+
   const dismissNotification = (id: number) => {
     appState.value.notifications = appState.value.notifications.filter(
-      n => n.id !== id
+      (n) => n.id !== id,
     );
   };
 
   return html`
     <div class="notification-center">
-      ${when(appState.value.notifications.length > 0, html`
-        <div class="notifications">
-          ${each(appState.value.notifications, (notification) => html`
-            <div 
-              key="${notification.id}"
-              class="notification notification-${notification.type}"
-            >
-              <span>${notification.message}</span>
-              <button @click="${() => dismissNotification(notification.id)}">
-                ×
-              </button>
-            </div>
-          `)}
-        </div>
-      `)}
+      ${when(
+        appState.value.notifications.length > 0,
+        html`
+          <div class="notifications">
+            ${each(
+              appState.value.notifications,
+              (notification) => html`
+                <div
+                  key="${notification.id}"
+                  class="notification notification-${notification.type}"
+                >
+                  <span>${notification.message}</span>
+                  <button
+                    @click="${() => dismissNotification(notification.id)}"
+                  >
+                    ×
+                  </button>
+                </div>
+              `,
+            )}
+          </div>
+        `,
+      )}
     </div>
   `;
 });
@@ -1404,27 +1498,29 @@ The functional API uses hooks for all component features:
 component('advanced-component', () => {
   const props = useProps({ data: [] as any[] });
   const emit = useEmit();
-  
+
   // Set up lifecycle hooks
   useOnConnected(() => {
     console.log('Component connected to DOM');
   });
-  
+
   useOnDisconnected(() => {
     console.log('Component disconnected from DOM');
   });
-  
+
   useOnError((error: Error) => {
     console.error('Component error:', error);
   });
-  
+
   // Apply custom styling
-  useStyle(() => css`
-    :host {
-      display: block;
-      padding: 16px;
-    }
-  `);
+  useStyle(
+    () => css`
+      :host {
+        display: block;
+        padding: 16px;
+      }
+    `,
+  );
 
   return html`<div>${props.data.length} items</div>`;
 });
@@ -1444,14 +1540,14 @@ component('async-data', () => {
 
   const fetchData = async () => {
     if (!props.userId) return;
-    
+
     loading.value = true;
     error.value = null;
-    
+
     try {
       const response = await fetch(`/api/users/${props.userId}`);
       if (!response.ok) throw new Error('Failed to fetch user');
-      
+
       data.value = await response.json();
       emit('data-loaded', data.value);
     } catch (err) {
@@ -1467,24 +1563,31 @@ component('async-data', () => {
 
   return html`
     <div class="async-data">
-      ${when(loading.value, html`
-        <div class="loading-spinner">Loading user data...</div>
-      `)}
-      
-      ${when(error.value, html`
-        <div class="error-state">
-          <p>Error: ${error.value}</p>
-          <button @click="${fetchData}">Retry</button>
-        </div>
-      `)}
-      
-      ${when(data.value && !loading.value, html`
-        <div class="user-data">
-          <h2>${data.value.name}</h2>
-          <p>${data.value.email}</p>
-          <p>Joined: ${new Date(data.value.createdAt).toLocaleDateString()}</p>
-        </div>
-      `)}
+      ${when(
+        loading.value,
+        html` <div class="loading-spinner">Loading user data...</div> `,
+      )}
+      ${when(
+        error.value,
+        html`
+          <div class="error-state">
+            <p>Error: ${error.value}</p>
+            <button @click="${fetchData}">Retry</button>
+          </div>
+        `,
+      )}
+      ${when(
+        data.value && !loading.value,
+        html`
+          <div class="user-data">
+            <h2>${data.value.name}</h2>
+            <p>${data.value.email}</p>
+            <p>
+              Joined: ${new Date(data.value.createdAt).toLocaleDateString()}
+            </p>
+          </div>
+        `,
+      )}
     </div>
   `;
 });
@@ -1507,10 +1610,10 @@ describe('Streamlined Component', () => {
     component('test-component', () => {
       const props = useProps({
         message: 'default',
-        count: 0
+        count: 0,
       });
       const emit = useEmit();
-      
+
       return html`
         <div>
           <span class="message">${props.message}</span>
@@ -1525,21 +1628,21 @@ describe('Streamlined Component', () => {
     element.setAttribute('count', '5');
     document.body.appendChild(element);
 
-    await new Promise(resolve => setTimeout(resolve, 50));
+    await new Promise((resolve) => setTimeout(resolve, 50));
 
     const messageEl = element.shadowRoot?.querySelector('.message');
     const countEl = element.shadowRoot?.querySelector('.count');
-    
+
     expect(messageEl?.textContent).toBe('Hello World');
     expect(countEl?.textContent).toBe('5');
   });
 
   it('should emit events correctly', async () => {
     let emittedData = null;
-    
+
     component('emitter-test', () => {
       const emit = useEmit();
-      
+
       return html`
         <button @click="${() => emit('test-event', { data: 'test' })}">
           Click
@@ -1551,9 +1654,9 @@ describe('Streamlined Component', () => {
     element.addEventListener('test-event', (e) => {
       emittedData = e.detail;
     });
-    
+
     document.body.appendChild(element);
-    await new Promise(resolve => setTimeout(resolve, 50));
+    await new Promise((resolve) => setTimeout(resolve, 50));
 
     const button = element.shadowRoot?.querySelector('button');
     button?.click();
@@ -1566,6 +1669,7 @@ describe('Streamlined Component', () => {
 ## 🎯 Best Practices
 
 ### 1. **Use Descriptive Props with Defaults**
+
 ```typescript
 // ✅ Good
 component('user-badge', () => {
@@ -1573,10 +1677,10 @@ component('user-badge', () => {
     name: 'Anonymous',
     role: 'user' as 'user' | 'admin' | 'moderator',
     showAvatar: true,
-    size: 'medium' as 'small' | 'medium' | 'large'
+    size: 'medium' as 'small' | 'medium' | 'large',
   });
   const emit = useEmit();
-  
+
   // ...
 });
 
@@ -1587,11 +1691,12 @@ component('user-badge', ({ a, b, c }: any, { emit }) => {
 ```
 
 ### 2. **Prefer External State for Shared Data**
+
 ```typescript
 // ✅ Good - Shared state
 const userPreferences = ref({
   theme: 'light',
-  language: 'en'
+  language: 'en',
 });
 
 component('theme-switcher', () => {
@@ -1606,15 +1711,12 @@ component('language-selector', () => {
 ```
 
 ### 3. **Use Computed Values for Derived State**
+
 ```typescript
 // ✅ Good
 const items = ref([]);
-const filteredItems = computed(() => 
-  items.value.filter(item => item.active)
-);
-const itemCount = computed(() => 
-  filteredItems.value.length
-);
+const filteredItems = computed(() => items.value.filter((item) => item.active));
+const itemCount = computed(() => filteredItems.value.length);
 
 // ❌ Avoid - Manual synchronization
 const items = ref([]);
@@ -1623,6 +1725,7 @@ const itemCount = ref(0);
 ```
 
 ### 4. **Emit Semantic Events**
+
 ```typescript
 // ✅ Good - Semantic event names
 emit('user-selected', { userId: 123 });
@@ -1636,13 +1739,14 @@ emit('event', data);
 ```
 
 ### 5. **Handle Errors Gracefully**
+
 ```typescript
 component('data-loader', () => {
   const props = useProps({ url: '' });
   const emit = useEmit();
   const loading = ref(false);
   const error = ref(null);
-  
+
   const loadData = async () => {
     try {
       loading.value = true;
@@ -1657,12 +1761,15 @@ component('data-loader', () => {
   };
 
   return html`
-    ${when(error.value, html`
-      <div class="error">
-        Error: ${error.value}
-        <button @click="${loadData}">Retry</button>
-      </div>
-    `)}
+    ${when(
+      error.value,
+      html`
+        <div class="error">
+          Error: ${error.value}
+          <button @click="${loadData}">Retry</button>
+        </div>
+      `,
+    )}
     <!-- Rest of template -->
   `;
 });

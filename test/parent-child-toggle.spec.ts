@@ -13,7 +13,14 @@ describe('parent-child toggle with :model', () => {
     component('test-child', () => {
       const props = useProps({ modelValue: false });
       const emit = useEmit();
-      return html`<div class="child">${props.modelValue ? 'ON' : ''}<button class="child-toggle" @click="${() => emit('update:model-value', !props.modelValue)}">Child Toggle</button></div>`;
+      return html`<div class="child">
+        ${props.modelValue ? 'ON' : ''}<button
+          class="child-toggle"
+          @click="${() => emit('update:model-value', !props.modelValue)}"
+        >
+          Child Toggle
+        </button>
+      </div>`;
     });
 
     // Define parent component which has a boolean ref and listens for child's toggle event
@@ -38,25 +45,37 @@ describe('parent-child toggle with :model', () => {
     await new Promise((r) => setTimeout(r, 10));
 
     // Child element is present initially (parent renders it)
-    const childBefore = parent.shadowRoot?.querySelector('test-child') as HTMLElement | null;
+    const childBefore = parent.shadowRoot?.querySelector(
+      'test-child',
+    ) as HTMLElement | null;
     expect(childBefore).not.toBeNull();
     // Initially the child should show 'ON' because parent starts visible=true
     const beforeText = childBefore!.shadowRoot?.textContent || '';
     expect(beforeText.includes('ON')).toBe(true);
     // Parent status should reflect ON (we start with visible=true)
-    const statusBefore = parent.shadowRoot?.querySelector('.status') as HTMLElement | null;
+    const statusBefore = parent.shadowRoot?.querySelector(
+      '.status',
+    ) as HTMLElement | null;
     expect(statusBefore?.textContent).toBe('ON');
 
     // Click the child's internal button to emit toggle -> parent toggles isVisible to false
-    const childBtn = childBefore!.shadowRoot?.querySelector('.child-toggle') as HTMLElement | null;
+    const childBtn = childBefore!.shadowRoot?.querySelector(
+      '.child-toggle',
+    ) as HTMLElement | null;
     expect(childBtn).not.toBeNull();
-    childBtn!.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
+    childBtn!.dispatchEvent(
+      new MouseEvent('click', { bubbles: true, composed: true }),
+    );
     await Promise.resolve();
     await new Promise((r) => setTimeout(r, 50));
     // After the child's toggle, the parent should become OFF and child removed
-    const childAfter = parent.shadowRoot?.querySelector('test-child') as HTMLElement | null;
+    const childAfter = parent.shadowRoot?.querySelector(
+      'test-child',
+    ) as HTMLElement | null;
     expect(childAfter).toBeNull();
-    const statusAfter = parent.shadowRoot?.querySelector('.status') as HTMLElement | null;
+    const statusAfter = parent.shadowRoot?.querySelector(
+      '.status',
+    ) as HTMLElement | null;
     expect(statusAfter?.textContent).toBe('OFF');
   });
 });

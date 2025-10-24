@@ -1,15 +1,18 @@
 import { describe, it, expect } from 'vitest';
-import { component, html, ref, when } from '../src/lib/index';
+import { component, html, ref } from '../src/lib/index';
+import { when } from '../src/lib/directives';
 
 describe('when lazy overload', () => {
   it('does not evaluate factory when condition is falsy', async () => {
-    const thrower = () => { throw new Error('EVAL'); };
+    const thrower = () => {
+      throw new Error('EVAL');
+    };
 
     component('when-lazy-test', () => {
       const curr = ref(false);
       return html`
         <div>
-          ${when(curr.value, () => html`<p id="lazy">${thrower()}</p>`) }
+          ${when(curr.value, () => html`<p id="lazy">${thrower()}</p>`)}
         </div>
       `;
     });
@@ -24,9 +27,7 @@ describe('when lazy overload', () => {
     component('when-lazy-test-2', () => {
       const curr = ref(true);
       return html`
-        <div>
-          ${when(curr.value, () => html`<p id="lazy2">OK</p>`) }
-        </div>
+        <div>${when(curr.value, () => html`<p id="lazy2">OK</p>`)}</div>
       `;
     });
 

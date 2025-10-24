@@ -18,14 +18,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Fetch all history and tags
+          fetch-depth: 0 # Fetch all history and tags
 
       - name: Use Node.js version from .nvmrc
         uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
           registry-url: 'https://registry.npmjs.org/'
-      
+
       - name: Cache node modules
         uses: actions/cache@v3
         with:
@@ -33,10 +33,10 @@ jobs:
           key: ${{ runner.os }}-node-${{ hashFiles('package-lock.json') }}
           restore-keys: |
             ${{ runner.os }}-node-
-      
+
       - name: Install dependencies
         run: npm ci
-      
+
       - name: Run tests
         run: npm test
 
@@ -83,11 +83,11 @@ jobs:
         run: |
           BRANCH=${GITHUB_REF##*/}
           BUMP_TYPE=$(cat .bump)
-          
+
           # Get the previous tag to determine what commits to include
           TAG_COUNT=$(git tag --sort=-version:refname | wc -l)
           echo "Debug: Found $TAG_COUNT tags"
-          
+
           if [ "$TAG_COUNT" -gt 1 ]; then
             # Get the second most recent tag
             PREV_TAG=$(git tag --sort=-version:refname | head -n2 | tail -n1)
@@ -97,21 +97,21 @@ jobs:
             PREV_TAG=$(git rev-list --max-parents=0 HEAD)
             echo "Debug: Using first commit as baseline: $PREV_TAG"
           fi
-          
+
           echo "Debug: Previous tag/commit is: $PREV_TAG"
           echo "Debug: Current HEAD is: $(git rev-parse HEAD)"
           echo "Debug: Checking commits between $PREV_TAG and HEAD"
-          
+
           # Generate commit log since last tag (excluding merge commits and version bumps)
           COMMITS=$(git log "$PREV_TAG..HEAD" --pretty=format:"- %s (%h)" --no-merges | grep -v "release:" | grep -v "chore: update changelog" || true)
-          
+
           echo "Debug: Found commits: $COMMITS"
-          
+
           # Handle case where no commits are found
           if [ -z "$COMMITS" ]; then
             COMMITS="- No changes since last release"
           fi
-          
+
           # Store commits for later use
           echo "$COMMITS" > commits.txt
 
@@ -134,18 +134,18 @@ jobs:
           BRANCH=${GITHUB_REF##*/}
           VERSION="${{ steps.version.outputs.version }}"
           COMMITS=$(cat commits.txt)
-          
+
           # Get the previous tag for comparison link
           PREV_TAG=$(git tag --sort=-version:refname | grep -v "$VERSION" | head -n1)
-          
+
           # Create release notes
           RELEASE_NOTES="## Release $VERSION
-          
+
           ### Changes
           $COMMITS
-          
+
           **Full Changelog**: https://github.com/${{ github.repository }}/compare/$PREV_TAG...$VERSION"
-          
+
           # Update or create CHANGELOG.md
           DATE=$(date +"%Y-%m-%d")
           if [ ! -f CHANGELOG.md ]; then
@@ -154,14 +154,14 @@ jobs:
             echo "All notable changes to this project will be documented in this file." >> CHANGELOG.md
             echo "" >> CHANGELOG.md
           fi
-          
+
           # Prepare new changelog entry
           TEMP_CHANGELOG="## [$VERSION] - $DATE
-          
+
           $COMMITS
-          
+
           "
-          
+
           # Insert new entry at the top of changelog (after header)
           # Create a temporary file to avoid sed portability issues
           {
@@ -169,18 +169,18 @@ jobs:
             echo "$TEMP_CHANGELOG"
             tail -n +4 CHANGELOG.md
           } > CHANGELOG.tmp && mv CHANGELOG.tmp CHANGELOG.md
-          
+
           # Commit and push changelog
           git add CHANGELOG.md
           git commit -m "chore: update changelog for $VERSION [skip ci]" || true
           git push || true
-          
+
           # Save release notes for GitHub release
           echo "$RELEASE_NOTES" > release_notes.md
-          
+
           # Create GitHub release using built-in GitHub CLI or curl without jq dependency
           ESCAPED_BODY=$(echo "$RELEASE_NOTES" | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
-          
+
           # Create GitHub release
           if [[ "$BRANCH" == "develop" ]]; then
             # Beta release

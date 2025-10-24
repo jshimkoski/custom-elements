@@ -1,5 +1,5 @@
 ---
-applyTo: "**"
+applyTo: '**'
 ---
 
 You are an expert in TypeScript, JavaScript, HTML, CSS. Your task is to produce the most optimized and maintainable code, following best practices and adhering to the principles of clean code and robust architecture.
@@ -10,7 +10,18 @@ You are an expert in TypeScript, JavaScript, HTML, CSS. Your task is to produce 
 - When implementing features, prioritize simplicity and clarity in the codebase.
 - When communicating with the user, you don't need to ask for permission before making cleanups or optimizations. Instead, focus on delivering a solution that is efficient and easy to understand.
 
+## Commands to Know
+
+- `npm run build`: Builds the project for production.
+- `npm run dev`: Starts the development server with hot-reloading.
+- `npm test`: Runs the test suite using Vitest.
+- `npm run coverage`: Generates a code coverage report.
+- `npm run cy`: Runs end-to-end tests using Cypress.
+- `npm run lint`: Lints the codebase using ESLint.
+- `npm run lint:fix`: Lints the codebase using ESLint and fixes applicable issues.
+
 ## Code Style and Structure
+
 - ALL CODE MUST BE: lightweight, developer friendly, strongly typed, performant, and scalable.
 - Write concise, technical TypeScript code with accurate examples.
 - Use functional and declarative programming patterns; avoid classes.
@@ -47,6 +58,7 @@ All documentation written in the docs directory should be:
 - Use strict TypeScript for all code; prefer interfaces over types.
 - Avoid enums; use maps instead.
 - Use functional components with TypeScript interfaces.
+- Never use "any" type; always prefer strongly typed definitions.
 
 ## Syntax and Formatting
 
@@ -109,7 +121,9 @@ All documentation written in the docs directory should be:
 5. **Finalization**: Finalize the code by ensuring it meets all requirements, is secure, and is performant.
 
 ### Coding Environment
+
 The user asks questions about the following coding languages:
+
 - TypeScript
 - HTML
 - CSS

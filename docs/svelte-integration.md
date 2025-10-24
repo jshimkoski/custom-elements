@@ -7,22 +7,23 @@ Quick guide for using Custom Elements Runtime components inside Svelte.
 1. Register a component:
 
 ```ts
-import { component, ref, html, useEmit } from '@jasonshimmy/custom-elements-runtime';
+import {
+  component,
+  ref,
+  html,
+  useEmit,
+} from '@jasonshimmy/custom-elements-runtime';
 
 component('my-counter', ({ initialCount = 0 }: { initialCount?: number }) => {
   const count = ref(initialCount);
   const emit = useEmit();
-  
+
   const handleClick = () => {
     count.value++;
     emit('count-changed', { count: count.value });
   };
-  
-  return html`
-    <button @click="${handleClick}">
-      Count: ${count.value}
-    </button>
-  `;
+
+  return html` <button @click="${handleClick}">Count: ${count.value}</button> `;
 });
 ```
 
@@ -37,6 +38,8 @@ component('my-counter', ({ initialCount = 0 }: { initialCount?: number }) => {
 - For simple values you can use attributes; prefer using property bindings when you need reactive values or non-string types. Svelte's `bind:prop` behavior is for Svelte components and may not automatically wire to arbitrary custom elements — use `on:update:<prop>` or `bind:this` + set the property if you need deterministic behavior.
 - When using our compiler the `:model` and `:model:prop` shorthands will be compiled to explicit prop + `update:<prop>` wiring. The runtime promotes bound attributes into JS properties for custom elements (mapping kebab-case attributes to camelCase properties) so property bindings and compiler-emitted wiring are the recommended pattern for non-string values and reactive flows.
 - Listen to CustomEvents declaratively with `on:event` (preferred). If you need closure capture, use `bind:this` and `addEventListener`.
+
+Compatibility note: `useEmit()` and the internal `emit()` helper dispatch standard DOM CustomEvents and will also dispatch alternate event-name variants in some cases (for example `update:model-value` and `update:modelValue`). If Svelte's template parser or tooling complains about colon-containing event names, prefer `bind:this` + `addEventListener` on the element reference and read `event.detail` for the payload.
 
 ## Two-way binding
 

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { VNode } from '../src/lib/runtime/types';
 import {
   unless,
@@ -15,7 +15,7 @@ import {
   responsive,
   whenVariants,
   responsiveSwitch,
-  switchOn
+  switchOn,
 } from '../src/lib/directive-enhancements';
 
 // Helper function to extract children from VNode
@@ -32,7 +32,7 @@ function createVNode(tag: string, content?: string): VNode {
     tag,
     children: content || '',
     props: {},
-    key: undefined
+    key: undefined,
   };
 }
 
@@ -60,7 +60,7 @@ describe('directive-enhancements', () => {
     it('should render content when condition is false', () => {
       const content = createVNode('div', 'content');
       const result = unless(false, content);
-      
+
       expect(result.tag).toBe('#anchor');
       expect(result.key).toBe('when-block');
       const children = getChildren(result);
@@ -71,7 +71,7 @@ describe('directive-enhancements', () => {
     it('should not render content when condition is true', () => {
       const content = createVNode('div', 'content');
       const result = unless(true, content);
-      
+
       expect(result.tag).toBe('#anchor');
       expect(result.key).toBe('when-block');
       const children = getChildren(result);
@@ -79,9 +79,12 @@ describe('directive-enhancements', () => {
     });
 
     it('should handle array children', () => {
-      const content = [createVNode('div', 'first'), createVNode('div', 'second')];
+      const content = [
+        createVNode('div', 'first'),
+        createVNode('div', 'second'),
+      ];
       const result = unless(false, content);
-      
+
       const children = getChildren(result);
       expect(children).toHaveLength(2);
       expect(children[0].children).toBe('first');
@@ -93,7 +96,7 @@ describe('directive-enhancements', () => {
     it('should render content when array is empty', () => {
       const content = createVNode('div', 'empty message');
       const result = whenEmpty([], content);
-      
+
       expect(result.tag).toBe('#anchor');
       const children = getChildren(result);
       expect(children).toHaveLength(1);
@@ -103,7 +106,7 @@ describe('directive-enhancements', () => {
     it('should render content when array is null', () => {
       const content = createVNode('div', 'empty message');
       const result = whenEmpty(null, content);
-      
+
       const children = getChildren(result);
       expect(children).toHaveLength(1);
     });
@@ -111,7 +114,7 @@ describe('directive-enhancements', () => {
     it('should render content when array is undefined', () => {
       const content = createVNode('div', 'empty message');
       const result = whenEmpty(undefined, content);
-      
+
       const children = getChildren(result);
       expect(children).toHaveLength(1);
     });
@@ -119,7 +122,7 @@ describe('directive-enhancements', () => {
     it('should not render content when array has items', () => {
       const content = createVNode('div', 'empty message');
       const result = whenEmpty([1, 2, 3], content);
-      
+
       const children = getChildren(result);
       expect(children).toHaveLength(0);
     });
@@ -129,7 +132,7 @@ describe('directive-enhancements', () => {
     it('should render content when array has items', () => {
       const content = createVNode('div', 'has items');
       const result = whenNotEmpty([1, 2, 3], content);
-      
+
       const children = getChildren(result);
       expect(children).toHaveLength(1);
       expect(children[0]).toEqual(content);
@@ -138,7 +141,7 @@ describe('directive-enhancements', () => {
     it('should not render content when array is empty', () => {
       const content = createVNode('div', 'has items');
       const result = whenNotEmpty([], content);
-      
+
       const children = getChildren(result);
       expect(children).toHaveLength(0);
     });
@@ -146,7 +149,7 @@ describe('directive-enhancements', () => {
     it('should not render content when array is null', () => {
       const content = createVNode('div', 'has items');
       const result = whenNotEmpty(null, content);
-      
+
       const children = getChildren(result);
       expect(children).toHaveLength(0);
     });
@@ -154,7 +157,7 @@ describe('directive-enhancements', () => {
     it('should not render content when array is undefined', () => {
       const content = createVNode('div', 'has items');
       const result = whenNotEmpty(undefined, content);
-      
+
       const children = getChildren(result);
       expect(children).toHaveLength(0);
     });
@@ -164,18 +167,25 @@ describe('directive-enhancements', () => {
     it('should filter and render items based on predicate', () => {
       const items = [1, 2, 3, 4, 5];
       const predicate = (item: number) => item % 2 === 0; // even numbers
-      const render = (item: number, originalIndex: number, filteredIndex: number) => 
-        createVNode('div', `item-${item}-orig-${originalIndex}-filtered-${filteredIndex}`);
-      
+      const render = (
+        item: number,
+        originalIndex: number,
+        filteredIndex: number,
+      ) =>
+        createVNode(
+          'div',
+          `item-${item}-orig-${originalIndex}-filtered-${filteredIndex}`,
+        );
+
       const result = eachWhere(items, predicate, render);
-      
+
       expect(result).toHaveLength(2); // 2 and 4
       expect(result[0].tag).toBe('#anchor');
       expect(result[0].key).toBe('each-where-filtered-1'); // Uses fallback key for primitives
-      
+
       const firstChild = getChildren(result[0])[0];
       expect(firstChild.children).toBe('item-2-orig-1-filtered-0');
-      
+
       const secondChild = getChildren(result[1])[0];
       expect(secondChild.children).toBe('item-4-orig-3-filtered-1');
     });
@@ -184,13 +194,13 @@ describe('directive-enhancements', () => {
       const items = [
         { id: 'a', value: 1 },
         { key: 'b', value: 2 },
-        { value: 3 }
+        { value: 3 },
       ];
       const predicate = (item: any) => item.value > 1;
       const render = (item: any) => createVNode('div', item.value.toString());
-      
+
       const result = eachWhere(items, predicate, render);
-      
+
       expect(result).toHaveLength(2);
       expect(result[0].key).toBe('each-where-b'); // uses key property
       expect(result[1].key).toBe('each-where-filtered-2'); // fallback for no id/key
@@ -200,9 +210,9 @@ describe('directive-enhancements', () => {
       const items = [1, 3, 5];
       const predicate = (item: number) => item % 2 === 0;
       const render = (item: number) => createVNode('div', item.toString());
-      
+
       const result = eachWhere(items, predicate, render);
-      
+
       expect(result).toHaveLength(0);
     });
   });
@@ -211,7 +221,7 @@ describe('directive-enhancements', () => {
     it('should render empty case when array is empty', () => {
       const emptyContent = createVNode('div', 'empty');
       const result = switchOnLength([], { empty: emptyContent });
-      
+
       expect(result.tag).toBe('#anchor');
       expect(result.key).toBe('switch-length-empty');
       const children = getChildren(result);
@@ -222,9 +232,9 @@ describe('directive-enhancements', () => {
     it('should render one case when array has one item', () => {
       const items = ['single'];
       const result = switchOnLength(items, {
-        one: (item) => createVNode('div', `one: ${item}`)
+        one: (item) => createVNode('div', `one: ${item}`),
       });
-      
+
       expect(result.key).toBe('switch-length-one');
       const children = getChildren(result);
       expect(children[0].children).toBe('one: single');
@@ -233,9 +243,9 @@ describe('directive-enhancements', () => {
     it('should render many case when array has multiple items', () => {
       const items = ['a', 'b', 'c'];
       const result = switchOnLength(items, {
-        many: (items) => createVNode('div', `many: ${items.length}`)
+        many: (items) => createVNode('div', `many: ${items.length}`),
       });
-      
+
       expect(result.key).toBe('switch-length-many');
       const children = getChildren(result);
       expect(children[0].children).toBe('many: 3');
@@ -245,10 +255,10 @@ describe('directive-enhancements', () => {
       const items = ['a', 'b'];
       const result = switchOnLength(items, {
         exactly: {
-          2: (items) => createVNode('div', `exactly two: ${items.join(',')}`)
-        }
+          2: (items) => createVNode('div', `exactly two: ${items.join(',')}`),
+        },
       });
-      
+
       expect(result.key).toBe('switch-length-2');
       const children = getChildren(result);
       expect(children[0].children).toBe('exactly two: a,b');
@@ -257,7 +267,7 @@ describe('directive-enhancements', () => {
     it('should render fallback when no cases match', () => {
       const items = ['a', 'b', 'c'];
       const result = switchOnLength(items, {});
-      
+
       expect(result.key).toBe('switch-length-fallback');
       const children = getChildren(result);
       expect(children).toHaveLength(0);
@@ -266,12 +276,12 @@ describe('directive-enhancements', () => {
     it('should prioritize exactly over many', () => {
       const items = ['a', 'b'];
       const result = switchOnLength(items, {
-        many: (items) => createVNode('div', 'many'),
+        many: () => createVNode('div', 'many'),
         exactly: {
-          2: (items) => createVNode('div', 'exactly two')
-        }
+          2: () => createVNode('div', 'exactly two'),
+        },
       });
-      
+
       expect(result.key).toBe('switch-length-2');
       const children = getChildren(result);
       expect(children[0].children).toBe('exactly two');
@@ -284,42 +294,45 @@ describe('directive-enhancements', () => {
         { category: 'A', value: 1 },
         { category: 'B', value: 2 },
         { category: 'A', value: 3 },
-        { category: 'B', value: 4 }
+        { category: 'B', value: 4 },
       ];
       const groupBy = (item: any) => item.category;
-      const renderGroup = (key: string, items: any[], index: number) => 
+      const renderGroup = (key: string, items: any[]) =>
         createVNode('div', `${key}: ${items.length} items`);
-      
+
       const result = eachGroup(items, groupBy, renderGroup);
-      
+
       expect(result).toHaveLength(2);
       expect(result[0].key).toBe('each-group-A');
       expect(result[1].key).toBe('each-group-B');
-      
+
       const firstGroup = getChildren(result[0])[0];
       expect(firstGroup.children).toBe('A: 2 items');
-      
+
       const secondGroup = getChildren(result[1])[0];
       expect(secondGroup.children).toBe('B: 2 items');
     });
 
     it('should handle empty array', () => {
       const groupBy = (item: any) => item.category;
-      const renderGroup = (key: string, items: any[]) => createVNode('div', key);
-      
+      const renderGroup = (key: string) => createVNode('div', key);
+
       const result = eachGroup([], groupBy, renderGroup);
-      
+
       expect(result).toHaveLength(0);
     });
 
     it('should handle single group', () => {
-      const items = [{ type: 'X', id: 1 }, { type: 'X', id: 2 }];
+      const items = [
+        { type: 'X', id: 1 },
+        { type: 'X', id: 2 },
+      ];
       const groupBy = (item: any) => item.type;
-      const renderGroup = (key: string, items: any[]) => 
+      const renderGroup = (key: string, items: any[]) =>
         createVNode('div', `Group ${key} has ${items.length}`);
-      
+
       const result = eachGroup(items, groupBy, renderGroup);
-      
+
       expect(result).toHaveLength(1);
       expect(result[0].key).toBe('each-group-X');
       const children = getChildren(result[0]);
@@ -330,17 +343,17 @@ describe('directive-enhancements', () => {
   describe('eachPage', () => {
     it('should render correct items for given page', () => {
       const items = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-      const render = (item: number, globalIndex: number, pageIndex: number) => 
+      const render = (item: number, globalIndex: number, pageIndex: number) =>
         createVNode('div', `${item}-global-${globalIndex}-page-${pageIndex}`);
-      
+
       const result = eachPage(items, 3, 1, render); // page size 3, page 1 (second page)
-      
+
       expect(result).toHaveLength(3);
       expect(result[0].key).toBe('each-page-page-3'); // Uses fallback key for primitives
       expect(result[1].key).toBe('each-page-page-4');
       expect(result[2].key).toBe('each-page-page-5');
-      
-      const children = result.map(r => getChildren(r)[0]);
+
+      const children = result.map((r) => getChildren(r)[0]);
       expect(children[0].children).toBe('4-global-3-page-0');
       expect(children[1].children).toBe('5-global-4-page-1');
       expect(children[2].children).toBe('6-global-5-page-2');
@@ -349,30 +362,30 @@ describe('directive-enhancements', () => {
     it('should handle partial last page', () => {
       const items = [1, 2, 3, 4, 5];
       const render = (item: number) => createVNode('div', item.toString());
-      
+
       const result = eachPage(items, 3, 1, render); // page size 3, page 1 (last page)
-      
+
       expect(result).toHaveLength(2); // only 2 items on last page
     });
 
     it('should handle empty page', () => {
       const items = [1, 2, 3];
       const render = (item: number) => createVNode('div', item.toString());
-      
+
       const result = eachPage(items, 3, 1, render); // page size 3, page 1 (beyond data)
-      
+
       expect(result).toHaveLength(0);
     });
 
     it('should use object id/key for keys', () => {
       const items = [
         { id: 'item1', name: 'First' },
-        { key: 'item2', name: 'Second' }
+        { key: 'item2', name: 'Second' },
       ];
       const render = (item: any) => createVNode('div', item.name);
-      
+
       const result = eachPage(items, 10, 0, render);
-      
+
       expect(result[0].key).toBe('each-page-item1');
       expect(result[1].key).toBe('each-page-item2');
     });
@@ -383,9 +396,9 @@ describe('directive-enhancements', () => {
       const loadingContent = createVNode('div', 'loading...');
       const result = switchOnPromise(
         { loading: true },
-        { loading: loadingContent }
+        { loading: loadingContent },
       );
-      
+
       expect(result.key).toBe('promise-loading');
       const children = getChildren(result);
       expect(children[0]).toEqual(loadingContent);
@@ -395,9 +408,9 @@ describe('directive-enhancements', () => {
       const data = { name: 'Test' };
       const result = switchOnPromise(
         { data },
-        { success: (data) => createVNode('div', data.name) }
+        { success: (data) => createVNode('div', data.name) },
       );
-      
+
       expect(result.key).toBe('promise-success');
       const children = getChildren(result);
       expect(children[0].children).toBe('Test');
@@ -407,9 +420,9 @@ describe('directive-enhancements', () => {
       const error = new Error('Test error');
       const result = switchOnPromise(
         { error },
-        { error: (err) => createVNode('div', err.message) }
+        { error: (err) => createVNode('div', err.message) },
       );
-      
+
       expect(result.key).toBe('promise-error');
       const children = getChildren(result);
       expect(children[0].children).toBe('Test error');
@@ -417,11 +430,8 @@ describe('directive-enhancements', () => {
 
     it('should render idle state when no other states match', () => {
       const idleContent = createVNode('div', 'idle');
-      const result = switchOnPromise(
-        {},
-        { idle: idleContent }
-      );
-      
+      const result = switchOnPromise({}, { idle: idleContent });
+
       expect(result.key).toBe('promise-idle');
       const children = getChildren(result);
       expect(children[0]).toEqual(idleContent);
@@ -431,13 +441,13 @@ describe('directive-enhancements', () => {
       const loadingContent = createVNode('div', 'loading...');
       const result = switchOnPromise(
         { loading: true, error: new Error('test'), data: 'test' },
-        { 
+        {
           loading: loadingContent,
           error: () => createVNode('div', 'error'),
-          success: () => createVNode('div', 'success')
-        }
+          success: () => createVNode('div', 'success'),
+        },
       );
-      
+
       expect(result.key).toBe('promise-loading');
     });
 
@@ -447,10 +457,10 @@ describe('directive-enhancements', () => {
         { error, data: 'test' },
         {
           error: (err) => createVNode('div', err.message),
-          success: () => createVNode('div', 'success')
-        }
+          success: () => createVNode('div', 'success'),
+        },
       );
-      
+
       expect(result.key).toBe('promise-error');
     });
   });
@@ -461,7 +471,7 @@ describe('directive-enhancements', () => {
         mockMatchMedia.mockReturnValue({ matches: true });
         const content = createVNode('div', 'responsive content');
         const result = whenMedia('(min-width: 768px)', content);
-        
+
         const children = getChildren(result);
         expect(children).toHaveLength(1);
         expect(children[0]).toEqual(content);
@@ -472,7 +482,7 @@ describe('directive-enhancements', () => {
         mockMatchMedia.mockReturnValue({ matches: false });
         const content = createVNode('div', 'responsive content');
         const result = whenMedia('(min-width: 768px)', content);
-        
+
         const children = getChildren(result);
         expect(children).toHaveLength(0);
       });
@@ -482,10 +492,10 @@ describe('directive-enhancements', () => {
           writable: true,
           value: undefined,
         });
-        
+
         const content = createVNode('div', 'content');
         const result = whenMedia('(min-width: 768px)', content);
-        
+
         const children = getChildren(result);
         expect(children).toHaveLength(0);
       });
@@ -512,17 +522,17 @@ describe('directive-enhancements', () => {
       it('should create anchor blocks with whenMedia calls', () => {
         mockMatchMedia.mockReturnValue({ matches: true });
         const content = createVNode('div', 'test');
-        
+
         // Test that the functions exist and return VNodes
         const smResult = responsive.sm(content);
         expect(smResult.tag).toBe('#anchor');
-        
+
         const darkResult = responsive.dark(content);
         expect(darkResult.tag).toBe('#anchor');
-        
+
         const lightResult = responsive.light(content);
         expect(lightResult.tag).toBe('#anchor');
-        
+
         // The responsive helper creates anchor blocks - matchMedia is called during render
         expect(smResult).toBeDefined();
         expect(darkResult).toBeDefined();
@@ -534,14 +544,16 @@ describe('directive-enhancements', () => {
   describe('whenVariants', () => {
     it('should combine dark mode and responsive variants', () => {
       // Mock both dark mode and lg breakpoint to match
-      mockMatchMedia.mockImplementation((query) => ({ 
-        matches: query === '(prefers-color-scheme: dark)' || query === '(min-width:1024px)',
-        addEventListener: vi.fn() 
+      mockMatchMedia.mockImplementation((query) => ({
+        matches:
+          query === '(prefers-color-scheme: dark)' ||
+          query === '(min-width:1024px)',
+        addEventListener: vi.fn(),
       }));
-      
+
       const content = createVNode('div', 'dark lg content');
       const result = whenVariants(['dark', 'lg'], content);
-      
+
       expect(result.tag).toBe('#anchor');
       const children = getChildren(result);
       // Should render content since both conditions match
@@ -552,7 +564,7 @@ describe('directive-enhancements', () => {
       mockMatchMedia.mockReturnValue({ matches: true });
       const content = createVNode('div', 'content');
       const result = whenVariants(['sm', 'md', 'lg'], content);
-      
+
       expect(result.tag).toBe('#anchor');
     });
 
@@ -560,7 +572,7 @@ describe('directive-enhancements', () => {
       mockMatchMedia.mockReturnValue({ matches: true });
       const content = createVNode('div', 'light content');
       const result = whenVariants(['light'], content);
-      
+
       expect(result.tag).toBe('#anchor');
     });
 
@@ -568,7 +580,7 @@ describe('directive-enhancements', () => {
       mockMatchMedia.mockReturnValue({ matches: true });
       const content = createVNode('div', 'base content');
       const result = whenVariants([], content);
-      
+
       expect(result.tag).toBe('#anchor');
     });
 
@@ -576,7 +588,7 @@ describe('directive-enhancements', () => {
       mockMatchMedia.mockReturnValue({ matches: true });
       const content = createVNode('div', 'light xl content');
       const result = whenVariants(['light', 'xl'], content);
-      
+
       expect(result.tag).toBe('#anchor');
     });
   });
@@ -589,7 +601,7 @@ describe('directive-enhancements', () => {
     it('should render base content', () => {
       const baseContent = createVNode('div', 'base');
       const result = responsiveSwitch({ base: baseContent });
-      
+
       expect(result).toHaveLength(1);
       expect(result[0].key).toBe('responsive-base');
       const children = getChildren(result[0]);
@@ -600,7 +612,7 @@ describe('directive-enhancements', () => {
       const smContent = createVNode('div', 'sm');
       const mdContent = createVNode('div', 'md');
       const result = responsiveSwitch({ sm: smContent, md: mdContent });
-      
+
       expect(result).toHaveLength(2);
     });
   });
@@ -611,7 +623,7 @@ describe('directive-enhancements', () => {
         .case('test', createVNode('div', 'matched'))
         .case('other', createVNode('div', 'not matched'))
         .done();
-      
+
       expect(result.key).toBe('switch-case-0');
       const children = getChildren(result);
       expect(children[0].children).toBe('matched');
@@ -622,7 +634,7 @@ describe('directive-enhancements', () => {
         .case((val) => val > 3, createVNode('div', 'greater than 3'))
         .case((val) => val < 3, createVNode('div', 'less than 3'))
         .done();
-      
+
       expect(result.key).toBe('switch-case-0');
       const children = getChildren(result);
       expect(children[0].children).toBe('greater than 3');
@@ -633,7 +645,7 @@ describe('directive-enhancements', () => {
         .when((val) => val % 2 === 0, createVNode('div', 'even'))
         .when((val) => val % 2 === 1, createVNode('div', 'odd'))
         .done();
-      
+
       expect(result.key).toBe('switch-case-0');
       const children = getChildren(result);
       expect(children[0].children).toBe('even');
@@ -645,7 +657,7 @@ describe('directive-enhancements', () => {
         .case('other', createVNode('div', 'other'))
         .otherwise(createVNode('div', 'default'))
         .done();
-      
+
       expect(result.key).toBe('switch-otherwise');
       const children = getChildren(result);
       expect(children[0].children).toBe('default');
@@ -656,7 +668,7 @@ describe('directive-enhancements', () => {
         .case('test', createVNode('div', 'test'))
         .case('other', createVNode('div', 'other'))
         .done();
-      
+
       expect(result.key).toBe('switch-otherwise');
       const children = getChildren(result);
       expect(children).toHaveLength(0);
@@ -667,7 +679,7 @@ describe('directive-enhancements', () => {
         .case((val) => val > 2, createVNode('div', 'first match'))
         .case((val) => val > 3, createVNode('div', 'second match'))
         .done();
-      
+
       expect(result.key).toBe('switch-case-0');
       const children = getChildren(result);
       expect(children[0].children).toBe('first match');

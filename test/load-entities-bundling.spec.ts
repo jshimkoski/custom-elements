@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { decodeEntities, loadEntityMap } from '../src/lib/runtime/helpers';
+import { decodeEntities } from '../src/lib/runtime/helpers';
 
 describe('entity map bundling behavior', () => {
   it('does not load entities.json when document is present', async () => {
@@ -27,7 +27,10 @@ describe('entity map bundling behavior', () => {
     };
 
     // Spy on loadEntityMap
-    const spy = vi.spyOn(await import('../src/lib/runtime/helpers'), 'loadEntityMap');
+    const spy = vi.spyOn(
+      await import('../src/lib/runtime/helpers'),
+      'loadEntityMap',
+    );
 
     // Call decodeEntities which should take the DOM path and not call the loader
     const result = decodeEntities('&lt;&gt;&amp;');

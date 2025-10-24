@@ -12,7 +12,9 @@ describe('useProps', () => {
   });
 
   it('throws when called outside render', () => {
-    expect(() => useProps({ foo: 'bar' })).toThrow(/must be called during component render/);
+    expect(() => useProps({ foo: 'bar' })).toThrow(
+      /must be called during component render/,
+    );
   });
 
   it('returns an object with default values when context has no values', () => {

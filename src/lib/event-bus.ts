@@ -1,25 +1,26 @@
-
 /**
  * Event handler type for global event bus
  */
-export type EventHandler<T = any> = (data: T) => void;
+export type EventHandler<T> = (data: T) => void;
 
-import { devError } from "./runtime/logger";
+import { devError } from './runtime/logger';
 
 /**
  * Event map type using Set for efficient handler management
  */
-type EventMap = { [eventName: string]: Set<EventHandler> };
+type EventMap<Events extends Record<string, unknown>> = {
+  [K in keyof Events]: Set<EventHandler<Events[K]>>;
+};
 
 /**
  * GlobalEventBus provides a singleton event bus for cross-component communication.
  * Uses Set for handler storage to optimize add/remove operations and prevent duplicates.
  */
 export class GlobalEventBus extends EventTarget {
-  private handlers: EventMap = {};
+  private handlers: EventMap<Record<string, unknown>> = {};
   private static instance: GlobalEventBus;
-  private eventCounters: Map<string, { count: number; window: number }> = new Map();
-
+  private eventCounters: Map<string, { count: number; window: number }> =
+    new Map();
 
   /**
    * Returns the singleton instance of GlobalEventBus
@@ -36,17 +37,17 @@ export class GlobalEventBus extends EventTarget {
    * @param eventName - Name of the event
    * @param data - Optional event payload
    */
-  emit<T = any>(eventName: string, data?: T): void {
+  emit<T = unknown>(eventName: string, data?: T): void {
     // Event storm protection
     const now = Date.now();
     const counter = this.eventCounters.get(eventName);
-    
+
     if (!counter || now - counter.window > 1000) {
       // Reset counter every second
       this.eventCounters.set(eventName, { count: 1, window: now });
     } else {
       counter.count++;
-      
+
       if (counter.count > 50) {
         // Throttle excessive events to avoid event storms (silent in runtime)
         if (counter.count > 100) {
@@ -56,16 +57,18 @@ export class GlobalEventBus extends EventTarget {
     }
 
     // Use native CustomEvent for better browser integration
-    this.dispatchEvent(new CustomEvent(eventName, { 
-      detail: data,
-      bubbles: false, // Global events don't need to bubble
-      cancelable: true 
-    }));
+    this.dispatchEvent(
+      new CustomEvent(eventName, {
+        detail: data,
+        bubbles: false, // Global events don't need to bubble
+        cancelable: true,
+      }),
+    );
 
     // Also trigger registered handlers
     const eventHandlers = this.handlers[eventName];
     if (eventHandlers) {
-      eventHandlers.forEach(handler => {
+      eventHandlers.forEach((handler) => {
         try {
           handler(data);
         } catch (error) {
@@ -75,33 +78,30 @@ export class GlobalEventBus extends EventTarget {
     }
   }
 
-
   /**
    * Register a handler for a global event. Returns an unsubscribe function.
    * @param eventName - Name of the event
    * @param handler - Handler function
    */
-  on<T = any>(eventName: string, handler: EventHandler<T>): () => void {
+  on<T = unknown>(eventName: string, handler: EventHandler<T>): () => void {
     if (!this.handlers[eventName]) {
-      this.handlers[eventName] = new Set();
+      this.handlers[eventName] = new Set<EventHandler<unknown>>();
     }
-    this.handlers[eventName].add(handler);
+    this.handlers[eventName].add(handler as EventHandler<unknown>);
     return () => this.off(eventName, handler);
   }
-
 
   /**
    * Remove a specific handler for a global event.
    * @param eventName - Name of the event
    * @param handler - Handler function to remove
    */
-  off<T = any>(eventName: string, handler: EventHandler<T>): void {
+  off<T = unknown>(eventName: string, handler: EventHandler<T>): void {
     const eventHandlers = this.handlers[eventName];
     if (eventHandlers) {
-      eventHandlers.delete(handler);
+      eventHandlers.delete(handler as EventHandler<unknown>);
     }
   }
-
 
   /**
    * Remove all handlers for a specific event.
@@ -111,25 +111,27 @@ export class GlobalEventBus extends EventTarget {
     delete this.handlers[eventName];
   }
 
-
   /**
    * Listen for a native CustomEvent. Returns an unsubscribe function.
    * @param eventName - Name of the event
    * @param handler - CustomEvent handler
    * @param options - AddEventListener options
    */
-  listen<T = any>(eventName: string, handler: (event: CustomEvent<T>) => void, options?: AddEventListenerOptions): () => void {
+  listen<T = unknown>(
+    eventName: string,
+    handler: (event: CustomEvent<T>) => void,
+    options?: AddEventListenerOptions,
+  ): () => void {
     this.addEventListener(eventName, handler as EventListener, options);
     return () => this.removeEventListener(eventName, handler as EventListener);
   }
-
 
   /**
    * Register a one-time event handler. Returns a promise that resolves with the event data.
    * @param eventName - Name of the event
    * @param handler - Handler function
    */
-  once<T = any>(eventName: string, handler: EventHandler<T>): Promise<T> {
+  once<T = unknown>(eventName: string, handler: EventHandler<T>): Promise<T> {
     return new Promise((resolve) => {
       const unsubscribe = this.on(eventName, (data: T) => {
         unsubscribe();
@@ -139,16 +141,15 @@ export class GlobalEventBus extends EventTarget {
     });
   }
 
-
   /**
    * Get a list of all active event names with registered handlers.
    */
   getActiveEvents(): string[] {
-    return Object.keys(this.handlers).filter(eventName => 
-      this.handlers[eventName] && this.handlers[eventName].size > 0
+    return Object.keys(this.handlers).filter(
+      (eventName) =>
+        this.handlers[eventName] && this.handlers[eventName].size > 0,
     );
   }
-
 
   /**
    * Clear all event handlers (useful for testing or cleanup).
@@ -158,7 +159,6 @@ export class GlobalEventBus extends EventTarget {
     // Note: This doesn't clear native event listeners, use removeAllListeners if needed
   }
 
-
   /**
    * Get the number of handlers registered for a specific event.
    * @param eventName - Name of the event
@@ -166,7 +166,6 @@ export class GlobalEventBus extends EventTarget {
   getHandlerCount(eventName: string): number {
     return this.handlers[eventName]?.size || 0;
   }
-
 
   /**
    * Get event statistics for debugging.
@@ -176,12 +175,11 @@ export class GlobalEventBus extends EventTarget {
     for (const [eventName, counter] of this.eventCounters.entries()) {
       stats[eventName] = {
         count: counter.count,
-        handlersCount: this.getHandlerCount(eventName)
+        handlersCount: this.getHandlerCount(eventName),
       };
     }
     return stats;
   }
-
 
   /**
    * Reset event counters (useful for testing or after resolving issues).
@@ -194,30 +192,67 @@ export class GlobalEventBus extends EventTarget {
 /**
  * Singleton instance of the global event bus
  */
-export const eventBus = GlobalEventBus.getInstance();
+/**
+ * Lazily-instantiated event bus.
+ *
+ * We preserve the `eventBus` export for backward compatibility but avoid
+ * creating the underlying GlobalEventBus instance at module import time.
+ * A small proxy defers the call to `GlobalEventBus.getInstance()` until a
+ * property is accessed. This reduces import-time side-effects and helps
+ * bundlers tree-shake unused entrypoints.
+ */
+export const eventBus = new Proxy(
+  {},
+  {
+    get(_target, prop: PropertyKey) {
+      const inst = GlobalEventBus.getInstance();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const val = (inst as any)[prop as any];
+      // If the property is a function (method), bind it to the instance
+      // so callers using `eventBus.method(...)` get the correct `this`.
+      if (typeof val === 'function') return val.bind(inst);
+      return val;
+    },
+    // Support direct function calls (unlikely) and other traps defensively
+    apply(_target, thisArg, args) {
+      const inst = GlobalEventBus.getInstance();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (inst as any).apply(thisArg, args);
+    },
+  },
+) as unknown as GlobalEventBus;
 
 /**
  * Emit a global event
  */
-export const emit = <T = any>(eventName: string, data?: T) => eventBus.emit(eventName, data);
+export const emit = <T = unknown>(eventName: string, data?: T) =>
+  eventBus.emit(eventName, data);
 
 /**
  * Register a handler for a global event
  */
-export const on = <T = any>(eventName: string, handler: EventHandler<T>) => eventBus.on(eventName, handler);
+export const on = <T = unknown>(eventName: string, handler: EventHandler<T>) =>
+  eventBus.on(eventName, handler);
 
 /**
  * Remove a handler for a global event
  */
-export const off = <T = any>(eventName: string, handler: EventHandler<T>) => eventBus.off(eventName, handler);
+export const off = <T = unknown>(eventName: string, handler: EventHandler<T>) =>
+  eventBus.off(eventName, handler);
 
 /**
  * Register a one-time handler for a global event
  */
-export const once = <T = any>(eventName: string, handler: EventHandler<T>) => eventBus.once(eventName, handler);
+export const once = <T = unknown>(
+  eventName: string,
+  handler: EventHandler<T>,
+) => eventBus.once(eventName, handler);
 
 /**
  * Listen for a native CustomEvent
  */
-export const listen = <T = any>(eventName: string, handler: (event: CustomEvent<T>) => void, options?: AddEventListenerOptions) => 
-  eventBus.listen(eventName, handler, options);
+export const listen = <T = unknown>(
+  eventName: string,
+  handler: (event: CustomEvent<T>) => void,
+  options?: AddEventListenerOptions,
+) => eventBus.listen(eventName, handler, options);

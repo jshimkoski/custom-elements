@@ -1,8 +1,8 @@
-import { component, useProps, useEmit, ref, html } from "../../lib";
+import { component, useProps, useEmit, ref, html } from '../../lib';
 
-component("baby", () => {
+component('baby', () => {
   const props = useProps({
-    babyText: ''
+    babyText: '',
   });
   const emit = useEmit();
   return html`
@@ -11,17 +11,18 @@ component("baby", () => {
         type="text"
         class="border border-neutral-300 p-2 rounded-sm"
         :value="${props.babyText}"
-        @input="${(e: Event) => emit('update:babyText', (e.target as HTMLInputElement).value)}"
+        @input="${(e: Event) =>
+          emit('update:babyText', (e.target as HTMLInputElement).value)}"
       />
     </div>
   `;
-})
+});
 
-component("child", () =>{
+component('child', () => {
   const props = useProps({
-    test: ''
+    test: '',
   });
-  const text = ref("baby text");
+  const text = ref('baby text');
 
   const emit = useEmit();
 
@@ -44,14 +45,14 @@ component("child", () =>{
   `;
 });
 
-component("parent", () => {
+component('parent', () => {
   const value = ref('Initial Value');
   const anotherValue = ref('Initial Prop Value');
   const resetValue = () => {
     console.log('Resetting value');
     value.value = 'Initial Value';
     anotherValue.value = 'Initial Prop Value';
-  }
+  };
   return html`
     <div class="p-4 border rounded-sm space-y-4">
       <h2 class="text-xl font-bold">Baby Child Parent Example</h2>

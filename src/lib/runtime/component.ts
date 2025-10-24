@@ -4,23 +4,31 @@ import type {
   Refs,
   WatcherState,
   VNode,
-} from "./types";
-import { reactiveSystem, isReactiveState } from "./reactive";
-import { toKebab, safe } from "./helpers";
-import { initWatchers, triggerWatchers } from "./watchers";
-import { applyProps } from "./props";
+} from './types';
+import { reactiveSystem, isReactiveState } from './reactive';
+import { toKebab, safe } from './helpers';
+import { initWatchers, triggerWatchers } from './watchers';
+import { applyProps } from './props';
 import {
   handleConnected,
   handleDisconnected,
   handleAttributeChanged,
-} from "./lifecycle";
-import { renderComponent, requestRender, applyStyle } from "./render";
-import { scheduleDOMUpdate } from "./scheduler";
+} from './lifecycle';
+import { renderComponent, requestRender, applyStyle } from './render';
+import { scheduleDOMUpdate } from './scheduler';
 import {
   setCurrentComponentContext,
   clearCurrentComponentContext,
-} from "./hooks";
-import { devError, devWarn } from "./logger";
+} from './hooks';
+import { devError, devWarn } from './logger';
+
+// Interface for custom element with framework-specific properties
+interface CustomElement extends HTMLElement {
+  _cfg?: ComponentConfig<object, object, object>;
+  _render?: (config: ComponentConfig<object, object, object>) => void;
+  onLoadingStateChange?: (loading: boolean) => void;
+  onErrorStateChange?: (error: Error | null) => void;
+}
 
 /**
  * @internal
@@ -29,21 +37,37 @@ import { devError, devWarn } from "./logger";
  * published package in consumer code — it is intended for runtime/HMR and
  * internal tests only. Consumers should use the public `component` API.
  */
-export const registry = new Map<string, ComponentConfig<any, any, any>>();
+export const registry = new Map<
+  string,
+  ComponentConfig<object, object, object>
+>();
 
 // Expose the registry for browser/HMR use without overwriting existing globals
 // (avoid cross-request mutation in SSR and preserve HMR behavior).
-const GLOBAL_REG_KEY = Symbol.for("cer.registry");
-if (typeof window !== "undefined") {
-  const g = globalThis as any;
-  // Authoritative, collision-safe slot for programmatic access
-  if (!g[GLOBAL_REG_KEY]) g[GLOBAL_REG_KEY] = registry;
+const GLOBAL_REG_KEY = Symbol.for('cer.registry');
+
+/**
+ * Lazily initialize the global registry slot. This avoids performing a
+ * write to globalThis at module-import time (which is a side-effect that
+ * prevents bundlers from tree-shaking). Call this from entry points that
+ * actually need the registry (for example `component()`) so the module
+ * remains import-side-effect-free.
+ */
+function initGlobalRegistryIfNeeded(): void {
+  if (typeof window !== 'undefined') {
+    const g = globalThis as Record<string | symbol, unknown>;
+    if (!g[GLOBAL_REG_KEY]) g[GLOBAL_REG_KEY] = registry;
+  }
 }
 
 // --- Hot Module Replacement (HMR) ---
 if (
-  typeof import.meta !== "undefined" &&
-  (import.meta as any).hot &&
+  typeof import.meta !== 'undefined' &&
+  (
+    import.meta as {
+      hot?: { accept: (fn: (newModule?: unknown) => void) => void };
+    }
+  ).hot &&
   import.meta &&
   import.meta.hot
 ) {
@@ -53,17 +77,18 @@ if (
       for (const [tag, newConfig] of newModule.registry.entries()) {
         registry.set(tag, newConfig);
         // Update all instances to use new config
-        if (typeof document !== "undefined") {
+        if (typeof document !== 'undefined') {
           document.querySelectorAll(tag).forEach((el) => {
-            if (typeof (el as any)._cfg !== "undefined") {
-              (el as any)._cfg = newConfig;
+            const customEl = el as CustomElement;
+            if (typeof customEl._cfg !== 'undefined') {
+              customEl._cfg = newConfig;
             }
             // HMR: Preserve existing state by keeping the context object intact.
             // Instead of re-executing the component function (which would create new refs),
             // we just update the config and re-render with the existing context.
             // This ensures refs and other reactive state are preserved across HMR updates.
-            if (typeof (el as any)._render === "function") {
-              (el as any)._render(newConfig);
+            if (typeof customEl._render === 'function') {
+              customEl._render(newConfig);
             }
           });
         }
@@ -76,16 +101,16 @@ export function createElementClass<
   S extends object,
   C extends object,
   P extends object,
-  T extends object = any
+  T extends object = object,
 >(
   tag: string,
-  config: ComponentConfig<S, C, P, T>
+  config: ComponentConfig<S, C, P, T>,
 ): CustomElementConstructor | { new (): object } {
   // Validate that render is provided
   if (!config.render) {
-    throw new Error("Component must have a render function");
+    throw new Error('Component must have a render function');
   }
-  if (typeof window === "undefined") {
+  if (typeof window === 'undefined') {
     // SSR fallback: minimal class, no DOM, no lifecycle, no "this"
     return class {
       constructor() {}
@@ -93,7 +118,7 @@ export function createElementClass<
   }
   return class extends HTMLElement {
     public context: ComponentContext<S, C, P, T>;
-    private _refs: Refs["refs"] = {};
+    private _refs: Refs['refs'] = {};
     private _listeners: Array<() => void> = [];
     private _watchers: Map<string, WatcherState> = new Map();
     /** @internal */
@@ -106,7 +131,7 @@ export function createElementClass<
 
     private _styleSheet: CSSStyleSheet | null = null;
 
-    private _lastHtmlStringForJitCSS = "";
+    private _lastHtmlStringForJitCSS = '';
 
     /**
      * Returns the last rendered HTML string for JIT CSS.
@@ -137,7 +162,7 @@ export function createElementClass<
 
     constructor() {
       super();
-      this.attachShadow({ mode: "open" });
+      this.attachShadow({ mode: 'open' });
       // Always read the latest config from the registry so re-registration
       // (HMR / tests) updates future instances.
       this._cfg = (registry.get(tag) as ComponentConfig<S, C, P, T>) || config;
@@ -148,7 +173,11 @@ export function createElementClass<
       const reactiveContext = this._initContext(config);
 
       // Helper to define non-enumerable properties
-      const defineNonEnum = (obj: any, key: string, value: any) => {
+      const defineNonEnum = (
+        obj: Record<string, unknown>,
+        key: string,
+        value: unknown,
+      ) => {
         Object.defineProperty(obj, key, {
           value,
           writable: false,
@@ -158,18 +187,19 @@ export function createElementClass<
       };
 
       // Inject refs into context (non-enumerable to avoid proxy traps)
-      defineNonEnum(reactiveContext, "refs", this._refs);
-      defineNonEnum(reactiveContext, "requestRender", () =>
-        this.requestRender()
+      defineNonEnum(reactiveContext, 'refs', this._refs);
+      defineNonEnum(reactiveContext, 'requestRender', () =>
+        this.requestRender(),
       );
-      defineNonEnum(reactiveContext, "_requestRender", () =>
-        this._requestRender()
+      defineNonEnum(reactiveContext, '_requestRender', () =>
+        this._requestRender(),
       );
-      defineNonEnum(reactiveContext, "_componentId", this._componentId);
+      defineNonEnum(reactiveContext, '_componentId', this._componentId);
       defineNonEnum(
         reactiveContext,
-        "_triggerWatchers",
-        (path: string, newValue: any) => this._triggerWatchers(path, newValue)
+        '_triggerWatchers',
+        (path: string, newValue: unknown) =>
+          this._triggerWatchers(path, newValue),
       );
 
       // --- Apply props BEFORE wiring listeners and emit ---
@@ -179,7 +209,7 @@ export function createElementClass<
       // serialized (e.g., objects became "[object Object]"). This is added
       // as a non-enumerable field to avoid interfering with reactive proxy.
       safe(() => {
-        defineNonEnum(reactiveContext, "_host", this);
+        defineNonEnum(reactiveContext, '_host', this);
       });
       // Defer applying props until connectedCallback so attributes that are
       // set by the parent renderer (after element construction) are available.
@@ -191,8 +221,8 @@ export function createElementClass<
       // Emits a DOM CustomEvent and returns whether it was not defaultPrevented.
       defineNonEnum(
         this.context,
-        "emit",
-        (eventName: string, detail?: any, options?: CustomEventInit) => {
+        'emit',
+        (eventName: string, detail?: unknown, options?: CustomEventInit) => {
           const eventOptions = {
             detail,
             bubbles: true,
@@ -205,20 +235,18 @@ export function createElementClass<
           this.dispatchEvent(ev);
 
           // Dispatch alternate camel/kebab variation for compatibility
-          const colonIndex = eventName.indexOf(":");
+          const colonIndex = eventName.indexOf(':');
           if (colonIndex > 0) {
             const prefix = eventName.substring(0, colonIndex);
             const prop = eventName.substring(colonIndex + 1);
-            const altName = prop.includes("-")
+            const altName = prop.includes('-')
               ? `${prefix}:${prop
-                  .split("-")
+                  .split('-')
                   .map((p, i) =>
-                    i === 0 ? p : p.charAt(0).toUpperCase() + p.slice(1)
+                    i === 0 ? p : p.charAt(0).toUpperCase() + p.slice(1),
                   )
-                  .join("")}`
-              : `${prefix}:${prop
-                  .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
-                  .toLowerCase()}`;
+                  .join('')}`
+              : `${prefix}:${prop.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase()}`;
             if (altName !== eventName) {
               safe(() => {
                 this.dispatchEvent(new CustomEvent(altName, eventOptions));
@@ -227,7 +255,7 @@ export function createElementClass<
           }
 
           return !ev.defaultPrevented;
-        }
+        },
       );
 
       // --- Inject config methods into context ---
@@ -238,18 +266,19 @@ export function createElementClass<
       const cfgToUse =
         (registry.get(tag) as ComponentConfig<S, C, P, T>) || config;
       for (const key in cfgToUse) {
-        const fn = (cfgToUse as any)[key];
-        if (typeof fn === "function") {
+        const fn = (cfgToUse as Record<string, unknown>)[key];
+        if (typeof fn === 'function') {
           // Expose as context method: context.fn(...args) => fn(...args, context)
-          (this.context as any)[key] = (...args: any[]) =>
-            fn(...args, this.context);
+          (this.context as Record<string, unknown>)[key] = (
+            ...args: unknown[]
+          ) => fn(...args, this.context);
         }
       }
 
       // Set up reactive property setters for all props to detect external changes
       if (cfgToUse.props) {
         for (const propName in cfgToUse.props) {
-          let internalValue = (this as any)[propName];
+          let internalValue = (this as Record<string, unknown>)[propName];
 
           Object.defineProperty(this, propName, {
             get() {
@@ -260,7 +289,7 @@ export function createElementClass<
               internalValue = newValue;
 
               // Update the context to trigger watchers
-              (this.context as any)[propName] = newValue;
+              (this.context as Record<string, unknown>)[propName] = newValue;
 
               // Apply props to sync with context
               if (!this._initializing) {
@@ -324,7 +353,7 @@ export function createElementClass<
           },
           (val) => {
             this._mounted = val;
-          }
+          },
         );
       });
     }
@@ -332,7 +361,7 @@ export function createElementClass<
     attributeChangedCallback(
       name: string,
       oldValue: string | null,
-      newValue: string | null
+      newValue: string | null,
     ) {
       this._runLogicWithinErrorBoundary(config, () => {
         this._applyProps(config);
@@ -360,25 +389,33 @@ export function createElementClass<
           (html) => {
             this._lastHtmlStringForJitCSS = html;
             // Optionally, use the latest HTML string for debugging or external logic
-            if (typeof (this as any).onHtmlStringUpdate === "function") {
-              (this as any).onHtmlStringUpdate(html);
+            if (
+              typeof (this as { onHtmlStringUpdate?: (html: string) => void })
+                .onHtmlStringUpdate === 'function'
+            ) {
+              const htmlUpdater = this as unknown as
+                | { onHtmlStringUpdate?: (html: string) => void }
+                | undefined;
+              htmlUpdater?.onHtmlStringUpdate?.(html as string);
             }
           },
           (val) => {
             this._templateLoading = val;
             // Optionally, use loading state for external logic
-            if (typeof (this as any).onLoadingStateChange === "function") {
-              (this as any).onLoadingStateChange(val);
-            }
+            const selfAsAny = this as unknown as
+              | { onLoadingStateChange?: (val: boolean) => void }
+              | undefined;
+            selfAsAny?.onLoadingStateChange?.(val);
           },
           (err) => {
             this._templateError = err;
             // Optionally, use error state for external logic
-            if (typeof (this as any).onErrorStateChange === "function") {
-              (this as any).onErrorStateChange(err);
-            }
+            const selfAsAny2 = this as unknown as
+              | { onErrorStateChange?: (err: Error) => void }
+              | undefined;
+            selfAsAny2?.onErrorStateChange?.(err as Error);
           },
-          (html) => this._applyStyle(cfg, html)
+          (html) => this._applyStyle(cfg, html),
         );
       });
     }
@@ -404,7 +441,7 @@ export function createElementClass<
             this._renderTimeoutId,
             (id) => {
               this._renderTimeoutId = id;
-            }
+            },
           );
         }, this._componentId);
       });
@@ -420,7 +457,7 @@ export function createElementClass<
           this._styleSheet,
           (sheet) => {
             this._styleSheet = sheet;
-          }
+          },
         );
       });
     }
@@ -428,7 +465,7 @@ export function createElementClass<
     // --- Error Boundary function ---
     private _runLogicWithinErrorBoundary(
       cfg: ComponentConfig<S, C, P, T>,
-      fn: () => void
+      fn: () => void,
     ) {
       if (this._hasError) this._hasError = false;
       try {
@@ -438,19 +475,16 @@ export function createElementClass<
 
         // DEV-only diagnostic: provide actionable context to help debugging
         try {
-          const tag =
-            (cfg && (cfg as any).tag) ||
-            this.tagName?.toLowerCase?.() ||
-            "<unknown>";
-          const compId = this._componentId || "<unknown-id>";
-          const safeProps: Record<string, any> = {};
-          if (cfg && (cfg as any).props) {
-            for (const k of Object.keys((cfg as any).props)) {
+          const tag = this.tagName?.toLowerCase?.() || '<unknown>';
+          const compId = this._componentId || '<unknown-id>';
+          const safeProps: Record<string, unknown> = {};
+          if (cfg && cfg.props) {
+            for (const k of Object.keys(cfg.props)) {
               try {
-                const v = (this.context as any)[k];
+                const v = (this.context as Record<string, unknown>)[k];
                 if (v instanceof Node) {
                   safeProps[k] = `[DOM Node: ${v.nodeName}]`;
-                } else if (typeof v === "object" && v !== null) {
+                } else if (typeof v === 'object' && v !== null) {
                   safeProps[k] =
                     Object.keys(v).length > 5
                       ? `[object(${Object.keys(v).length} keys)]`
@@ -458,18 +492,18 @@ export function createElementClass<
                 } else {
                   safeProps[k] = v;
                 }
-              } catch (e) {
-                safeProps[k] = "[unreadable]";
+              } catch {
+                safeProps[k] = '[unreadable]';
               }
             }
           }
 
           devError(`Error rendering component <${tag}> (id=${compId}):`, error);
-          devError("Component props snapshot:", safeProps);
+          devError('Component props snapshot:', safeProps);
           devWarn(
-            "Common causes: accessing properties of null/undefined inside template interpolations; expensive or throwing expressions inside templates that evaluate eagerly. Fixes: use optional chaining (obj?.prop), guard with ternary, or use the runtime lazy overload: when(cond, () => html`...`)."
+            'Common causes: accessing properties of null/undefined inside template interpolations; expensive or throwing expressions inside templates that evaluate eagerly. Fixes: use optional chaining (obj?.prop), guard with ternary, or use the runtime lazy overload: when(cond, () => html`...`).',
           );
-        } catch (e) {
+        } catch {
           // best-effort diagnostics - swallow failures here to preserve original behavior
         }
 
@@ -481,11 +515,12 @@ export function createElementClass<
 
     // --- State, props, computed ---
     private _initContext(
-      cfg: ComponentConfig<S, C, P, T>
+      cfg: ComponentConfig<S, C, P, T>,
     ): ComponentContext<S, C, P, T> {
       try {
+        // eslint-disable-next-line @typescript-eslint/no-this-alias
         const self = this;
-        function createReactive(obj: any, path = ""): any {
+        function createReactive<T>(obj: T, path = ''): T {
           if (Array.isArray(obj)) {
             // Create a proxy that intercepts array mutations
             return new Proxy(obj, {
@@ -493,26 +528,26 @@ export function createElementClass<
                 const value = Reflect.get(target, prop, receiver);
 
                 // Intercept array mutating methods
-                if (typeof value === "function" && typeof prop === "string") {
+                if (typeof value === 'function' && typeof prop === 'string') {
                   const mutatingMethods = [
-                    "push",
-                    "pop",
-                    "shift",
-                    "unshift",
-                    "splice",
-                    "sort",
-                    "reverse",
+                    'push',
+                    'pop',
+                    'shift',
+                    'unshift',
+                    'splice',
+                    'sort',
+                    'reverse',
                   ];
                   if (mutatingMethods.includes(prop)) {
-                    return function (...args: any[]) {
+                    return function (...args: unknown[]) {
                       const result = value.apply(target, args);
 
                       if (!self._initializing) {
-                        const fullPath = path || "root";
+                        const fullPath = path || 'root';
                         self._triggerWatchers(fullPath, target);
                         scheduleDOMUpdate(
                           () => self._render(cfg),
-                          self._componentId
+                          self._componentId,
                         );
                       }
 
@@ -524,7 +559,7 @@ export function createElementClass<
                 return value;
               },
               set(target, prop, value) {
-                target[prop as any] = value;
+                (target as Record<string, unknown>)[String(prop)] = value;
                 if (!self._initializing) {
                   const fullPath = path
                     ? `${path}.${String(prop)}`
@@ -535,7 +570,7 @@ export function createElementClass<
                 return true;
               },
               deleteProperty(target, prop) {
-                delete target[prop as any];
+                delete (target as Record<string, unknown>)[String(prop)];
                 if (!self._initializing) {
                   const fullPath = path
                     ? `${path}.${String(prop)}`
@@ -547,7 +582,7 @@ export function createElementClass<
               },
             });
           }
-          if (obj && typeof obj === "object") {
+          if (obj && typeof obj === 'object') {
             // Skip ReactiveState objects to avoid corrupting their internal structure
             if (isReactiveState(obj)) {
               return obj;
@@ -562,9 +597,13 @@ export function createElementClass<
                 const fullPath = path
                   ? `${path}.${String(prop)}`
                   : String(prop);
-                target[prop as any] = createReactive(value, fullPath);
+                (target as Record<string, unknown>)[String(prop)] =
+                  createReactive(value, fullPath);
                 if (!self._initializing) {
-                  self._triggerWatchers(fullPath, target[prop as any]);
+                  self._triggerWatchers(
+                    fullPath,
+                    (target as Record<string, unknown>)[String(prop)],
+                  );
                   scheduleDOMUpdate(() => self._render(cfg), self._componentId);
                 }
                 return true;
@@ -584,11 +623,11 @@ export function createElementClass<
                 Object.entries(cfg.props).map(([key, def]) => [
                   key,
                   def.default,
-                ])
+                ]),
               )
             : {}),
         }) as ComponentContext<S, C, P, T>;
-      } catch (error) {
+      } catch {
         return {} as ComponentContext<S, C, P, T>;
       }
     }
@@ -598,12 +637,12 @@ export function createElementClass<
         initWatchers(
           this.context,
           this._watchers,
-          {} // Watchers are now handled by the watch() function in functional API
+          {}, // Watchers are now handled by the watch() function in functional API
         );
       });
     }
 
-    private _triggerWatchers(path: string, newValue: any): void {
+    private _triggerWatchers(path: string, newValue: unknown): void {
       triggerWatchers(this.context, this._watchers, path, newValue);
     }
 
@@ -662,56 +701,60 @@ export function createElementClass<
 // Overload: No parameters - use useProps() hook for props access
 export function component(
   tag: string,
-  renderFn: () => VNode | VNode[] | Promise<VNode | VNode[]>
+  renderFn: () => VNode | VNode[] | Promise<VNode | VNode[]>,
 ): void;
 
 // Implementation
 export function component(
   tag: string,
-  renderFn: () => VNode | VNode[] | Promise<VNode | VNode[]>
+  renderFn: () => VNode | VNode[] | Promise<VNode | VNode[]>,
 ): void {
+  // Ensure the global registry is exposed when running in a browser. This is
+  // performed lazily to avoid module-load side-effects that prevent
+  // tree-shaking by bundlers.
+  initGlobalRegistryIfNeeded();
   let normalizedTag = toKebab(tag);
-  if (!normalizedTag.includes("-")) {
+  if (!normalizedTag.includes('-')) {
     normalizedTag = `cer-${normalizedTag}`;
   }
 
   // Store lifecycle hooks from the render function
-  let lifecycleHooks: {
+  const lifecycleHooks: {
     onConnected?: () => void;
     onDisconnected?: () => void;
     onAttributeChanged?: (
       name: string,
       oldValue: string | null,
-      newValue: string | null
+      newValue: string | null,
     ) => void;
     onError?: (error: Error) => void;
   } = {};
 
   // Create component config
-  const config: ComponentConfig<{}, {}, {}, {}> = {
+  const config: ComponentConfig<object, object, object, object> = {
     // Props are accessed via useProps() hook
     props: {},
 
     // Add lifecycle hooks from the stored functions
-    onConnected: (_context) => {
+    onConnected: () => {
       if (lifecycleHooks.onConnected) {
         lifecycleHooks.onConnected();
       }
     },
 
-    onDisconnected: (_context) => {
+    onDisconnected: () => {
       if (lifecycleHooks.onDisconnected) {
         lifecycleHooks.onDisconnected();
       }
     },
 
-    onAttributeChanged: (name, oldValue, newValue, _context) => {
+    onAttributeChanged: (name, oldValue, newValue) => {
       if (lifecycleHooks.onAttributeChanged) {
         lifecycleHooks.onAttributeChanged(name, oldValue, newValue);
       }
     },
 
-    onError: (error, _context) => {
+    onError: (error) => {
       if (lifecycleHooks.onError && error) {
         lifecycleHooks.onError(error);
       }
@@ -720,8 +763,26 @@ export function component(
     render: (context) => {
       // Track dependencies for rendering
       // Use stable component ID from context if available, otherwise generate new one
+      type InternalContext = Record<string, unknown> & {
+        _componentId?: string;
+        _hookCallbacks?: Record<string, unknown> & {
+          onConnected?: () => void;
+          onDisconnected?: () => void;
+          onAttributeChanged?: (
+            name: string,
+            oldValue: string | null,
+            newValue: string | null,
+          ) => void;
+          onError?: (err: unknown) => void;
+          style?: (el: HTMLElement) => void;
+          props?: Record<string, unknown>;
+        };
+        _styleCallback?: (el: HTMLElement) => void;
+      };
+
+      const ictx = context as InternalContext;
       const componentId =
-        (context as any)._componentId ||
+        ictx._componentId ||
         `${normalizedTag}-${Math.random().toString(36).substr(2, 9)}`;
 
       reactiveSystem.setCurrentComponent(componentId, () => {
@@ -738,28 +799,28 @@ export function component(
         // If renderFn throws synchronously (for example due to eager interpolation
         // inside templates), invoke any useOnError hook that the component may
         // have already registered during the render execution before rethrowing.
-        let result: any;
+        let result: VNode | VNode[] | Promise<VNode | VNode[]>;
         try {
           result = renderFn();
         } catch (err) {
           try {
-            const hookCallbacks = (context as any)?._hookCallbacks;
-            if (hookCallbacks && typeof hookCallbacks.onError === "function") {
+            const hookCallbacks = ictx._hookCallbacks;
+            if (hookCallbacks && typeof hookCallbacks.onError === 'function') {
               try {
-                hookCallbacks.onError(err);
-              } catch (e) {
+                (hookCallbacks.onError as (e: unknown) => void)(err);
+              } catch {
                 /* swallow */
               }
             }
-          } catch (e) {
+          } catch {
             /* best-effort */
           }
           throw err;
         }
 
         // Process hook callbacks that were set during render
-        if ((context as any)._hookCallbacks) {
-          const hookCallbacks = (context as any)._hookCallbacks;
+        if (ictx._hookCallbacks) {
+          const hookCallbacks = ictx._hookCallbacks;
           if (hookCallbacks.onConnected) {
             lifecycleHooks.onConnected = hookCallbacks.onConnected;
           }
@@ -768,33 +829,44 @@ export function component(
           }
           if (hookCallbacks.onAttributeChanged) {
             lifecycleHooks.onAttributeChanged =
-              hookCallbacks.onAttributeChanged;
+              hookCallbacks.onAttributeChanged as (
+                name: string,
+                oldValue: string | null,
+                newValue: string | null,
+              ) => void;
           }
           if (hookCallbacks.onError) {
-            lifecycleHooks.onError = hookCallbacks.onError;
+            lifecycleHooks.onError = hookCallbacks.onError as (
+              err: Error,
+            ) => void;
           }
           if (hookCallbacks.style) {
             // Store the style callback in the context for applyStyle to use
-            (context as any)._styleCallback = hookCallbacks.style;
+            ictx._styleCallback = hookCallbacks.style as (
+              el: HTMLElement,
+            ) => void;
           }
           // If useProps() was called, update config.props with the defaults
           if (hookCallbacks.props) {
-            const propsDefaults = hookCallbacks.props;
+            const propsDefaults = hookCallbacks.props as Record<
+              string,
+              unknown
+            >;
             config.props = Object.fromEntries(
               Object.entries(propsDefaults).map(([key, defaultValue]) => {
                 const type =
-                  typeof defaultValue === "boolean"
+                  typeof defaultValue === 'boolean'
                     ? Boolean
-                    : typeof defaultValue === "number"
-                    ? Number
-                    : typeof defaultValue === "string"
-                    ? String
-                    : Function; // Use Function for complex types
+                    : typeof defaultValue === 'number'
+                      ? Number
+                      : typeof defaultValue === 'string'
+                        ? String
+                        : Function; // Use Function for complex types
                 return [
                   key,
                   { type, default: defaultValue as string | number | boolean },
                 ];
-              })
+              }),
             );
             // Update the registry so future instances and observedAttributes use the updated config
             registry.set(normalizedTag, config);
@@ -815,12 +887,21 @@ export function component(
   // CRITICAL: Perform a "discovery render" to detect props from useProps()
   // This must happen BEFORE defining the custom element, so observedAttributes
   // includes all props declared via useProps()
-  if (typeof window !== "undefined") {
+  if (typeof window !== 'undefined') {
     try {
       // Create a minimal mock context for discovery
-      const discoveryContext: any = {
+      const discoveryContext: {
+        _hookCallbacks: Record<string, unknown>;
+        requestRender: () => void;
+        emit?: (eventName: string, detail?: unknown) => boolean;
+      } = {
         _hookCallbacks: {},
         requestRender: () => {},
+        // Provide a noop emit during discovery render so hooks like useEmit()
+        // can be called safely when the component author invokes them at
+        // module-evaluation time to declare handlers. The real element
+        // instances will have a proper emit implementation.
+        emit: () => true,
       };
       setCurrentComponentContext(discoveryContext);
       try {
@@ -831,23 +912,27 @@ export function component(
         renderFn();
       } catch (err) {
         try {
-          const hookCallbacks = (discoveryContext as any)?._hookCallbacks;
-          if (hookCallbacks && typeof hookCallbacks.onError === "function") {
+          const hookCallbacks = (
+            discoveryContext as {
+              _hookCallbacks?: { onError?: (err: unknown) => void };
+            }
+          )?._hookCallbacks;
+          if (hookCallbacks && typeof hookCallbacks.onError === 'function') {
             try {
               hookCallbacks.onError(err);
-            } catch (e) {
+            } catch {
               /* swallow */
             }
           }
           // DEV diagnostics for discovery-time failures
           devError(
             `Error during component discovery render <${normalizedTag}>:`,
-            err
+            err,
           );
           devWarn(
-            "Error occurred during initial component discovery render. Consider guarding expensive expressions or using lazy factories for directives like when()."
+            'Error occurred during initial component discovery render. Consider guarding expensive expressions or using lazy factories for directives like when().',
           );
-        } catch (e) {
+        } catch {
           /* best-effort */
         }
         clearCurrentComponentContext();
@@ -861,30 +946,30 @@ export function component(
         config.props = Object.fromEntries(
           Object.entries(propsDefaults).map(([key, defaultValue]) => {
             const type =
-              typeof defaultValue === "boolean"
+              typeof defaultValue === 'boolean'
                 ? Boolean
-                : typeof defaultValue === "number"
-                ? Number
-                : typeof defaultValue === "string"
-                ? String
-                : Function;
+                : typeof defaultValue === 'number'
+                  ? Number
+                  : typeof defaultValue === 'string'
+                    ? String
+                    : Function;
             return [
               key,
               { type, default: defaultValue as string | number | boolean },
             ];
-          })
+          }),
         );
         // Update registry with discovered props
         registry.set(normalizedTag, config);
       }
-    } catch (e) {
+    } catch {
       // Discovery render failed - this is OK, props will be discovered on first real render
     }
 
     if (!customElements.get(normalizedTag)) {
       customElements.define(
         normalizedTag,
-        createElementClass(normalizedTag, config) as CustomElementConstructor
+        createElementClass(normalizedTag, config) as CustomElementConstructor,
       );
     }
   }

@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
-import { decodeEntities, clearRegisteredEntityMap } from '../src/lib/runtime/helpers';
+import {
+  decodeEntities,
+  clearRegisteredEntityMap,
+} from '../src/lib/runtime/helpers';
 import * as logger from '../src/lib/runtime/logger';
 
 describe('decodeEntities SSR fallback warning', () => {
@@ -8,8 +11,8 @@ describe('decodeEntities SSR fallback warning', () => {
     // Ensure no DOM global is present (simulate SSR) and clear any registered map
     // Some environments may have document; tests in this repo run under jsdom by default
     // so temporarily delete it if present to force SSR code path.
-    // @ts-ignore
-    if (typeof globalThis.document !== 'undefined') delete (globalThis as any).document;
+    if (typeof globalThis.document !== 'undefined')
+      delete (globalThis as any).document;
 
     // Clear any registered map and internal flags on decodeEntities
     clearRegisteredEntityMap();

@@ -9,14 +9,22 @@ The event bus is a lightweight publish/subscribe system for sending and receivin
 ## 🚀 Importing
 
 **Standard API:**
+
 ```ts
-import { eventBus } from '@jasonshimmy/custom-elements-runtime';
+import { eventBus } from '@jasonshimmy/custom-elements-runtime/event-bus';
 ```
 
 **✨ Shorthand API (Recommended):**
+
 ```ts
 // Import shorthand functions for cleaner code
-import { emit, on, off, once, listen } from '@jasonshimmy/custom-elements-runtime';
+import {
+  emit,
+  on,
+  off,
+  once,
+  listen,
+} from '@jasonshimmy/custom-elements-runtime/event-bus';
 
 // Use directly without eventBus prefix
 emit('cart:add', { id: 123 });
@@ -83,16 +91,27 @@ component('notification-sender', () => {
 // Receiver component
 component('notification-receiver', () => {
   const message = ref('');
-  
+
+  // Subscribe on connect and clean up on disconnect so we don't leak handlers
+  let unsubscribe: (() => void) | null = null;
+
   useOnConnected(() => {
-    const unsubscribe = eventBus.on('notify', (msg) => {
+    unsubscribe = eventBus.on('notify', (msg) => {
       message.value = msg;
     });
-    
-    // Return cleanup function
-    return unsubscribe;
   });
-  
+
+  useOnDisconnected(() => {
+    if (unsubscribe) {
+      try {
+        unsubscribe();
+      } catch {
+        /* swallow */
+      }
+      unsubscribe = null;
+    }
+  });
+
   return html`
     <div class="notification">
       ${message.value && html`<p>Received: ${message.value}</p>`}

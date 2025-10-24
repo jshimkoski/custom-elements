@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { parseColorClass, parseArbitrary, parseSpacing } from '../src/lib/runtime/style';
+import {
+  parseColorClass,
+  parseArbitrary,
+  parseSpacing,
+} from '../src/lib/runtime/style';
 
 describe('style runtime helpers', () => {
   it('parseColorClass sets --ce-shadow-color for shadow tokens', () => {

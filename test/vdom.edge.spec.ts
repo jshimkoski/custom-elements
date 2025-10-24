@@ -13,15 +13,15 @@ import {
   patchChildren,
   patch,
   vdomRenderer,
-  renderToString,
 } from '../src/lib/runtime/vdom';
+import { renderToString } from '../src/lib/runtime/vdom-ssr';
 import { getNestedValue, setNestedValue } from '../src/lib/runtime/helpers';
 import type { VNode, VDomRefs } from '../src/lib/runtime/types';
 
 describe('vdom.ts edge cases', () => {
   it('cleanupRefs does nothing for non-HTMLElement', () => {
     const text = document.createTextNode('hi');
-  const refs: Record<string, any> = { foo: text };
+    const refs: Record<string, any> = { foo: text };
     cleanupRefs(text, refs);
     expect(refs.foo).toBe(text);
   });
@@ -40,7 +40,15 @@ describe('vdom.ts edge cases', () => {
     const props: any = {};
     const attrs: any = {};
     const listeners: any = {};
-    processModelDirective('foo', [], props, attrs, listeners, undefined, undefined);
+    processModelDirective(
+      'foo',
+      [],
+      props,
+      attrs,
+      listeners,
+      undefined,
+      undefined,
+    );
     expect(props).toEqual({});
     expect(attrs).toEqual({});
     expect(listeners).toEqual({});
@@ -69,7 +77,7 @@ describe('vdom.ts edge cases', () => {
   it('processStyleDirective does nothing if context is missing and value is string', () => {
     const attrs: any = {};
     processStyleDirective('foo', attrs, undefined);
-  expect(attrs.style).toBeUndefined();
+    expect(attrs.style).toBeUndefined();
   });
 
   it('processDirectives handles unknown directive', () => {
@@ -89,7 +97,11 @@ describe('vdom.ts edge cases', () => {
   it('patchProps removes attribute if newVal is false', () => {
     const el = document.createElement('input');
     el.setAttribute('foo', 'bar');
-    patchProps(el, { props: {}, attrs: { foo: 'bar' } }, { props: {}, attrs: { foo: false } });
+    patchProps(
+      el,
+      { props: {}, attrs: { foo: 'bar' } },
+      { props: {}, attrs: { foo: false } },
+    );
     expect(el.hasAttribute('foo')).toBe(false);
   });
 
@@ -127,21 +139,30 @@ describe('vdom.ts edge cases', () => {
     expect(node.nodeType).toBe(Node.COMMENT_NODE);
   });
 
-  it.todo('vdomRenderer removes extra nodes except style [fails, might be due to no multi-root support in vdom]', () => {
-    const host = document.createElement('div');
-    const root = host.attachShadow({ mode: 'open' });
-    const vnode: VNode = { tag: 'div', props: {}, children: '' };
-    const style = document.createElement('style');
-    root.appendChild(style);
-    root.appendChild(document.createElement('span'));
-    vdomRenderer(root, vnode);
-    expect(root.querySelector('span')).toBeNull();
-    const hasStyle = Array.from(root.childNodes).some(n => n.nodeName === 'STYLE');
-    expect(hasStyle).toBe(true);
-  });
+  it.todo(
+    'vdomRenderer removes extra nodes except style [fails, might be due to no multi-root support in vdom]',
+    () => {
+      const host = document.createElement('div');
+      const root = host.attachShadow({ mode: 'open' });
+      const vnode: VNode = { tag: 'div', props: {}, children: '' };
+      const style = document.createElement('style');
+      root.appendChild(style);
+      root.appendChild(document.createElement('span'));
+      vdomRenderer(root, vnode);
+      expect(root.querySelector('span')).toBeNull();
+      const hasStyle = Array.from(root.childNodes).some(
+        (n) => n.nodeName === 'STYLE',
+      );
+      expect(hasStyle).toBe(true);
+    },
+  );
 
   it('renderToString handles props other than attrs', () => {
-    const vnode: VNode = { tag: 'div', props: { attrs: { id: 'x', 'data-foo': 'bar' } }, children: 'hi' };
+    const vnode: VNode = {
+      tag: 'div',
+      props: { attrs: { id: 'x', 'data-foo': 'bar' } },
+      children: 'hi',
+    };
     expect(renderToString(vnode)).toBe('<div id="x" data-foo="bar">hi</div>');
   });
 

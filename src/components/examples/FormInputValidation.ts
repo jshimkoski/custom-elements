@@ -2,7 +2,8 @@
  * FormInputValidation: A form with input validation and error handling.
  * Demonstrates form.value, validation, and error feedback.
  */
-import { component, html, ref, useOnConnected, when } from '../../lib';
+import { component, html, ref, useOnConnected } from '../../lib';
+import { when } from '../../lib/directives';
 
 component('form-input-validation', () => {
   const email = ref('');
@@ -75,7 +76,9 @@ component('form-input-validation', () => {
       @submit="${submit}"
     >
       <fieldset>
-        <legend class="text-2xl font-medium mb-8">Form Input Validation Demo</legend>
+        <legend class="text-2xl font-medium mb-8">
+          Form Input Validation Demo
+        </legend>
         <label class="flex flex-col items-start gap-2 w-full mb-6">
           <span class="font-semibold">Email:</span>
           <input
@@ -84,7 +87,7 @@ component('form-input-validation', () => {
             type="email"
             required
             class="w-full px-2 py-1 rounded-sm border border-neutral-300 dark:border-neutral-800 hover:bg-neutral-50 focus:bg-white dark:hover:bg-neutral-900 dark:focus:bg-black"
-          >
+          />
         </label>
         <label class="flex flex-col items-start gap-2 w-full mb-6">
           <span class="font-semibold">Username:</span>
@@ -94,7 +97,7 @@ component('form-input-validation', () => {
             minlength="3"
             required
             class="w-full px-2 py-1 rounded-sm border border-neutral-300 dark:border-neutral-800 hover:bg-neutral-50 focus:bg-white dark:hover:bg-neutral-900 dark:focus:bg-black"
-          >
+          />
         </label>
         <label class="flex flex-col items-start gap-2 w-full mb-6">
           <span class="font-semibold">Bio:</span>
@@ -108,21 +111,52 @@ component('form-input-validation', () => {
         </label>
         <div class="flex flex-col items-start gap-2 w-full mb-6">
           <span class="font-semibold">Gender:</span>
-          <label><input :model="${gender}" type="radio" value="male" name="gender"> Male</label>
-          <label><input :model="${gender}" type="radio" value="female" name="gender"> Female</label>
-          <label><input :model="${gender}" type="radio" value="other" name="gender"> Other</label>
+          <label
+            ><input
+              :model="${gender}"
+              type="radio"
+              value="male"
+              name="gender"
+            />
+            Male</label
+          >
+          <label
+            ><input
+              :model="${gender}"
+              type="radio"
+              value="female"
+              name="gender"
+            />
+            Female</label
+          >
+          <label
+            ><input
+              :model="${gender}"
+              type="radio"
+              value="other"
+              name="gender"
+            />
+            Other</label
+          >
         </div>
         <label class="flex flex-col items-start gap-2 w-full mb-6">
           <span class="font-semibold">Subscribe:</span>
-          <div>
-            <input :model="${subscribe}" type="checkbox"> Yes
-          </div>
+          <div><input :model="${subscribe}" type="checkbox" /> Yes</div>
         </label>
         <div class="flex flex-col items-start gap-2 w-full mb-6">
           <span class="font-semibold">Favorite Fruits:</span>
-          <label><input :model="${fruits}" type="checkbox" value="apple"> Apple</label>
-          <label><input :model="${fruits}" type="checkbox" value="banana"> Banana</label>
-          <label><input :model="${fruits}" type="checkbox" value="orange"> Orange</label>
+          <label
+            ><input :model="${fruits}" type="checkbox" value="apple" />
+            Apple</label
+          >
+          <label
+            ><input :model="${fruits}" type="checkbox" value="banana" />
+            Banana</label
+          >
+          <label
+            ><input :model="${fruits}" type="checkbox" value="orange" />
+            Orange</label
+          >
         </div>
         <label class="flex flex-col items-start gap-2 w-full mb-6">
           <span class="font-semibold">Country:</span>
@@ -136,16 +170,28 @@ component('form-input-validation', () => {
             <option value="uk">United Kingdom</option>
           </select>
         </label>
-        ${when(errorMessage.value !== '', html`
-          <div class="mb-6 text-sm text-error-600 dark:text-error-400">${errorMessage.value}</div>
-        `)}
+        ${when(
+          errorMessage.value !== '',
+          html`
+            <div class="mb-6 text-sm text-error-600 dark:text-error-400">
+              ${errorMessage.value}
+            </div>
+          `,
+        )}
         <button
           type="submit"
           class="px-4 py-2 bg-primary-600 text-white rounded-sm hover:bg-primary-500 focus:bg-primary-500"
-        >Submit</button>
-        ${when(successMessage.value !== '', html`
-          <div class="mt-4 text-sm text-success-600 dark:text-success-400">${successMessage.value}</div>
-        `)}
+        >
+          Submit
+        </button>
+        ${when(
+          successMessage.value !== '',
+          html`
+            <div class="mt-4 text-sm text-success-600 dark:text-success-400">
+              ${successMessage.value}
+            </div>
+          `,
+        )}
       </fieldset>
     </form>
   `;

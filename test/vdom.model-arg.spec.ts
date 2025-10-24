@@ -3,7 +3,10 @@ import { processModelDirective } from '../src/lib/runtime/vdom';
 
 describe('vdom model directive with arg (custom prop)', () => {
   it('binds checkbox to array using custom prop name and updates on change', () => {
-    const context: any = { _state: { selected: ['b'] }, _requestRender: () => {} };
+    const context: any = {
+      _state: { selected: ['b'] },
+      _requestRender: () => {},
+    };
     const props: Record<string, any> = {};
     const attrs: Record<string, any> = { value: 'b' };
     const listeners: Record<string, any> = {};
@@ -12,7 +15,16 @@ describe('vdom model directive with arg (custom prop)', () => {
     el.setAttribute('value', 'b');
 
     // Use arg 'active' instead of default 'checked'
-    processModelDirective('selected', [], props, attrs, listeners, context, el, 'active');
+    processModelDirective(
+      'selected',
+      [],
+      props,
+      attrs,
+      listeners,
+      context,
+      el,
+      'active',
+    );
 
     // props should carry our custom prop when different from DOM
     expect(props).toBeDefined();
@@ -21,7 +33,11 @@ describe('vdom model directive with arg (custom prop)', () => {
 
     // Simulate user checking the box
     (el as HTMLInputElement).checked = true;
-    (listeners.change as any)({ target: el, isTrusted: true, isComposing: false });
+    (listeners.change as any)({
+      target: el,
+      isTrusted: true,
+      isComposing: false,
+    });
 
     // State should be updated to include 'b'
     expect(Array.isArray(context._state.selected)).toBe(true);
@@ -38,7 +54,16 @@ describe('vdom model directive with arg (custom prop)', () => {
     (el as HTMLInputElement).value = 'bar';
 
     // Use arg 'custom' to bind to a child property named 'custom'
-    processModelDirective('foo', [], props, attrs, listeners, context, el, 'custom');
+    processModelDirective(
+      'foo',
+      [],
+      props,
+      attrs,
+      listeners,
+      context,
+      el,
+      'custom',
+    );
 
     // The compiler/runtime should have set props.custom to current value
     expect(props.custom === 'bar' || props.custom === undefined).toBe(true);
@@ -47,7 +72,11 @@ describe('vdom model directive with arg (custom prop)', () => {
 
     // Simulate user typing
     (el as HTMLInputElement).value = 'baz';
-    (listeners.input as any)({ target: el, isTrusted: true, isComposing: false });
+    (listeners.input as any)({
+      target: el,
+      isTrusted: true,
+      isComposing: false,
+    });
 
     // State should update to 'baz'
     expect(context._state.foo).toBe('baz');

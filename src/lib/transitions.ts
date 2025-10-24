@@ -1,4 +1,9 @@
 /**
+ * Transitions module (top-level). This file provides the public Transition
+ * and TransitionGroup APIs. It is an explicit entry used by the build so
+ * consumers can import transitions separately: `.../transitions`.
+ */
+/**
  * Transitions Module
  * Vue-like transition system integrated with JIT CSS
  * Provides Transition and TransitionGroup components for enter/leave animations
@@ -74,7 +79,8 @@ export interface TransitionOptions extends TransitionClasses, TransitionHooks {
 /**
  * Options for TransitionGroup component
  */
-export interface TransitionGroupOptions extends Omit<TransitionOptions, 'show'> {
+export interface TransitionGroupOptions
+  extends Omit<TransitionOptions, 'show'> {
   /** HTML tag for the wrapper element */
   tag?: string;
   /** Class applied during move transitions (when items reorder) */
@@ -199,12 +205,12 @@ export const transitionPresets = {
 
 /**
  * Transition component - wraps content with enter/leave animations
- * 
+ *
  * @example
  * ```ts
  * // Using a preset
  * ${Transition({ preset: 'fade', show: isVisible.value }, html`<div>Content</div>`)}
- * 
+ *
  * // Using custom JIT classes
  * ${Transition({
  *   show: isVisible.value,
@@ -215,7 +221,7 @@ export const transitionPresets = {
  *   leaveActive: 'transition-all duration-200',
  *   leaveTo: 'opacity-0 scale-95'
  * }, html`<div>Content</div>`)}
- * 
+ *
  * // With lifecycle hooks
  * ${Transition({
  *   preset: 'slide-right',
@@ -227,7 +233,7 @@ export const transitionPresets = {
  */
 export function Transition(
   options: TransitionOptions,
-  content: VNode | VNode[]
+  content: VNode | VNode[],
 ): VNode {
   const {
     preset,
@@ -276,11 +282,12 @@ export function Transition(
   }
 
   // Create anchor block with transition metadata
-  const transitionKey = name || (preset ? `transition-${preset}` : 'transition');
+  const transitionKey =
+    name || (preset ? `transition-${preset}` : 'transition');
   const transitionVNode = anchorBlock(show ? content : [], transitionKey);
 
   // Attach metadata for VDOM to consume during patching
-  (transitionVNode as any)._transition = {
+  (transitionVNode as VNode & { _transition?: unknown })._transition = {
     name: transitionKey,
     classes: transitionClasses,
     mode,
@@ -305,7 +312,7 @@ export function Transition(
 
 /**
  * TransitionGroup component - animates lists with enter/leave/move transitions
- * 
+ *
  * @example
  * ```ts
  * // Basic usage
@@ -316,7 +323,7 @@ export function Transition(
  * }, each(items.value, (item) => html`
  *   <li key="${item.id}">${item.text}</li>
  * `))}
- * 
+ *
  * // With flex layout
  * ${TransitionGroup({
  *   preset: 'fade',
@@ -324,7 +331,7 @@ export function Transition(
  * }, each(items.value, (item) => html`
  *   <div key="${item.id}" class="flex-shrink-0">${item.text}</div>
  * `))}
- * 
+ *
  * // With grid layout
  * ${TransitionGroup({
  *   preset: 'scale',
@@ -336,7 +343,7 @@ export function Transition(
  */
 export function TransitionGroup(
   options: TransitionGroupOptions,
-  children: VNode[]
+  children: VNode[],
 ): VNode {
   const {
     tag = 'div',
@@ -389,16 +396,19 @@ export function TransitionGroup(
   }
 
   // Create wrapper element with transition group metadata
-  const groupKey = name || (preset ? `transition-group-${preset}` : 'transition-group');
-  
+  const groupKey =
+    name || (preset ? `transition-group-${preset}` : 'transition-group');
+
   // Flatten anchor block children to enable proper keyed diffing
   // When each() is used, it creates anchor blocks. We need to extract the actual elements
   // and give them keys from their anchor blocks for proper reordering
   const flattenedChildren: VNode[] = [];
-  for (const child of (show ? children : [])) {
+  for (const child of show ? children : []) {
     if (child && typeof child === 'object' && child.tag === '#anchor') {
       // Extract children from anchor block
-      const anchorChildren = Array.isArray(child.children) ? child.children : [];
+      const anchorChildren = Array.isArray(child.children)
+        ? child.children
+        : [];
       for (const anchorChild of anchorChildren) {
         if (anchorChild && typeof anchorChild === 'object') {
           // Use anchor block's key for the child element
@@ -407,8 +417,8 @@ export function TransitionGroup(
             key: child.key || anchorChild.key,
             props: {
               ...anchorChild.props,
-              _anchorKey: child.key // Preserve original anchor key
-            }
+              _anchorKey: child.key, // Preserve original anchor key
+            },
           };
           flattenedChildren.push(keyedChild);
         } else {
@@ -419,7 +429,17 @@ export function TransitionGroup(
       flattenedChildren.push(child);
     }
   }
-  
+
+  // Serialize style object to a CSS string for the attrs record so it matches
+  // the expected primitive attribute value types.
+  const styleAttr = (() => {
+    if (!style) return undefined;
+    if (typeof style === 'string') return style;
+    return Object.entries(style)
+      .map(([k, v]) => `${k}: ${v}`)
+      .join('; ');
+  })();
+
   return {
     tag,
     children: flattenedChildren,
@@ -427,7 +447,7 @@ export function TransitionGroup(
     props: {
       attrs: {
         ...(className ? { class: className } : {}),
-        ...(style ? { style: style } : {}),
+        ...(styleAttr ? { style: styleAttr } : {}),
       },
       _transitionGroup: {
         name: groupKey,
@@ -454,7 +474,7 @@ export function TransitionGroup(
 
 /**
  * Helper to create custom transition presets
- * 
+ *
  * @example
  * ```ts
  * const customFade = createTransitionPreset({
@@ -465,11 +485,13 @@ export function TransitionGroup(
  *   leaveActive: 'transition-opacity duration-300 ease-in',
  *   leaveTo: 'opacity-0'
  * });
- * 
+ *
  * ${Transition({ ...customFade, show: visible.value }, content)}
  * ```
  */
-export function createTransitionPreset(classes: TransitionClasses): TransitionClasses {
+export function createTransitionPreset(
+  classes: TransitionClasses,
+): TransitionClasses {
   return { ...classes };
 }
 
@@ -485,9 +507,9 @@ let transitionStyleSheet: CSSStyleSheet | null = null;
 export function getTransitionStyleSheet(): CSSStyleSheet {
   if (!transitionStyleSheet) {
     const allClasses: string[] = [];
-    
+
     // Collect all classes from presets
-    Object.values(transitionPresets).forEach(preset => {
+    Object.values(transitionPresets).forEach((preset) => {
       if (preset.enterFrom) allClasses.push(preset.enterFrom);
       if (preset.enterActive) allClasses.push(preset.enterActive);
       if (preset.enterTo) allClasses.push(preset.enterTo);
@@ -498,7 +520,7 @@ export function getTransitionStyleSheet(): CSSStyleSheet {
 
     // Create a fake HTML string with all transition classes
     const fakeHtml = `<div class="${allClasses.join(' ')}"></div>`;
-    
+
     // Trigger JIT CSS generation
     const generatedCSS = jitCSS(fakeHtml);
 
@@ -506,7 +528,7 @@ export function getTransitionStyleSheet(): CSSStyleSheet {
     transitionStyleSheet = new CSSStyleSheet();
     transitionStyleSheet.replaceSync(generatedCSS);
   }
-  
+
   return transitionStyleSheet;
 }
 

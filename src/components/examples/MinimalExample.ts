@@ -13,6 +13,8 @@ export const MinimalExample = component('minimal-example', () => {
     <button
       class="bg-primary-600 hover:bg-primary-500 transition-colors text-white rounded-sm py-2 px-4 dark:bg-primary-700 dark:hover:bg-primary-600"
       @click="${increase}"
-    >Count: ${count.value}</button>
+    >
+      Count: ${count.value}
+    </button>
   `;
 });

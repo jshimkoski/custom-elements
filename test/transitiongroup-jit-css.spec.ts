@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { component, html, ref, each, TransitionGroup } from '../src/lib/index';
+import { component, html, ref } from '../src/lib/index';
+import { each } from '../src/lib/directives';
+import { TransitionGroup } from '../src/lib/transitions';
 
 describe('TransitionGroup class prop with JIT CSS', () => {
   beforeEach(() => {
@@ -11,30 +13,42 @@ describe('TransitionGroup class prop with JIT CSS', () => {
       const items = ref([
         { id: 1, text: 'A' },
         { id: 2, text: 'B' },
-        { id: 3, text: 'C' }
+        { id: 3, text: 'C' },
       ]);
-      
+
       return html`
         <div>
-          ${TransitionGroup({
-            preset: 'fade',
-            class: 'flex gap-4 items-center justify-between',
-            tag: 'div'
-          }, each(items.value, (item: any) => html`
-            <div key="${item.id}" class="p-4 bg-blue-100" data-test-id="${item.id}">
-              ${item.text}
-            </div>
-          `))}
+          ${TransitionGroup(
+            {
+              preset: 'fade',
+              class: 'flex gap-4 items-center justify-between',
+              tag: 'div',
+            },
+            each(
+              items.value,
+              (item: any) => html`
+                <div
+                  key="${item.id}"
+                  class="p-4 bg-blue-100"
+                  data-test-id="${item.id}"
+                >
+                  ${item.text}
+                </div>
+              `,
+            ),
+          )}
         </div>
       `;
     });
 
     const el = document.createElement('test-jit-flex') as any;
     document.body.appendChild(el);
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, 100));
 
     // Check that the wrapper has the class attribute
-    const wrapper = el.shadowRoot.querySelector('[class*="flex"]') as HTMLElement;
+    const wrapper = el.shadowRoot.querySelector(
+      '[class*="flex"]',
+    ) as HTMLElement;
     expect(wrapper).toBeTruthy();
     expect(wrapper.className).toContain('flex');
     expect(wrapper.className).toContain('gap-4');
@@ -49,14 +63,16 @@ describe('TransitionGroup class prop with JIT CSS', () => {
     let hasFlexRule = false;
     let hasGapRule = false;
     let hasItemsCenterRule = false;
-    
+
     try {
       for (const sheet of shadowRoot.adoptedStyleSheets) {
         for (const rule of sheet.cssRules) {
           const cssText = rule.cssText;
-          if (cssText.includes('display') && cssText.includes('flex')) hasFlexRule = true;
+          if (cssText.includes('display') && cssText.includes('flex'))
+            hasFlexRule = true;
           if (cssText.includes('gap')) hasGapRule = true;
-          if (cssText.includes('align-items') && cssText.includes('center')) hasItemsCenterRule = true;
+          if (cssText.includes('align-items') && cssText.includes('center'))
+            hasItemsCenterRule = true;
         }
       }
     } catch (e) {
@@ -82,30 +98,42 @@ describe('TransitionGroup class prop with JIT CSS', () => {
         { id: 1, text: '1' },
         { id: 2, text: '2' },
         { id: 3, text: '3' },
-        { id: 4, text: '4' }
+        { id: 4, text: '4' },
       ]);
-      
+
       return html`
         <div>
-          ${TransitionGroup({
-            preset: 'scale',
-            class: 'grid grid-cols-2 gap-4 p-8 bg-gray-100',
-            tag: 'div'
-          }, each(items.value, (item: any) => html`
-            <div key="${item.id}" class="p-4 bg-purple-100" data-test-id="${item.id}">
-              ${item.text}
-            </div>
-          `))}
+          ${TransitionGroup(
+            {
+              preset: 'scale',
+              class: 'grid grid-cols-2 gap-4 p-8 bg-gray-100',
+              tag: 'div',
+            },
+            each(
+              items.value,
+              (item: any) => html`
+                <div
+                  key="${item.id}"
+                  class="p-4 bg-purple-100"
+                  data-test-id="${item.id}"
+                >
+                  ${item.text}
+                </div>
+              `,
+            ),
+          )}
         </div>
       `;
     });
 
     const el = document.createElement('test-jit-grid') as any;
     document.body.appendChild(el);
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, 100));
 
     // Check that the wrapper has the class attribute
-    const wrapper = el.shadowRoot.querySelector('[class*="grid"]') as HTMLElement;
+    const wrapper = el.shadowRoot.querySelector(
+      '[class*="grid"]',
+    ) as HTMLElement;
     expect(wrapper).toBeTruthy();
     expect(wrapper.className).toContain('grid');
     expect(wrapper.className).toContain('grid-cols-2');
@@ -125,27 +153,34 @@ describe('TransitionGroup class prop with JIT CSS', () => {
   it('should generate JIT CSS for complex utility combinations', async () => {
     component('test-jit-complex', () => {
       const items = ref([{ id: 1, text: 'Test' }]);
-      
+
       return html`
         <div>
-          ${TransitionGroup({
-            preset: 'fade',
-            class: 'flex flex-wrap gap-6 p-6 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl shadow-2xl hover:shadow-3xl transition-all duration-300',
-            tag: 'div'
-          }, each(items.value, (item: any) => html`
-            <div key="${item.id}">${item.text}</div>
-          `))}
+          ${TransitionGroup(
+            {
+              preset: 'fade',
+              class:
+                'flex flex-wrap gap-6 p-6 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl shadow-2xl hover:shadow-3xl transition-all duration-300',
+              tag: 'div',
+            },
+            each(
+              items.value,
+              (item: any) => html` <div key="${item.id}">${item.text}</div> `,
+            ),
+          )}
         </div>
       `;
     });
 
     const el = document.createElement('test-jit-complex') as any;
     document.body.appendChild(el);
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, 100));
 
-    const wrapper = el.shadowRoot.querySelector('[class*="flex"]') as HTMLElement;
+    const wrapper = el.shadowRoot.querySelector(
+      '[class*="flex"]',
+    ) as HTMLElement;
     expect(wrapper).toBeTruthy();
-    
+
     // Verify all classes are present
     const classList = wrapper.className.split(' ');
     expect(classList).toContain('flex');
@@ -154,7 +189,7 @@ describe('TransitionGroup class prop with JIT CSS', () => {
     expect(classList).toContain('p-6');
     expect(classList).toContain('rounded-xl');
     expect(classList).toContain('shadow-2xl');
-    
+
     // Verify JIT CSS was generated
     const shadowRoot = el.shadowRoot as ShadowRoot;
     expect(shadowRoot.adoptedStyleSheets.length).toBeGreaterThan(1); // Base + user styles
@@ -163,34 +198,41 @@ describe('TransitionGroup class prop with JIT CSS', () => {
   it('should work with responsive and variant utilities', async () => {
     component('test-jit-responsive', () => {
       const items = ref([{ id: 1, text: 'Item' }]);
-      
+
       return html`
         <div>
-          ${TransitionGroup({
-            preset: 'fade',
-            class: 'flex flex-col sm:flex-row md:grid md:grid-cols-3 gap-4 hover:gap-6 dark:bg-gray-900',
-            tag: 'div'
-          }, each(items.value, (item: any) => html`
-            <div key="${item.id}">${item.text}</div>
-          `))}
+          ${TransitionGroup(
+            {
+              preset: 'fade',
+              class:
+                'flex flex-col sm:flex-row md:grid md:grid-cols-3 gap-4 hover:gap-6 dark:bg-gray-900',
+              tag: 'div',
+            },
+            each(
+              items.value,
+              (item: any) => html` <div key="${item.id}">${item.text}</div> `,
+            ),
+          )}
         </div>
       `;
     });
 
     const el = document.createElement('test-jit-responsive') as any;
     document.body.appendChild(el);
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, 100));
 
-    const wrapper = el.shadowRoot.querySelector('[class*="flex"]') as HTMLElement;
+    const wrapper = el.shadowRoot.querySelector(
+      '[class*="flex"]',
+    ) as HTMLElement;
     expect(wrapper).toBeTruthy();
-    
+
     // Check for responsive classes
     expect(wrapper.className).toContain('flex');
     expect(wrapper.className).toContain('flex-col');
     expect(wrapper.className).toContain('sm:flex-row');
     expect(wrapper.className).toContain('md:grid');
     expect(wrapper.className).toContain('md:grid-cols-3');
-    
+
     // Verify JIT CSS was generated with media queries
     const shadowRoot = el.shadowRoot as ShadowRoot;
     expect(shadowRoot.adoptedStyleSheets.length).toBeGreaterThan(0);
@@ -200,43 +242,65 @@ describe('TransitionGroup class prop with JIT CSS', () => {
     component('test-jit-dynamic', () => {
       const items = ref([
         { id: 1, text: 'A' },
-        { id: 2, text: 'B' }
+        { id: 2, text: 'B' },
       ]);
-      
+
       return html`
         <div>
-          <button @click="${() => {
-            items.value = [...items.value, { 
-              id: items.value.length + 1, 
-              text: 'New'
-            }];
-          }}" data-test="add">Add</button>
-          
-          ${TransitionGroup({
-            preset: 'scale',
-            class: 'flex gap-4',
-            tag: 'div'
-          }, each(items.value, (item: any) => html`
-            <div key="${item.id}" class="bg-blue-500 p-4 text-white" data-test-id="${item.id}">
-              ${item.text}
-            </div>
-          `))}
+          <button
+            @click="${() => {
+              items.value = [
+                ...items.value,
+                {
+                  id: items.value.length + 1,
+                  text: 'New',
+                },
+              ];
+            }}"
+            data-test="add"
+          >
+            Add
+          </button>
+
+          ${TransitionGroup(
+            {
+              preset: 'scale',
+              class: 'flex gap-4',
+              tag: 'div',
+            },
+            each(
+              items.value,
+              (item: any) => html`
+                <div
+                  key="${item.id}"
+                  class="bg-blue-500 p-4 text-white"
+                  data-test-id="${item.id}"
+                >
+                  ${item.text}
+                </div>
+              `,
+            ),
+          )}
         </div>
       `;
     });
 
     const el = document.createElement('test-jit-dynamic') as any;
     document.body.appendChild(el);
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, 100));
 
-    const wrapper = el.shadowRoot.querySelector('[class*="flex"]') as HTMLElement;
+    const wrapper = el.shadowRoot.querySelector(
+      '[class*="flex"]',
+    ) as HTMLElement;
     let items = wrapper.querySelectorAll('[data-test-id]');
     expect(items.length).toBe(2);
 
     // Add a new item
-    const addBtn = el.shadowRoot.querySelector('[data-test="add"]') as HTMLElement;
+    const addBtn = el.shadowRoot.querySelector(
+      '[data-test="add"]',
+    ) as HTMLElement;
     addBtn.click();
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, 100));
 
     // Check that new item was added
     items = wrapper.querySelectorAll('[data-test-id]');

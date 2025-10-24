@@ -13,10 +13,14 @@ import {
   patchChildren,
   patch,
   vdomRenderer,
-  renderToString,
 } from '../src/lib/runtime/vdom';
+import { renderToString } from '../src/lib/runtime/vdom-ssr';
 import { getNestedValue, setNestedValue } from '../src/lib/runtime/helpers';
-import type { VNode, VDomRefs, AnchorBlockVNode } from '../src/lib/runtime/types';
+import type {
+  VNode,
+  VDomRefs,
+  AnchorBlockVNode,
+} from '../src/lib/runtime/types';
 
 describe('vdom.ts', () => {
   describe('cleanupRefs', () => {
@@ -87,11 +91,27 @@ describe('vdom.ts', () => {
       expect(context._requestRender).toHaveBeenCalled();
     });
     it('handles lazy modifier', () => {
-      processModelDirective('foo', ['lazy'], props, attrs, listeners, context, el);
+      processModelDirective(
+        'foo',
+        ['lazy'],
+        props,
+        attrs,
+        listeners,
+        context,
+        el,
+      );
       expect(listeners.change).toBeDefined();
     });
     it('handles trim and number modifiers', () => {
-      processModelDirective('foo', ['trim', 'number'], props, attrs, listeners, context, el);
+      processModelDirective(
+        'foo',
+        ['trim', 'number'],
+        props,
+        attrs,
+        listeners,
+        context,
+        el,
+      );
       el.value = ' 123 ';
       listeners.input({ target: el, isTrusted: true } as any);
       expect(context._state.foo).toBe(123);
@@ -117,7 +137,15 @@ describe('vdom.ts', () => {
     it('handles select input', () => {
       const select = document.createElement('select');
       context._state.foo = 'x';
-      processModelDirective('foo', [], props, attrs, listeners, context, select);
+      processModelDirective(
+        'foo',
+        [],
+        props,
+        attrs,
+        listeners,
+        context,
+        select,
+      );
       expect(typeof listeners.change).toBe('function');
     });
   });
@@ -165,7 +193,9 @@ describe('vdom.ts', () => {
     });
     it('adds classes from object', () => {
       const attrs: any = {};
-      processClassDirective('foo', attrs, { foo: { x: true, y: false, z: true } });
+      processClassDirective('foo', attrs, {
+        foo: { x: true, y: false, z: true },
+      });
       expect(attrs.class).toContain('x');
       expect(attrs.class).toContain('z');
       expect(attrs.class).not.toContain('y');
@@ -193,7 +223,11 @@ describe('vdom.ts', () => {
         class: { value: 'foo', modifiers: [] },
         style: { value: { color: 'red' }, modifiers: [] },
       };
-      const result = processDirectives(directives, { foo: 'bar' }, document.createElement('input'));
+      const result = processDirectives(
+        directives,
+        { foo: 'bar' },
+        document.createElement('input'),
+      );
       expect(result.props).toBeDefined();
       expect(result.attrs.class).toBeDefined();
       expect(result.attrs.style).toContain('color: red');
@@ -231,17 +265,29 @@ describe('vdom.ts', () => {
       el = document.createElement('input');
     });
     it('sets value and checked props', () => {
-      patchProps(el, { props: { value: 'a', checked: false }, attrs: {} }, { props: { value: 'b', checked: true }, attrs: {} });
+      patchProps(
+        el,
+        { props: { value: 'a', checked: false }, attrs: {} },
+        { props: { value: 'b', checked: true }, attrs: {} },
+      );
       expect((el as HTMLInputElement).value).toBe('b');
       expect((el as HTMLInputElement).checked).toBe(true);
     });
     it('sets/removes attributes', () => {
-      patchProps(el, { props: {}, attrs: { foo: 'bar' } }, { props: {}, attrs: { foo: undefined } });
+      patchProps(
+        el,
+        { props: {}, attrs: { foo: 'bar' } },
+        { props: {}, attrs: { foo: undefined } },
+      );
       expect(el.hasAttribute('foo')).toBe(false);
     });
     it('adds event listeners', () => {
       const fn = vi.fn();
-  patchProps(el, { props: {}, attrs: {} }, { props: { onClick: fn }, attrs: {} });
+      patchProps(
+        el,
+        { props: {}, attrs: {} },
+        { props: { onClick: fn }, attrs: {} },
+      );
       el.dispatchEvent(new Event('click'));
       expect(fn).toHaveBeenCalled();
     });
@@ -254,14 +300,18 @@ describe('vdom.ts', () => {
       expect(node.textContent).toBe('hello');
     });
     it('creates element node for VNode', () => {
-  const vnode: VNode = { tag: 'div', props: {}, children: 'hi' };
+      const vnode: VNode = { tag: 'div', props: {}, children: 'hi' };
       const node = createElement(vnode);
       expect(node.nodeType).toBe(Node.ELEMENT_NODE);
       expect((node as HTMLElement).tagName).toBe('DIV');
       expect(node.textContent).toBe('hi');
     });
     it('creates anchor block fragment', () => {
-  const vnode: AnchorBlockVNode = { tag: '#anchor', key: 'a', children: [ { tag: '#text', children: 'x' } ] };
+      const vnode: AnchorBlockVNode = {
+        tag: '#anchor',
+        key: 'a',
+        children: [{ tag: '#text', children: 'x' }],
+      };
       const node = createElement(vnode);
       expect(node.nodeType).toBe(Node.DOCUMENT_FRAGMENT_NODE);
     });
@@ -297,15 +347,30 @@ describe('vdom.ts', () => {
       expect(node.textContent).toBe('b');
     });
     it('patches element node', () => {
-  const oldVNode: VNode = { tag: 'div', key: 'x', props: {}, children: 'a' };
-  const newVNode: VNode = { tag: 'div', key: 'x', props: {}, children: 'b' };
+      const oldVNode: VNode = {
+        tag: 'div',
+        key: 'x',
+        props: {},
+        children: 'a',
+      };
+      const newVNode: VNode = {
+        tag: 'div',
+        key: 'x',
+        props: {},
+        children: 'b',
+      };
       const dom = createElement(oldVNode);
       const node = patch(dom, oldVNode, newVNode);
       expect(node.textContent).toBe('b');
     });
     it('replaces node if tag or key changes', () => {
       const oldVNode: VNode = { tag: 'div', key: 'x', props: {}, children: [] };
-      const newVNode: VNode = { tag: 'span', key: 'y', props: {}, children: [] };
+      const newVNode: VNode = {
+        tag: 'span',
+        key: 'y',
+        props: {},
+        children: [],
+      };
       const dom = createElement(oldVNode);
       const node = patch(dom, oldVNode, newVNode);
       expect((node as HTMLElement).tagName).toBe('SPAN');
@@ -325,14 +390,14 @@ describe('vdom.ts', () => {
       root = host.attachShadow({ mode: 'open' });
     });
     it('renders vnode to shadow root', () => {
-  const vnode: VNode = { tag: 'div', props: {}, children: 'hi' };
+      const vnode: VNode = { tag: 'div', props: {}, children: 'hi' };
       vdomRenderer(root, vnode);
       expect(root.firstChild).toBeInstanceOf(HTMLElement);
       expect((root.firstChild as HTMLElement).textContent).toBe('hi');
     });
     it('updates on subsequent renders', () => {
-  const vnode1: VNode = { tag: 'div', props: {}, children: 'a' };
-  const vnode2: VNode = { tag: 'div', props: {}, children: 'b' };
+      const vnode1: VNode = { tag: 'div', props: {}, children: 'a' };
+      const vnode2: VNode = { tag: 'div', props: {}, children: 'b' };
       vdomRenderer(root, vnode1);
       vdomRenderer(root, vnode2);
       expect((root.firstChild as HTMLElement).textContent).toBe('b');
@@ -344,10 +409,24 @@ describe('vdom.ts', () => {
       expect(renderToString({ tag: '#text', children: 'hi' })).toBe('hi');
     });
     it('renders element vnode', () => {
-      expect(renderToString({ tag: 'div', props: { attrs: { id: 'x' } }, children: 'hi' })).toBe('<div id="x">hi</div>');
+      expect(
+        renderToString({
+          tag: 'div',
+          props: { attrs: { id: 'x' } },
+          children: 'hi',
+        }),
+      ).toBe('<div id="x">hi</div>');
     });
     it('renders anchor block vnode', () => {
-      expect(renderToString({ tag: '#anchor', children: [ { tag: '#text', children: 'a' }, { tag: '#text', children: 'b' } ] })).toBe('ab');
+      expect(
+        renderToString({
+          tag: '#anchor',
+          children: [
+            { tag: '#text', children: 'a' },
+            { tag: '#text', children: 'b' },
+          ],
+        }),
+      ).toBe('ab');
     });
   });
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { ref, reactiveSystem } from '../src/lib/runtime/reactive';
+import { reactiveSystem } from '../src/lib/runtime/reactive';
 
 describe('per-component warning throttle', () => {
   let consoleWarnSpy: any;

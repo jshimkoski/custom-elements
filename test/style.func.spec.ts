@@ -5,9 +5,9 @@ import {
   extractClassesFromHTML,
   jitCSS,
   jitCssCache,
-  JIT_CSS_THROTTLE_MS
+  JIT_CSS_THROTTLE_MS,
 } from '../src/lib/runtime/style';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 
 // --- parseArbitrary ---
 describe('parseArbitrary', () => {
@@ -27,7 +27,9 @@ describe('parseArbitrary', () => {
 // --- parseArbitraryVariant ---
 describe('parseArbitraryVariant', () => {
   it('returns token for [attr=value] syntax', () => {
-    expect(parseArbitraryVariant('[aria-selected=true]')).toBe('[aria-selected=true]');
+    expect(parseArbitraryVariant('[aria-selected=true]')).toBe(
+      '[aria-selected=true]',
+    );
   });
   it('returns token for foo-[bar] syntax', () => {
     expect(parseArbitraryVariant('foo-[bar]')).toBe('foo-[bar]');
@@ -72,7 +74,7 @@ describe('jitCSS', () => {
     const html = '<div class="block"></div>';
     jitCssCache.clear();
     const css1 = jitCSS(html);
-    await new Promise(r => setTimeout(r, JIT_CSS_THROTTLE_MS + 5));
+    await new Promise((r) => setTimeout(r, JIT_CSS_THROTTLE_MS + 5));
     const css2 = jitCSS(html);
     expect(css2).toBe(css1); // Should be same output, but regenerated
   });

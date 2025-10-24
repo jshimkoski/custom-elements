@@ -4,7 +4,6 @@ import { EventManager } from '../src/lib/runtime/event-manager';
 describe('EventManager', () => {
   beforeEach(() => {
     // Reset global state
-    // @ts-ignore access testing helper
     EventManager.cleanupAll();
   });
 

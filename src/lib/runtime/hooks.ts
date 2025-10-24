@@ -4,16 +4,37 @@
  */
 
 // Global state to track current component context during render
-let currentComponentContext: any = null;
-import { isReactiveState } from "./reactive";
-import { toKebab } from "./helpers";
-import { devWarn } from "./logger";
+// Narrowed internal type for currentComponentContext to expose _hookCallbacks
+interface InternalHookCallbacks {
+  onConnected?: () => void;
+  onDisconnected?: () => void;
+  onAttributeChanged?: (
+    name: string,
+    oldValue: string | null,
+    newValue: string | null,
+  ) => void;
+  onError?: (err: unknown) => void;
+  props?: Record<string, unknown>;
+  style?: () => string;
+}
+
+type InternalComponentContext = Record<string, unknown> & {
+  _hookCallbacks?: InternalHookCallbacks;
+  _computedStyle?: string;
+};
+
+let currentComponentContext: InternalComponentContext | null = null;
+import { isReactiveState } from './reactive';
+import { toKebab } from './helpers';
+import { devWarn } from './logger';
 
 /**
  * Set the current component context (called internally during render)
  * @internal
  */
-export function setCurrentComponentContext(context: any): void {
+export function setCurrentComponentContext(
+  context: Record<string, unknown>,
+): void {
   currentComponentContext = context;
 }
 
@@ -43,15 +64,30 @@ export function clearCurrentComponentContext(): void {
  * });
  * ```
  */
-export function useEmit(): (eventName: string, detail?: any) => boolean {
+export function useEmit(): (
+  eventName: string,
+  detail?: unknown,
+  options?: CustomEventInit,
+) => boolean {
   if (!currentComponentContext) {
-    throw new Error("useEmit must be called during component render");
+    throw new Error('useEmit must be called during component render');
   }
 
-  // Capture the emit function from the current context
-  const emitFn = currentComponentContext.emit;
-  return (eventName: string, detail?: any) => {
-    return emitFn(eventName, detail);
+  // Capture and validate the emit function from the current context
+  const emitCandidate = (currentComponentContext as { emit?: unknown }).emit;
+  if (typeof emitCandidate !== 'function') {
+    throw new Error(
+      'useEmit requires an emit function on the component context',
+    );
+  }
+  const emitFn = emitCandidate as (
+    eventName: string,
+    detail?: unknown,
+    options?: CustomEventInit,
+  ) => boolean;
+
+  return (eventName: string, detail?: unknown, options?: CustomEventInit) => {
+    return emitFn(eventName, detail, options);
   };
 }
 
@@ -59,9 +95,9 @@ export function useEmit(): (eventName: string, detail?: any) => boolean {
  * Initialize hook callbacks storage on context if not exists
  * Uses Object.defineProperty to avoid triggering reactive updates
  */
-function ensureHookCallbacks(context: any): void {
+function ensureHookCallbacks(context: Record<string, unknown>): void {
   if (!context._hookCallbacks) {
-    Object.defineProperty(context, "_hookCallbacks", {
+    Object.defineProperty(context, '_hookCallbacks', {
       value: {},
       writable: true,
       enumerable: false,
@@ -86,11 +122,14 @@ function ensureHookCallbacks(context: any): void {
  */
 export function useOnConnected(callback: () => void): void {
   if (!currentComponentContext) {
-    throw new Error("useOnConnected must be called during component render");
+    throw new Error('useOnConnected must be called during component render');
   }
 
-  ensureHookCallbacks(currentComponentContext);
-  currentComponentContext._hookCallbacks.onConnected = callback;
+  ensureHookCallbacks(currentComponentContext as InternalComponentContext);
+  // currentComponentContext._hookCallbacks is typed via ensureHookCallbacks
+  (
+    currentComponentContext._hookCallbacks as InternalHookCallbacks
+  ).onConnected = callback;
 }
 
 /**
@@ -109,11 +148,13 @@ export function useOnConnected(callback: () => void): void {
  */
 export function useOnDisconnected(callback: () => void): void {
   if (!currentComponentContext) {
-    throw new Error("useOnDisconnected must be called during component render");
+    throw new Error('useOnDisconnected must be called during component render');
   }
 
-  ensureHookCallbacks(currentComponentContext);
-  currentComponentContext._hookCallbacks.onDisconnected = callback;
+  ensureHookCallbacks(currentComponentContext as InternalComponentContext);
+  (
+    currentComponentContext._hookCallbacks as InternalHookCallbacks
+  ).onDisconnected = callback;
 }
 
 /**
@@ -134,17 +175,19 @@ export function useOnAttributeChanged(
   callback: (
     name: string,
     oldValue: string | null,
-    newValue: string | null
-  ) => void
+    newValue: string | null,
+  ) => void,
 ): void {
   if (!currentComponentContext) {
     throw new Error(
-      "useOnAttributeChanged must be called during component render"
+      'useOnAttributeChanged must be called during component render',
     );
   }
 
-  ensureHookCallbacks(currentComponentContext);
-  currentComponentContext._hookCallbacks.onAttributeChanged = callback;
+  ensureHookCallbacks(currentComponentContext as InternalComponentContext);
+  (
+    currentComponentContext._hookCallbacks as InternalHookCallbacks
+  ).onAttributeChanged = callback;
 }
 
 /**
@@ -163,11 +206,21 @@ export function useOnAttributeChanged(
  */
 export function useOnError(callback: (error: Error) => void): void {
   if (!currentComponentContext) {
-    throw new Error("useOnError must be called during component render");
+    throw new Error('useOnError must be called during component render');
   }
 
-  ensureHookCallbacks(currentComponentContext);
-  currentComponentContext._hookCallbacks.onError = callback;
+  ensureHookCallbacks(currentComponentContext as InternalComponentContext);
+  // Accept unknown error types from runtime and forward to user-provided Error handler when possible
+  (currentComponentContext._hookCallbacks as InternalHookCallbacks).onError = (
+    err: unknown,
+  ) => {
+    try {
+      if (err instanceof Error) callback(err);
+      else callback(new Error(String(err)));
+    } catch {
+      /* swallow */
+    }
+  };
 }
 
 /**
@@ -183,14 +236,15 @@ export function useOnError(callback: (error: Error) => void): void {
  * });
  * ```
  */
-export function useProps<T extends Record<string, any>>(defaults: T): T {
+export function useProps<T extends Record<string, unknown>>(defaults: T): T {
   if (!currentComponentContext) {
-    throw new Error("useProps must be called during component render");
+    throw new Error('useProps must be called during component render');
   }
 
-  ensureHookCallbacks(currentComponentContext);
-  currentComponentContext._hookCallbacks.props = {
-    ...(currentComponentContext._hookCallbacks.props || {}),
+  ensureHookCallbacks(currentComponentContext as InternalComponentContext);
+  const hooks = currentComponentContext._hookCallbacks as InternalHookCallbacks;
+  hooks.props = {
+    ...(hooks.props || {}),
     ...defaults,
   };
 
@@ -200,7 +254,7 @@ export function useProps<T extends Record<string, any>>(defaults: T): T {
   try {
     const declaredKeys = Object.keys(defaults || {});
     for (const key of declaredKeys) {
-      if (typeof key !== "string" || key.startsWith("_")) continue;
+      if (typeof key !== 'string' || key.startsWith('_')) continue;
       const existing = Object.getOwnPropertyDescriptor(ctx, key);
       // Only define if not present or configurable (allow overriding)
       if (existing && !existing.configurable) continue;
@@ -208,14 +262,16 @@ export function useProps<T extends Record<string, any>>(defaults: T): T {
         // Preserve any existing concrete value on the context in a closure.
         // This avoids recursive getters when we later reference ctx[key].
         const hasOwn = Object.prototype.hasOwnProperty.call(ctx, key);
-        let localValue: any = hasOwn ? (ctx as any)[key] : undefined;
+        let localValue: unknown = hasOwn
+          ? (ctx as Record<string, unknown>)[key]
+          : undefined;
 
         Object.defineProperty(ctx, key, {
           configurable: true,
           enumerable: true,
           get() {
             try {
-              const host = (ctx && (ctx as any)._host) as
+              const host = (ctx && (ctx as { _host?: HTMLElement })._host) as
                 | HTMLElement
                 | undefined;
               if (host) {
@@ -224,33 +280,38 @@ export function useProps<T extends Record<string, any>>(defaults: T): T {
                 const attrValue = host.getAttribute(kebabKey);
                 if (attrValue !== null) {
                   const defaultType = typeof defaults[key];
-                  if (defaultType === "boolean") {
+                  if (defaultType === 'boolean') {
                     // Standalone boolean attributes have empty string value
-                    return attrValue === "" || attrValue === "true";
+                    return attrValue === '' || attrValue === 'true';
                   }
-                  if (defaultType === "number") {
+                  if (defaultType === 'number') {
                     return Number(attrValue);
                   }
                   return attrValue;
                 }
 
                 // If no attribute, check if host has a property value set
-                if (typeof (host as any)[key] !== "undefined") {
-                  const fromHost = (host as any)[key];
+                if (
+                  typeof (host as unknown as Record<string, unknown>)[key] !==
+                  'undefined'
+                ) {
+                  const fromHost = (host as unknown as Record<string, unknown>)[
+                    key
+                  ];
                   // prefer host value when present
                   // If the host provided a ReactiveState instance or a wrapper
                   // with a .value, unwrap it here so destructured props and
                   // useProps return the primitive/current value consistently.
                   if (isReactiveState(fromHost)) {
-                    return (fromHost as any).value;
+                    return (fromHost as { value: unknown }).value;
                   }
                   if (
                     fromHost &&
-                    typeof fromHost === "object" &&
-                    "value" in fromHost &&
+                    typeof fromHost === 'object' &&
+                    'value' in fromHost &&
                     !(fromHost instanceof Node)
                   ) {
-                    return (fromHost as any).value;
+                    return (fromHost as { value?: unknown }).value;
                   }
                   // For string-typed declared props, avoid returning host
                   // object-like properties (for example `element.style` which
@@ -259,69 +320,75 @@ export function useProps<T extends Record<string, any>>(defaults: T): T {
                   // property into templates which expect primitives.
                   const defaultType = typeof defaults[key];
                   if (
-                    defaultType === "string" &&
+                    defaultType === 'string' &&
                     fromHost &&
-                    typeof fromHost === "object"
+                    typeof fromHost === 'object'
                   ) {
                     // fallthrough to localValue
                   } else {
                     // For boolean defaults, treat empty string (standalone attribute) or 'true' as true.
                     if (
-                      defaultType === "boolean" &&
-                      typeof fromHost === "string"
+                      defaultType === 'boolean' &&
+                      typeof fromHost === 'string'
                     ) {
-                      return fromHost === "" || fromHost === "true";
+                      return fromHost === '' || fromHost === 'true';
                     }
                     return fromHost;
                   }
                 }
               }
-            } catch (e) {
+            } catch {
               // ignore host read failures and fall back to context
             }
             return localValue;
           },
-          set(v: any) {
+          set(v: unknown) {
             // allow test/runtime code to set context props during render/init
             localValue = v;
           },
         });
-      } catch (e) {
+      } catch {
         // ignore
       }
     }
-  } catch (e) {
+  } catch {
     // ignore
   }
   // Return a Proxy that always reads the latest value from the component
   // context so accesses are reactive. Also unwrap functional refs ({ value })
   // and coerce string attribute values to boolean/number when defaults
   // indicate such types.
-  const result = new Proxy({} as any, {
+  const result = new Proxy({} as Record<string, unknown>, {
     get(_target, prop: string) {
-      if (typeof prop !== "string") return undefined;
-      const def = (defaults as any)[prop];
+      if (typeof prop !== 'string') return undefined;
+      const def = (defaults as Record<string, unknown>)[prop];
 
       // If a host element is available, prefer reading from attributes first,
       // then from properties. This ensures that HTML attributes take precedence
       // over default property values (like the standard "title" attribute).
       try {
-        const host = (ctx && (ctx as any)._host) as HTMLElement | undefined;
+        const host = (ctx && (ctx as { _host?: HTMLElement })._host) as
+          | HTMLElement
+          | undefined;
         if (host) {
           // Check attribute first (only if host is an actual HTMLElement)
           if (
             host instanceof HTMLElement ||
-            (typeof (host as any).getAttribute === "function" &&
-              typeof (host as any).hasAttribute === "function")
+            (typeof (host as { getAttribute?: (name: string) => string | null })
+              .getAttribute === 'function' &&
+              typeof (host as { hasAttribute?: (name: string) => boolean })
+                .hasAttribute === 'function')
           ) {
-            const kebabKey = prop.replace(/([A-Z])/g, "-$1").toLowerCase();
-            const attrValue = (host as any).getAttribute(kebabKey);
+            const kebabKey = prop.replace(/([A-Z])/g, '-$1').toLowerCase();
+            const attrValue = (
+              host as { getAttribute: (name: string) => string | null }
+            ).getAttribute(kebabKey);
             if (attrValue !== null) {
               // Attribute exists - convert based on default type
-              if (typeof def === "boolean") {
-                return attrValue === "" || attrValue === "true";
+              if (typeof def === 'boolean') {
+                return attrValue === '' || attrValue === 'true';
               }
-              if (typeof def === "number") {
+              if (typeof def === 'number') {
                 return Number(attrValue);
               }
               return attrValue;
@@ -329,10 +396,10 @@ export function useProps<T extends Record<string, any>>(defaults: T): T {
           }
 
           // No attribute - check property value
-          const hostValue = (host as any)[prop];
+          const hostValue = (host as unknown as Record<string, unknown>)[prop];
           // Only use host value if it's explicitly set (not undefined AND not empty string for string defaults)
           // Empty strings on standard HTML properties (like 'title') should fall through to defaults
-          if (typeof hostValue !== "undefined" && hostValue !== "") {
+          if (typeof hostValue !== 'undefined' && hostValue !== '') {
             // If the declared default is a string, avoid returning raw DOM
             // object-like properties (such as element.style which is a CSSStyleDeclaration)
             // since templates expect primitives and serializing objects can
@@ -341,13 +408,13 @@ export function useProps<T extends Record<string, any>>(defaults: T): T {
             // unwrapped and returned even for string defaults.
             const isWrapperLike =
               hostValue &&
-              typeof hostValue === "object" &&
-              "value" in hostValue &&
+              typeof hostValue === 'object' &&
+              'value' in hostValue &&
               !(hostValue instanceof Node);
             if (
-              typeof def === "string" &&
+              typeof def === 'string' &&
               hostValue &&
-              typeof hostValue === "object" &&
+              typeof hostValue === 'object' &&
               !isWrapperLike &&
               !isReactiveState(hostValue)
             ) {
@@ -356,9 +423,9 @@ export function useProps<T extends Record<string, any>>(defaults: T): T {
               // Special handling for boolean props: if default is false and hostValue is empty string,
               // treat it as if the property wasn't set (use default false)
               if (
-                typeof def === "boolean" &&
+                typeof def === 'boolean' &&
                 def === false &&
-                hostValue === ""
+                hostValue === ''
               ) {
                 return def;
               }
@@ -367,23 +434,23 @@ export function useProps<T extends Record<string, any>>(defaults: T): T {
               // from the host so useProps mirrors applyProps/destructured props
               // behavior and returns primitive/current values.
               if (isReactiveState(hostValue)) {
-                return (hostValue as any).value;
+                return (hostValue as { value: unknown }).value;
               }
               if (isWrapperLike) {
-                return (hostValue as any).value;
+                return (hostValue as { value: unknown }).value;
               }
 
               // Primitive on host - return directly (but coerce strings if default provided)
-              if (typeof def === "boolean" && typeof hostValue === "string") {
+              if (typeof def === 'boolean' && typeof hostValue === 'string') {
                 // For boolean attributes, only explicit 'true' string or non-empty presence means true
                 return (
-                  hostValue === "true" ||
-                  (hostValue !== "" && hostValue !== "false")
+                  hostValue === 'true' ||
+                  (hostValue !== '' && hostValue !== 'false')
                 );
               }
               if (
-                typeof def === "number" &&
-                typeof hostValue === "string" &&
+                typeof def === 'number' &&
+                typeof hostValue === 'string' &&
                 !Number.isNaN(Number(hostValue))
               )
                 return Number(hostValue);
@@ -391,7 +458,7 @@ export function useProps<T extends Record<string, any>>(defaults: T): T {
             }
           }
         }
-      } catch (e) {
+      } catch {
         // ignore host read failures and fall back to context
       }
 
@@ -399,7 +466,7 @@ export function useProps<T extends Record<string, any>>(defaults: T): T {
       const raw = ctx[prop];
       // Treat empty-string on context as boolean true (attribute presence)
       // EXCEPT when the default is false - in that case, empty string means "not set"
-      if (typeof def === "boolean" && raw === "") {
+      if (typeof def === 'boolean' && raw === '') {
         if (def === false) {
           // For boolean props with default false, empty string means use the default
           return def;
@@ -412,21 +479,21 @@ export function useProps<T extends Record<string, any>>(defaults: T): T {
       // when the source is the component context itself. Host-provided
       // ReactiveState instances are preserved above; this path is only
       // for ctx values and defaults.
-      if (isReactiveState(raw)) return (raw as any).value;
+      if (isReactiveState(raw)) return (raw as { value: unknown }).value;
       if (
         raw &&
-        typeof raw === "object" &&
-        "value" in raw &&
+        typeof raw === 'object' &&
+        'value' in raw &&
         !(raw instanceof Node)
       )
-        return (raw as any).value;
-      if (raw != null && raw !== "") {
-        if (typeof def === "boolean" && typeof raw === "string") {
-          return raw === "true";
+        return (raw as { value: unknown }).value;
+      if (raw != null && raw !== '') {
+        if (typeof def === 'boolean' && typeof raw === 'string') {
+          return raw === 'true';
         }
         if (
-          typeof def === "number" &&
-          typeof raw === "string" &&
+          typeof def === 'number' &&
+          typeof raw === 'string' &&
           !Number.isNaN(Number(raw))
         )
           return Number(raw);
@@ -435,11 +502,11 @@ export function useProps<T extends Record<string, any>>(defaults: T): T {
       return def;
     },
     has(_target, prop: string) {
-      return typeof prop === "string" && (prop in ctx || prop in defaults);
+      return typeof prop === 'string' && (prop in ctx || prop in defaults);
     },
     ownKeys() {
       return Array.from(
-        new Set([...Object.keys(defaults), ...Object.keys(ctx || {})])
+        new Set([...Object.keys(defaults), ...Object.keys(ctx || {})]),
       );
     },
     getOwnPropertyDescriptor() {
@@ -485,7 +552,7 @@ export function useProps<T extends Record<string, any>>(defaults: T): T {
  */
 export function useStyle(callback: () => string): void {
   if (!currentComponentContext) {
-    throw new Error("useStyle must be called during component render");
+    throw new Error('useStyle must be called during component render');
   }
 
   ensureHookCallbacks(currentComponentContext);
@@ -496,16 +563,16 @@ export function useStyle(callback: () => string): void {
     const computedStyle = callback();
 
     // Store the computed style using Object.defineProperty to avoid triggering reactive updates
-    Object.defineProperty(currentComponentContext, "_computedStyle", {
+    Object.defineProperty(currentComponentContext, '_computedStyle', {
       value: computedStyle,
       writable: true,
       enumerable: false,
       configurable: true,
     });
   } catch (error) {
-    devWarn("Error in useStyle callback:", error);
-    Object.defineProperty(currentComponentContext, "_computedStyle", {
-      value: "",
+    devWarn('Error in useStyle callback:', error);
+    Object.defineProperty(currentComponentContext, '_computedStyle', {
+      value: '',
       writable: true,
       enumerable: false,
       configurable: true,

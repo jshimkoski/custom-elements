@@ -15,10 +15,10 @@ describe('directives', () => {
     expect((vnode.children ?? []).length).toBe(1);
     expect(
       vnode.children &&
-      typeof vnode.children[0] === 'object' &&
-      vnode.children[0] !== null &&
-      'tag' in vnode.children[0] &&
-      (vnode.children[0] as VNode).tag
+        typeof vnode.children[0] === 'object' &&
+        vnode.children[0] !== null &&
+        'tag' in vnode.children[0] &&
+        (vnode.children[0] as VNode).tag,
     ).toBe('div');
   });
 
@@ -29,19 +29,25 @@ describe('directives', () => {
   });
 
   it('each returns array of anchor blocks for primitives', () => {
-    const arr = each([1, 2, 3], (item) => ({ tag: 'span', children: String(item) }));
+    const arr = each([1, 2, 3], (item) => ({
+      tag: 'span',
+      children: String(item),
+    }));
     expect(Array.isArray(arr)).toBe(true);
     expect(arr.length).toBe(3);
     arr.forEach((v, i) => {
       expect(v.tag).toBe('#anchor');
-      expect(v.key).toBe(`each-${i+1}`);
+      expect(v.key).toBe(`each-${i + 1}`);
       expect(getChildren(v)[0].tag).toBe('span');
-      expect(getChildren(v)[0].children).toBe(String(i+1));
+      expect(getChildren(v)[0].children).toBe(String(i + 1));
     });
   });
 
   it('each returns array of anchor blocks for objects with key/id', () => {
-    const items = [{ id: 'a', name: 'A' }, { key: 'b', name: 'B' }];
+    const items = [
+      { id: 'a', name: 'A' },
+      { key: 'b', name: 'B' },
+    ];
     const arr = each(items, (item) => ({ tag: 'div', children: item.name }));
     expect(arr.length).toBe(2);
     expect(arr[0].key).toBe('each-a');

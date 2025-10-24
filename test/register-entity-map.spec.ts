@@ -1,5 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { decodeEntities, registerEntityMap, clearRegisteredEntityMap } from '../src/lib/runtime/helpers';
+import {
+  decodeEntities,
+  registerEntityMap,
+  clearRegisteredEntityMap,
+} from '../src/lib/runtime/helpers';
 
 describe('registerEntityMap', () => {
   beforeEach(() => {
@@ -13,7 +17,10 @@ describe('registerEntityMap', () => {
   });
 
   it('uses registered map when provided', () => {
-    const fakeMap = { hellip: '…', copy: '©', nbsp: '\u00A0' } as Record<string, string>;
+    const fakeMap = { hellip: '…', copy: '©', nbsp: '\u00A0' } as Record<
+      string,
+      string
+    >;
     registerEntityMap(fakeMap, { overwrite: true });
     expect(decodeEntities('&hellip;&copy;&nbsp;')).toBe('…©\u00A0');
   });

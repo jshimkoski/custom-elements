@@ -30,7 +30,7 @@ export function createStore<T extends object>(initial: T): Store<T> {
   }
 
   function setState(partial: Partial<T> | ((prev: T) => Partial<T>)) {
-    const next = typeof partial === "function" ? partial(state) : partial;
+    const next = typeof partial === 'function' ? partial(state) : partial;
 
     state = { ...state, ...next };
     notify();

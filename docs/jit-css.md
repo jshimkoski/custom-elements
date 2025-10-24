@@ -13,12 +13,15 @@ Custom Elements Runtime provides a high-performance, zero-dependency JIT CSS eng
 ## 🧩 Built-in Utilities
 
 ### **Layout & Display**
+
 `block`, `inline`, `inline-block`, `flex`, `inline-flex`, `grid`, `inline-grid`, `table`, `table-cell`, `table-row`, `hidden`
 
 ### **Position**
+
 `absolute`, `relative`, `fixed`, `sticky`, `static`
 
 ### **Sizing & Spacing**
+
 `w-full`, `w-screen`, `w-auto`, `w-fit`, `w-min`, `w-max`, `h-full`, `h-screen`, `h-auto`, `h-fit`, `h-min`, `h-max`
 `max-w-full`, `max-w-screen`, `max-h-full`, `max-h-screen`, `min-w-0`, `min-h-0`, `min-w-full`, `min-h-full`, `min-w-screen`, `min-h-screen`
 
@@ -26,30 +29,38 @@ Custom Elements Runtime provides a high-performance, zero-dependency JIT CSS eng
 `w-3xs` to `w-7xl`, `h-3xs` to `h-7xl`, `max-w-3xs` to `max-w-7xl`, `max-h-3xs` to `max-h-7xl`, `min-w-3xs` to `min-w-7xl`, `min-h-3xs` to `min-h-7xl`
 
 ### **Spacing (Margin/Padding/Gap):**
+
 `m-auto`, `mx-auto`, `my-auto`, `p-4`, `m-2`, `mx-auto`, `gap-2`, `gap-x-2`, `gap-y-2`, etc. (all axis and negative values supported)
 
 ### **Space Between (Tailwind-style)**
+
 `space-x-*`, `space-y-*` - Add consistent spacing between child elements using margin (see [Spacing Utilities](./space-utilities.md) for details)
 
 ### **Overflow**
+
 `overflow-auto`, `overflow-hidden`, `overflow-visible`, `overflow-scroll`
 `overflow-x-auto`, `overflow-x-hidden`, `overflow-x-visible`, `overflow-x-scroll`
 `overflow-y-auto`, `overflow-y-hidden`, `overflow-y-visible`, `overflow-y-scroll`
 
 ### **Pointer Events & Cursor**
+
 `pointer-events-none`, `pointer-events-auto`
 `cursor-auto`, `cursor-default`, `cursor-pointer`, `cursor-wait`, `cursor-text`, `cursor-move`, `cursor-help`, `cursor-not-allowed`, `cursor-grab`, `cursor-grabbing`
 
 ### **Accessibility**
+
 `sr-only`, `not-sr-only`
 
 ### **Visibility**
+
 `visible`, `invisible`
 
 ### **Z-index**
+
 `z-0`, `z-10`, `z-20`, `z-30`, `z-40`, `z-50`
 
 ### **Grid**
+
 `grid-cols-1` to `grid-cols-12`, `grid-rows-1` to `grid-rows-12`, `grid-cols-none`, `grid-rows-none`
 `col-span-1` to `col-span-12`, `row-span-1` to `row-span-12`, `col-span-full`, `row-span-full`
 `col-start-1` to `col-start-12`, `col-end-1` to `col-end-12`, `row-start-1` to `row-start-12`, `row-end-1` to `row-end-12`
@@ -58,6 +69,7 @@ Custom Elements Runtime provides a high-performance, zero-dependency JIT CSS eng
 `grid-flow-row`, `grid-flow-col`, `grid-flow-row-dense`, `grid-flow-col-dense`
 
 ### **Flexbox**
+
 `items-center`, `items-start`, `items-end`, `items-baseline`, `items-stretch`
 `justify-center`, `justify-start`, `justify-between`, `justify-around`, `justify-evenly`, `justify-end`
 `flex-wrap`, `flex-nowrap`, `flex-wrap-reverse`
@@ -69,9 +81,11 @@ Custom Elements Runtime provides a high-performance, zero-dependency JIT CSS eng
 `grow-0` to `grow-12`, `shrink-0` to `shrink-12`
 
 ### **Order**
+
 `order-1` to `order-12`, `order-first`, `order-last`, `order-none`
 
 ### **Typography**
+
 `font-thin`, `font-extralight`, `font-light`, `font-normal`, `font-medium`, `font-semibold`, `font-bold`, `font-extrabold`, `font-black`
 `italic`, `not-italic`
 `uppercase`, `lowercase`, `capitalize`, `normal-case`
@@ -98,6 +112,7 @@ Custom Elements Runtime provides a high-performance, zero-dependency JIT CSS eng
 `line-clamp-1`, `line-clamp-2`, `line-clamp-3`, `line-clamp-4`, `line-clamp-5`, `line-clamp-6`, `line-clamp-none`
 
 ### **Borders & Radius**
+
 **Border Widths:**
 `border`, `border-0`, `border-1`, `border-2`, `border-4`, `border-6`, `border-8`
 `border-t`, `border-t-0`, `border-t-1`, `border-t-2`, `border-t-4`, `border-t-6`, `border-t-8`
@@ -115,12 +130,15 @@ Custom Elements Runtime provides a high-performance, zero-dependency JIT CSS eng
 `rounded-t-*`, `rounded-r-*`, `rounded-b-*`, `rounded-l-*`, `rounded-tl-*`, `rounded-tr-*`, `rounded-br-*`, `rounded-bl-*` (all sizes available)
 
 ### **Shadow & Effects**
+
 `shadow-none`, `shadow-xs`, `shadow-sm`, `shadow`, `shadow-md`, `shadow-lg`, `shadow-xl`, `shadow-2xl`, `shadow-inner`
 
 ### **Opacity**
+
 `opacity-0`, `opacity-5`, `opacity-10`, `opacity-20`, `opacity-25`, `opacity-30`, `opacity-40`, `opacity-50`, `opacity-60`, `opacity-70`, `opacity-75`, `opacity-80`, `opacity-90`, `opacity-95`, `opacity-100`
 
 ### **Transforms**
+
 **Scale:**
 `scale-0`, `scale-50`, `scale-75`, `scale-90`, `scale-95`, `scale-100`, `scale-105`, `scale-110`, `scale-125`, `scale-150`
 
@@ -129,6 +147,7 @@ Custom Elements Runtime provides a high-performance, zero-dependency JIT CSS eng
 `-rotate-1`, `-rotate-2`, `-rotate-3`, `-rotate-6`, `-rotate-12`, `-rotate-45`, `-rotate-90`, `-rotate-180`
 
 ### **Transitions**
+
 **Properties:**
 `transition`, `transition-none`, `transition-all`, `transition-colors`, `transition-shadow`, `transition-opacity`, `transition-transform`
 
@@ -139,9 +158,11 @@ Custom Elements Runtime provides a high-performance, zero-dependency JIT CSS eng
 `duration-75`, `duration-100`, `duration-150`, `duration-200`, `duration-300`, `duration-500`, `duration-700`, `duration-1000`
 
 ### **Aspect Ratio**
+
 `aspect-auto`, `aspect-square`, `aspect-video`
 
 ### **Object Utilities**
+
 `object-contain`, `object-cover`, `object-fill`, `object-none`, `object-scale-down`
 `object-bottom`, `object-center`, `object-left`, `object-left-bottom`, `object-left-top`, `object-right`, `object-right-bottom`, `object-right-top`, `object-top`
 
@@ -165,9 +186,11 @@ Custom Elements Runtime provides a high-performance, zero-dependency JIT CSS eng
 Examples: `from-primary-500`, `to-secondary-600`, `via-neutral-300`
 
 ### **Container Queries**
+
 `@container` - Sets `container-type: inline-size`
 
 ### **Colors**
+
 `bg-neutral-100`, `text-primary-500`, `border-error-500`, `shadow-primary-500`, etc. (full palette, semantic, and arbitrary)
 
 For a complete list, see the `utilityMap` in [`src/lib/runtime/style.ts`](../src/lib/runtime/style.ts).
@@ -191,8 +214,11 @@ For a complete list, see the `utilityMap` in [`src/lib/runtime/style.ts`](../src
 **Dark Mode:** `dark:`
 
 **Example:**
+
 ```html
-<button class="bg-primary-500 hover:bg-primary-600 focus:shadow-sm">Hover & Focus</button>
+<button class="bg-primary-500 hover:bg-primary-600 focus:shadow-sm">
+  Hover & Focus
+</button>
 <div class="group">
   <span class="group-hover:text-primary-500">Group Hover</span>
 </div>
@@ -226,7 +252,7 @@ Based on the enhanced property mappings in the implementation:
 - `p-[value]`, `px-[value]`, `py-[value]` → padding variants
 - `m-[value]`, `mx-[value]`, `my-[value]` → margin variants
 - `w-[value]`, `h-[value]` → width, height
-- `min-w-[value]`, `max-w-[value]`, `min-h-[value]`, `max-h-value]` → size constraints
+- `min-w-[value]`, `max-w-[value]`, `min-h-[value]`, `max-h-[value]` → size constraints
 - `border-t-[value]`, `border-r-[value]`, `border-b-[value]`, `border-l-[value]` → directional borders
 - `border-x-[value]`, `border-y-[value]` → axis borders
 - `grid-cols-[value]`, `grid-rows-[value]` → grid templates
@@ -264,6 +290,7 @@ Based on the enhanced property mappings in the implementation:
 ```
 
 **Variants + Arbitrary:**
+
 ```html
 <button class="hover:bg-[#09f] focus:[box-shadow:0_0_0_2px_#09f]"></button>
 <div class="md:p-[2rem] dark:bg-[#222] @lg:gap-[3rem]"></div>
@@ -273,11 +300,13 @@ Based on the enhanced property mappings in the implementation:
 
 Arbitrary variants allow you to target custom selectors, attributes, or states directly in your utility classes. This enables advanced styling scenarios, such as targeting specific attributes, custom states, or deeply nested elements, all with utility-first syntax.
 
-**Syntax:**  
-- `[attr=value]:utility` — targets elements with a specific attribute value  
+**Syntax:**
+
+- `[attr=value]:utility` — targets elements with a specific attribute value
 - `foo-[bar]:utility` — targets custom selectors or pseudo-classes
 
 **Examples:**
+
 ```html
 <!-- Attribute variant: style when aria-selected is true -->
 <div class="[aria-selected=true]:bg-primary-500"></div>
@@ -296,16 +325,19 @@ Arbitrary variants allow you to target custom selectors, attributes, or states d
 - You can combine arbitrary variants with built-in variants (e.g., `hover:`, `md:`, `dark:`).
 
 **Supported Patterns:**
+
 - `[attr=value]:utility`
 - `foo-[bar]:utility`
 - Any valid selector or attribute inside brackets
 
 **Best Practices:**
+
 - Use arbitrary variants for advanced targeting needs, such as custom attributes, states, or deep selectors.
 - Combine with responsive and state variants for dynamic, context-aware styling.
 - Keep selectors concise and valid for optimal performance.
 
 **Reference:**
+
 - See `parseArbitraryVariant` and variant handling in [`src/lib/runtime/style.ts`](../src/lib/runtime/style.ts).
 
 ## 🎨 Color Palettes & Usage
@@ -367,6 +399,7 @@ JIT CSS provides a rich set of built-in color palettes, all accessible via utili
 ```
 
 **How to Override Colors:**
+
 ```css
 :root {
   --color-primary-500: #007bff;
@@ -383,36 +416,47 @@ The `useStyle` hook allows you to inject dynamic CSS-in-JS styles that can react
 ### **Basic Usage**
 
 ```typescript
-import { component, html, css, useStyle, ref } from '@jasonshimmy/custom-elements-runtime';
+import {
+  component,
+  html,
+  css,
+  useStyle,
+  ref,
+} from '@jasonshimmy/custom-elements-runtime';
 
 component('dynamic-card', ({ theme = 'light', size = 'md' }) => {
   const isExpanded = ref(false);
-  
-  useStyle(() => css`
-    :host {
-      background: ${theme === 'light' ? 'white' : 'black'};
-      color: ${theme === 'light' ? 'black' : 'white'};
-      padding: ${size === 'sm' ? '0.5rem' : size === 'lg' ? '2rem' : '1rem'};
-      border-radius: 8px;
-      transition: all 0.3s ease;
-      transform: ${isExpanded.value ? 'scale(1.05)' : 'scale(1)'};
-    }
-    
-    .card-content {
-      opacity: ${isExpanded.value ? 1 : 0.8};
-      transition: opacity 0.2s ease;
-    }
-    
-    @media (prefers-color-scheme: dark) {
+
+  useStyle(
+    () => css`
       :host {
-        background: #111;
-        color: #fff;
+        background: ${theme === 'light' ? 'white' : 'black'};
+        color: ${theme === 'light' ? 'black' : 'white'};
+        padding: ${size === 'sm' ? '0.5rem' : size === 'lg' ? '2rem' : '1rem'};
+        border-radius: 8px;
+        transition: all 0.3s ease;
+        transform: ${isExpanded.value ? 'scale(1.05)' : 'scale(1)'};
       }
-    }
-  `);
-  
+
+      .card-content {
+        opacity: ${isExpanded.value ? 1 : 0.8};
+        transition: opacity 0.2s ease;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :host {
+          background: #111;
+          color: #fff;
+        }
+      }
+    `,
+  );
+
   return html`
-    <div class="card-content" @click="${() => isExpanded.value = !isExpanded.value}">
+    <div
+      class="card-content"
+      @click="${() => (isExpanded.value = !isExpanded.value)}"
+    >
       <h3>Dynamic Card</h3>
       <p>Click to expand!</p>
     </div>
@@ -425,37 +469,45 @@ component('dynamic-card', ({ theme = 'light', size = 'md' }) => {
 ```typescript
 component('chart-widget', ({ data, colorScheme = 'blue' }) => {
   const hoveredIndex = ref(-1);
-  
-  useStyle(() => css`
-    .chart-bar {
-      transition: all 0.2s ease;
-      background: var(--color-${colorScheme}-500);
-    }
-    
-    .chart-bar:hover {
-      background: var(--color-${colorScheme}-600);
-      transform: translateY(-2px);
-    }
-    
-    ${data.map((item, index) => `
+
+  useStyle(
+    () => css`
+      .chart-bar {
+        transition: all 0.2s ease;
+        background: var(--color-${colorScheme}-500);
+      }
+
+      .chart-bar:hover {
+        background: var(--color-${colorScheme}-600);
+        transform: translateY(-2px);
+      }
+
+      ${data
+        .map(
+          (item, index) => `
       .bar-${index} {
-        height: ${(item.value / Math.max(...data.map(d => d.value))) * 100}%;
+        height: ${(item.value / Math.max(...data.map((d) => d.value))) * 100}%;
         opacity: ${hoveredIndex.value === -1 || hoveredIndex.value === index ? 1 : 0.5};
       }
-    `).join('\n')}
-  `);
-  
+    `,
+        )
+        .join('\n')}
+    `,
+  );
+
   return html`
     <div class="chart-container">
-      ${data.map((item, index) => html`
-        <div 
-          class="chart-bar bar-${index}"
-          @mouseenter="${() => hoveredIndex.value = index}"
-          @mouseleave="${() => hoveredIndex.value = -1}"
-        >
-          ${item.label}
-        </div>
-      `)}
+      ${data.map(
+        (item, index) => html`
+          <div
+            class="chart-bar bar-${index}"
+            @mouseenter="${() => (hoveredIndex.value = index)}"
+            @mouseleave="${() => (hoveredIndex.value = -1)}"
+          >
+            ${item.label}
+          </div>
+        `,
+      )}
     </div>
   `;
 });
@@ -467,39 +519,55 @@ You can mix `useStyle` with utility classes for maximum flexibility:
 
 ```typescript
 component('hybrid-button', ({ variant = 'primary', loading = false }) => {
-  useStyle(() => css`
-    .btn-custom {
-      position: relative;
-      overflow: hidden;
-    }
-    
-    .btn-custom::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: ${loading ? '0%' : '-100%'};
-      width: 100%;
-      height: 100%;
-      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-      transition: left 0.6s ease;
-    }
-    
-    .loading-spinner {
-      animation: spin 1s linear infinite;
-    }
-    
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-  `);
-  
+  useStyle(
+    () => css`
+      .btn-custom {
+        position: relative;
+        overflow: hidden;
+      }
+
+      .btn-custom::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: ${loading ? '0%' : '-100%'};
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(
+          90deg,
+          transparent,
+          rgba(255, 255, 255, 0.2),
+          transparent
+        );
+        transition: left 0.6s ease;
+      }
+
+      .loading-spinner {
+        animation: spin 1s linear infinite;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+    `,
+  );
+
   return html`
-    <button class="btn-custom px-4 py-2 rounded-lg font-medium transition-colors
-                   ${variant === 'primary' ? 'bg-primary-500 hover:bg-primary-600 text-white' : 
-                     variant === 'secondary' ? 'bg-secondary-500 hover:bg-secondary-600 text-white' :
-                     'bg-neutral-200 hover:bg-neutral-300 text-neutral-800'}"
+    <button
+      class="btn-custom px-4 py-2 rounded-lg font-medium transition-colors
+                   ${variant === 'primary'
+        ? 'bg-primary-500 hover:bg-primary-600 text-white'
+        : variant === 'secondary'
+          ? 'bg-secondary-500 hover:bg-secondary-600 text-white'
+          : 'bg-neutral-200 hover:bg-neutral-300 text-neutral-800'}"
     >
-      ${loading ? html`<span class="loading-spinner inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full"></span>` : ''}
+      ${loading
+        ? html`<span
+            class="loading-spinner inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full"
+          ></span>`
+        : ''}
       <slot></slot>
     </button>
   `;
@@ -513,53 +581,57 @@ component('hybrid-button', ({ variant = 'primary', loading = false }) => {
 ```typescript
 component('dashboard-layout', ({ sidebarWidth = 280, headerHeight = 64 }) => {
   const sidebarCollapsed = ref(false);
-  const currentWidth = computed(() => sidebarCollapsed.value ? 80 : sidebarWidth);
-  
-  useStyle(() => css`
-    :host {
-      display: grid;
-      grid-template-areas: 
-        "sidebar header"
-        "sidebar main";
-      grid-template-columns: ${currentWidth.value}px 1fr;
-      grid-template-rows: ${headerHeight}px 1fr;
-      height: 100vh;
-      transition: grid-template-columns 0.3s ease;
-    }
-    
-    .sidebar {
-      grid-area: sidebar;
-      background: var(--color-neutral-900);
-      transition: all 0.3s ease;
-    }
-    
-    .header {
-      grid-area: header;
-      background: var(--color-white);
-      border-bottom: 1px solid var(--color-neutral-200);
-    }
-    
-    .main {
-      grid-area: main;
-      overflow-y: auto;
-    }
-  `);
-  
+  const currentWidth = computed(() =>
+    sidebarCollapsed.value ? 80 : sidebarWidth,
+  );
+
+  useStyle(
+    () => css`
+      :host {
+        display: grid;
+        grid-template-areas:
+          'sidebar header'
+          'sidebar main';
+        grid-template-columns: ${currentWidth.value}px 1fr;
+        grid-template-rows: ${headerHeight}px 1fr;
+        height: 100vh;
+        transition: grid-template-columns 0.3s ease;
+      }
+
+      .sidebar {
+        grid-area: sidebar;
+        background: var(--color-neutral-900);
+        transition: all 0.3s ease;
+      }
+
+      .header {
+        grid-area: header;
+        background: var(--color-white);
+        border-bottom: 1px solid var(--color-neutral-200);
+      }
+
+      .main {
+        grid-area: main;
+        overflow-y: auto;
+      }
+    `,
+  );
+
   return html`
     <aside class="sidebar p-4">
-      <button 
+      <button
         class="w-full p-2 bg-neutral-800 hover:bg-neutral-700 text-white rounded-md mb-4 transition-colors"
-        @click="${() => sidebarCollapsed.value = !sidebarCollapsed.value}"
+        @click="${() => (sidebarCollapsed.value = !sidebarCollapsed.value)}"
       >
         ${sidebarCollapsed.value ? '→' : '←'}
       </button>
       <slot name="sidebar"></slot>
     </aside>
-    
+
     <header class="header flex items-center justify-between px-6">
       <slot name="header"></slot>
     </header>
-    
+
     <main class="main p-6 bg-neutral-50">
       <slot></slot>
     </main>
@@ -571,15 +643,19 @@ component('dashboard-layout', ({ sidebarWidth = 280, headerHeight = 64 }) => {
 
 ```html
 <div class="@container">
-  <div class="grid gap-4 
+  <div
+    class="grid gap-4 
               grid-cols-1 
               @xs:grid-cols-2 
               @md:grid-cols-3 
               @lg:grid-cols-4 
-              @2xl:grid-cols-5">
-    <div class="bg-white rounded-lg shadow-md p-4 
+              @2xl:grid-cols-5"
+  >
+    <div
+      class="bg-white rounded-lg shadow-md p-4 
                 hover:shadow-lg hover:scale-105 
-                transition-all duration-200">
+                transition-all duration-200"
+    >
       <h3 class="font-semibold text-lg mb-2 text-neutral-800">Card Title</h3>
       <p class="text-neutral-600 text-sm leading-relaxed">
         This card uses container queries for responsive behavior.
@@ -592,6 +668,7 @@ component('dashboard-layout', ({ sidebarWidth = 280, headerHeight = 64 }) => {
 ### **Gradient Background Examples**
 
 **Linear Gradients:**
+
 ```html
 <!-- Top to bottom -->
 <div class="bg-linear-to-b from-primary-500 to-secondary-900 p-8 text-white">
@@ -607,23 +684,31 @@ component('dashboard-layout', ({ sidebarWidth = 280, headerHeight = 64 }) => {
 ```
 
 **Radial Gradients:**
+
 ```html
 <!-- Ellipse from center -->
-<div class="bg-radial from-primary-500 to-secondary-900 p-8 text-white rounded-xl">
+<div
+  class="bg-radial from-primary-500 to-secondary-900 p-8 text-white rounded-xl"
+>
   <h2 class="text-2xl font-bold text-center">Radial Ellipse</h2>
   <p class="text-center">Fades from center outward</p>
 </div>
 
 <!-- Circle from top-right corner -->
-<div class="bg-radial-circle-at-tr from-success-400 via-info-500 to-warning-600 p-8 h-64">
+<div
+  class="bg-radial-circle-at-tr from-success-400 via-info-500 to-warning-600 p-8 h-64"
+>
   <p class="text-right">Circular burst from corner</p>
 </div>
 ```
 
 **Conic Gradients:**
+
 ```html
 <!-- Color wheel effect -->
-<div class="bg-conic from-error-500 via-warning-500 to-success-500 p-8 rounded-full w-64 h-64">
+<div
+  class="bg-conic from-error-500 via-warning-500 to-success-500 p-8 rounded-full w-64 h-64"
+>
   <div class="flex items-center justify-center h-full">
     <span class="text-white font-bold">360° Gradient</span>
   </div>
@@ -636,8 +721,11 @@ component('dashboard-layout', ({ sidebarWidth = 280, headerHeight = 64 }) => {
 ```
 
 **Complex Multi-stop Gradients:**
+
 ```html
-<div class="bg-linear-to-r from-primary-500 via-secondary-400 to-success-500 p-8">
+<div
+  class="bg-linear-to-r from-primary-500 via-secondary-400 to-success-500 p-8"
+>
   <h2 class="text-2xl font-bold text-white drop-shadow-lg">
     Beautiful Multi-Color Gradient
   </h2>
@@ -646,7 +734,9 @@ component('dashboard-layout', ({ sidebarWidth = 280, headerHeight = 64 }) => {
 
 <!-- Combining gradients with background opacity -->
 <div class="relative">
-  <div class="absolute inset-0 bg-linear-to-r from-primary-500 to-secondary-900 opacity-80"></div>
+  <div
+    class="absolute inset-0 bg-linear-to-r from-primary-500 to-secondary-900 opacity-80"
+  ></div>
   <div class="relative p-8 text-white">
     <h2 class="text-2xl font-bold">Layered gradient effect</h2>
   </div>
@@ -661,7 +751,7 @@ component('dashboard-layout', ({ sidebarWidth = 280, headerHeight = 64 }) => {
     <label class="block text-sm font-medium text-neutral-700 mb-2">
       Email Address
     </label>
-    <input 
+    <input
       type="email"
       class="w-full px-3 py-2 
              border border-neutral-300 rounded-md
@@ -669,13 +759,15 @@ component('dashboard-layout', ({ sidebarWidth = 280, headerHeight = 64 }) => {
              peer-invalid:border-error-500 peer-invalid:ring-error-200
              transition-colors duration-200"
       required
+    />
+    <p
+      class="mt-1 text-sm text-error-600 opacity-0 peer-invalid:opacity-100 transition-opacity"
     >
-    <p class="mt-1 text-sm text-error-600 opacity-0 peer-invalid:opacity-100 transition-opacity">
       Please enter a valid email address
     </p>
   </div>
-  
-  <button 
+
+  <button
     type="submit"
     class="w-full bg-primary-500 hover:bg-primary-600 
            focus:bg-primary-600 focus:ring-4 focus:ring-primary-200
@@ -710,25 +802,29 @@ component('dashboard-layout', ({ sidebarWidth = 280, headerHeight = 64 }) => {
 ## 🔍 API Reference
 
 ### **Core Functions**
+
 - `minifyCSS(css: string): string` - Minifies CSS by removing whitespace and comments
 - `jitCSS(html: string): string` - Generates CSS from HTML class names
 - `css(strings, ...values): string` - Template literal function for CSS-in-JS
 - `useStyle(callback: () => string): void` - Hook for dynamic CSS injection
 
 ### **Built-in Exports**
+
 - `baseReset: string` - Base CSS reset for Shadow DOM
 - `colors: Record<string, Record<string, string>>` - Color palette object
 - `utilityMap: CSSMap` - Complete mapping of utility classes to CSS
 
 ### **Parser Functions**
+
 - `parseSpacing(className: string): string | null` - Parses spacing utilities
-- `parseColorClass(className: string): string | null` - Parses color utilities 
+- `parseColorClass(className: string): string | null` - Parses color utilities
 - `parseOpacityModifier(className: string): string | null` - Parses opacity modifiers
 - `parseGradientColorStop(className: string): string | null` - Parses gradient color stops (`from-*`, `via-*`, `to-*`)
 - `parseArbitrary(className: string): string | null` - Parses arbitrary value utilities
 - `parseArbitraryVariant(token: string): string | null` - Parses arbitrary variant selectors
 
 ### **Configuration Objects**
+
 - `selectorVariants: SelectorVariantMap` - State and pseudo-class variants
 - `mediaVariants: MediaVariantMap` - Responsive breakpoints and media queries
 - `containerVariants: MediaVariantMap` - Container query breakpoints

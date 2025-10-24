@@ -1,12 +1,18 @@
 import { describe, it, expect } from 'vitest';
-import { assignKeysDeep, renderToString, createElement, patch, vdomRenderer } from '../src/lib/runtime/vdom';
+import {
+  assignKeysDeep,
+  createElement,
+  patch,
+  vdomRenderer,
+} from '../src/lib/runtime/vdom';
+import { renderToString } from '../src/lib/runtime/vdom-ssr';
 
 describe('vdom.additional', () => {
   it('assignKeysDeep assigns unique keys for siblings and nested children', () => {
     const nodes = [
       { tag: 'div', props: { attrs: { id: 'a' } } },
       { tag: 'div', props: { attrs: { id: 'a' } } },
-      { tag: 'span' }
+      { tag: 'span' },
     ];
     const out = assignKeysDeep(nodes as any, 'base') as any[];
     expect(out[0].key).toMatch(/^base:div:a/);
@@ -15,10 +21,14 @@ describe('vdom.additional', () => {
   });
 
   it('renderToString renders elements, anchors and text correctly', () => {
-    const vnode = { tag: 'div', props: { attrs: { id: 'root' } }, children: [
-      { tag: '#text', children: 'hello' },
-      { tag: '#anchor', children: [{ tag: 'span', children: 'inner' }] }
-    ] } as any;
+    const vnode = {
+      tag: 'div',
+      props: { attrs: { id: 'root' } },
+      children: [
+        { tag: '#text', children: 'hello' },
+        { tag: '#anchor', children: [{ tag: 'span', children: 'inner' }] },
+      ],
+    } as any;
     const out = renderToString(vnode as any);
     expect(out).toContain('<div');
     expect(out).toContain('hello');
@@ -27,7 +37,11 @@ describe('vdom.additional', () => {
   });
 
   it('createElement creates anchor fragments with start/end markers', () => {
-    const vnode = { tag: '#anchor', key: 'block', children: [{ tag: 'b', children: 'x' }] } as any;
+    const vnode = {
+      tag: '#anchor',
+      key: 'block',
+      children: [{ tag: 'b', children: 'x' }],
+    } as any;
     const node = createElement(vnode as any);
     // Should be a DocumentFragment
     expect(node.nodeType).toBe(Node.DOCUMENT_FRAGMENT_NODE);
@@ -49,13 +63,29 @@ describe('vdom.additional', () => {
   it('vdomRenderer mounts and replaces nodes and preserves style elements removal behavior', () => {
     const host = document.createElement('div');
     const sr = host.attachShadow({ mode: 'open' });
-    vdomRenderer(sr as any, { tag: 'div', key: 'root', children: [{ tag: 'span', children: 'a' }] } as any);
+    vdomRenderer(
+      sr as any,
+      {
+        tag: 'div',
+        key: 'root',
+        children: [{ tag: 'span', children: 'a' }],
+      } as any,
+    );
     expect(sr.firstChild).toBeTruthy();
     // Insert a STYLE that should be preserved
     const style = document.createElement('style');
     sr.appendChild(style);
-    vdomRenderer(sr as any, { tag: 'div', key: 'root', children: [{ tag: 'span', children: 'b' }] } as any);
+    vdomRenderer(
+      sr as any,
+      {
+        tag: 'div',
+        key: 'root',
+        children: [{ tag: 'span', children: 'b' }],
+      } as any,
+    );
     // Style should still exist
-    expect(Array.from(sr.childNodes).some(n => n.nodeName === 'STYLE')).toBe(true);
+    expect(Array.from(sr.childNodes).some((n) => n.nodeName === 'STYLE')).toBe(
+      true,
+    );
   });
 });

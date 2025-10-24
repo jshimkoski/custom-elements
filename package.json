@@ -20,7 +20,12 @@
   "homepage": "https://github.com/jshimkoski/custom-elements#readme",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build && tsc",
+    "build": "npm run lint:ci && vite build && tsc",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --ext .ts",
+    "lint:fix": "eslint . --ext .ts --fix",
+    "lint:ci": "npm run lint && npm run typecheck",
+    "format": "prettier --write .",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -29,13 +34,20 @@
     "cy:open": "cypress open"
   },
   "devDependencies": {
-    "@testing-library/jest-dom": "^6.8.0",
+    "@testing-library/jest-dom": "^6.9.1",
     "@types/jsdom": "^27.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.46.2",
+    "@typescript-eslint/parser": "^8.46.2",
     "@vitest/coverage-v8": "^3.2.4",
-    "cypress": "^15.0.0",
+    "cypress": "^15.5.0",
+    "eslint": "^9.38.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.4",
     "jsdom": "^26.1.0",
-    "typescript": "^5.9.2",
-    "vite": "^7.1.3",
+    "prettier": "^3.6.2",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.46.2",
+    "vite": "^7.1.12",
     "vitest": "^3.2.4"
   },
   "main": "dist/custom-elements-runtime.cjs.js",
@@ -44,14 +56,50 @@
   "files": [
     "dist",
     "dist/index.d.ts",
+    "dist/*.d.ts",
     "entities.json"
   ],
+  "sideEffects": false,
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/custom-elements-runtime.es.js",
-      "require": "./dist/custom-elements-runtime.cjs.js",
-      "default": "./dist/custom-elements-runtime.umd.js"
+      "require": "./dist/custom-elements-runtime.cjs.js"
+    },
+    "./ssr": {
+      "types": "./dist/ssr.d.ts",
+      "import": "./dist/custom-elements-runtime.ssr.es.js",
+      "require": "./dist/custom-elements-runtime.ssr.cjs.js"
+    },
+    "./transitions": {
+      "types": "./dist/transitions.d.ts",
+      "import": "./dist/custom-elements-runtime.transitions.es.js",
+      "require": "./dist/custom-elements-runtime.transitions.cjs.js"
+    },
+    "./directives": {
+      "types": "./dist/directives.d.ts",
+      "import": "./dist/custom-elements-runtime.directives.es.js",
+      "require": "./dist/custom-elements-runtime.directives.cjs.js"
+    },
+    "./directive-enhancements": {
+      "types": "./dist/directive-enhancements.d.ts",
+      "import": "./dist/custom-elements-runtime.directive-enhancements.es.js",
+      "require": "./dist/custom-elements-runtime.directive-enhancements.cjs.js"
+    },
+    "./event-bus": {
+      "types": "./dist/event-bus.d.ts",
+      "import": "./dist/custom-elements-runtime.event-bus.es.js",
+      "require": "./dist/custom-elements-runtime.event-bus.cjs.js"
+    },
+    "./store": {
+      "types": "./dist/store.d.ts",
+      "import": "./dist/custom-elements-runtime.store.es.js",
+      "require": "./dist/custom-elements-runtime.store.cjs.js"
+    },
+    "./router": {
+      "types": "./dist/router.d.ts",
+      "import": "./dist/custom-elements-runtime.router.es.js",
+      "require": "./dist/custom-elements-runtime.router.cjs.js"
     },
     "./entities.json": "./entities.json"
   },

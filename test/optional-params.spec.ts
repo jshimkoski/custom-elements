@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { component, html, useOnConnected, useEmit, useProps } from '../src/lib';
 
 describe('Optional Parameters', () => {
@@ -14,7 +14,7 @@ describe('Optional Parameters', () => {
     const element = document.createElement('simple-component');
     document.body.appendChild(element);
 
-    await new Promise(resolve => setTimeout(resolve, 50));
+    await new Promise((resolve) => setTimeout(resolve, 50));
 
     const div = element.shadowRoot?.querySelector('div');
     expect(div?.textContent).toBe('Hello World');
@@ -30,7 +30,7 @@ describe('Optional Parameters', () => {
     element.setAttribute('message', 'Custom Message');
     document.body.appendChild(element);
 
-    await new Promise(resolve => setTimeout(resolve, 50));
+    await new Promise((resolve) => setTimeout(resolve, 50));
 
     const div = element.shadowRoot?.querySelector('div');
     expect(div?.textContent).toBe('Custom Message');
@@ -38,7 +38,7 @@ describe('Optional Parameters', () => {
 
   it('should support component with props and hooks', async () => {
     let connected = false;
-    
+
     component('full-component', () => {
       const props = useProps({ text: 'Default' });
       useOnConnected(() => {
@@ -52,7 +52,7 @@ describe('Optional Parameters', () => {
     element.setAttribute('text', 'Full Component');
     document.body.appendChild(element);
 
-    await new Promise(resolve => setTimeout(resolve, 50));
+    await new Promise((resolve) => setTimeout(resolve, 50));
 
     const div = element.shadowRoot?.querySelector('div');
     expect(div?.textContent).toBe('Full Component');
@@ -61,10 +61,10 @@ describe('Optional Parameters', () => {
 
   it('should support component with empty destructuring when no props needed', async () => {
     let emitted = false;
-    
+
     component('emit-only', () => {
       const emit = useEmit();
-      
+
       useOnConnected(() => {
         emit('ready', { message: 'Ready' });
       });
@@ -75,10 +75,10 @@ describe('Optional Parameters', () => {
     element.addEventListener('ready', () => {
       emitted = true;
     });
-    
+
     document.body.appendChild(element);
 
-    await new Promise(resolve => setTimeout(resolve, 50));
+    await new Promise((resolve) => setTimeout(resolve, 50));
 
     const div = element.shadowRoot?.querySelector('div');
     expect(div?.textContent).toBe('Emit Only');

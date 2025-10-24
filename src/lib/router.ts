@@ -1,19 +1,19 @@
-import { html } from "./runtime/template-compiler";
-import { component } from "./runtime/component";
+import { html } from './runtime/template-compiler';
+import { component } from './runtime/component';
 import {
   useProps,
   useOnConnected,
   useOnDisconnected,
   useStyle,
-} from "./runtime/hooks";
-import { ref, computed } from "./runtime/reactive";
-import { createStore, type Store } from "./store";
-import { devError, devWarn } from "./runtime/logger";
-import { match } from "./directives";
+} from './runtime/hooks';
+import { ref, computed } from './runtime/reactive';
+import { createStore, type Store } from './store';
+import { devError, devWarn } from './runtime/logger';
+import { match } from './directives';
 
 export type RouteComponent =
-  | { new (...args: any[]): any } // class components
-  | ((...args: any[]) => any); // functional components
+  | { new (...args: unknown[]): unknown } // class components
+  | ((...args: unknown[]) => unknown); // functional components
 
 export interface RouteState {
   path: string;
@@ -29,12 +29,14 @@ export interface Route {
   /**
    * Statically available component (already imported)
    */
-  component?: string | (() => any);
+  component?: string | (() => unknown);
 
   /**
    * Lazy loader that resolves to something renderable
    */
-  load?: () => Promise<{ default: string | HTMLElement | Function }>;
+  load?: () => Promise<{
+    default: string | HTMLElement | ((...args: unknown[]) => unknown);
+  }>;
 
   /**
    * Runs before matching — return false to cancel,
@@ -86,19 +88,19 @@ export interface RouterConfig {
 
 export const parseQuery = (search: string): Record<string, string> => {
   if (!search) return {};
-  if (typeof URLSearchParams === "undefined") return {};
+  if (typeof URLSearchParams === 'undefined') return {};
   return Object.fromEntries(new URLSearchParams(search));
 };
 
 export const matchRoute = (
   routes: Route[],
-  path: string
+  path: string,
 ): { route: Route | null; params: Record<string, string> } => {
   for (const route of routes) {
     const paramNames: string[] = [];
     const regexPath = route.path.replace(/:[^/]+/g, (m) => {
       paramNames.push(m.slice(1));
-      return "([^/]+)";
+      return '([^/]+)';
     });
     const regex = new RegExp(`^${regexPath}$`);
     const match = path.match(regex);
@@ -125,14 +127,19 @@ function findMatchedRoute(routes: Route[], path: string): Route | null {
 }
 
 // Async component loader cache
-const componentCache: Record<string, any> = {};
+const componentCache: Record<
+  string,
+  string | HTMLElement | ((...args: unknown[]) => unknown)
+> = {};
 
 /**
  * Loads a route's component, supporting both static and async.
  * @param route Route object
  * @returns Promise resolving to the component
  */
-export async function resolveRouteComponent(route: Route): Promise<any> {
+export async function resolveRouteComponent(
+  route: Route,
+): Promise<string | HTMLElement | ((...args: unknown[]) => unknown)> {
   if (route.component) return route.component;
   if (route.load) {
     if (componentCache[route.path]) return componentCache[route.path];
@@ -140,7 +147,7 @@ export async function resolveRouteComponent(route: Route): Promise<any> {
       const mod = await route.load();
       componentCache[route.path] = mod.default;
       return mod.default;
-    } catch (err) {
+    } catch {
       throw new Error(`Failed to load component for route: ${route.path}`);
     }
   }
@@ -148,7 +155,7 @@ export async function resolveRouteComponent(route: Route): Promise<any> {
 }
 
 export function useRouter(config: RouterConfig) {
-  const { routes, base = "", initialUrl } = config;
+  const { routes, base = '', initialUrl } = config;
 
   let getLocation: () => { path: string; query: Record<string, string> };
   let initial: { path: string; query: Record<string, string> };
@@ -164,14 +171,14 @@ export function useRouter(config: RouterConfig) {
     if (!matched || !matched.beforeEnter) return true;
     try {
       const result = await matched.beforeEnter(to, from);
-      if (typeof result === "string") {
+      if (typeof result === 'string') {
         // Redirect
         await navigate(result, true);
         return false;
       }
       return result !== false;
     } catch (err) {
-      devError("beforeEnter error", err);
+      devError('beforeEnter error', err);
       return false;
     }
   };
@@ -181,13 +188,13 @@ export function useRouter(config: RouterConfig) {
     if (!matched || !matched.onEnter) return true;
     try {
       const result = await matched.onEnter(to, from);
-      if (typeof result === "string") {
+      if (typeof result === 'string') {
         await navigate(result, true);
         return false;
       }
       return result !== false;
     } catch (err) {
-      devError("onEnter error", err);
+      devError('onEnter error', err);
       return false;
     }
   };
@@ -198,18 +205,18 @@ export function useRouter(config: RouterConfig) {
     try {
       matched.afterEnter(to, from);
     } catch (err) {
-      devError("afterEnter error", err);
+      devError('afterEnter error', err);
     }
   };
 
   const navigate = async (path: string, replace = false) => {
     try {
       const loc = {
-        path: path.replace(base, "") || "/",
+        path: path.replace(base, '') || '/',
         query: {},
       };
       const match = matchRoute(routes, loc.path);
-      if (!match) throw new Error(`No route found for ${loc.path}`);
+      if (!match.route) throw new Error(`No route found for ${loc.path}`);
 
       const from = store.getState();
       const to: RouteState = {
@@ -226,11 +233,11 @@ export function useRouter(config: RouterConfig) {
       const allowedOn = await runOnEnter(to, from);
       if (!allowedOn) return;
 
-      if (typeof window !== "undefined" && typeof document !== "undefined") {
+      if (typeof window !== 'undefined' && typeof document !== 'undefined') {
         if (replace) {
-          window.history.replaceState({}, "", base + path);
+          window.history.replaceState({}, '', base + path);
         } else {
-          window.history.pushState({}, "", base + path);
+          window.history.pushState({}, '', base + path);
         }
       }
 
@@ -239,7 +246,7 @@ export function useRouter(config: RouterConfig) {
       // afterEnter hook (post commit)
       runAfterEnter(to, from);
     } catch (err) {
-      devError("Navigation error:", err);
+      devError('Navigation error:', err);
     }
   };
 
@@ -247,14 +254,14 @@ export function useRouter(config: RouterConfig) {
   // even if a `window` exists (useful for hydration tests). Browser mode only
   // applies when `initialUrl` is undefined.
   if (
-    typeof window !== "undefined" &&
-    typeof document !== "undefined" &&
-    typeof initialUrl === "undefined"
+    typeof window !== 'undefined' &&
+    typeof document !== 'undefined' &&
+    typeof initialUrl === 'undefined'
   ) {
     // Browser mode
     getLocation = () => {
       const url = new URL(window.location.href);
-      const path = url.pathname.replace(base, "") || "/";
+      const path = url.pathname.replace(base, '') || '/';
       const query = parseQuery(url.search);
       return { path, query };
     };
@@ -272,7 +279,7 @@ export function useRouter(config: RouterConfig) {
       await navigate(loc.path, replace);
     };
 
-    window.addEventListener("popstate", () => update(true));
+    window.addEventListener('popstate', () => update(true));
 
     push = (path: string) => navigate(path, false);
     replaceFn = (path: string) => navigate(path, true);
@@ -280,8 +287,8 @@ export function useRouter(config: RouterConfig) {
   } else {
     // SSR mode
     getLocation = () => {
-      const url = new URL(initialUrl || "/", "http://localhost");
-      const path = url.pathname.replace(base, "") || "/";
+      const url = new URL(initialUrl || '/', 'http://localhost');
+      const path = url.pathname.replace(base, '') || '/';
       const query = parseQuery(url.search);
       return { path, query };
     };
@@ -299,14 +306,27 @@ export function useRouter(config: RouterConfig) {
       await navigateSSR(loc.path);
     };
 
+    // SSR navigation contract:
+    // - `push` / `replace` call into `navigateSSR` and return a Promise.
+    // - On the server we intentionally surface navigation failures so
+    //   server-side logic (or tests) can react: missing routes or thrown
+    //   errors from `beforeEnter`/`onEnter` will cause the Promise to
+    //   reject. This lets the server render 404s or abort builds.
+    // - For valid routes the server-side navigation resolves and updates
+    //   the internal store state so rendered output matches the target
+    //   path. The `back()` operation is client-only and is a synchronous
+    //   no-op in SSR mode.
     const navigateSSR = async (path: string) => {
       try {
         const loc = {
-          path: path.replace(base, "") || "/",
+          path: path.replace(base, '') || '/',
           query: {},
         };
         const match = matchRoute(routes, loc.path);
-        if (!match) throw new Error(`No route found for ${loc.path}`);
+        // In SSR mode we intentionally surface navigation errors (missing
+        // route) to the caller so server-side logic may handle them. If no
+        // route matches, throw and let the caller observe the rejection.
+        if (!match.route) throw new Error(`No route found for ${loc.path}`);
 
         const from = store.getState();
         const to: RouteState = {
@@ -318,42 +338,37 @@ export function useRouter(config: RouterConfig) {
         // beforeEnter guard
         const matched = findMatchedRoute(routes, to.path);
         if (matched?.beforeEnter) {
-          try {
-            const result = await matched.beforeEnter(to, from);
-            if (typeof result === "string") {
-              // Redirect
-              await navigateSSR(result);
-              return;
-            }
-            if (result === false) return;
-          } catch (err) {
+          const result = await matched.beforeEnter(to, from);
+          if (typeof result === 'string') {
+            // Redirect
+            await navigateSSR(result);
             return;
           }
+          if (result === false) return;
         }
 
         // onEnter guard
         if (matched?.onEnter) {
-          try {
-            const result = await matched.onEnter(to, from);
-            if (typeof result === "string") {
-              await navigateSSR(result);
-              return;
-            }
-            if (result === false) return;
-          } catch (err) {
+          const result = await matched.onEnter(to, from);
+          if (typeof result === 'string') {
+            await navigateSSR(result);
             return;
           }
+          if (result === false) return;
         }
 
         store.setState(to);
 
         // afterEnter hook
         if (matched?.afterEnter) {
-          try {
-            matched.afterEnter(to, from);
-          } catch (err) {}
+          matched.afterEnter(to, from);
         }
-      } catch (err) {}
+      } catch (err) {
+        // Surface SSR navigation errors so callers (and tests) can observe
+        // failures during server-side resolution.
+        devError('SSR navigation error:', err);
+        throw err;
+      }
     };
 
     push = async (path: string) => navigateSSR(path);
@@ -398,7 +413,7 @@ export function initRouter(config: RouterConfig) {
   // the router instance they use.
   activeRouter = router;
 
-  component("router-view", () => {
+  component('router-view', async () => {
     // Prefer the latest initialized router (tests may re-init). Fallback
     // to the router captured at init time.
     const r = activeRouter || router;
@@ -414,26 +429,26 @@ export function initRouter(config: RouterConfig) {
 
     useOnConnected(() => {
       try {
-        if (r && typeof r.subscribe === "function") {
+        if (r && typeof r.subscribe === 'function') {
           unsubRouterView = r.subscribe((s) => {
             try {
               current.value = s;
             } catch (e) {
-              devWarn("router-view subscription update failed", e);
+              devWarn('router-view subscription update failed', e);
             }
           });
         }
       } catch (e) {
-        devWarn("router-view subscribe failed", e);
+        devWarn('router-view subscribe failed', e);
       }
     });
 
     useOnDisconnected(() => {
-      if (typeof unsubRouterView === "function") {
+      if (typeof unsubRouterView === 'function') {
         try {
           unsubRouterView();
         } catch (e) {
-          devWarn("router-view unsubscribe failed", e);
+          devWarn('router-view unsubscribe failed', e);
         }
       }
     });
@@ -442,44 +457,49 @@ export function initRouter(config: RouterConfig) {
     if (!match || !match.route) return html`<div>Not found</div>`;
 
     // Resolve the component (supports cached async loaders)
-    return r
-      .resolveRouteComponent(match.route)
-      .then((comp: any) => {
-        // String tag (custom element) -> render as VNode
-        if (typeof comp === "string") {
-          return { tag: comp, props: {}, children: [] };
-        }
+    try {
+      const compRaw = await r.resolveRouteComponent(match.route);
+      const comp = compRaw as
+        | string
+        | HTMLElement
+        | ((...args: unknown[]) => unknown)
+        | undefined;
+      // String tag (custom element) -> render as VNode
+      if (typeof comp === 'string') {
+        return { tag: comp, props: {}, children: [] };
+      }
 
-        // Function component (sync or async) -> call and return its VNode(s)
-        if (typeof comp === "function") {
-          const out = comp();
-          const resolved = out instanceof Promise ? out : Promise.resolve(out);
-          return resolved.then((resolvedComp: any) => {
-            if (typeof resolvedComp === "string")
-              return { tag: resolvedComp, props: {}, children: [] };
-            return resolvedComp as any;
-          });
-        }
+      // Function component (sync or async) -> call and return its VNode(s)
+      if (typeof comp === 'function') {
+        const out = comp();
+        const resolved = out instanceof Promise ? out : Promise.resolve(out);
+        return resolved.then((resolvedComp) => {
+          if (typeof resolvedComp === 'string')
+            return { tag: resolvedComp, props: {}, children: [] };
+          return resolvedComp;
+        });
+      }
 
-        return html`<div>Invalid route component</div>`;
-      })
-      .catch(() => html`<div>Invalid route component</div>`);
+      return html`<div>Invalid route component</div>`;
+    } catch {
+      return html`<div>Invalid route component</div>`;
+    }
   });
 
-  component("router-link", () => {
+  component('router-link', () => {
     // Declare props via useProps so observedAttributes are correct
     const props = useProps<Partial<RouterLinkProps>>({
-      to: "",
-      tag: "a",
+      to: '',
+      tag: 'a',
       replace: false,
       exact: false,
-      activeClass: "active",
-      exactActiveClass: "exact-active",
-      ariaCurrentValue: "page",
+      activeClass: 'active',
+      exactActiveClass: 'exact-active',
+      ariaCurrentValue: 'page',
       disabled: false,
       external: false,
-      linkClass: "",
-      linkStyle: "",
+      linkClass: '',
+      linkStyle: '',
     });
 
     // Prefer the latest initialized router (tests may re-init). Fallback
@@ -492,51 +512,51 @@ export function initRouter(config: RouterConfig) {
     let unsubRouterLink: (() => void) | undefined;
 
     useStyle(
-      () => (`a,button{display:inline-block;}` + props.linkStyle) as string
+      () => (`a,button{display:inline-block;}` + props.linkStyle) as string,
     );
 
     useOnConnected(() => {
       try {
-        if (r && typeof r.subscribe === "function") {
+        if (r && typeof r.subscribe === 'function') {
           unsubRouterLink = r.subscribe((s) => {
             try {
               current.value = s;
             } catch (e) {
-              devWarn("router-link subscription update failed", e);
+              devWarn('router-link subscription update failed', e);
             }
           });
         }
       } catch (e) {
-        devWarn("router-link subscribe failed", e);
+        devWarn('router-link subscribe failed', e);
       }
     });
 
     useOnDisconnected(() => {
-      if (typeof unsubRouterLink === "function") {
+      if (typeof unsubRouterLink === 'function') {
         try {
           unsubRouterLink();
         } catch (e) {
-          devWarn("router-link unsubscribe failed", e);
+          devWarn('router-link unsubscribe failed', e);
         }
       }
     });
 
     const isExactActive = computed(
-      () => current.value.path === (props.to as string)
+      () => current.value.path === (props.to as string),
     );
     const isActive = computed(() =>
       props.exact
         ? isExactActive.value
-        : current.value && typeof current.value.path === "string"
-        ? current.value.path.startsWith(props.to as string)
-        : false
+        : current.value && typeof current.value.path === 'string'
+          ? current.value.path.startsWith(props.to as string)
+          : false,
     );
 
     // Build user classes reactively from the `linkClass` prop.
     // We intentionally do NOT read the host `class` attribute to avoid
     // duplicate styling applied to both host and inner element.
     const userClasses = computed(() => {
-      const raw = (props.linkClass as string) || "";
+      const raw = (props.linkClass as string) || '';
       const list = raw.split(/\s+/).filter(Boolean);
       const map: Record<string, boolean> = {};
       for (const c of list) map[c] = true;
@@ -545,24 +565,24 @@ export function initRouter(config: RouterConfig) {
 
     const classObject = computed(() => ({
       ...userClasses.value,
-      [(props.activeClass as string) || "active"]: isActive.value,
-      [(props.exactActiveClass as string) || "exact-active"]:
+      [(props.activeClass as string) || 'active']: isActive.value,
+      [(props.exactActiveClass as string) || 'exact-active']:
         isExactActive.value,
     }));
 
-    const isButton = computed(() => (props.tag as string) === "button");
+    const isButton = computed(() => (props.tag as string) === 'button');
     // Instead of pre-building attribute fragments as strings (which can
     // accidentally inject invalid attribute names into the template and
     // cause DOMExceptions), compute simple booleans/values and apply
     // attributes explicitly in the template below.
     const ariaCurrentValue = computed(() =>
-      isExactActive.value ? (props.ariaCurrentValue as string) : ""
+      isExactActive.value ? (props.ariaCurrentValue as string) : '',
     );
     const isDisabled = computed(() => !!props.disabled);
     const isExternal = computed(
       () =>
         !!props.external &&
-        ((props.tag as string) === "a" || !(props.tag as string))
+        ((props.tag as string) === 'a' || !(props.tag as string)),
     );
 
     const navigate = (e: MouseEvent) => {
@@ -572,7 +592,7 @@ export function initRouter(config: RouterConfig) {
       }
       if (
         props.external &&
-        ((props.tag as string) === "a" || !(props.tag as string))
+        ((props.tag as string) === 'a' || !(props.tag as string))
       ) {
         return;
       }
@@ -593,31 +613,29 @@ export function initRouter(config: RouterConfig) {
               part="button"
               :class="${classObject.value}"
               aria-current="${ariaCurrentValue.value}"
-              disabled="${isDisabled.value ? "" : null}"
-              aria-disabled="${isDisabled.value ? "true" : null}"
-              tabindex="${isDisabled.value ? "-1" : null}"
+              disabled="${isDisabled.value ? '' : null}"
+              aria-disabled="${isDisabled.value ? 'true' : null}"
+              tabindex="${isDisabled.value ? '-1' : null}"
               @click="${navigate}"
             >
               <slot></slot>
             </button>
-          `
+          `,
         )
-        .otherwise(
-          html`
-            <a
-              part="link"
-              href="${props.to}"
-              :class="${classObject.value}"
-              aria-current="${ariaCurrentValue.value}"
-              aria-disabled="${isDisabled.value ? "true" : null}"
-              tabindex="${isDisabled.value ? "-1" : null}"
-              target="${isExternal.value ? "_blank" : null}"
-              rel="${isExternal.value ? "noopener noreferrer" : null}"
-              @click="${navigate}"
-              ><slot></slot
-            ></a>
-          `
-        )
+        .otherwise(html`
+          <a
+            part="link"
+            href="${props.to}"
+            :class="${classObject.value}"
+            aria-current="${ariaCurrentValue.value}"
+            aria-disabled="${isDisabled.value ? 'true' : null}"
+            tabindex="${isDisabled.value ? '-1' : null}"
+            target="${isExternal.value ? '_blank' : null}"
+            rel="${isExternal.value ? 'noopener noreferrer' : null}"
+            @click="${navigate}"
+            ><slot></slot
+          ></a>
+        `)
         .done()}
     `;
   });

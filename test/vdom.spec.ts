@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { vdomRenderer, renderToString, cleanupRefs, patch } from '../src/lib/runtime/vdom';
+import { vdomRenderer, cleanupRefs, patch } from '../src/lib/runtime/vdom';
+import { renderToString } from '../src/lib/runtime/vdom-ssr';
 import type { VNode } from '../src/lib/runtime/types';
 
 function vnode(tag: any, children: any, key: any, props: any): VNode {
@@ -9,19 +10,29 @@ function vnode(tag: any, children: any, key: any, props: any): VNode {
 describe('vdom', () => {
   it('should render simple VNode tree', () => {
     const root = document.createElement('div').attachShadow({ mode: 'open' });
-    const tree = vnode('div', [
-      vnode('span', 'A', undefined, undefined),
-      vnode('span', 'B', undefined, undefined)
-    ], undefined, undefined);
+    const tree = vnode(
+      'div',
+      [
+        vnode('span', 'A', undefined, undefined),
+        vnode('span', 'B', undefined, undefined),
+      ],
+      undefined,
+      undefined,
+    );
     expect(() => vdomRenderer(root, tree)).not.toThrow();
     expect(root.innerHTML).toContain('span');
   });
 
   it('should SSR render to string', () => {
-    const tree = vnode('div', [
-      vnode('span', 'A', undefined, undefined),
-      vnode('span', 'B', undefined, undefined)
-    ], undefined, undefined);
+    const tree = vnode(
+      'div',
+      [
+        vnode('span', 'A', undefined, undefined),
+        vnode('span', 'B', undefined, undefined),
+      ],
+      undefined,
+      undefined,
+    );
     const htmlStr = renderToString(tree);
     expect(htmlStr).toContain('<div>');
     expect(htmlStr).toContain('<span>');
@@ -30,10 +41,14 @@ describe('vdom', () => {
   });
 
   it('should handle anchor blocks and keyed children', () => {
-    const anchor = { tag: '#anchor', key: 'a', children: [
-      vnode('li', 'X', undefined, undefined),
-      vnode('li', 'Y', undefined, undefined)
-    ] };
+    const anchor = {
+      tag: '#anchor',
+      key: 'a',
+      children: [
+        vnode('li', 'X', undefined, undefined),
+        vnode('li', 'Y', undefined, undefined),
+      ],
+    };
     const tree = vnode('ul', [anchor], undefined, undefined);
     const htmlStr = renderToString(tree);
     expect(htmlStr).toContain('<ul>');
@@ -43,12 +58,22 @@ describe('vdom', () => {
   });
 
   it('should handle deeply nested VNodes', () => {
-    const deep = vnode('div', [
-      vnode('ul', [
-        vnode('li', 'X', undefined, undefined),
-        vnode('li', 'Y', undefined, undefined)
-      ], undefined, undefined)
-    ], undefined, undefined);
+    const deep = vnode(
+      'div',
+      [
+        vnode(
+          'ul',
+          [
+            vnode('li', 'X', undefined, undefined),
+            vnode('li', 'Y', undefined, undefined),
+          ],
+          undefined,
+          undefined,
+        ),
+      ],
+      undefined,
+      undefined,
+    );
     const htmlStr = renderToString(deep);
     expect(htmlStr).toContain('<ul>');
     expect(htmlStr).toContain('<li>');
@@ -82,10 +107,12 @@ describe('vdom', () => {
       tag: '#anchor',
       key: 'deep',
       children: [
-        { tag: '#anchor', key: 'inner', children: [
-          { tag: 'span', children: 'Inner' }
-        ]}
-      ]
+        {
+          tag: '#anchor',
+          key: 'inner',
+          children: [{ tag: 'span', children: 'Inner' }],
+        },
+      ],
     };
     const htmlStr = renderToString(deepAnchor);
     expect(htmlStr).toContain('Inner');
@@ -107,21 +134,16 @@ describe('vdom', () => {
 
   // Edge case: SSR serialization for VNode with children as array of text nodes
   it('should SSR render VNode with array of text nodes', () => {
-    const vnode = { tag: 'div', children: [
-      { tag: '#text', children: 'A' },
-      { tag: '#text', children: 'B' }
-    ]};
+    const vnode = {
+      tag: 'div',
+      children: [
+        { tag: '#text', children: 'A' },
+        { tag: '#text', children: 'B' },
+      ],
+    };
     const htmlStr = renderToString(vnode);
     expect(htmlStr).toContain('A');
     expect(htmlStr).toContain('B');
-  });
-
-  // Patch with null/undefined nodes
-  it.skip('should handle patching with null nodes', () => {
-    const dom = document.createElement('div');
-    expect(() => {
-      // patch(dom, null, null, {});
-    }).not.toThrow();
   });
 
   // SSR: anchor block with undefined children
@@ -131,21 +153,12 @@ describe('vdom', () => {
     expect(htmlStr).toBe('');
   });
 
-  // SSR: VNode with children as array of undefined
-  it.skip('should SSR VNode with children as array of undefined', () => {
-    const vnode = { tag: 'div', children: [undefined, undefined] };
-    // const htmlStr = renderToString(vnode);
-    // expect(htmlStr).toContain('<div');
-  });
-
   // SSR: deeply nested anchor blocks with undefined children
   it('should SSR deeply nested anchor blocks with undefined children', () => {
     const deepAnchor = {
       tag: '#anchor',
       key: 'deep',
-      children: [
-        { tag: '#anchor', key: 'inner', children: undefined }
-      ]
+      children: [{ tag: '#anchor', key: 'inner', children: undefined }],
     };
     const htmlStr = renderToString(deepAnchor);
     expect(htmlStr).toBe('');
@@ -153,9 +166,19 @@ describe('vdom', () => {
 
   it('should patch element with same tag and key', () => {
     const root = document.createElement('div').attachShadow({ mode: 'open' });
-    const tree1 = vnode('div', [vnode('span', 'A', 'k1', undefined)], 'root', undefined);
+    const tree1 = vnode(
+      'div',
+      [vnode('span', 'A', 'k1', undefined)],
+      'root',
+      undefined,
+    );
     vdomRenderer(root, tree1);
-    const tree2 = vnode('div', [vnode('span', 'B', 'k1', undefined)], 'root', undefined);
+    const tree2 = vnode(
+      'div',
+      [vnode('span', 'B', 'k1', undefined)],
+      'root',
+      undefined,
+    );
     expect(() => vdomRenderer(root, tree2)).not.toThrow();
     expect(root.innerHTML).toContain('B');
   });
@@ -173,19 +196,33 @@ describe('vdom', () => {
   it('should remove extra nodes but preserve style elements', () => {
     const root = document.createElement('div').attachShadow({ mode: 'open' });
     const styleVNode = { tag: 'style', children: '.x{}' };
-    const tree = vnode('div', [styleVNode, vnode('span', 'A', 'k1', undefined)], 'root', undefined);
+    const tree = vnode(
+      'div',
+      [styleVNode, vnode('span', 'A', 'k1', undefined)],
+      'root',
+      undefined,
+    );
     vdomRenderer(root, tree);
     expect(root.querySelector('style')).not.toBeNull();
     expect(root.innerHTML).toContain('A');
   });
 
   it('should escape HTML entities in text', () => {
-    const html = renderToString({ tag: 'div', children: 'Tom & Jerry <script> "Hello"' });
-    expect(html).toBe('<div>Tom &amp; Jerry &lt;script&gt; &quot;Hello&quot;</div>');
+    const html = renderToString({
+      tag: 'div',
+      children: 'Tom & Jerry <script> "Hello"',
+    });
+    expect(html).toBe(
+      '<div>Tom &amp; Jerry &lt;script&gt; &quot;Hello&quot;</div>',
+    );
   });
 
   it.skip('should serialize props as HTML attributes', () => {
-    const vnodeObj = { tag: 'div', props: { props: { id: 'foo', title: 'bar & baz' } }, children: 'X' };
+    const vnodeObj = {
+      tag: 'div',
+      props: { props: { id: 'foo', title: 'bar & baz' } },
+      children: 'X',
+    };
     const htmlStr = renderToString(vnodeObj);
     expect(htmlStr).toContain('id="foo"');
     expect(htmlStr).toContain('title="bar &amp; baz"');
@@ -225,10 +262,20 @@ describe('vdomRenderer edge cases', () => {
     const shadowRoot = host.attachShadow({ mode: 'open' });
     const refs: any = {};
     // First render with ref and key
-    vdomRenderer(shadowRoot, { tag: 'div', key: 'old', props: { ref: 'myRef' } }, {}, refs);
+    vdomRenderer(
+      shadowRoot,
+      { tag: 'div', key: 'old', props: { ref: 'myRef' } },
+      {},
+      refs,
+    );
     expect(refs.myRef).toBeInstanceOf(HTMLElement);
     // Second render with a different key/tag, should replace and clean up
-    vdomRenderer(shadowRoot, { tag: 'span', key: 'new', children: 'X' }, {}, refs);
+    vdomRenderer(
+      shadowRoot,
+      { tag: 'span', key: 'new', children: 'X' },
+      {},
+      refs,
+    );
     expect(shadowRoot.querySelector('div')).toBeNull();
     expect(shadowRoot.querySelector('span')).not.toBeNull();
   });
@@ -245,12 +292,12 @@ describe('renderToString edge cases', () => {
       tag: 'section',
       children: [
         { tag: 'header', children: 'Title' },
-        { tag: 'main', children: [
-          { tag: 'article', children: 'Content' }
-        ]}
-      ]
+        { tag: 'main', children: [{ tag: 'article', children: 'Content' }] },
+      ],
     };
-    expect(renderToString(vnode)).toBe('<section><header>Title</header><main><article>Content</article></main></section>');
+    expect(renderToString(vnode)).toBe(
+      '<section><header>Title</header><main><article>Content</article></main></section>',
+    );
   });
 });
 
@@ -259,7 +306,7 @@ describe('vdom.ts coverage additions', () => {
     const root = document.createElement('div').attachShadow({ mode: 'open' });
     const tree = [
       { tag: 'span', children: 'A' },
-      { tag: 'span', children: 'B' }
+      { tag: 'span', children: 'B' },
     ];
     expect(() => vdomRenderer(root, tree)).not.toThrow();
     expect(root.innerHTML).toContain('span');
@@ -267,7 +314,11 @@ describe('vdom.ts coverage additions', () => {
 
   it('vdomRenderer handles anchor block as root', () => {
     const root = document.createElement('div').attachShadow({ mode: 'open' });
-    const anchor = { tag: '#anchor', key: 'anchor', children: [ { tag: 'span', children: 'X' } ] };
+    const anchor = {
+      tag: '#anchor',
+      key: 'anchor',
+      children: [{ tag: 'span', children: 'X' }],
+    };
     expect(() => vdomRenderer(root, anchor)).not.toThrow();
     expect(root.innerHTML).toContain('span');
   });
@@ -278,9 +329,9 @@ describe('vdom.ts coverage additions', () => {
       props: {
         attrs: { id: 'x', 'data-num': 42 },
         custom: { foo: 'bar' },
-        directives: { show: { value: 'true', modifiers: [] } }
+        directives: { show: { value: 'true', modifiers: [] } },
       },
-      children: 'hi'
+      children: 'hi',
     };
     const html = renderToString(vnode);
     expect(html).toContain('id="x"');
@@ -327,7 +378,11 @@ describe('vdom.ts more edge cases for coverage', () => {
 
   it('vdomRenderer wraps anchor block in div with __anchor_root__ key', () => {
     const root = document.createElement('div').attachShadow({ mode: 'open' });
-    const anchor = { tag: '#anchor', key: 'anchor', children: [ { tag: 'span', children: 'X' } ] };
+    const anchor = {
+      tag: '#anchor',
+      key: 'anchor',
+      children: [{ tag: 'span', children: 'X' }],
+    };
     vdomRenderer(root, anchor);
     expect((root as any)._prevVNode.key).toBe('__anchor_root__');
     expect(root.innerHTML).toContain('span');
@@ -337,7 +392,7 @@ describe('vdom.ts more edge cases for coverage', () => {
     const vnode = {
       tag: 'div',
       props: { attrs: { id: 'x' }, ref: 'myref', key: 'mykey' },
-      children: 'hi'
+      children: 'hi',
     };
     const html = renderToString(vnode);
     expect(html).toContain('id="x"');
@@ -363,7 +418,11 @@ describe('vdom.ts more edge cases for coverage', () => {
   });
 
   it('renderToString handles VNode with props containing boolean', () => {
-    const vnode = { tag: 'div', props: { attrs: { id: 'x', 'data-flag': true } }, children: 'hi' };
+    const vnode = {
+      tag: 'div',
+      props: { attrs: { id: 'x', 'data-flag': true } },
+      children: 'hi',
+    };
     const html = renderToString(vnode);
     expect(html).toContain('data-flag="true"');
   });
@@ -371,8 +430,18 @@ describe('vdom.ts more edge cases for coverage', () => {
 
 describe('vdom.ts targeted ref patch coverage', () => {
   it('patch assigns ref for matching VNode', () => {
-    const vnodeOld = { tag: 'div', key: 'x', props: { ref: 'myref' }, children: 'A' };
-    const vnodeNew = { tag: 'div', key: 'x', props: { ref: 'myref' }, children: 'B' };
+    const vnodeOld = {
+      tag: 'div',
+      key: 'x',
+      props: { ref: 'myref' },
+      children: 'A',
+    };
+    const vnodeNew = {
+      tag: 'div',
+      key: 'x',
+      props: { ref: 'myref' },
+      children: 'B',
+    };
     const dom = document.createElement('div');
     dom.textContent = 'A';
     const refs: Record<string, HTMLElement> = {};
@@ -382,15 +451,25 @@ describe('vdom.ts targeted ref patch coverage', () => {
   });
 
   it('patch cleans up old ref and assigns new ref for replaced node', () => {
-    const vnodeOld = { tag: 'span', key: 'x', props: { ref: 'oldref' }, children: 'A' };
-    const vnodeNew = { tag: 'div', key: 'y', props: { ref: 'newref' }, children: 'B' };
+    const vnodeOld = {
+      tag: 'span',
+      key: 'x',
+      props: { ref: 'oldref' },
+      children: 'A',
+    };
+    const vnodeNew = {
+      tag: 'div',
+      key: 'y',
+      props: { ref: 'newref' },
+      children: 'B',
+    };
     const dom = document.createElement('span');
     dom.textContent = 'A';
     const refs: Record<string, HTMLElement> = { oldref: dom };
     const node = patch(dom, vnodeOld, vnodeNew, {}, refs);
     expect(refs.oldref).toBeUndefined();
     expect(refs.newref).toBe(node);
-  expect(node.textContent).toBe('B');
-  expect((node as HTMLElement).tagName).toBe('DIV');
+    expect(node.textContent).toBe('B');
+    expect((node as HTMLElement).tagName).toBe('DIV');
   });
 });

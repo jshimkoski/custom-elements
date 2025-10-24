@@ -39,7 +39,9 @@ describe('milestones component JIT CSS', () => {
 
     // Should include a linear-gradient/background-image rule for the gradient
     expect(
-      css.includes('linear-gradient') || css.includes('background-image') || css.includes('background:')
+      css.includes('linear-gradient') ||
+        css.includes('background-image') ||
+        css.includes('background:'),
     ).toBe(true);
   });
 });

@@ -1,5 +1,5 @@
-import type { VNode } from "./types";
-import { contextStack } from "./render";
+import type { VNode } from './types';
+import { contextStack } from './render';
 import {
   toKebab,
   toCamel,
@@ -10,9 +10,9 @@ import {
   isUnsafeHTML,
   safeSerializeAttr,
   isClassLikeAttr,
-} from "./helpers";
-import { isReactiveState } from "./reactive";
-import { devWarn } from "./logger";
+} from './helpers';
+import { isReactiveState } from './reactive';
+import { devWarn } from './logger';
 
 // Strict LRU cache helper for fully static templates (no interpolations, no context)
 class LRUCache<K, V> {
@@ -52,137 +52,148 @@ const TEMPLATE_COMPILE_CACHE = new LRUCache<string, VNode | VNode[]>(500);
 /**
  * Validates event handlers to prevent common mistakes that lead to infinite loops
  */
-function validateEventHandler(value: any, eventName: string): void {
+function validateEventHandler(value: unknown, eventName: string): void {
   // Check for null/undefined handlers
   if (value === null || value === undefined) {
     devWarn(
       `⚠️ Event handler for '@${eventName}' is ${value}. ` +
         `This will prevent the event from working. ` +
-        `Use a function reference instead: @${eventName}="\${functionName}"`
+        `Use a function reference instead: @${eventName}="\${functionName}"`,
     );
     return;
   }
 
   // Check for immediate function invocation (most common mistake)
-  if (typeof value !== "function") {
+  if (typeof value !== 'function') {
     devWarn(
       `🚨 Potential infinite loop detected! Event handler for '@${eventName}' appears to be ` +
         `the result of a function call (${typeof value}) instead of a function reference. ` +
         `Change @${eventName}="\${functionName()}" to @${eventName}="\${functionName}" ` +
-        `to pass the function reference instead of calling it immediately.`
+        `to pass the function reference instead of calling it immediately.`,
     );
   }
 
   // Additional check for common return values of mistaken function calls
-  if (value === undefined && typeof value !== "function") {
+  if (value === undefined && typeof value !== 'function') {
     devWarn(
       `💡 Tip: If your event handler function returns undefined, make sure you're passing ` +
-        `the function reference, not calling it. Use @${eventName}="\${fn}" not @${eventName}="\${fn()}"`
+        `the function reference, not calling it. Use @${eventName}="\${fn}" not @${eventName}="\${fn()}"`,
     );
   }
 }
 
 export function h(
   tag: string,
-  props: Record<string, any> = {},
+  props: Record<string, unknown> = {},
   children?: VNode[] | string,
-  key?: string | number
+  key?: string | number,
 ): VNode {
   // Do NOT invent keys here; use only what the caller passes (or props.key).
-  const finalKey = key ?? props.key;
+  const finalKey = (key ?? (props.key as unknown as string | undefined)) as
+    | string
+    | undefined;
   return { tag, key: finalKey, props, children };
 }
 
-export function isAnchorBlock(v: any): boolean {
+export function isAnchorBlock(v: unknown): boolean {
   return (
     !!v &&
-    typeof v === "object" &&
-    ((v as any).type === "AnchorBlock" || (v as any).tag === "#anchor")
+    typeof v === 'object' &&
+    ((v as { type?: string }).type === 'AnchorBlock' ||
+      (v as { tag?: string }).tag === '#anchor')
   );
 }
 
-export function isElementVNode(v: any): v is VNode {
+export function isElementVNode(v: unknown): v is VNode {
   return (
-    typeof v === "object" && v !== null && "tag" in v && !isAnchorBlock(v) // exclude anchor blocks from being treated as normal elements
+    typeof v === 'object' && v !== null && 'tag' in v && !isAnchorBlock(v) // exclude anchor blocks from being treated as normal elements
   );
 }
 
-export function ensureKey(v: VNode, k: string): VNode {
+export function ensureKey(v: VNode, k?: string): VNode {
+  // Keep behavior consistent with the older compiler: only surface the
+  // provided key when present. Do not invent a random key here — that
+  // causes remounts and breaks deterministic tests (especially for
+  // form controls like <select>). If caller passes `undefined`, we
+  // preserve `undefined` so downstream key-assignment logic can decide.
   return v.key != null ? v : { ...v, key: k };
 }
 
 export interface ParsePropsResult {
-  props: Record<string, any>;
-  attrs: Record<string, any>;
-  directives: Record<string, { value: any; modifiers: string[]; arg?: string }>;
+  props: Record<string, unknown>;
+  attrs: Record<string, unknown>;
+  directives: Record<
+    string,
+    { value: unknown; modifiers: string[]; arg?: string }
+  >;
   bound: string[];
 }
 
 export function parseProps(
   str: string,
   values: unknown[] = [],
-  context: Record<string, any> = {}
+  context: Record<string, unknown> = {},
 ): ParsePropsResult {
-  const props: Record<string, any> = {};
-  const attrs: Record<string, any> = {};
+  const props: Record<string, unknown> = {};
+  const attrs: Record<string, unknown> = {};
   const directives: Record<
     string,
-    { value: any; modifiers: string[]; arg?: string }
+    { value: unknown; modifiers: string[]; arg?: string }
   > = {};
   const bound: string[] = [];
 
   // Match attributes with optional prefix and support for single/double quotes
   // Also matches standalone boolean attributes (without =value)
   const attrRegex =
-    /([:@#]?)([a-zA-Z0-9-:\.]+)(?:=("([^"\\]*(\\.[^"\\]*)*)"|'([^'\\]*(\\.[^'\\]*)*)'))?/g;
+    /([:@#]?)([a-zA-Z0-9-:.]+)(?:=("([^"\\]*(\\.[^"\\]*)*)"|'([^'\\]*(\\.[^'\\]*)*)'))?/g;
 
   let match: RegExpExecArray | null;
 
   while ((match = attrRegex.exec(str))) {
     const prefix = match[1];
     const rawName = match[2];
-    const rawVal = (match[4] || match[6]) ?? "";
+    const rawVal = (match[4] || match[6]) ?? '';
 
     // If no value was provided (standalone attribute), treat as boolean true
     const isStandalone = match[3] === undefined && match[6] === undefined;
 
     // Interpolation detection
     const interpMatch = rawVal.match(/^{{(\d+)}}$/);
-    let value: any = isStandalone
+    let value: unknown = isStandalone
       ? true // Standalone attributes are boolean true
       : interpMatch
-      ? values[Number(interpMatch[1])] ?? null
-      : rawVal;
+        ? (values[Number(interpMatch[1])] ?? null)
+        : rawVal;
 
     // Type inference for booleans, null, numbers
     if (!interpMatch) {
-      if (value === "true") value = true;
-      else if (value === "false") value = false;
-      else if (value === "null") value = null;
+      if (value === 'true') value = true;
+      else if (value === 'false') value = false;
+      else if (value === 'null') value = null;
       else if (!isNaN(Number(value))) value = Number(value);
     }
 
     // Known directive names
     const knownDirectives = [
-      "model",
-      "bind",
-      "show",
-      "class",
-      "style",
-      "ref",
-      "when",
+      'model',
+      'bind',
+      'show',
+      'class',
+      'style',
+      'ref',
+      'when',
     ];
-    if (prefix === ":") {
+    if (prefix === ':') {
       // Support :model:checked (directive with argument) and :class.foo (modifiers)
-      const [nameAndModifiers, argPart] = rawName.split(":");
-      const [maybeDirective, ...modifierParts] = nameAndModifiers.split(".");
+      const [nameAndModifiers, argPart] = rawName.split(':');
+      const [maybeDirective, ...modifierParts] = nameAndModifiers.split('.');
       if (knownDirectives.includes(maybeDirective)) {
         const modifiers = [...modifierParts];
         // Allow multiple :model directives on the same tag by keying them with
         // their argument when present (e.g. 'model:test'). This preserves both
         // plain :model and :model:prop simultaneously.
         const directiveKey =
-          maybeDirective === "model" && argPart
+          maybeDirective === 'model' && argPart
             ? `model:${argPart}`
             : maybeDirective;
         directives[directiveKey] = {
@@ -194,30 +205,30 @@ export function parseProps(
         // Special-case certain boolean-like attributes to promote them to
         // props so runtime property assignment and coercion behave correctly
         // for native elements (e.g. :disabled should affect el.disabled).
-        if (rawName === "disabled") {
+        if (rawName === 'disabled') {
           // Be conservative: only promote disabled to props at compile-time
           // when the bound value is an explicit boolean-ish primitive
           // (boolean, empty-string presence, literal 'true'/'false', null, or number).
           // Otherwise leave it in attrs so the runtime can apply safer coercion.
           let propValue = value;
           if (propValue && isReactiveState(propValue))
-            propValue = (propValue as any).value;
+            propValue = (propValue as { value: unknown }).value;
           const t = typeof propValue;
           const isBoolStr =
-            t === "string" && (propValue === "true" || propValue === "false");
+            t === 'string' && (propValue === 'true' || propValue === 'false');
           const shouldPromote =
-            propValue === "" ||
-            t === "boolean" ||
+            propValue === '' ||
+            t === 'boolean' ||
             isBoolStr ||
             propValue == null ||
-            t === "number";
+            t === 'number';
           if (shouldPromote) {
             props[rawName] = propValue;
           } else {
             // Unwrap reactive state objects for bound attributes and keep in attrs
             let attrValue = value;
             if (attrValue && isReactiveState(attrValue)) {
-              attrValue = (attrValue as any).value; // This triggers dependency tracking
+              attrValue = (attrValue as { value: unknown }).value; // This triggers dependency tracking
             }
             attrs[rawName] = attrValue;
           }
@@ -226,49 +237,53 @@ export function parseProps(
           // Unwrap reactive state objects for bound attributes
           let attrValue = value;
           if (attrValue && isReactiveState(attrValue)) {
-            attrValue = (attrValue as any).value; // This triggers dependency tracking
+            attrValue = (attrValue as { value: unknown }).value; // This triggers dependency tracking
           }
           attrs[rawName] = attrValue;
           bound.push(rawName);
         }
       }
-    } else if (prefix === "@") {
+    } else if (prefix === '@') {
       // Parse event modifiers: @click.prevent.stop
-      const [eventName, ...modifierParts] = rawName.split(".");
+      const [eventName, ...modifierParts] = rawName.split('.');
       const modifiers = modifierParts;
 
       // Validate event handler to prevent common mistakes
       validateEventHandler(value, eventName);
 
       // Create wrapped event handler that applies modifiers
-      const originalHandler =
-        typeof value === "function"
-          ? value
-          : typeof context[value] === "function"
-          ? context[value]
-          : undefined;
+      const originalHandler: ((e: Event) => unknown) | undefined =
+        typeof value === 'function'
+          ? (value as (e: Event) => unknown)
+          : typeof (context as Record<string, unknown>)[
+                value as unknown as string
+              ] === 'function'
+            ? ((context as Record<string, unknown>)[value as string] as (
+                e: Event,
+              ) => unknown)
+            : undefined;
 
       if (originalHandler) {
         const wrappedHandler = (event: Event) => {
           // Apply event modifiers
-          if (modifiers.includes("prevent")) {
+          if (modifiers.includes('prevent')) {
             event.preventDefault();
           }
-          if (modifiers.includes("stop")) {
+          if (modifiers.includes('stop')) {
             event.stopPropagation();
           }
           if (
-            modifiers.includes("self") &&
+            modifiers.includes('self') &&
             event.target !== event.currentTarget
           ) {
             return;
           }
 
           // For .once modifier, we need to remove the listener after first call
-          if (modifiers.includes("once")) {
+          if (modifiers.includes('once')) {
             (event.currentTarget as Element)?.removeEventListener(
               eventName,
-              wrappedHandler
+              wrappedHandler,
             );
           }
 
@@ -278,10 +293,10 @@ export function parseProps(
 
         // Map @event to an `on<Event>` prop (DOM-first event listener convention)
         const onName =
-          "on" + eventName.charAt(0).toUpperCase() + eventName.slice(1);
+          'on' + eventName.charAt(0).toUpperCase() + eventName.slice(1);
         props[onName] = wrappedHandler;
       }
-    } else if (rawName === "ref") {
+    } else if (rawName === 'ref') {
       props.ref = value;
     } else {
       attrs[rawName] = value;
@@ -307,11 +322,12 @@ function transformWhenDirective(vnode: VNode): VNode {
     // If the directive value is a ReactiveState, unwrap it so the condition
     // reflects the current boolean value (e.g. ref(false) -> false).
     const whenCondition = isReactiveState(rawWhen)
-      ? (rawWhen as any).value
+      ? (rawWhen as { value: unknown }).value
       : rawWhen;
 
     // Remove the :when directive from the VNode since we're handling it here
-    const { when, ...remainingDirectives } = directives;
+    const remainingDirectives = { ...directives };
+    delete remainingDirectives.when;
     const newProps = { ...vnode.props };
     if (Object.keys(remainingDirectives).length > 0) {
       newProps.directives = remainingDirectives;
@@ -328,9 +344,9 @@ function transformWhenDirective(vnode: VNode): VNode {
     // Recursively transform children if they exist
     if (Array.isArray(elementVNode.children)) {
       elementVNode.children = elementVNode.children.map((child) =>
-        typeof child === "object" && child !== null
+        typeof child === 'object' && child !== null
           ? transformWhenDirective(child as VNode)
-          : child
+          : child,
       );
     }
 
@@ -338,7 +354,7 @@ function transformWhenDirective(vnode: VNode): VNode {
     const anchorKey =
       vnode.key != null ? `when-${vnode.key}` : `when-${vnode.tag}`;
     return {
-      tag: "#anchor",
+      tag: '#anchor',
       key: anchorKey,
       children: whenCondition ? [elementVNode] : [],
     };
@@ -347,9 +363,9 @@ function transformWhenDirective(vnode: VNode): VNode {
   // Recursively transform children if they exist
   if (Array.isArray(vnode.children)) {
     const transformedChildren = vnode.children.map((child) =>
-      typeof child === "object" && child !== null
+      typeof child === 'object' && child !== null
         ? transformWhenDirective(child as VNode)
-        : child
+        : child,
     );
     return {
       ...vnode,
@@ -371,7 +387,7 @@ function transformWhenDirective(vnode: VNode): VNode {
 export function htmlImpl(
   strings: TemplateStringsArray,
   values: unknown[],
-  context?: Record<string, any>
+  context?: Record<string, unknown>,
 ): VNode | VNode[] {
   // Retrieve current context from stack (transparent injection)
   const injectedContext =
@@ -384,7 +400,7 @@ export function htmlImpl(
   // (values.length === 0) and no explicit context. This avoids incorrectly
   // reusing parsed structures that depend on runtime values or context.
   const canCache = !context && values.length === 0;
-  const cacheKey = canCache ? strings.join("<!--TEMPLATE_DELIM-->") : null;
+  const cacheKey = canCache ? strings.join('<!--TEMPLATE_DELIM-->') : null;
   if (canCache && cacheKey) {
     const cached = TEMPLATE_COMPILE_CACHE.get(cacheKey);
     if (cached) return cached;
@@ -392,7 +408,7 @@ export function htmlImpl(
 
   // Create a text VNode for interpolations (do NOT decode entity sequences)
   function textVNode(text: string, key: string): VNode {
-    return h("#text", {}, text, key);
+    return h('#text', {}, text, key);
   }
 
   // Create a text VNode for literal template text (decode HTML entities so
@@ -401,12 +417,19 @@ export function htmlImpl(
   // where the runtime should preserve the original string provided by the
   // consumer.
   function decodedTextVNode(text: string, key: string): VNode {
-    const decoded = typeof text === "string" ? decodeEntities(text) : text;
-    return h("#text", {}, decoded as any, key);
+    let decoded = typeof text === 'string' ? decodeEntities(text) : text;
+    // If the literal template text contains newlines or carriage returns,
+    // collapse any run of whitespace (including newlines and indentation)
+    // into a single space. This preserves single-space separators while
+    // eliminating incidental indentation/newline leakage inside elements.
+    if (typeof decoded === 'string' && /[\r\n]/.test(decoded)) {
+      decoded = decoded.replace(/\s+/g, ' ');
+    }
+    return h('#text', {}, decoded as string, key);
   }
 
   // Stitch template with interpolation markers
-  let template = "";
+  let template = '';
   for (let i = 0; i < strings.length; i++) {
     template += strings[i];
     if (i < values.length) template += `{{${i}}}`;
@@ -442,77 +465,90 @@ export function htmlImpl(
 
   const stack: Array<{
     tag: string;
-    props: Record<string, any>;
+    props: Record<string, unknown>;
     children: VNode[];
     key: string | number | undefined;
   }> = [];
-  let root: VNode | null = null;
+  const root: VNode | null = null;
   let match: RegExpExecArray | null;
   let currentChildren: VNode[] = [];
   let currentTag: string | null = null;
-  let currentProps: Record<string, any> = {};
+  let currentProps: Record<string, unknown> = {};
   let currentKey: string | number | undefined = undefined;
   let nodeIndex = 0;
-  let fragmentChildren: VNode[] = []; // Track root-level nodes for fragments
+  const fragmentChildren: VNode[] = []; // Track root-level nodes for fragments
 
   // Helper: merge object-like interpolation into currentProps
-  function mergeIntoCurrentProps(maybe: any) {
-    if (!maybe || typeof maybe !== "object") return;
+  type MaybeVNodeLike =
+    | { props?: Record<string, unknown>; attrs?: Record<string, unknown> }
+    | Record<string, unknown>;
+
+  function mergeIntoCurrentProps(maybe: unknown) {
+    if (!maybe || typeof maybe !== 'object') return;
     if (isAnchorBlock(maybe)) return; // do not merge AnchorBlocks
-    if (maybe.props || maybe.attrs) {
-      if (maybe.props) {
+    const mm = maybe as MaybeVNodeLike;
+    const cp = currentProps as {
+      props?: Record<string, unknown>;
+      attrs?: Record<string, unknown>;
+    };
+    if (
+      (mm as { props?: unknown }).props ||
+      (mm as { attrs?: unknown }).attrs
+    ) {
+      const mmWith = mm as {
+        props?: Record<string, unknown>;
+        attrs?: Record<string, unknown>;
+      };
+      if (mmWith.props) {
         // Ensure currentProps.props exists
-        if (!currentProps.props) currentProps.props = {};
-        Object.assign(currentProps.props, maybe.props);
+        if (!cp.props) cp.props = {};
+        Object.assign(cp.props, mmWith.props);
       }
-      if (maybe.attrs) {
+      if (mmWith.attrs) {
         // Ensure currentProps.attrs exists
-        if (!currentProps.attrs) currentProps.attrs = {};
+        if (!cp.attrs) cp.attrs = {};
 
         // Handle special merging for style and class attributes
-        Object.keys(maybe.attrs).forEach((key) => {
-          if (key === "style" && currentProps.attrs.style) {
+        Object.keys(mmWith.attrs).forEach((key) => {
+          if (key === 'style' && cp.attrs!.style) {
             // Merge style attributes by concatenating with semicolon
-            const existingStyle = currentProps.attrs.style.replace(
-              /;?\s*$/,
-              ""
-            );
-            const newStyle = maybe.attrs.style.replace(/^;?\s*/, "");
-            currentProps.attrs.style = existingStyle + "; " + newStyle;
-          } else if (key === "class" && currentProps.attrs.class) {
+            const existingStyle = String(cp.attrs!.style).replace(/;?\s*$/, '');
+            const newStyle = String(mmWith.attrs!.style).replace(/^;?\s*/, '');
+            cp.attrs!.style = existingStyle + '; ' + newStyle;
+          } else if (key === 'class' && cp.attrs!.class) {
             // Merge class attributes by concatenating with space
-            const existingClasses = currentProps.attrs.class
+            const existingClasses = String(cp.attrs!.class)
               .trim()
               .split(/\s+/)
               .filter(Boolean);
-            const newClasses = maybe.attrs.class
+            const newClasses = String(mmWith.attrs!.class)
               .trim()
               .split(/\s+/)
               .filter(Boolean);
             const allClasses = [
               ...new Set([...existingClasses, ...newClasses]),
             ];
-            currentProps.attrs.class = allClasses.join(" ");
+            cp.attrs!.class = allClasses.join(' ');
           } else {
             // For other attributes, just assign (later values override)
-            currentProps.attrs[key] = maybe.attrs[key];
+            cp.attrs![key] = mmWith.attrs![key];
           }
         });
       }
     } else {
       // If no props/attrs structure, merge directly into props
-      if (!currentProps.props) currentProps.props = {};
-      Object.assign(currentProps.props, maybe);
+      if (!cp.props) cp.props = {};
+      Object.assign(cp.props, mm as Record<string, unknown>);
     }
   }
 
   // Helper: push an interpolated value into currentChildren/currentProps or fragments
-  function pushInterpolation(val: any, baseKey: string) {
+  function pushInterpolation(val: unknown, baseKey: string) {
     const targetChildren = currentTag ? currentChildren : fragmentChildren;
 
     if (isAnchorBlock(val)) {
       const anchorKey = (val as VNode).key ?? baseKey;
-      let anchorChildren = (val as any).children as VNode[] | undefined;
+      const anchorChildren = (val as { children?: VNode[] }).children;
       targetChildren.push({
         ...(val as VNode),
         key: anchorKey,
@@ -523,7 +559,7 @@ export function htmlImpl(
 
     if (isElementVNode(val)) {
       // Leave key undefined so assignKeysDeep can generate a stable one
-      targetChildren.push(ensureKey(val, undefined as any));
+      targetChildren.push(ensureKey(val, undefined));
       return;
     }
 
@@ -534,11 +570,16 @@ export function htmlImpl(
         if (isAnchorBlock(v) || isElementVNode(v) || Array.isArray(v)) {
           // recurse or push without forcing a key
           pushInterpolation(v, `${baseKey}-${i}`);
-        } else if (v !== null && typeof v === "object") {
+        } else if (v !== null && typeof v === 'object') {
           // If the object is an unsafe HTML marker, push a raw vnode
           if (isUnsafeHTML(v)) {
             targetChildren.push(
-              h("#raw", {}, (v as any).__rawHTML, `${baseKey}-${i}`)
+              h(
+                '#raw',
+                {},
+                (v as { __rawHTML: string }).__rawHTML,
+                `${baseKey}-${i}`,
+              ),
             );
           } else {
             mergeIntoCurrentProps(v);
@@ -550,10 +591,10 @@ export function htmlImpl(
       return;
     }
 
-    if (val !== null && typeof val === "object") {
+    if (val !== null && typeof val === 'object') {
       if (isUnsafeHTML(val)) {
-        const raw = (val as any).__rawHTML ?? "";
-        targetChildren.push(h("#raw", {}, raw, baseKey));
+        const raw = (val as { __rawHTML?: string }).__rawHTML ?? '';
+        targetChildren.push(h('#raw', {}, raw, baseKey));
         return;
       }
       mergeIntoCurrentProps(val);
@@ -564,34 +605,34 @@ export function htmlImpl(
   }
 
   const voidElements = new Set([
-    "area",
-    "base",
-    "br",
-    "col",
-    "embed",
-    "hr",
-    "img",
-    "input",
-    "link",
-    "meta",
-    "param",
-    "source",
-    "track",
-    "wbr",
+    'area',
+    'base',
+    'br',
+    'col',
+    'embed',
+    'hr',
+    'img',
+    'input',
+    'link',
+    'meta',
+    'param',
+    'source',
+    'track',
+    'wbr',
   ]);
 
   while ((match = tagRegex.exec(template))) {
     // Skip HTML comments (they are matched by the regex but ignored)
-    if (match[0].startsWith("<!--") && match[0].endsWith("-->")) {
+    if (match[0].startsWith('<!--') && match[0].endsWith('-->')) {
       continue;
     }
 
     if (match[1]) {
       // Tag token
       const tagName = match[1];
-      const isClosing = match[0][1] === "/";
+      const isClosing = match[0][1] === '/';
       const isSelfClosing =
-        match[0][match[0].length - 2] === "/" || voidElements.has(tagName);
+        match[0][match[0].length - 2] === '/' || voidElements.has(tagName);
 
       const {
         props: rawProps,
@@ -599,9 +640,9 @@ export function htmlImpl(
         directives,
         bound: boundList,
       } = parseProps(
-        match[2] || "",
+        match[2] || '',
         values,
-        effectiveContext
+        (effectiveContext ?? {}) as Record<string, unknown>,
       ) as ParsePropsResult;
 
       // No runtime registration here; compiler will set `isCustomElement`
@@ -612,7 +653,7 @@ export function htmlImpl(
       const vnodeProps: {
         props: Record<string, unknown>;
         attrs: Record<string, unknown>;
-        directives?: Record<string, { value: any; modifiers: string[] }>;
+        directives?: Record<string, { value: unknown; modifiers: string[] }>;
         isCustomElement?: boolean;
       } = { props: {}, attrs: {} };
 
@@ -624,14 +665,14 @@ export function htmlImpl(
       // unnecessary remounts when children order/state changes.
       if (
         vnodeProps.attrs &&
-        Object.prototype.hasOwnProperty.call(vnodeProps.attrs, "key") &&
+        Object.prototype.hasOwnProperty.call(vnodeProps.attrs, 'key') &&
         !(
           vnodeProps.props &&
-          Object.prototype.hasOwnProperty.call(vnodeProps.props, "key")
+          Object.prototype.hasOwnProperty.call(vnodeProps.props, 'key')
         )
       ) {
         safe(() => {
-          vnodeProps.props.key = vnodeProps.attrs["key"];
+          vnodeProps.props.key = vnodeProps.attrs['key'];
         });
       }
 
@@ -651,28 +692,28 @@ export function htmlImpl(
         // performs defensive coercion for boolean-like values; prefer that.
         const nativePromoteMap: Record<string, string[]> = {
           input: [
-            "value",
-            "checked",
-            "readonly",
-            "required",
-            "placeholder",
-            "maxlength",
-            "minlength",
+            'value',
+            'checked',
+            'readonly',
+            'required',
+            'placeholder',
+            'maxlength',
+            'minlength',
           ],
           textarea: [
-            "value",
-            "readonly",
-            "required",
-            "placeholder",
-            "maxlength",
-            "minlength",
+            'value',
+            'readonly',
+            'required',
+            'placeholder',
+            'maxlength',
+            'minlength',
           ],
-          select: ["value", "required", "multiple"],
-          option: ["selected", "value"],
-          video: ["muted", "autoplay", "controls", "loop", "playsinline"],
-          audio: ["muted", "autoplay", "controls", "loop"],
-          img: ["src", "alt", "width", "height"],
-          button: ["type", "name", "value", "autofocus", "form"],
+          select: ['value', 'required', 'multiple'],
+          option: ['selected', 'value'],
+          video: ['muted', 'autoplay', 'controls', 'loop', 'playsinline'],
+          audio: ['muted', 'autoplay', 'controls', 'loop'],
+          img: ['src', 'alt', 'width', 'height'],
+          button: ['type', 'name', 'value', 'autofocus', 'form'],
         };
 
         const lname = tagName.toLowerCase();
@@ -689,10 +730,33 @@ export function htmlImpl(
               let attrValue = vnodeProps.attrs[propName];
               // Unwrap reactive state objects during promotion
               if (attrValue && isReactiveState(attrValue)) {
-                attrValue = (attrValue as any).value; // This triggers dependency tracking
+                attrValue = (attrValue as { value: unknown }).value; // This triggers dependency tracking
                 // Promote the unwrapped primitive value
                 vnodeProps.props[propName] = attrValue;
                 delete vnodeProps.attrs[propName];
+              } else if (
+                attrValue &&
+                typeof attrValue === 'object' &&
+                'value' in (attrValue as Record<string, unknown>) &&
+                !(attrValue instanceof Node)
+              ) {
+                // Support simple wrapper objects that carry a `value` property
+                // (for example useProps/ref-like wrappers that aren't our
+                // ReactiveState instances). Promote their inner primitive
+                // value for native element properties such as <select>.value.
+                try {
+                  const unwrapped = (attrValue as { value: unknown }).value;
+                  // For native select/option values prefer string primitives so
+                  // the DOM <select>.value matches option values exactly.
+                  vnodeProps.props[propName] =
+                    (lname === 'select' || lname === 'option') &&
+                    propName === 'value'
+                      ? String(unwrapped)
+                      : unwrapped;
+                  delete vnodeProps.attrs[propName];
+                } catch {
+                  void 0;
+                }
               } else {
                 // Only promote primitive values to native element properties.
                 // For most attributes we accept string/number/boolean/empty-string
@@ -703,16 +767,16 @@ export function htmlImpl(
                 // non-boolean strings which could be misinterpreted as
                 // truthy and accidentally enable native controls.
                 const t = typeof attrValue;
-                if (propName === "disabled") {
+                if (propName === 'disabled') {
                   const isBoolStr =
-                    t === "string" &&
-                    (attrValue === "true" || attrValue === "false");
+                    t === 'string' &&
+                    (attrValue === 'true' || attrValue === 'false');
                   const shouldPromote =
-                    attrValue === "" ||
-                    t === "boolean" ||
+                    attrValue === '' ||
+                    t === 'boolean' ||
                     isBoolStr ||
                     attrValue == null ||
-                    t === "number";
+                    t === 'number';
                   if (shouldPromote) {
                     vnodeProps.props[propName] = attrValue;
                     // DEV INSTRUMENTATION: record compiler-time promotions of disabled
@@ -724,13 +788,19 @@ export function htmlImpl(
                   }
                 } else {
                   if (
-                    attrValue === "" ||
-                    t === "string" ||
-                    t === "number" ||
-                    t === "boolean" ||
+                    attrValue === '' ||
+                    t === 'string' ||
+                    t === 'number' ||
+                    t === 'boolean' ||
                     attrValue == null
                   ) {
-                    vnodeProps.props[propName] = attrValue;
+                    // Coerce select/option `value` to string to avoid mismatch
+                    const promoted =
+                      (lname === 'select' || lname === 'option') &&
+                      propName === 'value'
+                        ? String(attrValue)
+                        : attrValue;
+                    vnodeProps.props[propName] = promoted;
                     delete vnodeProps.attrs[propName];
                   } else {
                     // leave complex objects in attrs so the runtime can decide how
@@ -743,23 +813,27 @@ export function htmlImpl(
         }
         // If this looks like a custom element (hyphenated tag), promote all bound attrs to props
         const isCustom =
-          tagName.includes("-") ||
-          Boolean((effectiveContext as any)?.__customElements?.has?.(tagName));
+          tagName.includes('-') ||
+          Boolean(
+            (
+              effectiveContext as { __customElements?: Set<string> }
+            )?.__customElements?.has?.(tagName),
+          );
         if (isCustom) {
           // Always mark custom elements, regardless of bound attributes
           vnodeProps.isCustomElement = true;
 
           if (boundList && vnodeProps.attrs) {
             // Preserve attributes that may be used for stable key generation
-            const keyAttrs = new Set(["id", "name", "data-key", "key"]);
+            const keyAttrs = new Set(['id', 'name', 'data-key', 'key']);
             for (const b of boundList) {
               if (
                 b in vnodeProps.attrs &&
                 !(vnodeProps.props && b in vnodeProps.props)
               ) {
                 // Convert kebab-case to camelCase for JS property names on custom elements
-                const camel = b.includes("-") ? toCamel(b) : b;
-                let attrValue = vnodeProps.attrs[b];
+                const camel = b.includes('-') ? toCamel(b) : b;
+                const attrValue = vnodeProps.attrs[b];
                 // Preserve ReactiveState instances for custom elements so the
                 // runtime can assign the live ReactiveState to the element
                 // property (children using useProps will read .value). Do not
@@ -778,8 +852,8 @@ export function htmlImpl(
                   try {
                     const serialized = safeSerializeAttr(vnodeProps.attrs[b]);
                     if (serialized === null) delete vnodeProps.attrs[b];
-                    else vnodeProps.attrs[b] = serialized as any;
-                  } catch (e) {
+                    else vnodeProps.attrs[b] = serialized as string;
+                  } catch {
                     delete vnodeProps.attrs[b];
                   }
                 } else {
@@ -788,8 +862,26 @@ export function htmlImpl(
               }
             }
           }
+          // Ensure common model-binding attribute forms are available as
+          // JS props on custom elements even when they were passed as
+          // attributes (for example :model-value="..." -> attrs['model-value']).
+          // This helps ensure consistent behavior for `:model-value` (bind)
+          // usage where downstream component expects a `modelValue` prop.
+          try {
+            if (
+              vnodeProps.attrs &&
+              !(vnodeProps.props && 'modelValue' in vnodeProps.props)
+            ) {
+              const mv =
+                (vnodeProps.attrs as Record<string, unknown>)['model-value'] ??
+                (vnodeProps.attrs as Record<string, unknown>)['modelValue'];
+              if (typeof mv !== 'undefined') vnodeProps.props.modelValue = mv;
+            }
+          } catch {
+            void 0;
+          }
         }
-      } catch (e) {
+      } catch {
         // Best-effort; ignore failures to keep runtime robust.
       }
 
@@ -800,62 +892,70 @@ export function htmlImpl(
       if (
         directives &&
         Object.keys(directives).some(
-          (k) => k === "model" || k.startsWith("model:")
+          (k) => k === 'model' || k.startsWith('model:'),
         )
       ) {
         try {
-          const GLOBAL_REG_KEY = Symbol.for("cer.registry");
-          const globalRegistry = (globalThis as any)[GLOBAL_REG_KEY] as
-            | Set<string>
-            | Map<string, any>
-            | undefined;
+          const GLOBAL_REG_KEY = Symbol.for('cer.registry');
+          const globalRegistry = (globalThis as { [key: symbol]: unknown })[
+            GLOBAL_REG_KEY
+          ] as Set<string> | Map<string, unknown> | undefined;
           const isInGlobalRegistry = Boolean(
             globalRegistry &&
-              typeof globalRegistry.has === "function" &&
-              globalRegistry.has(tagName)
+              typeof globalRegistry.has === 'function' &&
+              globalRegistry.has(tagName),
           );
+
+          const ctx = effectiveContext as
+            | ({
+                __customElements?: Set<string>;
+                __isCustomElements?: string[];
+              } & Record<string, unknown>)
+            | undefined;
 
           const isInContext = Boolean(
-            effectiveContext &&
-              (((effectiveContext as any).__customElements instanceof Set &&
-                (effectiveContext as any).__customElements.has(tagName)) ||
-                (Array.isArray((effectiveContext as any).__isCustomElements) &&
-                  (effectiveContext as any).__isCustomElements.includes(
-                    tagName
-                  )))
+            ctx &&
+              ((ctx.__customElements instanceof Set &&
+                ctx.__customElements.has(tagName)) ||
+                (Array.isArray(ctx.__isCustomElements) &&
+                  ctx.__isCustomElements.includes(tagName))),
           );
 
-          const isHyphenated = tagName.includes("-");
+          const isHyphenated = tagName.includes('-');
 
           const isCustomFromContext = Boolean(
-            isHyphenated || isInContext || isInGlobalRegistry
+            isHyphenated || isInContext || isInGlobalRegistry,
           );
 
           if (isCustomFromContext) {
             for (const dk of Object.keys(directives)) {
-              if (dk !== "model" && !dk.startsWith("model:")) continue;
+              if (dk !== 'model' && !dk.startsWith('model:')) continue;
               const model = directives[dk] as {
-                value: any;
+                value: unknown;
                 modifiers: string[];
                 arg?: string;
               };
               const arg =
                 model.arg ??
-                (dk.includes(":") ? dk.split(":", 2)[1] : undefined);
+                (dk.includes(':') ? dk.split(':', 2)[1] : undefined);
               const modelVal = model.value;
 
-              const argToUse = arg ?? "modelValue";
+              const argToUse = arg ?? 'modelValue';
 
               const getNested = getNestedValue;
               const setNested = setNestedValue;
 
-              const actualState = effectiveContext
-                ? (effectiveContext as any)._state || effectiveContext
-                : undefined;
+              const actualState =
+                (effectiveContext as { _state?: unknown } | undefined)
+                  ?._state ||
+                (effectiveContext as Record<string, unknown> | undefined);
 
-              let initial: any = undefined;
-              if (typeof modelVal === "string" && effectiveContext) {
-                initial = getNested(actualState, modelVal);
+              let initial: unknown = undefined;
+              if (typeof modelVal === 'string' && actualState) {
+                initial = getNested(
+                  actualState as Record<string, unknown>,
+                  modelVal,
+                );
               } else {
                 initial = modelVal;
                 // Unwrap reactive state objects
@@ -869,18 +969,18 @@ export function htmlImpl(
 
               try {
                 const attrName = toKebab(argToUse);
-                if (!vnodeProps.attrs) vnodeProps.attrs = {} as any;
+                if (!vnodeProps.attrs) vnodeProps.attrs = {};
                 // Only set attributes for primitive values; skip objects/refs
                 if (
                   initial !== undefined &&
                   initial !== null &&
-                  (typeof initial === "string" ||
-                    typeof initial === "number" ||
-                    typeof initial === "boolean")
+                  (typeof initial === 'string' ||
+                    typeof initial === 'number' ||
+                    typeof initial === 'boolean')
                 ) {
                   vnodeProps.attrs[attrName] = initial;
                 }
-              } catch (e) {
+              } catch {
                 /* best-effort */
               }
 
@@ -890,22 +990,22 @@ export function htmlImpl(
               // Convert kebab-case event name to camelCase handler key
               const camelEventName = eventName.replace(
                 /-([a-z])/g,
-                (_, letter) => letter.toUpperCase()
+                (_, letter) => letter.toUpperCase(),
               );
               const handlerKey =
-                "on" +
+                'on' +
                 camelEventName.charAt(0).toUpperCase() +
                 camelEventName.slice(1);
 
               vnodeProps.props[handlerKey] = function (
-                ev: Event & { detail?: any }
+                ev: Event & { detail?: unknown },
               ) {
                 const newVal =
-                  (ev as any).detail !== undefined
-                    ? (ev as any).detail
+                  (ev as { detail?: unknown }).detail !== undefined
+                    ? (ev as { detail?: unknown }).detail
                     : ev.target
-                    ? (ev.target as any).value
-                    : undefined;
+                      ? (ev.target as { value?: unknown }).value
+                      : undefined;
                 if (!actualState) return;
 
                 // Handle reactive state objects (functional API)
@@ -919,16 +1019,28 @@ export function htmlImpl(
                       : newVal !== current;
                   if (changed) {
                     modelVal.value = newVal;
-                    if ((effectiveContext as any)?.requestRender)
-                      (effectiveContext as any).requestRender();
-                    else if ((effectiveContext as any)?._requestRender)
-                      (effectiveContext as any)._requestRender();
+                    try {
+                      const eff = effectiveContext as
+                        | Record<string, unknown>
+                        | undefined;
+                      if (eff) {
+                        const rr = (eff as { requestRender?: unknown })
+                          .requestRender;
+                        const _rr = (eff as { _requestRender?: unknown })
+                          ._requestRender;
+                        if (typeof rr === 'function') (rr as () => void)();
+                        else if (typeof _rr === 'function')
+                          (_rr as () => void)();
+                      }
+                    } catch {
+                      void 0;
+                    }
                   }
                 } else {
                   // Legacy string-based state handling
                   const current = getNested(
-                    actualState,
-                    typeof modelVal === "string" ? modelVal : String(modelVal)
+                    (actualState as Record<string, unknown>) || {},
+                    typeof modelVal === 'string' ? modelVal : String(modelVal),
                   );
                   const changed =
                     Array.isArray(newVal) && Array.isArray(current)
@@ -937,16 +1049,28 @@ export function htmlImpl(
                       : newVal !== current;
                   if (changed) {
                     setNested(
-                      actualState,
-                      typeof modelVal === "string"
+                      (actualState as Record<string, unknown>) || {},
+                      typeof modelVal === 'string'
                         ? modelVal
                         : String(modelVal),
-                      newVal
+                      newVal,
                     );
-                    if ((effectiveContext as any)?.requestRender)
-                      (effectiveContext as any).requestRender();
-                    else if ((effectiveContext as any)?._requestRender)
-                      (effectiveContext as any)._requestRender();
+                    try {
+                      const eff = effectiveContext as
+                        | Record<string, unknown>
+                        | undefined;
+                      if (eff) {
+                        const rr = (eff as { requestRender?: unknown })
+                          .requestRender;
+                        const _rr = (eff as { _requestRender?: unknown })
+                          ._requestRender;
+                        if (typeof rr === 'function') (rr as () => void)();
+                        else if (typeof _rr === 'function')
+                          (_rr as () => void)();
+                      }
+                    } catch {
+                      void 0;
+                    }
                   }
                 }
               };
@@ -954,7 +1078,7 @@ export function htmlImpl(
               delete directives[dk];
             }
           }
-        } catch (e) {
+        } catch {
           // ignore transform errors and fall back to runtime directive handling
         }
       }
@@ -966,19 +1090,70 @@ export function htmlImpl(
       }
 
       if (isClosing) {
+        // If there are any non-text children (elements, anchors, raw), we
+        // will trim incidental whitespace-only text nodes that result from
+        // template indentation/newlines only at the boundaries (leading
+        // and trailing). This avoids turning indentation into real text
+        // nodes while preserving interior whitespace that may be used as
+        // separators between interpolations.
+        const hasNonTextChild = currentChildren.some(
+          (c) => typeof c === 'object' && (c as VNode).tag !== '#text',
+        );
+
+        let effectiveChildren = currentChildren;
+        if (hasNonTextChild && currentChildren.length > 0) {
+          // Trim leading whitespace-only text nodes
+          let start = 0;
+          while (start < currentChildren.length) {
+            const node = currentChildren[start];
+            if (
+              !isElementVNode(node) ||
+              node.tag !== '#text' ||
+              typeof node.children !== 'string' ||
+              node.children.trim() !== ''
+            ) {
+              break;
+            }
+            start++;
+          }
+
+          // Trim trailing whitespace-only text nodes
+          let end = currentChildren.length - 1;
+          while (end >= 0) {
+            const node = currentChildren[end];
+            if (
+              !isElementVNode(node) ||
+              node.tag !== '#text' ||
+              typeof node.children !== 'string' ||
+              node.children.trim() !== ''
+            ) {
+              break;
+            }
+            end--;
+          }
+
+          if (start === 0 && end === currentChildren.length - 1) {
+            effectiveChildren = currentChildren;
+          } else if (start > end) {
+            effectiveChildren = [];
+          } else {
+            effectiveChildren = currentChildren.slice(start, end + 1);
+          }
+        }
+
         const node = h(
           currentTag!,
           currentProps,
-          currentChildren.length === 1 &&
-            isElementVNode(currentChildren[0]) &&
-            currentChildren[0].tag === "#text"
-            ? typeof currentChildren[0].children === "string"
-              ? currentChildren[0].children
-              : ""
-            : currentChildren.length
-            ? currentChildren
-            : undefined,
-          currentKey
+          effectiveChildren.length === 1 &&
+            isElementVNode(effectiveChildren[0]) &&
+            effectiveChildren[0].tag === '#text'
+            ? typeof effectiveChildren[0].children === 'string'
+              ? effectiveChildren[0].children
+              : ''
+            : effectiveChildren.length
+              ? effectiveChildren
+              : undefined,
+          currentKey,
         );
         const prev = stack.pop();
         if (prev) {
@@ -1016,7 +1191,7 @@ export function htmlImpl(
         currentProps = vnodeProps;
         currentChildren = [];
       }
-    } else if (typeof match[3] !== "undefined") {
+    } else if (typeof match[3] !== 'undefined') {
       // Standalone interpolation marker {{N}}
       const idx = Number(match[3]);
       const val = values[idx];
@@ -1058,9 +1233,9 @@ export function htmlImpl(
   // Filter out empty text nodes and whitespace-only nodes
   const cleanedFragments = fragmentChildren.filter((child): child is VNode => {
     if (isElementVNode(child)) {
-      if (child.tag === "#text") {
+      if (child.tag === '#text') {
         return (
-          typeof child.children === "string" && child.children.trim() !== ""
+          typeof child.children === 'string' && child.children.trim() !== ''
         );
       }
       return true;
@@ -1071,7 +1246,7 @@ export function htmlImpl(
 
   // Transform nodes with :when directive into anchor blocks
   const transformedFragments = cleanedFragments.map((child) =>
-    transformWhenDirective(child)
+    transformWhenDirective(child),
   );
 
   if (transformedFragments.length === 1) {
@@ -1089,7 +1264,7 @@ export function htmlImpl(
   }
 
   // Fallback for empty content
-  return h("div", {}, "", "fallback-root");
+  return h('div', {}, '', 'fallback-root');
 }
 
 /**
@@ -1109,8 +1284,8 @@ export function html(
   // If last value is a context object, use it
   const last = values[values.length - 1];
   const context =
-    typeof last === "object" && last && !Array.isArray(last)
-      ? (last as Record<string, any>)
+    typeof last === 'object' && last && !Array.isArray(last)
+      ? (last as Record<string, unknown>)
       : undefined;
 
   return htmlImpl(strings, values, context);

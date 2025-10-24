@@ -8,18 +8,18 @@ The built-in event bus enables decoupled communication between components.
 
 - **Publish events:**
   ```typescript
-  import { eventBus } from "@jasonshimmy/custom-elements-runtime";
-  eventBus.emit("cart:add", { id: 123 });
+  import { eventBus } from '@jasonshimmy/custom-elements-runtime/event-bus';
+  eventBus.emit('cart:add', { id: 123 });
   ```
 - **Subscribe to events:**
   ```typescript
-  eventBus.on("cart:add", (payload) => {
+  eventBus.on('cart:add', (payload) => {
     // Handle add to cart
   });
   ```
 - **Unsubscribe:**
   ```typescript
-  const unsub = eventBus.on("cart:add", handler);
+  const unsub = eventBus.on('cart:add', handler);
   unsub(); // Remove listener
   ```
 
@@ -28,11 +28,13 @@ The built-in event bus enables decoupled communication between components.
 Pass data from parent to child using props and attributes (string, number, boolean). For function props (event handlers), set them as properties on the element instance (not as attributes).
 
 - **Primitive props example:**
+
   ```html
   <user-card name="Alice" age="30"></user-card>
   ```
+
   ```typescript
-  component("user-card", ({ name = '', age = 0 }) => {
+  component('user-card', ({ name = '', age = 0 }) => {
     return html`<div>${name} (${age})</div>`;
   });
   ```
@@ -40,12 +42,12 @@ Pass data from parent to child using props and attributes (string, number, boole
 - **Function prop (event handler) example:**
   ```typescript
   // In parent code
-    const el = document.createElement('user-card');
-    // attach a function prop or a listener via addEventListener
-    el.addEventListener('custom-event', (e) => {
-      // handle event e.detail
-    });
-    document.body.appendChild(el);
+  const el = document.createElement('user-card');
+  // attach a function prop or a listener via addEventListener
+  el.addEventListener('custom-event', (e) => {
+    // handle event e.detail
+  });
+  document.body.appendChild(el);
   ```
 
 ## 🏪 Shared Store
@@ -54,23 +56,22 @@ Use the built-in store for global or shared state.
 
 - **Create a store:**
   ```typescript
-  import { createStore } from "@jasonshimmy/custom-elements-runtime";
-  const store = createStore({ theme: "light" });
+  import { createStore } from '@jasonshimmy/custom-elements-runtime/store';
+  const store = createStore({ theme: 'light' });
   ```
 - **Access in components:**
+
   ```typescript
-  import { component, html } from "@jasonshimmy/custom-elements-runtime";
-  
-  component("theme-toggle", (props, { emit }) => {
+  import { component, html } from '@jasonshimmy/custom-elements-runtime';
+
+  component('theme-toggle', (props, { emit }) => {
     const toggleTheme = () => {
       const currentTheme = store.getState().theme;
       store.getState().theme = currentTheme === 'light' ? 'dark' : 'light';
     };
-    
+
     return html`
-      <button @click="${toggleTheme}">
-        Theme: ${store.getState().theme}
-      </button>
+      <button @click="${toggleTheme}">Theme: ${store.getState().theme}</button>
     `;
   });
   ```
@@ -81,8 +82,12 @@ Use native DOM events for direct communication.
 
 - **Dispatch custom events (from within runtime component):**
   ```typescript
-  // Use emit parameter for custom events
-  emit('my-event', { foo: 'bar' });
+  // Use useEmit() inside your component to dispatch CustomEvents
+  component('my-comp', () => {
+    const emit = useEmit();
+    const handle = () => emit('my-event', { foo: 'bar' });
+    return html`<button @click="${handle}">Send</button>`;
+  });
   ```
 - **Listen in parent (frameworks):**
   - Vue: `<my-child @my-event="handleEvent" />`
@@ -90,10 +95,13 @@ Use native DOM events for direct communication.
   - Svelte: `<my-child on:my-event={handleEvent} />`
   - React: Use ref and `addEventListener`
     ```jsx
-    el.addEventListener('my-event', e => { /* ... */ });
+    el.addEventListener('my-event', (e) => {
+      /* ... */
+    });
     ```
 
 **Note:**
+
 - The `@event` binding only works in templates rendered by the runtime or supported frameworks.
 - For plain HTML, always use `addEventListener`.
 

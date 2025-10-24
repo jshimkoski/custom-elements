@@ -58,7 +58,9 @@ describe('helpers.ts combined tests', () => {
     try {
       try {
         delete (globalThis as any).document;
-      } catch {}
+      } catch {
+        void 0;
+      }
       expect(decodeEntities('&heyo;')).toBe('😺');
     } finally {
       (globalThis as any).document = origDoc;
@@ -101,7 +103,10 @@ describe('helpers.ts combined tests', () => {
     setNestedValue(obj, 'a.b.c', 5);
     expect(getNestedValue(obj, 'a.b.c')).toBe(5);
 
-    const reactive = { value: 5, [Symbol.for('@cer/ReactiveState')]: true } as any;
+    const reactive = {
+      value: 5,
+      [Symbol.for('@cer/ReactiveState')]: true,
+    } as any;
     const obj2: any = { x: { y: { z: reactive } } };
     expect(getNestedValue(obj2, 'x.y.z')).toBe(5);
     setNestedValue(obj2, 'x.y.z', 12);

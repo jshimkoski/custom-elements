@@ -16,7 +16,10 @@ describe('template-compiler additional cases', () => {
   });
 
   it('honors context __customElements opt-in (Set) and canonicalizes :model', () => {
-    const ctx = { __customElements: new Set(['x-custom']), _state: { foo: 'hello' } };
+    const ctx = {
+      __customElements: new Set(['x-custom']),
+      _state: { foo: 'hello' },
+    };
     const vnode = html`<x-custom :model="foo" />${ctx}` as unknown as VNode;
     const props = (vnode.props as any)?.props || {};
     const attrs = (vnode.props as any)?.attrs || {};
@@ -48,7 +51,9 @@ describe('template-compiler additional cases', () => {
       const props = (vnode.props as any)?.props || {};
       const attrs = (vnode.props as any)?.attrs || {};
       // Model prop should be present even without explicit context
-      expect(props.modelValue !== undefined || attrs['model-value'] !== undefined).toBe(true);
+      expect(
+        props.modelValue !== undefined || attrs['model-value'] !== undefined,
+      ).toBe(true);
       expect((vnode.props as any).isCustomElement).toBe(true);
     } finally {
       // restore previous registry value
@@ -58,8 +63,14 @@ describe('template-compiler additional cases', () => {
   });
 
   it('handles multiple :model variants on one tag (plain + arg)', () => {
-    const ctx = { __customElements: new Set(['multi-widget']), _state: { a: 1, b: 2 } };
-    const vnode = html`<multi-widget :model="a" :model:beta="b" />${ctx}` as unknown as VNode;
+    const ctx = {
+      __customElements: new Set(['multi-widget']),
+      _state: { a: 1, b: 2 },
+    };
+    const vnode = html`<multi-widget
+        :model="a"
+        :model:beta="b"
+      />${ctx}` as unknown as VNode;
     const props = (vnode.props as any)?.props || {};
     const attrs = (vnode.props as any)?.attrs || {};
     expect(props.modelValue).toBe(1);

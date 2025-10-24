@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { decodeEntities, unsafeHTML } from '../src/lib/runtime/helpers';
-import { html, renderToString } from '../src/lib';
+import { html } from '../src/lib';
+import { renderToString } from '../src/lib/ssr';
 
 describe('decodeEntities & unsafeHTML', () => {
   it('decodeEntities decodes named and numeric entities', () => {

@@ -7,22 +7,23 @@ Quick guide for using Custom Elements Runtime components inside Vue.
 1. Register a component as usual:
 
 ```ts
-import { component, ref, html, useEmit } from '@jasonshimmy/custom-elements-runtime';
+import {
+  component,
+  ref,
+  html,
+  useEmit,
+} from '@jasonshimmy/custom-elements-runtime';
 
 component('my-counter', ({ initialCount = 0 }: { initialCount?: number }) => {
   const count = ref(initialCount);
   const emit = useEmit();
-  
+
   const handleClick = () => {
     count.value++;
     emit('count-changed', { count: count.value });
   };
-  
-  return html`
-    <button @click="${handleClick}">
-      Count: ${count.value}
-    </button>
-  `;
+
+  return html` <button @click="${handleClick}">Count: ${count.value}</button> `;
 });
 ```
 
@@ -40,6 +41,8 @@ component('my-counter', ({ initialCount = 0 }: { initialCount?: number }) => {
 - Listen to DOM CustomEvents declaratively with `@event` (preferred). Handlers receive a DOM CustomEvent; the payload is `event.detail`.
 - If you need closure capture or must attach a function/object prop, get a `ref` to the element and set the property on the instance (rare).
 
+Compatibility note: the runtime's `emit()` helper dispatches DOM CustomEvents and may also emit alternate event-name variants for compatibility (e.g., a kebab-cased `update:model-value` may also be dispatched as `update:modelValue`). Vue's template event binding (`@event`) will generally catch the kebab-cased form; if you encounter parser or tooling issues, use a `ref` and `addEventListener` to receive events directly and read `event.detail`.
+
 Runtime note: the compiler will promote many bound attributes into JS properties so non-string values and reactive updates reach the element instance immediately. For native elements a curated promotable list (value, checked, disabled, etc.) is applied; for custom elements any bound attribute is promoted and kebab-case attribute names are converted to camelCase property names when assigned to the instance.
 
 ## Vue two-way binding (v-model)
@@ -53,7 +56,7 @@ Compiler transform: when using the runtime's `html` compiler the `:model` and `:
 - When using our compiler, `:model:prop` on custom elements is compiled into an explicit prop set plus an update handler (`onUpdate:<prop>`), producing direct prop + handler wiring. For uncompiled templates (raw Vue templates), manually wire prop + update event:
 
 ```vue
-<my-custom :modelValue="value" @update:model-value="v => value = v" />
+<my-custom :modelValue="value" @update:model-value="(v) => (value = v)" />
 ```
 
 Inside your element, emit updates via `ctx.emit('update:propName', newValue)` or dispatch a CustomEvent with `detail = newValue` (use `bubbles: true, composed: true`).
@@ -76,6 +79,7 @@ const value = ref('hello');
 ```
 
 **Notes:**
+
 - If you author the host template with the runtime compiler, `:model:value="value"` will compile to the equivalent `<my-custom :value="value" @update:value="v => value = v" />` wiring that plain templates can consume.
 - The renderer performs an optimization and will only notify custom elements when a prop or attribute actually changes. Updating parent state won't re-trigger child apply/update hooks unless the child's props/attrs changed.
 

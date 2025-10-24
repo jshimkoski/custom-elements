@@ -1,13 +1,25 @@
-import { component, html, ref, watch, useProps, useEmit, useOnConnected } from '../lib/index.js';
+import {
+  component,
+  html,
+  ref,
+  useProps,
+  useEmit,
+  useOnConnected,
+} from '../lib/index.js';
+
+interface Option {
+  value: string;
+  label: string;
+}
 
 /**
  * 🎨 Design System Components
- * 
+ *
  * A comprehensive set of form components that support Vue-like directives:
  * - :model (two-way data binding)
- * - :bind (one-way data binding)  
+ * - :bind (one-way data binding)
  * - :model:prop (model binding with custom prop names)
- * 
+ *
  * All components emit 'update:modelValue' events for model binding compatibility.
  */
 
@@ -17,7 +29,7 @@ component('ds-input', () => {
     modelValue: '',
     placeholder: '',
     disabled: false,
-    type: 'text'
+    type: 'text',
   });
   const emit = useEmit();
 
@@ -44,7 +56,7 @@ component('ds-textarea', () => {
     modelValue: '',
     placeholder: '',
     disabled: false,
-    rows: 3
+    rows: 3,
   });
   const emit = useEmit();
 
@@ -70,7 +82,7 @@ component('ds-checkbox', () => {
   const props = useProps({
     modelValue: false,
     label: '',
-    disabled: false
+    disabled: false,
   });
   const emit = useEmit();
 
@@ -86,7 +98,9 @@ component('ds-checkbox', () => {
           emit('update:modelValue', input.checked);
         }}"
       />
-      ${props.label ? html`<span class="text-sm text-gray-700">${props.label}</span>` : ''}
+      ${props.label
+        ? html`<span class="text-sm text-gray-700">${props.label}</span>`
+        : ''}
     </label>
   `;
 });
@@ -95,7 +109,7 @@ component('ds-checkbox', () => {
 component('ds-select', () => {
   const props = useProps({
     modelValue: '',
-    disabled: false
+    disabled: false,
   });
   const emit = useEmit();
   const options = ref([
@@ -103,8 +117,6 @@ component('ds-select', () => {
     { value: 'green', label: 'Green' },
     { value: 'blue', label: 'Blue' },
   ]);
-
-
 
   useOnConnected(() => {
     // Ensure initial value is set correctly
@@ -126,9 +138,11 @@ component('ds-select', () => {
         }}"
       >
         <option value="">Select an option</option>
-        ${options.value.map((option: any) => html`
-          <option value="${option.value}">${option.label}</option>
-        `)}
+        ${options.value.map(
+          (option: Option) => html`
+            <option value="${option.value}">${option.label}</option>
+          `,
+        )}
       </select>
     </div>
   `;
@@ -139,7 +153,7 @@ component('ds-radio-group', () => {
   const props = useProps({
     modelValue: '',
     name: 'radio-group',
-    disabled: false
+    disabled: false,
   });
   const emit = useEmit();
 
@@ -149,29 +163,29 @@ component('ds-radio-group', () => {
     { value: 'option3', label: 'Option 3' },
   ]);
 
-
-
   return html`
     <div class="radio-group space-y-2">
-      ${options.value.map((option: any) => html`
-        <label class="inline-flex items-center gap-2 cursor-pointer">
-          <input
-            class="form-radio h-4 w-4 text-blue-600"
-            type="radio"
-            name="${props.name}"
-            value="${option.value}"
-            :disabled="${props.disabled}"
-            :checked="${props.modelValue === option.value}"
-            @change="${(e: Event) => {
-              const input = e.target as HTMLInputElement;
-              if (input.checked) {
-                emit('update:modelValue', input.value);
-              }
-            }}"
-          />
-          <span class="text-sm text-gray-700">${option.label}</span>
-        </label>
-      `)}
+      ${options.value.map(
+        (option: Option) => html`
+          <label class="inline-flex items-center gap-2 cursor-pointer">
+            <input
+              class="form-radio h-4 w-4 text-blue-600"
+              type="radio"
+              name="${props.name}"
+              value="${option.value}"
+              :disabled="${props.disabled}"
+              :checked="${props.modelValue === option.value}"
+              @change="${(e: Event) => {
+                const input = e.target as HTMLInputElement;
+                if (input.checked) {
+                  emit('update:modelValue', input.value);
+                }
+              }}"
+            />
+            <span class="text-sm text-gray-700">${option.label}</span>
+          </label>
+        `,
+      )}
     </div>
   `;
 });
@@ -181,17 +195,20 @@ component('ds-button', () => {
   const props = useProps({
     disabled: false,
     type: 'button',
-    variant: 'primary'
+    variant: 'primary',
   });
   const emit = useEmit();
   return html`
     <button
       class="px-4 py-2 rounded-md font-medium focus:outline-none focus:ring-2 transition-colors"
       :class="${{
-        'bg-blue-600 hover:bg-blue-700 text-white focus:ring-blue-500': props.variant === 'primary',
-        'bg-gray-600 hover:bg-gray-700 text-white focus:ring-gray-500': props.variant === 'secondary',
-        'bg-green-600 hover:bg-green-700 text-white focus:ring-green-500': props.variant === 'success',
-        'opacity-50 cursor-not-allowed': props.disabled
+        'bg-blue-600 hover:bg-blue-700 text-white focus:ring-blue-500':
+          props.variant === 'primary',
+        'bg-gray-600 hover:bg-gray-700 text-white focus:ring-gray-500':
+          props.variant === 'secondary',
+        'bg-green-600 hover:bg-green-700 text-white focus:ring-green-500':
+          props.variant === 'success',
+        'opacity-50 cursor-not-allowed': props.disabled,
       }}"
       type="${props.type}"
       :disabled="${props.disabled}"
@@ -209,10 +226,8 @@ component('ds-progress', () => {
   const props = useProps({
     modelValue: 0,
     max: 100,
-    showValue: true
+    showValue: true,
   });
-
-
 
   return html`
     <div class="progress-wrapper">
@@ -221,11 +236,14 @@ component('ds-progress', () => {
         :value="${props.modelValue}"
         :max="${props.max}"
       ></progress>
-      ${props.showValue ? html`
-        <div class="text-sm text-gray-600 mt-1">
-          ${props.modelValue} / ${props.max} (${Math.round((props.modelValue / props.max) * 100)}%)
-        </div>
-      ` : ''}
+      ${props.showValue
+        ? html`
+            <div class="text-sm text-gray-600 mt-1">
+              ${props.modelValue} / ${props.max}
+              (${Math.round((props.modelValue / props.max) * 100)}%)
+            </div>
+          `
+        : ''}
     </div>
   `;
 });
@@ -237,7 +255,7 @@ component('ds-range', () => {
     min: 0,
     max: 100,
     step: 1,
-    disabled: false
+    disabled: false,
   });
   const emit = useEmit();
 
@@ -273,7 +291,7 @@ component('ds-number', () => {
     max: undefined,
     step: 1,
     disabled: false,
-    placeholder: ''
+    placeholder: '',
   });
   const emit = useEmit();
 

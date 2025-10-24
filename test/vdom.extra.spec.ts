@@ -6,10 +6,10 @@ import {
   processShowDirective,
   processDirectives,
   patchProps,
-  renderToString,
   cleanupRefs,
-  createElement
+  createElement,
 } from '../src/lib/runtime/vdom';
+import { renderToString } from '../src/lib/runtime/vdom-ssr';
 import { getNestedValue, setNestedValue } from '../src/lib/runtime/helpers';
 
 describe('vdom.extra', () => {
@@ -28,7 +28,9 @@ describe('vdom.extra', () => {
 
   it('processClassDirective merges string/array/object class values', () => {
     const attrs: any = { class: 'existing' };
-    const ctx = { my: { classes: ['a', 'b'], obj: { x: true, y: false }, str: 's' } };
+    const ctx = {
+      my: { classes: ['a', 'b'], obj: { x: true, y: false }, str: 's' },
+    };
     processClassDirective('my.classes', attrs, ctx);
     expect(attrs.class).toContain('a');
     const attrs2: any = {};
@@ -42,7 +44,9 @@ describe('vdom.extra', () => {
   it('processBindDirective accepts object and JSON string and falls back for invalid JSON', () => {
     const props: any = {};
     const attrs: any = {};
-    processBindDirective({ id: 'x', value: 1 } as any, props, attrs, { foo: 'bar' });
+    processBindDirective({ id: 'x', value: 1 } as any, props, attrs, {
+      foo: 'bar',
+    });
     expect(props.id).toBe('x');
 
     const props2: any = {};
@@ -51,10 +55,10 @@ describe('vdom.extra', () => {
     processBindDirective('{"a":2}', props2, attrs2, ctx);
     expect(props2.a).toBe(2);
 
-  const attrs3: any = {};
-  processBindDirective('nested.val', {} as any, attrs3, ctx);
-  // fallback reads nested value from context
-  expect(attrs3['nested.val']).toBe(3);
+    const attrs3: any = {};
+    processBindDirective('nested.val', {} as any, attrs3, ctx);
+    // fallback reads nested value from context
+    expect(attrs3['nested.val']).toBe(3);
     // fallback should set attribute with the key when invalid JSON — here we expect no crash
     expect(typeof attrs3).toBe('object');
   });
@@ -64,7 +68,7 @@ describe('vdom.extra', () => {
     const ctx = { showMe: false };
     processShowDirective('showMe', attrs, ctx);
     expect(attrs.style).toContain('display: none');
-    
+
     const attrs2: any = { style: 'color: red; display: none;' };
     processShowDirective('showMe', attrs2, { showMe: true });
     expect(attrs2.style).toBe('color: red;');
@@ -74,9 +78,14 @@ describe('vdom.extra', () => {
     const directives = {
       style: { value: { color: 'red' }, modifiers: [] },
       class: { value: 'cls', modifiers: [] },
-      bind: { value: '{"x":1}', modifiers: [] }
+      bind: { value: '{"x":1}', modifiers: [] },
     } as any;
-    const res = processDirectives(directives, { nested: {} }, document.createElement('div'), {});
+    const res = processDirectives(
+      directives,
+      { nested: {} },
+      document.createElement('div'),
+      {},
+    );
     expect(res.attrs).toBeDefined();
     expect(res.props).toBeDefined();
   });
@@ -85,9 +94,15 @@ describe('vdom.extra', () => {
     const el = document.createElement('input');
     el.type = 'text';
     const clickOld = () => {};
-    const oldProps = { props: { value: 'a', checked: true, onClick: clickOld }, attrs: { 'data-x': '1' } } as any;
+    const oldProps = {
+      props: { value: 'a', checked: true, onClick: clickOld },
+      attrs: { 'data-x': '1' },
+    } as any;
     const clickNew = vi.fn();
-    const newProps = { props: { value: 'b', checked: false, onClick: clickNew, title: 't' }, attrs: { 'data-x': undefined } } as any;
+    const newProps = {
+      props: { value: 'b', checked: false, onClick: clickNew, title: 't' },
+      attrs: { 'data-x': undefined },
+    } as any;
     patchProps(el, oldProps, newProps);
     expect(el.value).toBe('b');
     expect(el.checked).toBe(false);
@@ -121,7 +136,10 @@ describe('vdom.extra', () => {
   });
 
   it('createElement skips invalid attribute keys and does not throw', () => {
-    const vnode: any = { tag: 'div', props: { attrs: { ['[object Object]']: { x: 1 } } } };
+    const vnode: any = {
+      tag: 'div',
+      props: { attrs: { ['[object Object]']: { x: 1 } } },
+    };
     const el = createElement(vnode as any);
     expect(el instanceof HTMLElement).toBe(true);
   });

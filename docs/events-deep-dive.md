@@ -19,14 +19,15 @@ Use the `useEmit()` hook inside your component function to get the emit function
 
 ```ts
 // In your component function
-component('my-component', ({ title = 'Save' }) => {
+component('my-component', () => {
+  const props = useProps({ title: 'Save' });
   const emit = useEmit();
-  
+
   const handleSave = () => {
-    emit('save', { id: 123, title });
+    emit('save', { id: 123, title: props.title });
   };
-  
-  return html`<button @click="${handleSave}">${title}</button>`;
+
+  return html`<button @click="${handleSave}">${props.title}</button>`;
 });
 ```
 
@@ -45,9 +46,12 @@ How to emit a cancelable event from a component:
 
 ```ts
 // inside component logic
-component('closable-modal', ({ onClose }) => {
+component('closable-modal', () => {
+  const props = useProps({
+    onClose: undefined as unknown as (() => void) | undefined,
+  });
   const emit = useEmit();
-  
+
   const handleCloseRequest = () => {
     // emit a cancelable event and get a boolean result indicating whether the
     // event was *not* defaultPrevented (true == allowed)
@@ -57,9 +61,9 @@ component('closable-modal', ({ onClose }) => {
       return; // abort closing
     }
     // proceed to close the component
-    onClose?.();
+    props.onClose?.();
   };
-  
+
   return html`
     <div class="modal">
       <button @click="${handleCloseRequest}">Close</button>
@@ -71,7 +75,7 @@ component('closable-modal', ({ onClose }) => {
 How a host can prevent the action:
 
 ```js
-const modal = document.querySelector('my-modal');
+const modal = document.querySelector('closable-modal');
 modal.addEventListener('close', (ev) => {
   if (hasUnsavedChanges()) {
     ev.preventDefault(); // veto the close
@@ -80,6 +84,7 @@ modal.addEventListener('close', (ev) => {
 ```
 
 Notes and best practices:
+
 - Call `emit(name, detail, { cancelable: true })` only when the action is
   logically a request that the host might legitimately block. Most events are
   simple notifications and shouldn't be cancelable by default.
@@ -112,26 +117,30 @@ get a reference to the element and add/remove listeners using `addEventListener`
 ```
 
 ```ts
-component('item-list', ({ items = [] }) => {
+component('item-list', () => {
+  const props = useProps({ items: [] as Array<{ name: string }> });
   const emit = useEmit();
-  
-  const handleItemClick = (item) => {
+
+  const handleItemClick = (item: { name: string }) => {
     emit('item-selected', { item });
   };
-  
+
   return html`
-    ${each(items, item => html`
-      <div @click="${() => handleItemClick(item)}">
-        ${item.name}
-      </div>
-    `)}
+    ${each(
+      props.items,
+      (item) => html`
+        <div @click="${() => handleItemClick(item)}">${item.name}</div>
+      `,
+    )}
   `;
 });
 ```
 
 <!-- parent (runtime template) -->
+
 <cer-button @open="${ctx.handleOpen}" />
-```
+
+````
 
 ```ts
 // parent handler
@@ -139,7 +148,7 @@ function handleOpen(ev: Event) {
   // CustomEvent payload is in ev.detail
   if ('detail' in ev) console.log('opened', (ev as CustomEvent).detail);
 }
-```
+````
 
 Recommendation: avoid reusing native event names (like `click`) for semantic payload events; use descriptive names such as `open`, `save`, or `activate`.
 
@@ -160,7 +169,7 @@ Recommendation: avoid reusing native event names (like `click`) for semantic pay
 ## Best practices checklist
 
 - When writing components:
-  - Use `context.emit(name, detail)` to notify outside consumers.
+  - Use `useEmit()` inside your component (or `context.emit(name, detail)` when you have the context) to notify outside consumers.
   - Set `bubbles: true` and `composed: true` when events need to cross shadow boundaries.
 
 - When writing host code or framework adapters:
@@ -168,5 +177,6 @@ Recommendation: avoid reusing native event names (like `click`) for semantic pay
   - When you need closure capture or imperative wiring, use refs and `addEventListener`.
 
 ## See also
+
 - `functional-api.md`, `cross-component-communication.md`, and
   framework integration guides for concrete examples.

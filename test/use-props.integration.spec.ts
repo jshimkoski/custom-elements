@@ -4,11 +4,8 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import '../src/components/test-props';
 
 describe('ce-test-props component (integration)', () => {
-  let el: HTMLElement | null = null;
-
   beforeEach(() => {
     document.body.innerHTML = '';
-    el = null;
   });
 
   it('defines the custom element', () => {

@@ -10,7 +10,16 @@ describe('vdom model directive update event fallback', () => {
 
     const el = document.createElement('div');
 
-    processModelDirective('foo', [], props, attrs, listeners, context, el, 'prop');
+    processModelDirective(
+      'foo',
+      [],
+      props,
+      attrs,
+      listeners,
+      context,
+      el,
+      'prop',
+    );
 
     expect(typeof listeners['update:prop']).toBe('function');
 

@@ -19,20 +19,22 @@ The Virtual DOM (VDOM) is a lightweight, in-memory representation of the real DO
 ## 🧱 VNode Structure
 
 A VNode typically includes:
+
 - `tag`: Element tag name or special type (e.g., text, fragment)
 - `props`: Attributes, event listeners, and bindings
 - `children`: Array of child VNodes
 - `key`: Optional, for efficient list diffing
 
 **Example:**
+
 ```typescript
 const vnode = {
-  tag: "div",
-  props: { class: "container" },
+  tag: 'div',
+  props: { class: 'container' },
   children: [
-    { tag: "span", props: {}, children: ["Hello!"] },
-    { tag: "button", props: { onClick: handleClick }, children: ["Click"] }
-  ]
+    { tag: 'span', props: {}, children: ['Hello!'] },
+    { tag: 'button', props: { onClick: handleClick }, children: ['Click'] },
+  ],
 };
 ```
 
@@ -41,40 +43,47 @@ const vnode = {
 The `VNode` type is exported for TypeScript users who need type-safe virtual DOM manipulation:
 
 ```typescript
-import type { VNode } from '@jasonshimmy/custom-elements-runtime';
+import type { VNode } from '@jasonshimmy/custom-elements-runtime/ssr';
 
 // VNode interface structure
 interface VNode {
-  tag: string;                              // Element tag or special type
-  key?: string;                             // Unique identifier for diffing
-  props?: {                                 // Props object (optional)
-    key?: string;                           // Alternative key location
-    props?: any;                            // Component props
-    attrs?: Record<string, any>;            // Raw attributes
-    directives?: Record<string, {           // Directive metadata
-      value: string;
-      modifiers: string[];
-      arg?: string;
-    }>;
-    ref?: string;                           // String ref name
-    reactiveRef?: any;                      // Reactive state ref
-    isCustomElement?: boolean;              // Compiler hint for custom elements
-    _transitionGroup?: any;                 // Transition group metadata
-    [key: string]: any;                     // Other dynamic props/attributes
+  tag: string; // Element tag or special type
+  key?: string; // Unique identifier for diffing
+  props?: {
+    // Props object (optional)
+    key?: string; // Alternative key location
+    props?: any; // Component props
+    attrs?: Record<string, any>; // Raw attributes
+    directives?: Record<
+      string,
+      {
+        // Directive metadata
+        value: string;
+        modifiers: string[];
+        arg?: string;
+      }
+    >;
+    ref?: string; // String ref name
+    reactiveRef?: any; // Reactive state ref
+    isCustomElement?: boolean; // Compiler hint for custom elements
+    _transitionGroup?: any; // Transition group metadata
+    [key: string]: any; // Other dynamic props/attributes
   };
-  children?: VNode[] | string;              // Child nodes or text content
+  children?: VNode[] | string; // Child nodes or text content
 }
 ```
 
 **Use cases:**
+
 - Custom render functions with proper typing
 - VDOM manipulation utilities
 - Type-safe template composition
 - Building reusable VNode factories
 
 **Example: Type-safe VNode factory**
+
 ```typescript
-import type { VNode } from '@jasonshimmy/custom-elements-runtime';
+import type { VNode } from '@jasonshimmy/custom-elements-runtime/ssr';
 
 function createCard(title: string, content: string): VNode {
   return {
@@ -82,8 +91,8 @@ function createCard(title: string, content: string): VNode {
     props: { class: 'card p-4 rounded shadow' },
     children: [
       { tag: 'h3', props: { class: 'font-bold' }, children: [title] },
-      { tag: 'p', props: {}, children: [content] }
-    ]
+      { tag: 'p', props: {}, children: [content] },
+    ],
   };
 }
 
@@ -101,14 +110,14 @@ component('card-demo', () => {
 3. **Patches** only the changed parts of the real DOM
 4. **Handles directives, bindings, and events**
 
-**Usage:**
-```typescript
-vdomRenderer(
-  shadowRoot,
-  [vnode],
-  context, // optional context object
-  refs     // optional refs object
-);
+Note: `vdomRenderer` is an internal runtime entry exported from `src/lib/runtime/vdom.ts`. It is the low-level renderer used by the runtime. It is not re-exported from the package root; most users should rely on the higher-level `component()` API and the runtime's standard rendering flow instead of calling `vdomRenderer` directly. If you are building low-level integrations or debugging the renderer, you can inspect `src/lib/runtime/vdom.ts` for the implementation and signature.
+
+**Internal usage (for advanced cases / debugging):**
+
+```ts
+// internal runtime usage (not recommended for regular applications)
+// See src/lib/runtime/vdom.ts for the exact signature and behavior.
+vdomRenderer(shadowRoot, [vnode], context, refs);
 ```
 
 ## 🕵️‍♂️ Diffing Algorithm
@@ -142,16 +151,16 @@ vdomRenderer(
 ## 📚 Example: Dynamic List Rendering
 
 ```typescript
-const items = ["Apple", "Banana", "Cherry"];
+const items = ['Apple', 'Banana', 'Cherry'];
 const vnode = {
-  tag: "ul",
+  tag: 'ul',
   props: {},
   children: items.map((item, i) => ({
-    tag: "li",
+    tag: 'li',
     key: item,
     props: {},
-    children: [item]
-  }))
+    children: [item],
+  })),
 };
 vdomRenderer(shadowRoot, [vnode], context);
 ```

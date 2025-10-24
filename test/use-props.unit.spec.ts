@@ -1,5 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { setCurrentComponentContext, clearCurrentComponentContext, useProps } from '../src/lib/runtime/hooks';
+import {
+  setCurrentComponentContext,
+  clearCurrentComponentContext,
+  useProps,
+} from '../src/lib/runtime/hooks';
 import { ref } from '../src/lib/runtime/reactive';
 
 describe('useProps (unit)', () => {

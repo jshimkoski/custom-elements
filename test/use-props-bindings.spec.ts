@@ -28,7 +28,9 @@ describe('useProps bindings (integration)', () => {
     document.body.appendChild(comp);
     await Promise.resolve();
 
-    const count = comp.shadowRoot?.querySelector('.count') as HTMLElement | null;
+    const count = comp.shadowRoot?.querySelector(
+      '.count',
+    ) as HTMLElement | null;
     expect(count).not.toBeNull();
     expect(count?.textContent).toBe('42');
   });

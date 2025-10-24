@@ -50,7 +50,9 @@ describe('template-compiler root-level directives', () => {
 });
 
 describe('template-compiler root-level blocks (using directives)', () => {
-  function isVNode(val: any): val is { tag: string; children?: any; key?: any } {
+  function isVNode(
+    val: any,
+  ): val is { tag: string; children?: any; key?: any } {
     return val && typeof val === 'object' && typeof val.tag === 'string';
   }
 
@@ -59,7 +61,9 @@ describe('template-compiler root-level blocks (using directives)', () => {
     const arr = Array.isArray(output) ? output : [output];
     const anchor = arr.find(isVNode);
     expect(anchor?.tag).toBe('#anchor');
-    const child = Array.isArray(anchor?.children) ? anchor.children.find(isVNode) : undefined;
+    const child = Array.isArray(anchor?.children)
+      ? anchor.children.find(isVNode)
+      : undefined;
     expect(child?.tag).toBe('div');
     expect(child?.children).toBe('When True');
   });
@@ -69,17 +73,25 @@ describe('template-compiler root-level blocks (using directives)', () => {
     const arr = Array.isArray(output) ? output : [output];
     const anchor = arr.find(isVNode);
     expect(anchor?.tag).toBe('#anchor');
-    const child = Array.isArray(anchor?.children) ? anchor.children.find(isVNode) : undefined;
+    const child = Array.isArray(anchor?.children)
+      ? anchor.children.find(isVNode)
+      : undefined;
     expect(child?.tag).toBe(undefined);
     expect(child?.children).toBe(undefined);
   });
 
   it('handles root-level match block', () => {
-    const output = html`${match().when(false, html`<div>Should not show</div>`).when(true, html`<div>Matched</div>`).otherwise(html`<div>Fallback</div>`).done()}`;
+    const output = html`${match()
+      .when(false, html`<div>Should not show</div>`)
+      .when(true, html`<div>Matched</div>`)
+      .otherwise(html`<div>Fallback</div>`)
+      .done()}`;
     const arr = Array.isArray(output) ? output : [output];
     const anchor = arr.find(isVNode);
     expect(anchor?.tag).toBe('#anchor');
-    const child = Array.isArray(anchor?.children) ? anchor.children.find(isVNode) : undefined;
+    const child = Array.isArray(anchor?.children)
+      ? anchor.children.find(isVNode)
+      : undefined;
     expect(child?.tag).toBe('div');
     expect(child?.children).toBe('Matched');
   });
@@ -92,7 +104,9 @@ describe('template-compiler root-level blocks (using directives)', () => {
     arr.forEach((anchor, i) => {
       expect(isVNode(anchor)).toBe(true);
       expect(anchor.tag).toBe('#anchor');
-      const child = Array.isArray(anchor.children) ? anchor.children.find(isVNode) : undefined;
+      const child = Array.isArray(anchor.children)
+        ? anchor.children.find(isVNode)
+        : undefined;
       expect(child?.tag).toBe('div');
       expect(child?.children).toBe(items[i]);
     });
@@ -103,13 +117,14 @@ describe('template-compiler root-level blocks (using directives)', () => {
     const output = html`${each(items, (item) => html`<div>${item}</div>`)}`;
     const arr = Array.isArray(output) ? output : [output];
     expect(arr.length).toBe(1);
-    arr.forEach((anchor, i) => {
+    arr.forEach((anchor) => {
       expect(isVNode(anchor)).toBe(true);
       expect(anchor.tag).toBe('div');
-      const child = Array.isArray(anchor.children) ? anchor.children.find(isVNode) : undefined;
+      const child = Array.isArray(anchor.children)
+        ? anchor.children.find(isVNode)
+        : undefined;
       expect(child?.tag).toBe(undefined);
       expect(child?.children).toBe(undefined);
     });
   });
 });
-

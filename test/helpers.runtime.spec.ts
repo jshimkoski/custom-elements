@@ -29,7 +29,7 @@ describe('helpers: safeSerializeAttr', () => {
 
   it('returns null for objects and arrays', () => {
     expect(safeSerializeAttr({ a: 1 })).toBeNull();
-    expect(safeSerializeAttr([1,2,3])).toBeNull();
+    expect(safeSerializeAttr([1, 2, 3])).toBeNull();
   });
 
   it('handles null/undefined gracefully', () => {
@@ -40,9 +40,12 @@ describe('helpers: safeSerializeAttr', () => {
 
 describe('helpers: isClassLikeAttr', () => {
   it('matches `class`', () => expect(isClassLikeAttr('class')).toBe(true));
-  it('matches camelCase *Class', () => expect(isClassLikeAttr('activeClass')).toBe(true));
-  it('matches kebab-case *-class', () => expect(isClassLikeAttr('active-class')).toBe(true));
-  it('does not match other attributes', () => expect(isClassLikeAttr('data-foo')).toBe(false));
+  it('matches camelCase *Class', () =>
+    expect(isClassLikeAttr('activeClass')).toBe(true));
+  it('matches kebab-case *-class', () =>
+    expect(isClassLikeAttr('active-class')).toBe(true));
+  it('does not match other attributes', () =>
+    expect(isClassLikeAttr('data-foo')).toBe(false));
   it('handles edge-case variants', () => {
     expect(isClassLikeAttr('fooClassBar')).toBe(false);
     expect(isClassLikeAttr('-class')).toBe(true);

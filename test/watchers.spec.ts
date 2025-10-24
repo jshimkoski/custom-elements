@@ -42,13 +42,20 @@ describe('watchers.ts', () => {
       expect(cb).toHaveBeenCalledWith(1, undefined, context);
     });
     it('handles missing watchConfig', () => {
-      expect(() => initWatchers(context, watchers, undefined as any)).not.toThrow();
+      expect(() =>
+        initWatchers(context, watchers, undefined as any),
+      ).not.toThrow();
     });
     it('handles error in immediate callback', () => {
-      const cb = vi.fn(() => { throw new Error('fail'); });
+      const cb = vi.fn(() => {
+        throw new Error('fail');
+      });
       const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
       initWatchers(context, watchers, { foo: [cb, { immediate: true }] });
-      expect(spy).toHaveBeenCalledWith(expect.stringContaining('Error in immediate watcher'), expect.any(Error));
+      expect(spy).toHaveBeenCalledWith(
+        expect.stringContaining('Error in immediate watcher'),
+        expect.any(Error),
+      );
       spy.mockRestore();
     });
   });
@@ -68,35 +75,49 @@ describe('watchers.ts', () => {
       expect(cb).not.toHaveBeenCalled();
     });
     it('handles error in watcher callback', () => {
-      const cb = vi.fn(() => { throw new Error('fail'); });
+      const cb = vi.fn(() => {
+        throw new Error('fail');
+      });
       initWatchers(context, watchers, { foo: cb });
       const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
       triggerWatchers(context, watchers, 'foo', 'b');
-      expect(spy).toHaveBeenCalledWith(expect.stringContaining('Error in watcher'), expect.any(Error));
+      expect(spy).toHaveBeenCalledWith(
+        expect.stringContaining('Error in watcher'),
+        expect.any(Error),
+      );
       spy.mockRestore();
     });
     it('calls deep watcher on nested change', () => {
-  const cb = vi.fn();
-  initWatchers(context, watchers, { 'bar': [cb, { deep: true }] });
-  context.bar = { baz: 2, arr: [1, 2] };
-  triggerWatchers(context, watchers, 'bar.baz', 2);
-  expect(cb).toHaveBeenCalledWith(context.bar, { baz: 1, arr: [1, 2] }, context);
-  expect(watchers.get('bar').oldValue).toEqual({ baz: 2, arr: [1, 2] });
+      const cb = vi.fn();
+      initWatchers(context, watchers, { bar: [cb, { deep: true }] });
+      context.bar = { baz: 2, arr: [1, 2] };
+      triggerWatchers(context, watchers, 'bar.baz', 2);
+      expect(cb).toHaveBeenCalledWith(
+        context.bar,
+        { baz: 1, arr: [1, 2] },
+        context,
+      );
+      expect(watchers.get('bar').oldValue).toEqual({ baz: 2, arr: [1, 2] });
     });
     it('does not call deep watcher if value unchanged', () => {
       const cb = vi.fn();
-      initWatchers(context, watchers, { 'bar': [cb, { deep: true }] });
+      initWatchers(context, watchers, { bar: [cb, { deep: true }] });
       triggerWatchers(context, watchers, 'bar.baz', 1);
       expect(cb).not.toHaveBeenCalled();
     });
     it('handles error in deep watcher callback', () => {
-  const cb = vi.fn(() => { throw new Error('fail'); });
-  initWatchers(context, watchers, { 'bar': [cb, { deep: true }] });
-  context.bar = { baz: 2, arr: [1, 2] };
-  const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
-  triggerWatchers(context, watchers, 'bar.baz', 2);
-  expect(spy).toHaveBeenCalledWith(expect.stringContaining('Error in deep watcher'), expect.any(Error));
-  spy.mockRestore();
+      const cb = vi.fn(() => {
+        throw new Error('fail');
+      });
+      initWatchers(context, watchers, { bar: [cb, { deep: true }] });
+      context.bar = { baz: 2, arr: [1, 2] };
+      const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      triggerWatchers(context, watchers, 'bar.baz', 2);
+      expect(spy).toHaveBeenCalledWith(
+        expect.stringContaining('Error in deep watcher'),
+        expect.any(Error),
+      );
+      spy.mockRestore();
     });
     it('compares arrays deeply', () => {
       const cb = vi.fn();
@@ -108,11 +129,15 @@ describe('watchers.ts', () => {
     });
     it('compares objects deeply', () => {
       const cb = vi.fn();
-      initWatchers(context, watchers, { 'bar': cb });
+      initWatchers(context, watchers, { bar: cb });
       triggerWatchers(context, watchers, 'bar', { baz: 1, arr: [1, 2] });
       expect(cb).not.toHaveBeenCalled();
       triggerWatchers(context, watchers, 'bar', { baz: 2, arr: [1, 2] });
-      expect(cb).toHaveBeenCalledWith({ baz: 2, arr: [1, 2] }, { baz: 1, arr: [1, 2] }, context);
+      expect(cb).toHaveBeenCalledWith(
+        { baz: 2, arr: [1, 2] },
+        { baz: 1, arr: [1, 2] },
+        context,
+      );
     });
   });
 });

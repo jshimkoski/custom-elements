@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { parseQuery, matchRoute, resolveRouteComponent, useRouter, matchRouteSSR } from '../src/lib/router';
+import {
+  parseQuery,
+  matchRoute,
+  resolveRouteComponent,
+  useRouter,
+  matchRouteSSR,
+} from '../src/lib/router';
 
 describe('router.additional', () => {
   it('parseQuery parses search strings and returns empty for empty', () => {
@@ -24,7 +30,7 @@ describe('router.additional', () => {
       load: async () => {
         loaderCalled++;
         return { default: 'lazy-b' };
-      }
+      },
     };
 
     const first = await resolveRouteComponent(asyncRoute);
@@ -34,8 +40,15 @@ describe('router.additional', () => {
     // loader should only have run once because of caching
     expect(loaderCalled).toBe(1);
 
-    const badRoute: any = { path: '/bad', load: async () => { throw new Error('nope'); } };
-    await expect(resolveRouteComponent(badRoute)).rejects.toThrow(/Failed to load component/);
+    const badRoute: any = {
+      path: '/bad',
+      load: async () => {
+        throw new Error('nope');
+      },
+    };
+    await expect(resolveRouteComponent(badRoute)).rejects.toThrow(
+      /Failed to load component/,
+    );
   });
 
   it('useRouter in SSR mode honors initialUrl, beforeEnter/onEnter/afterEnter behaviors', async () => {
@@ -44,8 +57,16 @@ describe('router.additional', () => {
     const savedDoc = (globalThis as any).document;
     try {
       // delete window/document to simulate SSR
-      try { delete (globalThis as any).window; } catch {}
-      try { delete (globalThis as any).document; } catch {}
+      try {
+        delete (globalThis as any).window;
+      } catch {
+        void 0;
+      }
+      try {
+        delete (globalThis as any).document;
+      } catch {
+        void 0;
+      }
 
       let afterCalled = false;
       const routes = [
@@ -53,25 +74,30 @@ describe('router.additional', () => {
         {
           path: '/secret',
           component: 'secret',
-          beforeEnter: async () => false
+          beforeEnter: async () => false,
         },
         {
           path: '/to-login',
           component: 'to-login',
-          beforeEnter: async () => '/login'
+          beforeEnter: async () => '/login',
         },
         {
           path: '/login',
-          component: 'login'
+          component: 'login',
         },
         {
           path: '/after',
           component: 'after',
-          afterEnter: () => { afterCalled = true; }
-        }
+          afterEnter: () => {
+            afterCalled = true;
+          },
+        },
       ];
 
-      const router = useRouter({ routes: routes as any, initialUrl: 'http://localhost/'});
+      const router = useRouter({
+        routes: routes as any,
+        initialUrl: 'http://localhost/',
+      });
       expect(router.getCurrent().path).toBe('/');
 
       // secret should be blocked
@@ -86,7 +112,6 @@ describe('router.additional', () => {
       await router.push('/after');
       expect(router.getCurrent().path).toBe('/after');
       expect(afterCalled).toBe(true);
-
     } finally {
       // restore window/document
       (globalThis as any).window = savedWin;

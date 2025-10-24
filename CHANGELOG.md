@@ -1,38 +1,34 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+
 ## [v1.2.3] - 2025-10-17
 
 - fix: fix router-link rendering issues (2cfb6ea)
 - fix: Preserve class-like attributes for custom elements (compiler + vdom) and add regression test for JIT CSS (fix router-link) (7754f01)
-
 
 ## [v1.2.2] - 2025-10-17
 
 - fix: Preserve class-like attributes for custom elements (compiler + vdom) and add regression test for JIT CSS (fix router-link) (7754f01)
 - fix: improve error handling fix: allow for factory functions for when and match (32d1b2a)
 
-
 ## [v1.2.1] - 2025-10-15
 
 - fix: improve error handling fix: allow for factory functions for when and match (32d1b2a)
 - feat: add entity handling feat: add unsafeHTML function fix: semantic text sizes can now have their line height overridden (8479af9)
 
-
 ## [v1.2.0] - 2025-10-12
 
 - feat: add entity handling feat: add unsafeHTML function fix: semantic text sizes can now have their line height overridden (8479af9)
-- fix: add missing class and style props to TransitionGroup fix: add missing space-x-* and space-y-* utilities (a3751ee)
-
+- fix: add missing class and style props to TransitionGroup fix: add missing space-x-_ and space-y-_ utilities (a3751ee)
 
 ## [v1.1.2] - 2025-10-03
 
-- fix: add missing class and style props to TransitionGroup fix: add missing space-x-* and space-y-* utilities (a3751ee)
+- fix: add missing class and style props to TransitionGroup fix: add missing space-x-_ and space-y-_ utilities (a3751ee)
 - fix: add licenese fix: replace console logs with dev safe versions (771f12d)
 - fix: update readme, functional api toc, and router docs (fe6b866)
 - feat: add transition and transition group support (a3f5e8b)
 - BREAKING CHANGE: remove destructure props in favor of useProps feat: fraction width/heights feat: when directive feat: additional gradient styles fix: performance improvements (d722237)
-
 
 ## [v1.1.1] - 2025-10-03
 
@@ -42,66 +38,55 @@ All notable changes to this project will be documented in this file.
 - BREAKING CHANGE: remove destructure props in favor of useProps feat: fraction width/heights feat: when directive feat: additional gradient styles fix: performance improvements (d722237)
 - feat: add useProps functionality and integration tests (08820c3)
 
-
 ## [v1.1.0] - 2025-09-29
 
 - feat: add useProps functionality and integration tests (08820c3)
 - fix: fix gradient CSS generation and add corresponding tests for milestones component (c83b4fb)
-
 
 ## [v1.0.10] - 2025-09-27
 
 - fix: fix gradient CSS generation and add corresponding tests for milestones component (c83b4fb)
 - fix: Add classes to jit css such as bg-gradient, container querires, scale, rotate (596d4ed)
 
-
 ## [v1.0.9] - 2025-09-27
 
 - fix: Add classes to jit css such as bg-gradient, container querires, scale, rotate (596d4ed)
 - fix: Refactor component and props handling to improve readability and maintainability (3bca420)
-
 
 ## [v1.0.8] - 2025-09-27
 
 - fix: Refactor component and props handling to improve readability and maintainability (3bca420)
 - fix: update font family declarations to use CSS variables (9d02820)
 
-
 ## [v1.0.7] - 2025-09-27
 
 - fix: update font family declarations to use CSS variables (9d02820)
 - fix: expand border, rounded, and grid classes (b1dd1cb)
-
 
 ## [v1.0.6] - 2025-09-21
 
 - fix: expand border, rounded, and grid classes (b1dd1cb)
 - fix: add missing overflow classes (eb6620b)
 
-
 ## [v1.0.5] - 2025-09-21
 
 - fix: add missing overflow classes (eb6620b)
 - fix: add missing border and rounded classes fix: reference border with for border related arbitrary values (bf27851)
-
 
 ## [v1.0.4] - 2025-09-20
 
 - fix: add missing border and rounded classes fix: reference border with for border related arbitrary values (bf27851)
 - fix: add min-h-screen, min-w-screen (135f029)
 
-
 ## [v1.0.3] - 2025-09-19
 
 - fix: add min-h-screen, min-w-screen (135f029)
 - fix: add max-w-screen, max-h-screen (aaa1089)
 
-
 ## [v1.0.2] - 2025-09-19
 
 - fix: add max-w-screen, max-h-screen (aaa1089)
 - fix reactive state issue that prevented refs from working (5a8244c)
-
 
 ## [v1.0.1] - 2025-09-19
 
@@ -119,7 +104,6 @@ All notable changes to this project will be documented in this file.
 - docs: update readme example (7efdd8a)
 - BREAKING CHANGE: migrate to functional API (d62b2ba)
 
-
 ## [v1.0.0] - 2025-09-19
 
 - fix: improve caching, security, and inifinite loop protection docs: update documentation for secure expression evaluator and improve event manager metadata handling (d414d8c)
@@ -136,30 +120,25 @@ All notable changes to this project will be documented in this file.
 - BREAKING CHANGE: migrate to functional API (d62b2ba)
 - - fix: :model, :model:prop, :prop binding - fix: enhance test suite - fix: add enhanced directives - fix: improve dev logging (7d89209)
 
-
 ## [v0.3.1] - 2025-09-09
 
 - - fix: :model, :model:prop, :prop binding - fix: enhance test suite - fix: add enhanced directives - fix: improve dev logging (7d89209)
 - feat: enhance vdom handling for custom elements and attributes (9dc886a)
-
 
 ## [v0.3.0] - 2025-09-07
 
 - feat: enhance vdom handling for custom elements and attributes (9dc886a)
 - fix: enhance styling for baby component and add additional border-radius utilities (fdcf557)
 
-
 ## [v0.2.7] - 2025-09-06
 
 - fix: enhance styling for baby component and add additional border-radius utilities (fdcf557)
 - fix: clean up semantic color naming, add tests, update docs fix: update example components to use semantic colors fix: add missing utility classes fix: allow shadow coloring fix: stroke and fill definition (5ef1fb2)
 
-
 ## [v0.2.6] - 2025-09-06
 
 - fix: clean up semantic color naming, add tests, update docs fix: update example components to use semantic colors fix: add missing utility classes fix: allow shadow coloring fix: stroke and fill definition (5ef1fb2)
 - fix: Remove internal registry note from component documentation for clarity (f51e43b)
-
 
 ## [v0.2.5] - 2025-09-05
 
@@ -167,139 +146,116 @@ All notable changes to this project will be documented in this file.
 - fix: Enhance bindings documentation and examples. Fix typo in success message. (06b0153)
 - feat: Improve :model binding and introduce :model:prop binding. Refactor watchers. Improve typing. Export renderToString for SSR. (12a4759)
 
-
 ## [v0.2.4] - 2025-09-05
 
 - fix: Enhance bindings documentation and examples. Fix typo in success message. (06b0153)
 - feat: Improve :model binding and introduce :model:prop binding. Refactor watchers. Improve typing. Export renderToString for SSR. (12a4759)
 - fix: remove ring utility, add transition utilities and arbitrary helpers, add transparent and currentColor (4cd9e23)
 
-
 ## [v0.2.3] - 2025-09-04
 
 - fix: remove ring utility, add transition utilities and arbitrary helpers, add transparent and currentColor (4cd9e23)
 - fix: enhance component typing and add reserved keys warning (d274d2d)
-
 
 ## [v0.2.2] - 2025-09-04
 
 - fix: enhance component typing and add reserved keys warning (d274d2d)
 - revert: remove event modifiers implementation and related tests (4e0fbae)
 
-
 ## [v0.2.1] - 2025-09-04
 
 - revert: remove event modifiers implementation and related tests (4e0fbae)
 - feat: add support for event modifiers in template syntax and enhance event listener handling (ef86059)
-
 
 ## [v0.2.0] - 2025-09-04
 
 - feat: add support for event modifiers in template syntax and enhance event listener handling (ef86059)
 - refactor: transition to DOM-first events API and remove host-level handler conventions (3b5f98c)
 
-
 ## [v0.1.25] - 2025-09-04
 
 - refactor: transition to DOM-first events API and remove host-level handler conventions (3b5f98c)
 - fix: Introduce host-level event handling with `onHost<Event>` convention (996be52)
-
 
 ## [v0.1.24] - 2025-09-03
 
 - fix: Introduce host-level event handling with `onHost<Event>` convention (996be52)
 - docs: update README and JIT CSS documentation for clarity and consistency (3fb4ad5)
 
-
 ## [v0.1.23] - 2025-09-01
 
 - docs: update README and JIT CSS documentation for clarity and consistency (3fb4ad5)
 - docs(jit-css): update utility documentation and add missing sections (936469a)
-
 
 ## [v0.1.22] - 2025-09-01
 
 - docs(jit-css): update utility documentation and add missing sections (936469a)
 - fix(router): remove unused import from router view tests (209c513)
 
-
 ## [v0.1.21] - 2025-09-01
 
 - fix(router): remove unused import from router view tests (209c513)
 - fix(router): enhance route component resolution and caching (9eaf2a5)
-
 
 ## [v0.1.20] - 2025-09-01
 
 - fix(router): enhance route component resolution and caching (9eaf2a5)
 - fix: enhance class handling for JIT CSS in initRouter function (ac111de)
 
-
 ## [v0.1.19] - 2025-09-01
 
 - fix: enhance class handling for JIT CSS in initRouter function (ac111de)
 - fix: improve handling multiple pseudos and arbitrary values in jitCSS (74b8abb)
-
 
 ## [v0.1.18] - 2025-09-01
 
 - fix: improve handling multiple pseudos and arbitrary values in jitCSS (74b8abb)
 - fix: enhance jitCSS tests for complex variants and dark mode support (4297752)
 
-
 ## [v0.1.17] - 2025-09-01
 
 - fix: enhance jitCSS tests for complex variants and dark mode support (4297752)
 - fix: enhance jitCSS for improved arbitrary variant support (a2f635e)
-
 
 ## [v0.1.16] - 2025-08-31
 
 - fix: enhance jitCSS for improved arbitrary variant support (a2f635e)
 - fix: refine TodoApp styles and fix border color for input field (a0de062)
 
-
 ## [v0.1.15] - 2025-08-31
 
 - fix: refine TodoApp styles and fix border color for input field (a0de062)
 - fix: add z-index and opacity utility classes; enhance CSS utility functionality (09653d3)
-
 
 ## [v0.1.14] - 2025-08-31
 
 - fix: add z-index and opacity utility classes; enhance CSS utility functionality (09653d3)
 - fix: update binding syntax from #model to :model across documentation and examples; enhance clarity and consistency (72bb626)
 
-
 ## [v0.1.13] - 2025-08-31
 
 - fix: update binding syntax from #model to :model across documentation and examples; enhance clarity and consistency (72bb626)
 - fix: enhance bindings documentation and add class binding examples; improve router functionality and tests; add component edge cases and props tests (0a3a1e3)
-
 
 ## [v0.1.12] - 2025-08-31
 
 - fix: enhance bindings documentation and add class binding examples; improve router functionality and tests; add component edge cases and props tests (0a3a1e3)
 - fix: add class binding to router link and button components (4e43813)
 
-
 ## [v0.1.11] - 2025-08-31
 
 - fix: add class binding to router link and button components (4e43813)
 - fix: void elements will no longer break template compilation (89b3da9)
-
 
 ## [v0.1.10] - 2025-08-31
 
 - fix: void elements will no longer break template compilation (89b3da9)
 - fix: enhance bindings and context handling in template compiler and examples (4f9582d)
 
-
 ## [v0.1.9] - 2025-08-31
 
 - fix: enhance bindings and context handling in template compiler and examples (4f9582d)
 - fix: move test files to test directory fix: remove unnecessary import from TodoApp.ts (b496a63)
-
 
 ## [v0.1.8] - 2025-08-30
 
@@ -307,19 +263,16 @@ All notable changes to this project will be documented in this file.
 - fix: update utility classes and spacing handling in JIT CSS fix: improve template parsing to accommodate arbitrary variants (3ecfda7)
 - fix: add arbitrary variant support. docs: update docs to mention arbitrary variants (2077166)
 
-
 ## [v0.1.7] - 2025-08-30
 
 - fix: update utility classes and spacing handling in JIT CSS fix: improve template parsing to accommodate arbitrary variants (3ecfda7)
 - fix: add arbitrary variant support. docs: update docs to mention arbitrary variants (2077166)
 - fix: reference the prop ctx variables in router-link (b174807)
 
-
 ## [v0.1.6] - 2025-08-29
 
 - fix: reference the prop ctx variables in router-link (b174807)
 - fix: add tests for router-view dynamic rendering and improve component rendering logic (8ef94bd)
-
 
 ## [v0.1.5] - 2025-08-29
 
@@ -327,37 +280,31 @@ All notable changes to this project will be documented in this file.
 - fix: update assertion for div existence in minimal example test (81366e6)
 - feat: enhance documentation and improve router functionality with navigation guards (fd39856)
 
-
 ## [v0.1.4] - 2025-08-29
 
 - fix: update assertion for div existence in minimal example test (81366e6)
 - feat: enhance documentation and improve router functionality with navigation guards (fd39856)
 - refactor: refactored the lib directory and how the package is published. docs: added router documentation feat: added router to module export (87902f5)
 
-
 ## [v0.1.3] - 2025-08-28
 
 - refactor: refactored the lib directory and how the package is published. docs: added router documentation feat: added router to module export (87902f5)
 - docs: Updated error handling documentation to clarify default `onError` handler. (67adbc1)
-
 
 ## [v0.1.2] - 2025-08-28
 
 - docs: Updated error handling documentation to clarify default `onError` handler. (67adbc1)
 - docs: update Flex section to include missing flex-col and flex-row utilities (9a969b0)
 
-
 ## [v0.1.1] - 2025-08-27
 
 - docs: update Flex section to include missing flex-col and flex-row utilities (9a969b0)
 - feat: add ref binding support and update documentation docs: clean up docs (019eb7a)
 
-
 ## [v0.1.0] - 2025-08-27
 
 - feat: add ref binding support and update documentation docs: clean up docs (019eb7a)
 - docs: update component and troubleshooting guides to remove styleOptimizations references (6c1b90b)
-
 
 ## [v0.0.17] - 2025-08-26
 
@@ -367,7 +314,6 @@ All notable changes to this project will be documented in this file.
 - docs: update README and style documentation for clarity and consistency feat: enhance MinimalExample component styling and remove minifyCSS option style: add comprehensive base reset styles for improved consistency across elements (fb36db4)
 - refactor: enhance MinimalExample component styling and update utilityMap with new flex and alignment utilities (c5e7add)
 
-
 ## [v0.0.16] - 2025-08-26
 
 - fix: fix broken minimum example cypress test docs: fix docs for directives (6119047)
@@ -376,46 +322,37 @@ All notable changes to this project will be documented in this file.
 - refactor: enhance MinimalExample component styling and update utilityMap with new flex and alignment utilities (c5e7add)
 - fix: correct link to style-utils.ts in JIT CSS documentation (c6adcc7)
 
-
 ## [v0.0.15] - 2025-08-26
 
 - fix: correct link to style-utils.ts in JIT CSS documentation (c6adcc7)
 - fix: update link to style-utils.ts in JIT CSS documentation (77c34ef)
-
 
 ## [v0.0.14] - 2025-08-26
 
 - fix: update link to style-utils.ts in JIT CSS documentation (77c34ef)
 - docs: reorder and number steps in JIT CSS explanation for clarity (1a67bb6)
 
-
 ## [v0.0.13] - 2025-08-26
 
 - docs: reorder and number steps in JIT CSS explanation for clarity (1a67bb6)
 - docs: refine README for clarity and consistency in usage instructions (1a2f2f6)
-
 
 ## [v0.0.12] - 2025-08-26
 
 - docs: refine README for clarity and consistency in usage instructions (1a2f2f6)
 - chore: Bump version to 0.0.11-beta.0 and update documentation (89c6be6)
 
-
 ## [v0.0.11] - 2025-08-26
 
 - chore: Bump version to 0.0.11-beta.0 and update documentation (89c6be6)
-
 
 ## [v0.0.10-beta.3] - 2025-08-26
 
 - No changes since last release
 
-
 ## [v0.0.10-beta.2] - 2025-08-26
 
 - refactor(tests): update runtime config tests to improve clarity and remove unsupported assertions (f078f59)
-
-
 
 ## [v0.0.10-beta.1] - 2025-08-26
 
@@ -460,7 +397,6 @@ All notable changes to this project will be documented in this file.
 - feat: enhance key assignment logic in anchorBlock and vFor functions for improved uniqueness (b5f96f5)
 - feat: Introduce a lightweight, strongly typed functional custom element runtime (9b9e70d)
 
-
 ## [v0.0.10-beta.0] - 2025-08-25
 
 - refactor: update navigate function signature to enhance type safety (2088325)
@@ -504,41 +440,34 @@ All notable changes to this project will be documented in this file.
 - feat: Introduce a lightweight, strongly typed functional custom element runtime (9b9e70d)
 - feat: enhance template helpers with CSS sanitization and update README for usage guidelines (bafc46b)
 
-
 ## [v0.0.10] - 2025-08-17
 
 - feat: enhance template helpers with CSS sanitization and update README for usage guidelines (bafc46b)
 - fix: enhance SSR compatibility with a fallback for ComponentElement (6c9d8fa)
 
-
 ## [v0.0.9] - 2025-08-17
 
 - fix: enhance SSR compatibility with a fallback for ComponentElement (6c9d8fa)
-
 
 ## [v0.0.9-beta.5] - 2025-08-17
 
 - fix: enhance SSR compatibility with a fallback for ComponentElement (6c9d8fa)
 - fix: improve custom elements checks for development mode docs: fix routing header and other minor cleanup (8debd16)
 
-
 ## [v0.0.9-beta.4] - 2025-08-17
 
 - fix: improve custom elements checks for development mode docs: fix routing header and other minor cleanup (8debd16)
 - fix: update event handler binding to include state and API parameters (3f81095)
-
 
 ## [v0.0.9-beta.3] - 2025-08-17
 
 - fix: update event handler binding to include state and API parameters (3f81095)
 - feat: add <router-link> component for declarative navigation and update routing documentation (1443b81)
 
-
 ## [v0.0.9-beta.2] - 2025-08-16
 
 - feat: add <router-link> component for declarative navigation and update routing documentation (1443b81)
 - fix: update router initialization to support async component loading (14cddc9)
-
 
 ## [v0.0.9-beta.1] - 2025-08-16
 
@@ -546,99 +475,79 @@ All notable changes to this project will be documented in this file.
 - test: increase wait time for text input binding in DataModelDemo component (5937797)
 - refactor: remove singleton router instance and integrate into router-view component (80d23be)
 
-
 ## [v0.0.9-beta.0] - 2025-08-16
 
 - test: increase wait time for text input binding in DataModelDemo component (5937797)
 - refactor: remove singleton router instance and integrate into router-view component (80d23be)
 
-
 ## [v0.0.8] - 2025-08-16
 
 - feat: add resolveRouteComponent to Router API exports (2b6bb5a)
 
-
 ## [v0.0.8-beta.0] - 2025-08-16
 
 - feat: add resolveRouteComponent to Router API exports (2b6bb5a)
-
 
 ## [v0.0.7] - 2025-08-16
 
 - fix: increase wait time for text input binding test (c87190e)
 - feat: add support for asynchronous component loading in router (905276f)
 
-
 ## [v0.0.7-beta.0] - 2025-08-16
 
 - fix: increase wait time for text input binding test (c87190e)
 - feat: add support for asynchronous component loading in router (905276f)
 
-
 ## [v0.0.6] - 2025-08-16
 
 - Enhance documentation for Custom Elements Runtime (a21d0d0)
-
 
 ## [v0.0.6-beta.0] - 2025-08-16
 
 - Enhance documentation for Custom Elements Runtime (a21d0d0)
 
-
 ## [v0.0.5] - 2025-08-16
 
 - docs: update documentation for clarity and consistency, including SSR hydration changes and code examples (0025a74)
-
 
 ## [v0.0.5-beta.0] - 2025-08-16
 
 - docs: update documentation for clarity and consistency, including SSR hydration changes and code examples (0025a74)
 
-
 ## [v0.0.4] - 2025-08-16
 
 - feat(router): implement lightweight router with SSR support and `<router-view>` component (fae925b)
-
 
 ## [v0.0.4-beta.0] - 2025-08-16
 
 - feat(router): implement lightweight router with SSR support and `<router-view>` component (fae925b)
 
-
-
-
 ## [v0.0.3] - 2025-08-15
 
 - fix: make state optional for stateless components docs: add examples and documentation for stateless components (fc13ab8)
-
 
 ## [v0.0.3-beta.0] - 2025-08-15
 
 - fix: make state optional for stateless components docs: add examples and documentation for stateless components (fc13ab8)
 
-
 ## [v0.0.2] - 2025-08-15
 
 - No changes since last release
-
 
 ## [v0.0.2-beta.0] - 2025-08-15
 
 - test: add wait for text input binding in DataModelDemo component (73462f0)
 - docs: update README and documentation for dynamic styling and refs usage feat: enhance SimpleTest component with dynamic styling based on state refactor: remove unused ref and on functions from template helpers test: clean up template-helpers tests by removing unnecessary cases (0ff1d4f)
 
-
-
 ## [v0.0.1-beta.6] - 2025-08-15
 
 - test: add wait for text input binding in DataModelDemo component (73462f0)
 - docs: update README and documentation for dynamic styling and refs usage feat: enhance SimpleTest component with dynamic styling based on state refactor: remove unused ref and on functions from template helpers test: clean up template-helpers tests by removing unnecessary cases (0ff1d4f)
 
-
 ## [v0.0.1] - 2025-08-15
+
 - refactor: remove unnecessary global declaration for ImportMeta interface (c4f3464)
 - fix: improve HMR handling in component function and update tsconfig types (f5328c4)
-
 
 ## [v0.0.1-beta.5] - 2025-08-15
 
@@ -646,13 +555,11 @@ All notable changes to this project will be documented in this file.
 - fix: improve HMR handling in component function and update tsconfig types (f5328c4)
 - feat: add dev server setup and Cypress testing to publish workflow (b2c910d)
 
-
 ## [v0.0.1-beta.4] - 2025-08-15
 
 - feat: add dev server setup and Cypress testing to publish workflow (b2c910d)
 - fix: remove unused variable (5722fdd)
 - fix: prevent ssr issue when creating web components docs: add ssr example to framework integration (df77623)
-
 
 ## [v0.0.1-beta.3] - 2025-08-15
 
@@ -660,12 +567,10 @@ All notable changes to this project will be documented in this file.
 - fix: prevent ssr issue when creating web components docs: add ssr example to framework integration (df77623)
 - feat: add export for runtime.d.ts in package.json (16c39d9)
 
-
 ## [v0.0.1-beta.2] - 2025-08-15
 
 - feat: add export for runtime.d.ts in package.json (16c39d9)
 - feat: add types export to package.json for improved TypeScript support (4c91499)
-
 
 ## [v0.0.1-beta.1] - 2025-08-15
 
@@ -715,7 +620,7 @@ All notable changes to this project will be documented in this file.
 - feat: Add DataModelDemo component with various input types and state management (72accd1)
 - remove debug log. Add textarea to todo app just to check it works. update readme (3d7da9e)
 - feat: Refactor example imports and update data binding in SimpleTest and ShoppingCart components (ecfc821)
-- feat: Remove redundant _eventListenerMap from ComponentElement to streamline event binding (815f326)
+- feat: Remove redundant \_eventListenerMap from ComponentElement to streamline event binding (815f326)
 - feat: Update TodoAppCompiled to display newTodo state and enhance event handler binding in runtime (cb0cf04)
 - feat: Enhance patchVNode with improved diagnostics and robust reconciliation for VNodes (2ed9610)
 - feat: Add handling for clearing DOM children when new children are empty in patchVNode (1c72821)
@@ -782,7 +687,6 @@ All notable changes to this project will be documented in this file.
 - feat: Introduce simplified component creation and smart defaults (33ec495)
 - Add support for dark mode in FancyCounter component (f368e43)
 - Implement dynamic styling support and add demo components for state-based styling (8d6b1d7)
-
 
 ## [v0.0.1-beta.0] - 2025-08-15
 
@@ -831,7 +735,7 @@ All notable changes to this project will be documented in this file.
 - feat: Add DataModelDemo component with various input types and state management (72accd1)
 - remove debug log. Add textarea to todo app just to check it works. update readme (3d7da9e)
 - feat: Refactor example imports and update data binding in SimpleTest and ShoppingCart components (ecfc821)
-- feat: Remove redundant _eventListenerMap from ComponentElement to streamline event binding (815f326)
+- feat: Remove redundant \_eventListenerMap from ComponentElement to streamline event binding (815f326)
 - feat: Update TodoAppCompiled to display newTodo state and enhance event handler binding in runtime (cb0cf04)
 - feat: Enhance patchVNode with improved diagnostics and robust reconciliation for VNodes (2ed9610)
 - feat: Add handling for clearing DOM children when new children are empty in patchVNode (1c72821)
@@ -898,6 +802,3 @@ All notable changes to this project will be documented in this file.
 - feat: Introduce simplified component creation and smart defaults (33ec495)
 - Add support for dark mode in FancyCounter component (f368e43)
 - Implement dynamic styling support and add demo components for state-based styling (8d6b1d7)
-
-
-

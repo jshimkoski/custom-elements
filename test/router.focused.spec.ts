@@ -1,5 +1,12 @@
 import { describe, it, expect, vi } from 'vitest';
-import { parseQuery, matchRoute, matchRouteSSR, resolveRouteComponent, useRouter, initRouter } from '../src/lib/router';
+import {
+  parseQuery,
+  matchRoute,
+  matchRouteSSR,
+  resolveRouteComponent,
+  useRouter,
+  initRouter,
+} from '../src/lib/router';
 import * as componentModule from '../src/lib/runtime/component';
 
 describe('router - focused test suite', () => {
@@ -25,15 +32,34 @@ describe('router - focused test suite', () => {
   });
 
   it('resolveRouteComponent: static, async, and errors', async () => {
-    expect(await resolveRouteComponent({ path: '/s', component: 'S' } as any)).toBe('S');
-    expect(await resolveRouteComponent({ path: '/a', load: async () => ({ default: 'A' }) } as any)).toBe('A');
-    await expect(resolveRouteComponent({ path: '/none' } as any)).rejects.toThrow();
-    const bad = { path: '/bad', load: async () => { throw new Error('fail'); } } as any;
-    await expect(resolveRouteComponent(bad)).rejects.toThrow('Failed to load component for route: /bad');
+    expect(
+      await resolveRouteComponent({ path: '/s', component: 'S' } as any),
+    ).toBe('S');
+    expect(
+      await resolveRouteComponent({
+        path: '/a',
+        load: async () => ({ default: 'A' }),
+      } as any),
+    ).toBe('A');
+    await expect(
+      resolveRouteComponent({ path: '/none' } as any),
+    ).rejects.toThrow();
+    const bad = {
+      path: '/bad',
+      load: async () => {
+        throw new Error('fail');
+      },
+    } as any;
+    await expect(resolveRouteComponent(bad)).rejects.toThrow(
+      'Failed to load component for route: /bad',
+    );
   });
 
   it('useRouter SSR: initialUrl and navigation', async () => {
-    const routes = [ { path: '/', component: 'Home' }, { path: '/a', component: 'A' } ];
+    const routes = [
+      { path: '/', component: 'Home' },
+      { path: '/a', component: 'A' },
+    ];
     const router = useRouter({ routes, initialUrl: '/a' } as any);
     expect(router.getCurrent().path).toBe('/a');
     await router.push('/');
@@ -44,7 +70,7 @@ describe('router - focused test suite', () => {
     const routes = [
       { path: '/', component: 'Home' },
       { path: '/protected', component: 'P', beforeEnter: () => false },
-      { path: '/redir', component: 'R', beforeEnter: () => '/' }
+      { path: '/redir', component: 'R', beforeEnter: () => '/' },
     ];
     const router = useRouter({ routes } as any);
     await router.push('/protected');
@@ -57,6 +83,7 @@ describe('router - focused test suite', () => {
     const spy = vi.spyOn(componentModule, 'component');
     const routes = [{ path: '/', component: 'Home' }];
     const r = initRouter({ routes } as any);
+    void r;
     expect(spy).toHaveBeenCalledWith('router-view', expect.any(Function));
     expect(spy).toHaveBeenCalledWith('router-link', expect.any(Function));
     spy.mockRestore();

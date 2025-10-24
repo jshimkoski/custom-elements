@@ -21,17 +21,19 @@ A guide to diagnosing and resolving common issues in the custom elements runtime
 
 ## 🎨 Style Issues
 
-  - Use the `useStyle()` hook to provide component-scoped styles or rely on the runtime's JIT CSS (the renderer runs `jitCSS` on the rendered HTML).
-  - Handle loading/error state inside your component (for example use a `ref` for loading, or use `switchOnPromise` / the async-aware directives) and render conditional templates for feedback.
+- Use the `useStyle()` hook to provide component-scoped styles or rely on the runtime's JIT CSS (the renderer runs `jitCSS` on the rendered HTML).
+- Handle loading/error state inside your component (for example use a `ref` for loading, or use `switchOnPromise` / the async-aware directives) and render conditional templates for feedback.
 - **Unsafe CSS warning:**
   - Avoid `url(javascript:...)`, `<script>`, or `expression()` in styles.
 
 ## 🔗 Event & Binding Problems
 
 - **Events not firing:**
-  - Check for missing reactive dependencies inside your style callback.
-  - Use `@event` syntax in templates (e.g., `@click`).
-  - Ensure event handler is a function accessible in the component scope.
+- **Events not firing:**
+- Check that the handler is correctly bound and accessible in the component scope (no accidental shadowing or missing closure capture).
+- Ensure the element is mounted before wiring listeners when using imperative `addEventListener`.
+- Use `@event` syntax in templates (e.g., `@click`) or attach listeners via refs + `addEventListener` for cross-framework compatibility.
+- Ensure the event handler is a function and not accidentally undefined.
 - **Two-way binding not working:**
   - Check that state property exists and is reactive.
   - Use the provided hook helpers inside your component render: `useOnConnected`, `useOnDisconnected`, `useOnAttributeChanged`, `useOnError`, and `useStyle` (see `src/lib/runtime/hooks.ts`).
@@ -49,11 +51,11 @@ A guide to diagnosing and resolving common issues in the custom elements runtime
 
 ## 🧱 Template & Directives
 
-  - Use supported built-in directives and helpers such as `when`, `each`, `match`, `model`, `bind`, `show`, `class`, `style`, and `ref` as well as enhanced helpers like `switchOnPromise` / `switchOnPromise` and the `each*` helpers in `src/lib/directive-enhancements.ts`.
-  - Ensure directive syntax matches documentation and remember that some async/collection helpers return anchor blocks (stable boundaries) which affect keying and patch behavior.
+- Use supported built-in directives and helpers such as `when`, `each`, `match`, `model`, `bind`, `show`, `class`, `style`, and `ref` as well as enhanced helpers like `switchOnPromise` and the collection helpers in `src/lib/directive-enhancements.ts`.
+- Ensure directive syntax matches documentation and remember that some async/collection helpers return anchor blocks (stable boundaries) which affect keying and patch behavior.
 
-  - Use supported directives (`when`, `each`, `match`).
-  - Handle loading and error state in your component (for example using `ref` or `switchOnPromise`), and log errors in async code.
+- Use supported directives (`when`, `each`, `match`).
+- Handle loading and error state in your component (for example using `ref` or `switchOnPromise`), and log errors in async code.
 - **Template errors:**
   - Use error boundaries (`errorTemplate`, `errorFallback`) for robust handling.
 

@@ -3,12 +3,14 @@ import { JSDOM } from 'jsdom';
 
 /**
  * 🚀 Main Application Focused Test Suite
- * 
+ *
  * Simplified tests that focus on the core functionality without module caching issues
  */
 
 // Setup DOM environment
-const dom = new JSDOM('<!DOCTYPE html><html><body><div id="app"></div></body></html>');
+const dom = new JSDOM(
+  '<!DOCTYPE html><html><body><div id="app"></div></body></html>',
+);
 global.window = dom.window as any;
 global.document = dom.window.document;
 global.customElements = dom.window.customElements;
@@ -25,7 +27,7 @@ describe('🚀 Main Application Core Tests', () => {
       app.id = 'app';
       document.body.appendChild(app);
     }
-    
+
     // Import main.ts only once, after DOM is set up
     if (!mainImported) {
       await import('../src/main');
@@ -42,8 +44,8 @@ describe('🚀 Main Application Core Tests', () => {
 
     it('should populate app container with demo content', async () => {
       // Wait for any async operations
-      await new Promise(resolve => setTimeout(resolve, 50));
-      
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
       const app = document.getElementById('app');
       expect(app?.innerHTML.length).toBeGreaterThan(0);
     });
@@ -66,59 +68,59 @@ describe('🚀 Main Application Core Tests', () => {
       // Check that the main app components are registered
       expect(customElements.get('simple-switch')).toBeDefined();
       expect(customElements.get('cer-switch')).toBeDefined();
-      
+
       // These should be defined if the component files loaded
       const hasMainComponents = [
         'design-system',
-        'minimal-example', 
+        'minimal-example',
         'switch-test',
-        'my-greeting'
-      ].some(name => customElements.get(name));
-      
+        'my-greeting',
+      ].some((name) => customElements.get(name));
+
       expect(hasMainComponents).toBe(true);
     });
   });
 
   describe('🎨 App Content Rendering', () => {
     it('should render demo components in app container', async () => {
-      await new Promise(resolve => setTimeout(resolve, 50));
-      
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
       const app = document.getElementById('app');
       expect(app?.innerHTML).toBeTruthy();
       expect(app?.innerHTML.length).toBeGreaterThan(100);
     });
 
     it('should contain expected demo components', async () => {
-      await new Promise(resolve => setTimeout(resolve, 50));
-      
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
       const app = document.getElementById('app');
       const content = app?.innerHTML || '';
-      
+
       // Should contain the main demo components
       const expectedComponents = [
         'switch-test',
-        'design-system-test', 
+        'design-system-test',
         'design-system',
         'minimal-example',
         'shopping-cart',
         'todo-app',
         'form-input-validation',
-        'my-greeting'
+        'my-greeting',
       ];
-      
-      const hasExpectedComponents = expectedComponents.some(component => 
-        content.includes(component)
+
+      const hasExpectedComponents = expectedComponents.some((component) =>
+        content.includes(component),
       );
-      
+
       expect(hasExpectedComponents).toBe(true);
     });
 
     it('should have proper HTML structure', async () => {
-      await new Promise(resolve => setTimeout(resolve, 50));
-      
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
       const app = document.getElementById('app');
       const content = app?.innerHTML || '';
-      
+
       expect(content).toContain('<div');
       expect(content).toContain('</div>');
       expect(content).not.toContain('undefined');
@@ -132,7 +134,7 @@ describe('🚀 Main Application Core Tests', () => {
       const testInput = document.createElement('ds-input');
       expect(testInput).toBeDefined();
       expect(testInput.tagName.toLowerCase()).toBe('ds-input');
-      
+
       const testButton = document.createElement('ds-button');
       expect(testButton).toBeDefined();
       expect(testButton.tagName.toLowerCase()).toBe('ds-button');
@@ -140,28 +142,27 @@ describe('🚀 Main Application Core Tests', () => {
 
     it('should not throw errors during operation', async () => {
       let errorThrown = false;
-      
+
       const originalError = console.error;
       console.error = (...args: any[]) => {
         errorThrown = true;
         originalError(...args);
       };
-      
+
       try {
         // Wait for operations to complete
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
         // Try to access app content
         const app = document.getElementById('app');
         const content = app?.innerHTML;
         expect(typeof content).toBe('string');
-        
-      } catch (error) {
+      } catch {
         errorThrown = true;
       } finally {
         console.error = originalError;
       }
-      
+
       expect(errorThrown).toBe(false);
     });
 
@@ -169,9 +170,9 @@ describe('🚀 Main Application Core Tests', () => {
       const app = document.getElementById('app');
       const originalId = app?.id;
       const originalTagName = app?.tagName;
-      
-      await new Promise(resolve => setTimeout(resolve, 50));
-      
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
       // App element should still be the same element
       const appAfter = document.getElementById('app');
       expect(appAfter).toBeDefined();
@@ -183,11 +184,18 @@ describe('🚀 Main Application Core Tests', () => {
   describe('🔄 Component Lifecycle', () => {
     it('should have all expected design system components available', () => {
       const dsComponents = [
-        'ds-input', 'ds-textarea', 'ds-checkbox', 'ds-select',
-        'ds-radio-group', 'ds-button', 'ds-progress', 'ds-range', 'ds-number'
+        'ds-input',
+        'ds-textarea',
+        'ds-checkbox',
+        'ds-select',
+        'ds-radio-group',
+        'ds-button',
+        'ds-progress',
+        'ds-range',
+        'ds-number',
       ];
-      
-      dsComponents.forEach(componentName => {
+
+      dsComponents.forEach((componentName) => {
         expect(customElements.get(componentName)).toBeDefined();
       });
     });
@@ -196,7 +204,7 @@ describe('🚀 Main Application Core Tests', () => {
       // Create and append a component to test it works
       const container = document.createElement('div');
       container.innerHTML = '<ds-button>Test Button</ds-button>';
-      
+
       const button = container.querySelector('ds-button');
       expect(button).toBeDefined();
       expect(button?.tagName.toLowerCase()).toBe('ds-button');
@@ -208,7 +216,7 @@ describe('🚀 Main Application Core Tests', () => {
       // Main components should be available
       expect(customElements.get('simple-switch')).toBeDefined();
       expect(customElements.get('cer-switch')).toBeDefined();
-      
+
       // Design system should be available
       expect(customElements.get('ds-input')).toBeDefined();
       expect(customElements.get('ds-button')).toBeDefined();
@@ -219,7 +227,7 @@ describe('🚀 Main Application Core Tests', () => {
       expect(global.window).toBeDefined();
       expect(global.document).toBeDefined();
       expect(global.customElements).toBeDefined();
-      
+
       // Should not have unexpected globals
       expect((global as any).React).toBeUndefined();
       expect((global as any).Vue).toBeUndefined();
@@ -228,48 +236,47 @@ describe('🚀 Main Application Core Tests', () => {
 
   describe('🎯 Specific Feature Tests', () => {
     it('should render switch components with proper model binding', async () => {
-      await new Promise(resolve => setTimeout(resolve, 50));
-      
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
       const app = document.getElementById('app');
       const content = app?.innerHTML || '';
-      
+
       // Switch test component should be present
       expect(content).toContain('switch-test');
     });
 
     it('should include design system demo', async () => {
-      await new Promise(resolve => setTimeout(resolve, 50));
-      
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
       const app = document.getElementById('app');
       const content = app?.innerHTML || '';
-      
+
       // Design system components should be demonstrated
-      const hasDesignSystemDemo = [
-        'design-system-test',
-        'design-system'
-      ].some(component => content.includes(component));
-      
+      const hasDesignSystemDemo = ['design-system-test', 'design-system'].some(
+        (component) => content.includes(component),
+      );
+
       expect(hasDesignSystemDemo).toBe(true);
     });
 
     it('should demonstrate various example components', async () => {
-      await new Promise(resolve => setTimeout(resolve, 50));
-      
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
       const app = document.getElementById('app');
       const content = app?.innerHTML || '';
-      
+
       // Example components should be present
       const exampleComponents = [
         'minimal-example',
-        'shopping-cart', 
+        'shopping-cart',
         'todo-app',
-        'form-input-validation'
+        'form-input-validation',
       ];
-      
-      const foundComponents = exampleComponents.filter(component => 
-        content.includes(component)
+
+      const foundComponents = exampleComponents.filter((component) =>
+        content.includes(component),
       );
-      
+
       // Should have at least some example components
       expect(foundComponents.length).toBeGreaterThan(0);
     });

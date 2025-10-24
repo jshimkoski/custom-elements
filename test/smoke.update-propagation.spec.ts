@@ -12,7 +12,10 @@ describe('smoke: update propagation from child to parent', () => {
     component('parent-prop', () => {
       const value = ref('one');
       console.log('parent-prop state value:', value.value);
-      return html`<prop-child model-value="${value.value}" @update:model-value="${(e: CustomEvent) => value.value = e.detail}" />`;
+      return html`<prop-child
+        model-value="${value.value}"
+        @update:model-value="${(e: CustomEvent) => (value.value = e.detail)}"
+      />`;
     });
 
     const el = document.createElement('parent-prop');
@@ -20,18 +23,30 @@ describe('smoke: update propagation from child to parent', () => {
     // allow lifecycle to complete
     await new Promise((r) => setTimeout(r, 100));
 
-    const child = el.shadowRoot?.querySelector('prop-child') as HTMLElement | null;
+    const child = el.shadowRoot?.querySelector(
+      'prop-child',
+    ) as HTMLElement | null;
     expect(child).toBeTruthy();
-    const inner = child?.shadowRoot?.querySelector('#val') as HTMLElement | null;
+    const inner = child?.shadowRoot?.querySelector(
+      '#val',
+    ) as HTMLElement | null;
     expect(inner).toBeTruthy();
     expect(inner?.textContent).toBe('one');
 
     // Dispatch update event from child
-    child?.dispatchEvent(new CustomEvent('update:model-value', { detail: 'two', bubbles: true, composed: true }));
+    child?.dispatchEvent(
+      new CustomEvent('update:model-value', {
+        detail: 'two',
+        bubbles: true,
+        composed: true,
+      }),
+    );
     await new Promise((r) => setTimeout(r, 30));
 
     // After propagation, child should reflect new value
-    const innerAfter = child?.shadowRoot?.querySelector('#val') as HTMLElement | null;
+    const innerAfter = child?.shadowRoot?.querySelector(
+      '#val',
+    ) as HTMLElement | null;
     expect(innerAfter?.textContent).toBe('two');
 
     document.body.removeChild(el);
@@ -45,23 +60,36 @@ describe('smoke: update propagation from child to parent', () => {
 
     component('parent-arg', () => {
       const value = ref(5);
-      return html`<arg-child :beta="${value.value}" @update:beta="${(e: CustomEvent) => value.value = e.detail}" />`;
+      return html`<arg-child
+        :beta="${value.value}"
+        @update:beta="${(e: CustomEvent) => (value.value = e.detail)}"
+      />`;
     });
 
     const el = document.createElement('parent-arg');
     document.body.appendChild(el);
     await new Promise((r) => setTimeout(r, 10));
 
-    const child = el.shadowRoot?.querySelector('arg-child') as HTMLElement | null;
+    const child = el.shadowRoot?.querySelector(
+      'arg-child',
+    ) as HTMLElement | null;
     expect(child).toBeTruthy();
     const inner = child?.shadowRoot?.querySelector('#v') as HTMLElement | null;
     expect(inner).toBeTruthy();
     expect(inner?.textContent).toBe('5');
 
-    child?.dispatchEvent(new CustomEvent('update:beta', { detail: 9, bubbles: true, composed: true }));
+    child?.dispatchEvent(
+      new CustomEvent('update:beta', {
+        detail: 9,
+        bubbles: true,
+        composed: true,
+      }),
+    );
     await new Promise((r) => setTimeout(r, 10));
 
-    const innerAfter = child?.shadowRoot?.querySelector('#v') as HTMLElement | null;
+    const innerAfter = child?.shadowRoot?.querySelector(
+      '#v',
+    ) as HTMLElement | null;
     expect(innerAfter?.textContent).toBe('9');
 
     document.body.removeChild(el);

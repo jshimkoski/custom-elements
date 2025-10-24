@@ -25,11 +25,13 @@ Hot Module Replacement (HMR) allows you to update modules in a running applicati
 5. **Re-render:** Each instance calls its internal render method to reflect changes instantly
 
 **Example:**
+
 ```typescript
 if (
   typeof import.meta !== 'undefined' &&
   (import.meta as any).hot &&
-  import.meta && import.meta.hot
+  import.meta &&
+  import.meta.hot
 ) {
   import.meta.hot.accept((newModule) => {
     // Update internal registry and refresh live instances. The registry is
@@ -43,13 +45,13 @@ if (
 ## 🧩 HMR-Friendly Component Example
 
 ```typescript
-component("hmr-demo", ({ initialCount = 0 }, emit) => {
+component('hmr-demo', ({ initialCount = 0 }, emit) => {
   const count = ref(initialCount);
-  
+
   const handleClick = () => {
     count.value++;
   };
-  
+
   return html`<button @click="${handleClick}">${count.value}</button>`;
 });
 ```

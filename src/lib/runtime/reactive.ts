@@ -1,6 +1,6 @@
-import { scheduleDOMUpdate } from "./scheduler";
-import { ProxyOptimizer } from "./reactive-proxy-cache";
-import { devWarn } from "./logger";
+import { scheduleDOMUpdate } from './scheduler';
+import { ProxyOptimizer } from './reactive-proxy-cache';
+import { devWarn } from './logger';
 
 /**
  * Global reactive system for tracking dependencies and triggering updates
@@ -8,14 +8,17 @@ import { devWarn } from "./logger";
 class ReactiveSystem {
   private currentComponent: string | null = null;
   // Consolidated component data: stores dependencies, render function, state index, and last warning time
-  private componentData = new Map<string, {
-    dependencies: Set<ReactiveState<any>>;
-    renderFn: () => void;
-    stateIndex: number;
-    lastWarnTime: number;
-  }>();
+  private componentData = new Map<
+    string,
+    {
+      dependencies: Set<ReactiveState<unknown>>;
+      renderFn: () => void;
+      stateIndex: number;
+      lastWarnTime: number;
+    }
+  >();
   // Flat storage: compound key `${componentId}:${stateIndex}` -> ReactiveState
-  private stateStorage = new Map<string, ReactiveState<any>>();
+  private stateStorage = new Map<string, ReactiveState<unknown>>();
   private trackingDisabled = false;
 
   /**
@@ -73,11 +76,11 @@ class ReactiveSystem {
     if (!this.currentComponent) return true;
     const data = this.componentData.get(this.currentComponent);
     if (!data) return true;
-    
+
     const now = Date.now();
     const THROTTLE_MS = 1000; // 1 second per component
     if (now - data.lastWarnTime < THROTTLE_MS) return false;
-    
+
     data.lastWarnTime = now;
     return true;
   }
@@ -102,7 +105,7 @@ class ReactiveSystem {
     if (!this.currentComponent) {
       return new ReactiveState(initialValue);
     }
-    
+
     const data = this.componentData.get(this.currentComponent);
     if (!data) {
       return new ReactiveState(initialValue);
@@ -110,21 +113,21 @@ class ReactiveSystem {
 
     const stateKey = `${this.currentComponent}:${data.stateIndex++}`;
     let state = this.stateStorage.get(stateKey) as ReactiveState<T> | undefined;
-    
+
     if (!state) {
       state = new ReactiveState(initialValue);
       this.stateStorage.set(stateKey, state);
     }
-    
+
     return state;
   }
 
   /**
    * Track a dependency for the current component
    */
-  trackDependency(state: ReactiveState<any>): void {
+  trackDependency(state: ReactiveState<unknown>): void {
     if (this.trackingDisabled || !this.currentComponent) return;
-    
+
     const data = this.componentData.get(this.currentComponent);
     if (data) {
       data.dependencies.add(state);
@@ -135,7 +138,7 @@ class ReactiveSystem {
   /**
    * Trigger updates for all components that depend on a state
    */
-  triggerUpdate(state: ReactiveState<any>): void {
+  triggerUpdate(state: ReactiveState<unknown>): void {
     const deps = state.getDependents();
     for (const componentId of deps) {
       const data = this.componentData.get(componentId);
@@ -186,8 +189,12 @@ export class ReactiveState<T> {
     try {
       // Use a global symbol key to make it resilient across realms/bundles
       const key = Symbol.for('@cer/ReactiveState');
-      Object.defineProperty(this, key, { value: true, enumerable: false, configurable: false });
-    } catch (e) {
+      Object.defineProperty(this, key, {
+        value: true,
+        enumerable: false,
+        configurable: false,
+      });
+    } catch {
       // ignore if Symbol.for or defineProperty fails in exotic runtimes
     }
   }
@@ -204,13 +211,13 @@ export class ReactiveState<T> {
       if (reactiveSystem.shouldEmitRenderWarning()) {
         devWarn(
           '🚨 State modification detected during render! This can cause infinite loops.\n' +
-          '  • Move state updates to event handlers\n' +
-          '  • Use useEffect/watch for side effects\n' +
-          '  • Ensure computed properties don\'t modify state'
+            '  • Move state updates to event handlers\n' +
+            '  • Use useEffect/watch for side effects\n' +
+            "  • Ensure computed properties don't modify state",
         );
       }
     }
-    
+
     this._value = this.makeReactive(newValue);
     // Trigger updates for all dependent components
     reactiveSystem.triggerUpdate(this);
@@ -228,22 +235,26 @@ export class ReactiveState<T> {
     return this.dependents;
   }
 
-  private makeReactive(obj: T): T {
+  private makeReactive<U>(obj: U): U {
     if (obj === null || typeof obj !== 'object') {
       return obj;
     }
 
     // Skip reactivity for DOM nodes - they should not be made reactive
-    if (obj instanceof Node || obj instanceof Element || obj instanceof HTMLElement) {
+    if (
+      (obj as unknown) instanceof Node ||
+      (obj as unknown) instanceof Element ||
+      (obj as unknown) instanceof HTMLElement
+    ) {
       return obj;
     }
 
     // Use optimized proxy creation
     return ProxyOptimizer.createReactiveProxy(
-      obj,
+      obj as unknown as object,
       () => reactiveSystem.triggerUpdate(this),
-      (value: any) => this.makeReactive(value)
-    );
+      (value: unknown) => this.makeReactive(value),
+    ) as U;
   }
 }
 
@@ -251,40 +262,47 @@ export class ReactiveState<T> {
  * Create reactive state that automatically triggers component re-renders
  * when accessed during render and modified afterwards.
  * Defaults to null if no initial value is provided (Vue-style ref).
- * 
+ *
  * @example
  * ```ts
  * const counter = ref(0);
  * const user = ref({ name: 'John', age: 30 });
  * const emptyRef = ref(); // defaults to null
- * 
+ *
  * // Usage in component
  * counter.value++; // triggers re-render
  * user.value.name = 'Jane'; // triggers re-render
  * console.log(emptyRef.value); // null
  * ```
  */
-export function ref<T = null>(initialValue?: T): ReactiveState<T extends undefined ? null : T> {
-  return reactiveSystem.getOrCreateState(initialValue === undefined ? null as any : initialValue);
+export function ref(): ReactiveState<null>;
+export function ref<T>(initialValue: T): ReactiveState<T>;
+export function ref<T>(initialValue?: T): ReactiveState<T | null> {
+  // Ensure the created state has the union type T | null and explicitly
+  // tell getOrCreateState the correct generic to avoid conditional-type recursion.
+  return reactiveSystem.getOrCreateState<T | null>(
+    (initialValue === undefined ? null : (initialValue as T)) as T | null,
+  );
 }
 
 /**
  * Type guard to detect ReactiveState instances in a robust way that works
  * across bundlers, minifiers, and multiple package copies.
  */
-export function isReactiveState(v: any): v is ReactiveState<any> {
+export function isReactiveState(v: unknown): v is ReactiveState<unknown> {
   if (!v || typeof v !== 'object') return false;
   try {
     const key = Symbol.for('@cer/ReactiveState');
-    return !!v[key];
-  } catch (e) {
+    // Safely check for the presence of the symbol-keyed property without indexing with a unique symbol
+    return Object.prototype.hasOwnProperty.call(v, key);
+  } catch {
     return false;
   }
 }
 
 /**
  * Create computed state that derives from other reactive state
- * 
+ *
  * @example
  * ```ts
  * const firstName = ref('John');
@@ -294,20 +312,20 @@ export function isReactiveState(v: any): v is ReactiveState<any> {
  */
 export function computed<T>(fn: () => T): { readonly value: T } {
   const computedState = new ReactiveState(fn());
-  
+
   // We need to track dependencies when the computed function runs
   // For now, we'll re-evaluate on every access (can be optimized later)
   return {
     get value(): T {
-      reactiveSystem.trackDependency(computedState as any);
+      reactiveSystem.trackDependency(computedState as ReactiveState<unknown>);
       return fn();
-    }
+    },
   };
 }
 
 /**
  * Create a watcher that runs when dependencies change
- * 
+ *
  * @example
  * ```ts
  * const count = ref(0);
@@ -319,22 +337,22 @@ export function computed<T>(fn: () => T): { readonly value: T } {
 export function watch<T>(
   source: () => T,
   callback: (newValue: T, oldValue: T) => void,
-  options: { immediate?: boolean } = {}
+  options: { immediate?: boolean } = {},
 ): () => void {
   let oldValue = source();
-  
+
   if (options.immediate) {
     callback(oldValue, oldValue);
   }
 
   // Create a dummy component to track dependencies
   const watcherId = `watch-${Math.random().toString(36).substr(2, 9)}`;
-  
+
   const updateWatcher = () => {
     reactiveSystem.setCurrentComponent(watcherId, updateWatcher);
     const newValue = source();
     reactiveSystem.clearCurrentComponent();
-    
+
     if (newValue !== oldValue) {
       callback(newValue, oldValue);
       oldValue = newValue;

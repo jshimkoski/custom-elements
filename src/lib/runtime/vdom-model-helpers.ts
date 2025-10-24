@@ -9,12 +9,15 @@ import {
   toKebab,
   safe,
   safeSerializeAttr,
-} from "./helpers";
+} from './helpers';
 
 /**
  * Check if two values have changed, handling arrays specially
  */
-export function hasValueChanged(newValue: any, currentValue: any): boolean {
+export function hasValueChanged(
+  newValue: unknown,
+  currentValue: unknown,
+): boolean {
   if (Array.isArray(newValue) && Array.isArray(currentValue)) {
     return (
       JSON.stringify([...newValue].sort()) !==
@@ -29,24 +32,25 @@ export function hasValueChanged(newValue: any, currentValue: any): boolean {
  */
 export function updateStateValue(
   isReactive: boolean,
-  value: any,
-  newValue: any,
-  context: any,
-  arg?: string
+  value: unknown,
+  newValue: unknown,
+  context: Record<string, unknown>,
+  arg?: string,
 ): void {
   if (isReactive) {
-    if (arg && typeof value.value === "object" && value.value !== null) {
+    const unwrapped = (value as { value?: unknown }).value;
+    if (arg && typeof unwrapped === 'object' && unwrapped !== null) {
       // For :model:prop, update the specific property
-      const updated = { ...value.value };
-      updated[arg] = newValue;
-      value.value = updated;
+      const updated = { ...(unwrapped as Record<string, unknown>) };
+      (updated as Record<string, unknown>)[arg] = newValue;
+      (value as { value?: unknown }).value = updated as unknown;
     } else {
       // For plain :model, update the entire value
-      value.value = newValue;
+      (value as { value?: unknown }).value = newValue;
     }
   } else {
     // Fallback to string-based update (legacy config API)
-    const actualState = context._state || context;
+    const actualState = (context._state || context) as Record<string, unknown>;
     setNestedValue(actualState, value as string, newValue);
   }
 }
@@ -55,28 +59,28 @@ export function updateStateValue(
  * Trigger render and watchers after state update
  */
 export function triggerStateUpdate(
-  context: any,
+  context: Record<string, unknown>,
   isReactive: boolean,
-  value: any,
-  newValue: any
+  value: unknown,
+  newValue: unknown,
 ): void {
-  if (context._requestRender) {
+  if (typeof context._requestRender === 'function') {
     context._requestRender();
   }
 
-  if (context._triggerWatchers) {
-    const watchKey = isReactive ? "reactiveState" : (value as string);
+  if (typeof context._triggerWatchers === 'function') {
+    const watchKey = isReactive ? 'reactiveState' : (value as string);
     context._triggerWatchers(watchKey, newValue);
   }
 }
 
 /**
- * Emit custom update events (both kebab-case and camelCase)
+ * Emit custom update events for model binding
  */
 export function emitUpdateEvents(
   target: HTMLElement,
   propName: string,
-  newValue: any
+  newValue: unknown,
 ): void {
   const customEventNameKebab = `update:${toKebab(propName)}`;
   const customEventNameCamel = `update:${propName}`;
@@ -84,13 +88,13 @@ export function emitUpdateEvents(
   const customEventKebab = new CustomEvent(customEventNameKebab, {
     detail: newValue,
     bubbles: true,
-    composed: true,
+    cancelable: true,
   });
 
   const customEventCamel = new CustomEvent(customEventNameCamel, {
     detail: newValue,
     bubbles: true,
-    composed: true,
+    cancelable: true,
   });
 
   target.dispatchEvent(customEventKebab);
@@ -101,45 +105,51 @@ export function emitUpdateEvents(
  * Update element properties and attributes to sync with state
  */
 export function syncElementWithState(
-  target: any,
+  target: HTMLElement | Record<string, unknown>,
   propName: string,
-  propValue: any,
-  isReactive: boolean
+  propValue: unknown,
+  isReactive: boolean,
 ): void {
   const propToSet = isReactive ? propValue : propValue;
 
   // Set property
   safe(() => {
-    target[propName] = propToSet;
-  });
-
-  // Sync attributes for primitive/boolean values
-  safe(() => {
-    const attrName = toKebab(propName);
-    if (typeof propToSet === "boolean") {
-      const serialized = safeSerializeAttr(propToSet);
-      if (serialized !== null) target.setAttribute(attrName, serialized);
-      else target.removeAttribute?.(attrName);
-    } else if (
-      propToSet != null &&
-      (typeof propToSet === "string" || typeof propToSet === "number")
-    ) {
-      target.setAttribute(attrName, String(propToSet));
+    if (typeof (target as HTMLElement).setAttribute === 'function') {
+      // HTMLElement-like
+      try {
+        (target as unknown as Record<string, unknown>)[propName] = propToSet;
+      } catch {
+        // ignore property set failures
+      }
     } else {
-      // For anything else, attempt safe serialization and only set when safe
-      const serialized = safeSerializeAttr(propToSet);
-      if (serialized !== null) target.setAttribute(attrName, serialized);
-      else target.removeAttribute?.(attrName);
+      // Plain record
+      (target as Record<string, unknown>)[propName] = propToSet;
     }
   });
 
-  // Trigger component's internal handling
-  safe(() => {
-    target._applyProps?.(target._cfg);
-  });
-  safe(() => {
-    target._requestRender?.();
-  });
+  // Sync attributes for primitive/boolean values
+  if (
+    propToSet === null ||
+    propToSet === undefined ||
+    typeof propToSet === 'string' ||
+    typeof propToSet === 'number' ||
+    typeof propToSet === 'boolean'
+  ) {
+    const serialized = safeSerializeAttr(propToSet);
+    if (serialized !== null) {
+      safe(() => {
+        if (typeof (target as HTMLElement).setAttribute === 'function') {
+          (target as HTMLElement).setAttribute(toKebab(propName), serialized);
+        }
+      });
+    } else {
+      safe(() => {
+        if (typeof (target as HTMLElement).removeAttribute === 'function') {
+          (target as HTMLElement).removeAttribute(toKebab(propName));
+        }
+      });
+    }
+  }
 }
 
 /**
@@ -147,17 +157,18 @@ export function syncElementWithState(
  */
 export function getCurrentStateValue(
   isReactive: boolean,
-  value: any,
-  context: any,
-  arg?: string
-): any {
+  value: unknown,
+  context: Record<string, unknown>,
+  arg?: string,
+): unknown {
   if (isReactive) {
-    const unwrapped = value.value;
-    if (arg && typeof unwrapped === "object" && unwrapped !== null) {
-      return unwrapped[arg];
+    const unwrapped = (value as { value?: unknown }).value;
+    if (arg && typeof unwrapped === 'object' && unwrapped !== null) {
+      return (unwrapped as Record<string, unknown>)[arg];
     }
     return unwrapped;
+  } else {
+    const actualState = (context._state || context) as Record<string, unknown>;
+    return getNestedValue(actualState, value as string);
   }
-  const actualState = context._state || context;
-  return getNestedValue(actualState, value as string);
 }

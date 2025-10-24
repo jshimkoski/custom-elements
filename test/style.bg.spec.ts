@@ -7,7 +7,8 @@ describe('style - utility class rendering', () => {
   });
 
   it('renders bg-white text-black dark:bg-neutral-950 dark:text-white flex flex-col min-h-screen max-w-screen', () => {
-    const classes = 'bg-white text-black dark:bg-neutral-950 dark:text-white flex flex-col min-h-screen max-w-screen';
+    const classes =
+      'bg-white text-black dark:bg-neutral-950 dark:text-white flex flex-col min-h-screen max-w-screen';
     const html = `<div class="${classes}"></div>`;
     const css = minifyCSS(jitCSS(html));
 
@@ -15,8 +16,8 @@ describe('style - utility class rendering', () => {
     expect(css).toContain('background-color:var(--color-white,#ffffff)');
     expect(css).toContain('color:var(--color-black,#000000)');
 
-  // Dark variant should be wrapped in prefers-color-scheme media query and reference neutral-950
-  expect(css).toContain('@media (prefers-color-scheme:dark)');
+    // Dark variant should be wrapped in prefers-color-scheme media query and reference neutral-950
+    expect(css).toContain('@media (prefers-color-scheme:dark)');
     expect(css).toContain('var(--color-neutral-950,');
 
     // Flex utilities

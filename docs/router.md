@@ -5,7 +5,7 @@ A comprehensive guide to the router module for custom-elements. This page docume
 ## ⚡ Quick Start
 
 ```ts
-import { initRouter } from '@jasonshimmy/custom-elements-runtime';
+import { initRouter } from '@jasonshimmy/custom-elements-runtime/router';
 
 const routes = [
   { path: '/', component: 'home-page' },
@@ -28,13 +28,18 @@ router.back();
 
 - Registers `<router-view>` (renders matched route) and `<router-link>` (navigation link/button).
 - Returns router instance:
-  - `push(path: string)`: Navigate to path
-  - `replace(path: string)`: Replace current path
+  - `push(path: string)`: Navigate to path (in browser mode this updates history and the URL)
+  - `replace(path: string)`: Replace current path (in browser mode this updates history and the URL)
   - `back()`: Go back in history
   - `getCurrent()`: Get current route state (`{ path, params, query }`)
   - `subscribe(fn)`: Listen for route changes
+  - `matchRoute(path: string)`: Manually match a path against configured routes (returns `{ route, params }`)
+  - `resolveRouteComponent(route: Route)`: Helper that loads a route's component (supports static `component` or async `load`)
+  - `store`: Low-level store object (exposes `getState()` and `subscribe()`) — primarily useful for tests or advanced integration.
 
 Note: query parsing is performed for the initial browser location and for popstate (back/forward) events. Programmatic calls like `router.push('/path?x=1')` currently do not parse the query string into `getCurrent().query` (the runtime stores an empty query object for programmatic navigations). See "Behavior notes" below for details.
+
+Also: `push()` and `replace()` only update the browser URL/history when the router is running in browser mode (i.e. when `initialUrl` is not provided). When `initialUrl` is supplied (SSR/static rendering), navigation occurs via the server-side code path and may reject if a route or guard fails — server-side navigation does not mutate the client's history.
 
 ## 🧩 Route Definitions
 
@@ -87,6 +92,7 @@ When navigating to `/profile/123`, `<router-view>` loads the module returned by 
 - function component (async) — awaited and the returned VNode(s) are used
 
 Notes:
+
 - If a function component returns a string tag, a VNode for that tag will be rendered.
 - If the `default` is neither a string nor a function (for example, a plain HTMLElement instance or other object), `<router-view>` will render the "Invalid route component" fallback.
 - Function defaults are invoked with no arguments; they must return a VNode, VNode[] or a string tag (or a Promise resolving to one of those). If you export a class constructor as the default, it will be treated as a function and invoked — prefer exporting a string tag or a function component.
@@ -136,39 +142,46 @@ The `<router-link>` component supports the following props:
 ### Examples
 
 #### Basic Navigation
+
 ```html
 <router-link to="/about">About</router-link>
 ```
 
 #### Button Navigation
+
 ```html
 <router-link to="/settings" tag="button">Settings</router-link>
 ```
 
 #### Replace Navigation (no history entry)
+
 ```html
 <router-link to="/login" replace>Login</router-link>
 ```
 
 #### Exact Match Active Class
+
 ```html
 <router-link to="/" exact activeClass="home-active">Home</router-link>
 ```
 
 #### External Link
+
 ```html
 <router-link to="https://example.com" external>External Site</router-link>
 ```
 
 #### Disabled Link
+
 ```html
 <router-link to="/premium" disabled>Premium (Coming Soon)</router-link>
 ```
 
 #### Custom Active Classes
+
 ```html
-<router-link 
-  to="/dashboard" 
+<router-link
+  to="/dashboard"
   exact
   activeClass="is-active"
   exactActiveClass="is-exact-active"
@@ -179,12 +192,9 @@ The `<router-link>` component supports the following props:
 ```
 
 #### Styling with JIT CSS
+
 ```html
-<router-link 
-  to="/profile" 
-  linkClass="nav-link"
-  activeClass="nav-link-active"
->
+<router-link to="/profile" linkClass="nav-link" activeClass="nav-link-active">
   Profile
 </router-link>
 ```
@@ -229,8 +239,8 @@ const routes = [
     },
     afterEnter: (to, from) => {
       // analytics
-    }
-  }
+    },
+  },
 ];
 ```
 
@@ -252,7 +262,7 @@ The router module exports several utility functions for advanced use cases:
 Parse a URL query string into an object:
 
 ```ts
-import { parseQuery } from '@jasonshimmy/custom-elements-runtime';
+import { parseQuery } from '@jasonshimmy/custom-elements-runtime/router';
 
 const params = parseQuery('?foo=bar&baz=qux&count=5');
 // { foo: 'bar', baz: 'qux', count: '5' }
@@ -263,20 +273,21 @@ const params2 = parseQuery('foo=bar');
 ```
 
 **Parameters:**
+
 - `search`: string - URL query string (with or without leading '?')
 
-**Returns:** `Record<string, string>` - Parsed query parameters
+**Returns:** `Record<string, string>` - Parsed query parameters. Note: this uses the platform `URLSearchParams` when available; in environments where `URLSearchParams` is unavailable (some server runtimes) the function falls back to returning an empty object.
 
 ### `matchRoute(routes: Route[], path: string)`
 
 Manually match a route against a path:
 
 ```ts
-import { matchRoute } from '@jasonshimmy/custom-elements-runtime';
+import { matchRoute } from '@jasonshimmy/custom-elements-runtime/router';
 
 const routes = [
   { path: '/', component: 'home-page' },
-  { path: '/user/:id', component: 'user-page' }
+  { path: '/user/:id', component: 'user-page' },
 ];
 
 const result = matchRoute(routes, '/user/123');
@@ -291,6 +302,7 @@ const noMatch = matchRoute(routes, '/nonexistent');
 ```
 
 **Parameters:**
+
 - `routes`: Route[] - Array of route definitions
 - `path`: string - Path to match against routes
 
@@ -301,7 +313,7 @@ const noMatch = matchRoute(routes, '/nonexistent');
 Match routes during server-side rendering:
 
 ```ts
-import { matchRouteSSR } from '@jasonshimmy/custom-elements-runtime';
+import { matchRouteSSR } from '@jasonshimmy/custom-elements-runtime/router';
 
 // On the server
 const result = matchRouteSSR(routes, req.path);
@@ -313,6 +325,7 @@ if (result.route) {
 ```
 
 **Parameters:**
+
 - `routes`: Route[] - Array of route definitions
 - `path`: string - Path to match
 
@@ -325,26 +338,28 @@ if (result.route) {
 Initialize router programmatically (covered in detail above):
 
 ```ts
-import { initRouter } from '@jasonshimmy/custom-elements-runtime';
+import { initRouter } from '@jasonshimmy/custom-elements-runtime/router';
 
 const router = initRouter({
   routes: [
     { path: '/', component: 'home-page' },
-    { path: '/about', component: 'about-page' }
+    { path: '/about', component: 'about-page' },
   ],
-  mode: 'history', // or 'hash'
-  initialUrl: '/about' // optional, for SSR or testing
+  initialUrl: '/about', // optional, for SSR or testing
 });
 ```
 
 **Returns:** Router instance with methods:
-- `push(path: string)` - Navigate to path
-- `replace(path: string)` - Replace current path
+
+- `push(path: string)` - Navigate to path (browser mode: updates history and URL)
+- `replace(path: string)` - Replace current path (browser mode: updates history and URL)
 - `back()` - Go back in history
 - `getCurrent()` - Get current route state
 - `subscribe(fn)` - Listen for route changes
+  - `matchRoute(path: string)` - Manually match a path against routes
+  - `resolveRouteComponent(route: Route)` - Load/inspect a route's component (static or async)
 
-## �📝 Best Practices
+## 📝 Best Practices
 
 - Define all routes in one array
 - Use `load` for async/code-split components
@@ -359,13 +374,11 @@ const router = initRouter({
 
 Behavior notes:
 
-- Query parsing: when the router initializes in browser mode it parses the current URL's search string into `getCurrent().query`. The `popstate` handler also parses queries. However, calling `router.push('/some?x=1')` or `router.replace('/some?x=1')` programmatically will not populate `getCurrent().query` (the implementation currently stores an empty object for programmatic navigations). If query support for programmatic navigation is required, consider parsing `path` before calling `push` or update the router to extract the query from the provided path.
+- Query parsing: when the router initializes in browser mode it parses the current URL's search string into `getCurrent().query`. The `popstate` handler also parses queries. However, calling `router.push('/some?x=1')` or `router.replace('/some?x=1')` programmatically will not populate `getCurrent().query` — the implementation stores an empty object for programmatic navigations. If you need query parsing for programmatic navigations, parse the path before calling `push`/`replace` or extract the query yourself.
 
-- Async `load` behavior: `load()` is supported and cached, but the built-in `router-view` expects `loaded.default` to be a string tag name to render. If you need the `load()` result to be a class/function/element, update the `router-view` render to use `resolveRouteComponent` and handle non-string results.
+- Async `load` behavior: `load()` is supported and cached. The built-in `router-view` accepts module defaults that are either a string tag name (rendered as a custom element) or a function component (sync or async). Function components should return a VNode, VNode[] or a string tag (or a Promise resolving to one of those). If `router-view` receives another type it will render the "Invalid route component" fallback. Use the exported `resolveRouteComponent` helper when you need to load or inspect module results programmatically — it will load and cache the module default for the route and surface clear errors if the loader fails or the route has no component.
 
-- Async `load` behavior: `load()` is supported and cached. `router-view` accepts module defaults that are either a string tag name or a function component (sync or async). Function components should return a VNode or VNode[] (or a string tag). If you return another type, `router-view` will render the "Invalid route component" fallback. Use `resolveRouteComponent` if you need to handle module results manually.
-
-- SSR `initialUrl`: for server-side or static rendering, pass `initialUrl` into `initRouter`/`useRouter` so the router can derive the initial `path` and `query server-side. If you explicitly pass `initialUrl` the runtime will honor it and initialize from that URL even when a `window` object exists (this is useful for SSR hydration and deterministic tests). If you omit `initialUrl` the router operates in normal browser mode and derives its initial state from `window.location`.
+- SSR `initialUrl`: for server-side or static rendering, pass `initialUrl` into `initRouter`/`useRouter` so the router can derive the initial `path` and `query` server-side. If you explicitly pass `initialUrl` the runtime will honor it and initialize from that URL even when a `window` object exists (useful for SSR hydration and deterministic tests). If you omit `initialUrl` the router operates in normal browser mode and derives its initial state from `window.location`.
 
 ## 📚 See Also
 

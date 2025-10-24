@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { resolveRouteComponent, useRouter } from '../src/lib/router';
 
 describe('router additional tests', () => {
@@ -9,7 +9,7 @@ describe('router additional tests', () => {
       load: async () => {
         calls++;
         return { default: 'CachedComp' };
-      }
+      },
     } as any;
     const first = await resolveRouteComponent(route);
     const second = await resolveRouteComponent(route);
@@ -22,7 +22,11 @@ describe('router additional tests', () => {
     const origWindow = (global as any).window;
     const origDocument = (global as any).document;
 
-    const mockHistory = { pushState: vi.fn(), replaceState: vi.fn(), back: vi.fn() };
+    const mockHistory = {
+      pushState: vi.fn(),
+      replaceState: vi.fn(),
+      back: vi.fn(),
+    };
     (global as any).window = {
       location: { href: 'http://localhost/', pathname: '/', search: '' },
       history: mockHistory,
@@ -30,7 +34,10 @@ describe('router additional tests', () => {
     } as any;
     (global as any).document = {} as any;
 
-    const routes = [ { path: '/', component: 'Home' }, { path: '/about', component: 'About' } ];
+    const routes = [
+      { path: '/', component: 'Home' },
+      { path: '/about', component: 'About' },
+    ];
     const router = useRouter({ routes });
     await router.push('/about');
     expect(mockHistory.pushState).toHaveBeenCalled();
@@ -48,9 +55,10 @@ describe('router additional tests', () => {
     (global as any).document = undefined;
     const routes: any[] = [];
     const router = useRouter({ routes });
-  // Should not throw; current implementation updates state even when no route matches
-  await expect(router.push('/nope')).resolves.not.toThrow();
-  expect(router.getCurrent().path).toBe('/nope');
+    // With SSR navigation now rejecting for unknown routes, ensure the
+    // promise rejects and the current route is unchanged.
+    await expect(router.push('/nope')).rejects.toThrow();
+    expect(router.getCurrent().path).not.toBe('/nope');
     (global as any).window = origWindow;
     (global as any).document = origDocument;
   });

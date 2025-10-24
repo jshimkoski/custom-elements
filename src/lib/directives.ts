@@ -1,11 +1,14 @@
-import type { VNode } from "./runtime/types";
+import type { VNode } from './runtime/types';
 
 /* --- When --- */
 export function when(cond: boolean, children: VNode | VNode[]): VNode;
 export function when(cond: boolean, factory: () => VNode | VNode[]): VNode;
-export function when(cond: boolean, childrenOrFactory: any): VNode {
-  const anchorKey = "when-block"; // stable key regardless of condition
-  if (typeof childrenOrFactory === "function") {
+export function when(
+  cond: boolean,
+  childrenOrFactory: VNode | VNode[] | (() => VNode | VNode[]),
+): VNode {
+  const anchorKey = 'when-block'; // stable key regardless of condition
+  if (typeof childrenOrFactory === 'function') {
     return anchorBlock(cond ? childrenOrFactory() : [], anchorKey);
   }
   return anchorBlock(cond ? childrenOrFactory : [], anchorKey);
@@ -18,8 +21,10 @@ export function each<
   return list.map((item, i) => {
     // For primitives, use value as key; for objects, prefer key/id
     const itemKey =
-      typeof item === "object"
-        ? ((item as any)?.key ?? (item as any)?.id ?? `idx-${i}`)
+      typeof item === 'object'
+        ? ((item as Record<string, unknown>)?.key ??
+          (item as Record<string, unknown>)?.id ??
+          `idx-${i}`)
         : String(item);
     return anchorBlock(render(item, i), `each-${itemKey}`);
   });
@@ -29,7 +34,7 @@ export function each<
 export function match() {
   const branches: Branch[] = [];
   return {
-    when(cond: any, content: VNode | VNode[] | (() => VNode | VNode[])) {
+    when(cond: unknown, content: VNode | VNode[] | (() => VNode | VNode[])) {
       branches.push([cond, content]);
       return this;
     },
@@ -44,17 +49,23 @@ export function match() {
 }
 
 /* --- WhenChain --- */
-type Branch = [condition: any, content: VNode | VNode[] | (() => VNode | VNode[])];
+type Branch = [
+  condition: unknown,
+  content: VNode | VNode[] | (() => VNode | VNode[]),
+];
 
 function whenChain(...branches: Branch[]): VNode[] {
   for (let idx = 0; idx < branches.length; idx++) {
     const [cond, content] = branches[idx];
     if (cond) {
-      const payload = typeof content === 'function' ? (content as () => VNode | VNode[])() : content;
+      const payload =
+        typeof content === 'function'
+          ? (content as () => VNode | VNode[])()
+          : content;
       return [anchorBlock(payload, `whenChain-branch-${idx}`)];
     }
   }
-  return [anchorBlock([], "whenChain-empty")];
+  return [anchorBlock([], 'whenChain-empty')];
 }
 
 /**
@@ -74,7 +85,7 @@ export function anchorBlock(
       : [children].filter((c) => c !== null && c !== undefined);
 
   return {
-    tag: "#anchor",
+    tag: '#anchor',
     key: anchorKey,
     children: childArray,
   };

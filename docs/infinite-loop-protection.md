@@ -21,21 +21,21 @@ The runtime includes comprehensive protection mechanisms to prevent common mista
 // BAD: Modifying state during render
 component('bad-example', () => {
   const count = ref(0);
-  
+
   // This causes infinite loop!
   count.value = count.value + 1;
-  
+
   return html`<div>${count.value}</div>`;
 });
 
 // GOOD: Modify state in event handlers
 component('good-example', () => {
   const count = ref(0);
-  
+
   const increment = () => {
     count.value = count.value + 1;
   };
-  
+
   return html`
     <div>${count.value}</div>
     <button @click="${increment}">+</button>
@@ -76,10 +76,11 @@ The runtime automatically detects problematic event handlers:
 ```
 
 **Warning Message:**
+
 ```
-🚨 Potential infinite loop detected! Event handler for '@click' appears to be 
-the result of a function call (undefined) instead of a function reference. 
-Change @click="${functionName()}" to @click="${functionName}" 
+🚨 Potential infinite loop detected! Event handler for '@click' appears to be
+the result of a function call (undefined) instead of a function reference.
+Change @click="${functionName()}" to @click="${functionName}"
 to pass the function reference instead of calling it immediately.
 ```
 
@@ -90,15 +91,16 @@ Detects state changes during component render:
 ```typescript
 component('protected-component', () => {
   const state = ref(0);
-  
+
   // This triggers a warning:
   state.value = 1; // 🚨 State modification during render!
-  
+
   return html`<div>${state.value}</div>`;
 });
 ```
 
 **Warning Message:**
+
 ```
 🚨 State modification detected during render! This can cause infinite loops.
   • Move state updates to event handlers
@@ -116,6 +118,7 @@ Automatically throttles components with rapid re-renders:
 - **Extreme cases**: Complete render blocking to prevent browser freeze
 
 **Progressive Messages:**
+
 ```
 ⚠️ Component is re-rendering rapidly. This might indicate:
   • Event handler calling a function immediately: @click="${fn()}" should be @click="${fn}"
@@ -140,13 +143,13 @@ Automatically throttles components with rapid re-renders:
 component('event-example', () => {
   const count = ref(0);
   const emit = useEmit();
-  
+
   // All these are correct:
   const increment = () => count.value++;
   const decrement = () => count.value--;
-  const reset = () => count.value = 0;
+  const reset = () => (count.value = 0);
   const notify = () => emit('count-changed', count.value);
-  
+
   return html`
     <div>Count: ${count.value}</div>
     <button @click="${increment}">+</button>
@@ -163,27 +166,27 @@ component('event-example', () => {
 component('safe-state', () => {
   const items = state<string[]>([]);
   const filter = ref('');
-  
+
   // ✅ Pure computed - no side effects
   const filteredItems = computed(() =>
-    items.value.filter(item => 
-      item.toLowerCase().includes(filter.value.toLowerCase())
-    )
+    items.value.filter((item) =>
+      item.toLowerCase().includes(filter.value.toLowerCase()),
+    ),
   );
-  
+
   // ✅ State updates in event handlers
   const addItem = (item: string) => {
     items.value = [...items.value, item];
   };
-  
+
   const updateFilter = (e: Event) => {
     filter.value = (e.target as HTMLInputElement).value;
   };
-  
+
   return html`
-    <input @input="${updateFilter}" placeholder="Filter...">
+    <input @input="${updateFilter}" placeholder="Filter..." />
     <ul>
-      ${each(filteredItems.value, item => html`<li>${item}</li>`)}
+      ${each(filteredItems.value, (item) => html`<li>${item}</li>`)}
     </ul>
   `;
 });

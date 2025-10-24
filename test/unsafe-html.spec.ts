@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { html } from '../src/lib/runtime/template-compiler';
-import { renderToString } from '../src/lib/runtime/vdom';
+import { renderToString } from '../src/lib/runtime/vdom-ssr';
 import { unsafeHTML } from '../src/lib/runtime/helpers';
 
 describe('unsafeHTML and entity decoding', () => {

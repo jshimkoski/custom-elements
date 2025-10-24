@@ -20,24 +20,26 @@ The transitions module provides powerful, declarative animation capabilities usi
 ## 🚀 Quick Start
 
 ```typescript
-import { component, html, ref, Transition } from '@jasonshimmy/custom-elements-runtime';
+import { component, html, ref } from '@jasonshimmy/custom-elements-runtime';
+import { Transition } from '@jasonshimmy/custom-elements-runtime/transitions';
 
 component('fade-demo', () => {
   const show = ref(true);
-  
+
   return html`
-    <button @click="${() => show.value = !show.value}">
-      Toggle
-    </button>
-    
-    ${Transition({
-      preset: 'fade',
-      show: show.value
-    }, html`
-      <div class="card p-4 bg-primary-100 rounded-lg">
-        Hello, Transitions!
-      </div>
-    `)}
+    <button @click="${() => (show.value = !show.value)}">Toggle</button>
+
+    ${Transition(
+      {
+        preset: 'fade',
+        show: show.value,
+      },
+      html`
+        <div class="card p-4 bg-primary-100 rounded-lg">
+          Hello, Transitions!
+        </div>
+      `,
+    )}
   `;
 });
 ```
@@ -104,23 +106,24 @@ Create custom animations using any JIT utility classes:
 ```typescript
 component('custom-transition', () => {
   const show = ref(true);
-  
+
   return html`
-    ${Transition({
-      show: show.value,
-      // Start state
-      enterFrom: 'opacity-0 translate-y-4 scale-95',
-      // Active transition
-      enterActive: 'transition-all duration-300 ease-out',
-      // End state
-      enterTo: 'opacity-100 translate-y-0 scale-100',
-      // Leave transitions
-      leaveFrom: 'opacity-100 translate-y-0 scale-100',
-      leaveActive: 'transition-all duration-200 ease-in',
-      leaveTo: 'opacity-0 -translate-y-4 scale-95'
-    }, html`
-      <div>Custom animated content</div>
-    `)}
+    ${Transition(
+      {
+        show: show.value,
+        // Start state
+        enterFrom: 'opacity-0 translate-y-4 scale-95',
+        // Active transition
+        enterActive: 'transition-all duration-300 ease-out',
+        // End state
+        enterTo: 'opacity-100 translate-y-0 scale-100',
+        // Leave transitions
+        leaveFrom: 'opacity-100 translate-y-0 scale-100',
+        leaveActive: 'transition-all duration-200 ease-in',
+        leaveTo: 'opacity-0 -translate-y-4 scale-95',
+      },
+      html` <div>Custom animated content</div> `,
+    )}
   `;
 });
 ```
@@ -155,39 +158,46 @@ ${Transition({
 Animate lists with enter/leave/move transitions:
 
 ```typescript
-import { TransitionGroup, each } from '@jasonshimmy/custom-elements-runtime';
+import { TransitionGroup } from '@jasonshimmy/custom-elements-runtime/transitions';
+import { each } from '@jasonshimmy/custom-elements-runtime/directives';
 
 component('todo-list', () => {
   const todos = ref([
     { id: 1, text: 'Learn transitions' },
-    { id: 2, text: 'Build something awesome' }
+    { id: 2, text: 'Build something awesome' },
   ]);
-  
+
   const addTodo = () => {
     const id = Date.now();
     todos.value = [...todos.value, { id, text: `Todo ${id}` }];
   };
-  
+
   const removeTodo = (id: number) => {
-    todos.value = todos.value.filter(t => t.id !== id);
+    todos.value = todos.value.filter((t) => t.id !== id);
   };
-  
+
   return html`
     <button @click="${addTodo}">Add Todo</button>
-    
-    ${TransitionGroup({
-      preset: 'slide-right',
-      tag: 'ul',
-      moveClass: 'transition-transform duration-300'
-    }, each(todos.value, (todo) => html`
-      <li 
-        key="${todo.id}"
-        class="p-2 bg-neutral-100 rounded mb-2 flex justify-between items-center"
-      >
-        <span>${todo.text}</span>
-        <button @click="${() => removeTodo(todo.id)}">×</button>
-      </li>
-    `))}
+
+    ${TransitionGroup(
+      {
+        preset: 'slide-right',
+        tag: 'ul',
+        moveClass: 'transition-transform duration-300',
+      },
+      each(
+        todos.value,
+        (todo) => html`
+          <li
+            key="${todo.id}"
+            class="p-2 bg-neutral-100 rounded mb-2 flex justify-between items-center"
+          >
+            <span>${todo.text}</span>
+            <button @click="${() => removeTodo(todo.id)}">×</button>
+          </li>
+        `,
+      ),
+    )}
   `;
 });
 ```
@@ -244,26 +254,26 @@ ${TransitionGroup({
 
 Complete list of available options:
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `preset` | `string` | - | Preset name (fade, slide-right, scale, etc.) |
-| `show` | `boolean` | `true` | Whether to show the group |
-| `tag` | `string` | `'div'` | HTML tag for wrapper element |
-| `class` | `string` | - | CSS classes for wrapper (e.g., 'flex gap-4') |
-| `style` | `string \| object` | - | Inline styles for wrapper |
-| `moveClass` | `string` | `'transition-transform duration-300'` | Classes applied during move transitions |
-| `mode` | `'default' \| 'out-in' \| 'in-out'` | `'default'` | Transition timing mode |
-| `duration` | `number \| {enter, leave}` | - | Override transition duration (ms) |
-| `appear` | `boolean` | `false` | Apply transition on initial render |
-| `css` | `boolean` | `true` | Use CSS transitions (false = JS-only) |
-| `name` | `string` | - | Optional name for debugging |
-| `enterFrom` | `string` | - | Classes at start of enter |
-| `enterActive` | `string` | - | Classes during enter |
-| `enterTo` | `string` | - | Classes at end of enter |
-| `leaveFrom` | `string` | - | Classes at start of leave |
-| `leaveActive` | `string` | - | Classes during leave |
-| `leaveTo` | `string` | - | Classes at end of leave |
-| Lifecycle Hooks | - | - | All 8 hooks (see below) |
+| Option          | Type                                | Default                               | Description                                  |
+| --------------- | ----------------------------------- | ------------------------------------- | -------------------------------------------- |
+| `preset`        | `string`                            | -                                     | Preset name (fade, slide-right, scale, etc.) |
+| `show`          | `boolean`                           | `true`                                | Whether to show the group                    |
+| `tag`           | `string`                            | `'div'`                               | HTML tag for wrapper element                 |
+| `class`         | `string`                            | -                                     | CSS classes for wrapper (e.g., 'flex gap-4') |
+| `style`         | `string \| object`                  | -                                     | Inline styles for wrapper                    |
+| `moveClass`     | `string`                            | `'transition-transform duration-300'` | Classes applied during move transitions      |
+| `mode`          | `'default' \| 'out-in' \| 'in-out'` | `'default'`                           | Transition timing mode                       |
+| `duration`      | `number \| {enter, leave}`          | -                                     | Override transition duration (ms)            |
+| `appear`        | `boolean`                           | `false`                               | Apply transition on initial render           |
+| `css`           | `boolean`                           | `true`                                | Use CSS transitions (false = JS-only)        |
+| `name`          | `string`                            | -                                     | Optional name for debugging                  |
+| `enterFrom`     | `string`                            | -                                     | Classes at start of enter                    |
+| `enterActive`   | `string`                            | -                                     | Classes during enter                         |
+| `enterTo`       | `string`                            | -                                     | Classes at end of enter                      |
+| `leaveFrom`     | `string`                            | -                                     | Classes at start of leave                    |
+| `leaveActive`   | `string`                            | -                                     | Classes during leave                         |
+| `leaveTo`       | `string`                            | -                                     | Classes at end of leave                      |
+| Lifecycle Hooks | -                                   | -                                     | All 8 hooks (see below)                      |
 
 ## 🪝 Lifecycle Hooks
 
@@ -273,12 +283,12 @@ Execute JavaScript during animation phases:
 ${Transition({
   show: show.value,
   preset: 'fade',
-  
+
   // Before enter
   onBeforeEnter: (el) => {
     console.log('About to enter:', el);
   },
-  
+
   // During enter (with manual control)
   onEnter: (el, done) => {
     // Perform custom animation
@@ -289,17 +299,17 @@ ${Transition({
       complete: done
     });
   },
-  
+
   // After enter completes
   onAfterEnter: (el) => {
     console.log('Enter completed:', el);
   },
-  
+
   // If enter is cancelled
   onEnterCancelled: (el) => {
     console.log('Enter cancelled:', el);
   },
-  
+
   // Leave hooks work the same way
   onBeforeLeave: (el) => { /* ... */ },
   onLeave: (el, done) => { /* ... */ },
@@ -441,7 +451,7 @@ ${Transition({
 Create reusable custom transition presets:
 
 ```typescript
-import { createTransitionPreset, Transition } from '@jasonshimmy/custom-elements-runtime';
+import { createTransitionPreset, Transition } from '@jasonshimmy/custom-elements-runtime/transitions';
 
 // Define a custom preset
 const myCustomFade = createTransitionPreset({
@@ -454,9 +464,9 @@ const myCustomFade = createTransitionPreset({
 });
 
 // Use it with Transition
-${Transition({ 
-  ...myCustomFade, 
-  show: visible.value 
+${Transition({
+  ...myCustomFade,
+  show: visible.value
 }, content)}
 
 // Or share across your application
@@ -485,7 +495,7 @@ export const appTransitions = {
 Get the pre-generated stylesheet for all transition presets (automatically initialized on module load):
 
 ```typescript
-import { getTransitionStyleSheet } from '@jasonshimmy/custom-elements-runtime';
+import { getTransitionStyleSheet } from '@jasonshimmy/custom-elements-runtime/transitions';
 
 // Get the global transition stylesheet
 const stylesheet = getTransitionStyleSheet();
@@ -502,44 +512,44 @@ const stylesheet = getTransitionStyleSheet();
 
 ```typescript
 // ✅ Good - Quick and snappy
-enterActive: 'transition-all duration-200 ease-out'
+enterActive: 'transition-all duration-200 ease-out';
 
 // ❌ Too slow
-enterActive: 'transition-all duration-1000'
+enterActive: 'transition-all duration-1000';
 ```
 
 ### 2. Use Appropriate Easing
 
 ```typescript
 // Enter: Ease out (fast start, slow end)
-enterActive: 'transition-all duration-300 ease-out'
+enterActive: 'transition-all duration-300 ease-out';
 
 // Leave: Ease in (slow start, fast end)
-leaveActive: 'transition-all duration-200 ease-in'
+leaveActive: 'transition-all duration-200 ease-in';
 ```
 
 ### 3. Combine Opacity with Transform
 
 ```typescript
 // ✅ Smooth and performant
-enterFrom: 'opacity-0 translate-y-4'
-enterTo: 'opacity-100 translate-y-0'
+enterFrom: 'opacity-0 translate-y-4';
+enterTo: 'opacity-100 translate-y-0';
 
 // ❌ Jarring
-enterFrom: 'translate-y-4' // No opacity change
+enterFrom: 'translate-y-4'; // No opacity change
 ```
 
 ### 4. Test with Reduced Motion
 
 ```typescript
 // Respect user preferences
-enterActive: 'transition-all duration-300 [@media(prefers-reduced-motion:reduce)]:duration-0'
+enterActive: 'transition-all duration-300 [@media(prefers-reduced-motion:reduce)]:duration-0';
 ```
 
 ### 5. Use `will-change` for Complex Animations
 
 ```typescript
-enterActive: 'transition-all duration-300 [will-change:transform,opacity]'
+enterActive: 'transition-all duration-300 [will-change:transform,opacity]';
 ```
 
 ## 🔧 Available JIT Utilities for Transitions
@@ -577,55 +587,69 @@ enterActive: 'transition-all duration-300 [will-change:transform,opacity]'
 ## 📚 Complete Example
 
 ```typescript
-import { component, html, ref, Transition, TransitionGroup, each } from '@jasonshimmy/custom-elements-runtime';
+import { component, html, ref } from '@jasonshimmy/custom-elements-runtime';
+import {
+  Transition,
+  TransitionGroup,
+} from '@jasonshimmy/custom-elements-runtime/transitions';
+import { each } from '@jasonshimmy/custom-elements-runtime/directives';
 
 component('notification-center', () => {
-  const notifications = ref<Array<{ id: number; message: string; type: string }>>([]);
-  
+  const notifications = ref<
+    Array<{ id: number; message: string; type: string }>
+  >([]);
+
   const addNotification = (message: string, type = 'info') => {
     const id = Date.now();
     notifications.value = [...notifications.value, { id, message, type }];
-    
+
     // Auto-remove after 3 seconds
     setTimeout(() => removeNotification(id), 3000);
   };
-  
+
   const removeNotification = (id: number) => {
-    notifications.value = notifications.value.filter(n => n.id !== id);
+    notifications.value = notifications.value.filter((n) => n.id !== id);
   };
-  
+
   return html`
     <div class="fixed top-4 right-4 w-80 space-y-2">
-      ${TransitionGroup({
-        tag: 'div',
-        enterFrom: 'translate-x-full opacity-0',
-        enterActive: 'transition-all duration-300 ease-out',
-        enterTo: 'translate-x-0 opacity-100',
-        leaveFrom: 'translate-x-0 opacity-100 scale-100',
-        leaveActive: 'transition-all duration-200 ease-in',
-        leaveTo: 'translate-x-full opacity-0 scale-95',
-        moveClass: 'transition-transform duration-300'
-      }, each(notifications.value, (notif) => html`
-        <div
-          key="${notif.id}"
-          class="p-4 rounded-lg shadow-lg
-                 ${notif.type === 'success' ? 'bg-success-100' : 
-                   notif.type === 'error' ? 'bg-error-100' : 
-                   'bg-info-100'}
+      ${TransitionGroup(
+        {
+          tag: 'div',
+          enterFrom: 'translate-x-full opacity-0',
+          enterActive: 'transition-all duration-300 ease-out',
+          enterTo: 'translate-x-0 opacity-100',
+          leaveFrom: 'translate-x-0 opacity-100 scale-100',
+          leaveActive: 'transition-all duration-200 ease-in',
+          leaveTo: 'translate-x-full opacity-0 scale-95',
+          moveClass: 'transition-transform duration-300',
+        },
+        each(
+          notifications.value,
+          (notif) => html`
+            <div
+              key="${notif.id}"
+              class="p-4 rounded-lg shadow-lg
+                 ${notif.type === 'success'
+                ? 'bg-success-100'
+                : notif.type === 'error'
+                  ? 'bg-error-100'
+                  : 'bg-info-100'}
                  flex justify-between items-start"
-        >
-          <p class="flex-1">${notif.message}</p>
-          <button
-            @click="${() => removeNotification(notif.id)}"
-            class="ml-2 text-neutral-500 hover:text-neutral-700"
-          >
-            ×
-          </button>
-        </div>
-      `))
-      }
+            >
+              <p class="flex-1">${notif.message}</p>
+              <button
+                @click="${() => removeNotification(notif.id)}"
+                class="ml-2 text-neutral-500 hover:text-neutral-700"
+              >
+                ×
+              </button>
+            </div>
+          `,
+        ),
+      )}
     </div>
-    
+
     <div class="p-4 space-x-2">
       <button
         @click="${() => addNotification('Success!', 'success')}"
@@ -668,14 +692,17 @@ The transitions system provides powerful animation capabilities with:
 ### API Reference
 
 **Components:**
+
 - `Transition(options, content)` - Single element transitions
 - `TransitionGroup(options, children)` - List transitions with move support
 
 **Utility Functions:**
+
 - `createTransitionPreset(classes)` - Create reusable custom presets
 - `getTransitionStyleSheet()` - Get pre-generated transition stylesheet
 
 **Presets:**
+
 - `fade` - Simple opacity transition
 - `slide-right`, `slide-left`, `slide-up`, `slide-down` - Directional slides
 - `scale`, `scale-down` - Scale animations
@@ -684,6 +711,7 @@ The transitions system provides powerful animation capabilities with:
 - `flip` - Rotation effect
 
 **Lifecycle Hooks:**
+
 - `onBeforeEnter`, `onEnter`, `onAfterEnter`, `onEnterCancelled`
 - `onBeforeLeave`, `onLeave`, `onAfterLeave`, `onLeaveCancelled`
 

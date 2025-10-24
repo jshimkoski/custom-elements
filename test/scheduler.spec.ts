@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { updateScheduler, scheduleDOMUpdate } from '../src/lib/runtime/scheduler';
+import {
+  updateScheduler,
+  scheduleDOMUpdate,
+} from '../src/lib/runtime/scheduler';
 
 describe('🔄 Update Scheduler', () => {
   let originalQueueMicrotask: typeof queueMicrotask;
@@ -15,14 +18,14 @@ describe('🔄 Update Scheduler', () => {
     originalConsole = console;
     originalWindow = (globalThis as any).window;
     originalProcess = (globalThis as any).process;
-    
+
     // Create mocks
     mockQueueMicrotask = vi.fn((callback) => {
       // Execute immediately for testing
       callback();
     });
     mockConsoleError = vi.fn();
-    
+
     // Apply mocks
     globalThis.queueMicrotask = mockQueueMicrotask;
     global.console = {
@@ -32,7 +35,7 @@ describe('🔄 Update Scheduler', () => {
 
     // Set up test environment by default
     (globalThis as any).process = {
-      env: { NODE_ENV: 'test' }
+      env: { NODE_ENV: 'test' },
     };
     delete (globalThis as any).window;
   });
@@ -49,19 +52,19 @@ describe('🔄 Update Scheduler', () => {
   describe('Basic Scheduling', () => {
     it('should schedule and execute a single update', () => {
       const mockUpdate = vi.fn();
-      
+
       updateScheduler.schedule(mockUpdate);
-      
+
       expect(mockUpdate).toHaveBeenCalledTimes(1);
     });
 
     it('should schedule and execute multiple updates', () => {
       const mockUpdate1 = vi.fn();
       const mockUpdate2 = vi.fn();
-      
+
       updateScheduler.schedule(mockUpdate1);
       updateScheduler.schedule(mockUpdate2);
-      
+
       expect(mockUpdate1).toHaveBeenCalledTimes(1);
       expect(mockUpdate2).toHaveBeenCalledTimes(1);
     });
@@ -69,11 +72,11 @@ describe('🔄 Update Scheduler', () => {
     it('should track pending updates count', () => {
       const mockUpdate1 = vi.fn();
       const mockUpdate2 = vi.fn();
-      
+
       // In test environment, updates execute immediately
       updateScheduler.schedule(mockUpdate1, 'component-1');
       updateScheduler.schedule(mockUpdate2, 'component-2');
-      
+
       expect(mockUpdate1).toHaveBeenCalledTimes(1);
       expect(mockUpdate2).toHaveBeenCalledTimes(1);
     });
@@ -82,12 +85,12 @@ describe('🔄 Update Scheduler', () => {
   describe('Test Environment Detection', () => {
     it('should execute synchronously when NODE_ENV is test', () => {
       (globalThis as any).process = {
-        env: { NODE_ENV: 'test' }
+        env: { NODE_ENV: 'test' },
       };
-      
+
       const mockUpdate = vi.fn();
       updateScheduler.schedule(mockUpdate);
-      
+
       expect(mockUpdate).toHaveBeenCalledTimes(1);
       expect(mockQueueMicrotask).not.toHaveBeenCalled();
     });
@@ -95,10 +98,10 @@ describe('🔄 Update Scheduler', () => {
     it('should execute synchronously when __vitest__ is present', () => {
       delete (globalThis as any).process;
       (globalThis as any).window = { __vitest__: true };
-      
+
       const mockUpdate = vi.fn();
       updateScheduler.schedule(mockUpdate);
-      
+
       expect(mockUpdate).toHaveBeenCalledTimes(1);
       expect(mockQueueMicrotask).not.toHaveBeenCalled();
     });
@@ -106,10 +109,10 @@ describe('🔄 Update Scheduler', () => {
     it('should execute synchronously when Cypress is present', () => {
       delete (globalThis as any).process;
       (globalThis as any).window = { Cypress: {} };
-      
+
       const mockUpdate = vi.fn();
       updateScheduler.schedule(mockUpdate);
-      
+
       expect(mockUpdate).toHaveBeenCalledTimes(1);
       expect(mockQueueMicrotask).not.toHaveBeenCalled();
     });
@@ -126,11 +129,11 @@ describe('🔄 Update Scheduler', () => {
       // we'll verify the queueMicrotask behavior through other means
       const originalQueueMicrotask = globalThis.queueMicrotask;
       let capturedCallback: any;
-      
+
       globalThis.queueMicrotask = (callback) => {
         capturedCallback = callback;
       };
-      
+
       try {
         // Create new scheduler instance to bypass test environment detection
         class TestUpdateScheduler {
@@ -140,7 +143,7 @@ describe('🔄 Update Scheduler', () => {
           schedule(update: () => void, componentId?: string): void {
             const key = componentId || update.toString();
             this.pendingUpdates.set(key, update);
-            
+
             if (!this.isFlushScheduled) {
               this.isFlushScheduled = true;
               // Force production behavior
@@ -156,7 +159,7 @@ describe('🔄 Update Scheduler', () => {
             for (const update of updates) {
               try {
                 update();
-              } catch (error) {
+              } catch {
                 // Continue with other updates
               }
             }
@@ -165,16 +168,15 @@ describe('🔄 Update Scheduler', () => {
 
         const testScheduler = new TestUpdateScheduler();
         const mockUpdate = vi.fn();
-        
+
         testScheduler.schedule(mockUpdate);
-        
+
         expect(capturedCallback).toBeDefined();
         expect(mockUpdate).toHaveBeenCalledTimes(0); // Not called yet
-        
+
         // Execute the callback
         capturedCallback();
         expect(mockUpdate).toHaveBeenCalledTimes(1);
-        
       } finally {
         globalThis.queueMicrotask = originalQueueMicrotask;
       }
@@ -184,11 +186,11 @@ describe('🔄 Update Scheduler', () => {
       // Test batching behavior in our test environment (synchronous)
       const mockUpdate1 = vi.fn();
       const mockUpdate2 = vi.fn();
-      
+
       updateScheduler.schedule(mockUpdate1, 'comp1');
       updateScheduler.schedule(mockUpdate2, 'comp2');
-      
-      // In test environment, both should be executed immediately 
+
+      // In test environment, both should be executed immediately
       expect(mockUpdate1).toHaveBeenCalledTimes(1);
       expect(mockUpdate2).toHaveBeenCalledTimes(1);
     });
@@ -200,10 +202,10 @@ describe('🔄 Update Scheduler', () => {
         throw new Error('Update failed');
       });
       const successUpdate = vi.fn();
-      
+
       updateScheduler.schedule(errorUpdate);
       updateScheduler.schedule(successUpdate);
-      
+
       expect(errorUpdate).toHaveBeenCalledTimes(1);
       expect(successUpdate).toHaveBeenCalledTimes(1);
       expect(mockConsoleError).toHaveBeenCalledTimes(1);
@@ -217,11 +219,11 @@ describe('🔄 Update Scheduler', () => {
       const errorUpdate2 = vi.fn(() => {
         throw new Error('Second error');
       });
-      
+
       updateScheduler.schedule(errorUpdate1);
       updateScheduler.schedule(successUpdate);
       updateScheduler.schedule(errorUpdate2);
-      
+
       expect(errorUpdate1).toHaveBeenCalledTimes(1);
       expect(successUpdate).toHaveBeenCalledTimes(1);
       expect(errorUpdate2).toHaveBeenCalledTimes(1);
@@ -233,17 +235,17 @@ describe('🔄 Update Scheduler', () => {
     it('should delegate to updateScheduler.schedule', () => {
       const mockUpdate = vi.fn();
       const componentId = 'test-component';
-      
+
       scheduleDOMUpdate(mockUpdate, componentId);
-      
+
       expect(mockUpdate).toHaveBeenCalledTimes(1);
     });
 
     it('should work without componentId', () => {
       const mockUpdate = vi.fn();
-      
+
       scheduleDOMUpdate(mockUpdate);
-      
+
       expect(mockUpdate).toHaveBeenCalledTimes(1);
     });
   });

@@ -13,22 +13,29 @@ describe('SecureExpressionEvaluator - more cases', () => {
   });
 
   it('handles nested plain identifiers', () => {
-    const res = SEE.evaluate('user.age >= 18 ? "ok" : "no"', { user: { age: 21 } });
+    const res = SEE.evaluate('user.age >= 18 ? "ok" : "no"', {
+      user: { age: 21 },
+    });
     expect(res).toBe('ok');
   });
 
   it('does not confuse strings containing identifiers', () => {
-    const res = SEE.evaluate('ctx.name + " says: user.name"', { name: 'Alice' });
+    const res = SEE.evaluate('ctx.name + " says: user.name"', {
+      name: 'Alice',
+    });
     expect(res).toBe('Alice says: user.name');
   });
 
   it('returns undefined for expressions that reference unknown nested paths', () => {
-    const res = SEE.evaluate('user.profile.name', { user: { } });
+    const res = SEE.evaluate('user.profile.name', { user: {} });
     expect(res).toBeUndefined();
   });
 
   it('evaluates arrays containing mixed expressions', () => {
-    const res = SEE.evaluate('[1, ctx.x, user.y + 1]', { x: 2, user: { y: 4 } });
+    const res = SEE.evaluate('[1, ctx.x, user.y + 1]', {
+      x: 2,
+      user: { y: 4 },
+    });
     expect(res).toEqual([1, 2, 5]);
   });
 
@@ -38,7 +45,10 @@ describe('SecureExpressionEvaluator - more cases', () => {
   });
 
   it('works with boolean negation and unary minus', () => {
-    const res = SEE.evaluate('!ctx.enabled || -ctx.n === -5', { enabled: false, n: 5 });
+    const res = SEE.evaluate('!ctx.enabled || -ctx.n === -5', {
+      enabled: false,
+      n: 5,
+    });
     expect(res).toBe(true);
   });
 });

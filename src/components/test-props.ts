@@ -1,4 +1,10 @@
-import { component, html, useEmit, useOnConnected, useProps } from '../lib/index.js';
+import {
+  component,
+  html,
+  useEmit,
+  useOnConnected,
+  useProps,
+} from '../lib/index.js';
 
 // Example component that uses useProps inside the render to read props
 component('ce-test-props', () => {

@@ -7,17 +7,23 @@
 let isDev = false;
 try {
   // Node environment (Vitest / Node.js) via globalThis.process to avoid TS node type dependency
-  const maybeProcess: any = (globalThis as any).process;
+  const maybeProcess = (
+    globalThis as { process?: { env?: Record<string, string> } }
+  ).process;
   if (maybeProcess && maybeProcess.env) {
     isDev = maybeProcess.env.NODE_ENV !== 'production';
-  } else if (typeof import.meta !== 'undefined' && (import.meta as any).env) {
-    // Vite / bundler-provided mode
-    isDev = (import.meta as any).env.MODE !== 'production';
+  } else if (typeof import.meta !== 'undefined') {
+    const maybeEnv = (import.meta as { env?: { MODE?: string } }).env;
+    if (maybeEnv) {
+      isDev = maybeEnv.MODE !== 'production';
+    } else {
+      isDev = typeof window !== 'undefined';
+    }
   } else {
     // Fallback: assume dev when running in a browser-like environment without explicit MODE
     isDev = typeof window !== 'undefined';
   }
-} catch (e) {
+} catch {
   // Be conservative: default to true to surface diagnostics during development
   isDev = true;
 }
@@ -25,7 +31,7 @@ try {
 /**
  * Log error only in development mode
  */
-export function devError(message: string, ...args: any[]): void {
+export function devError(message: string, ...args: unknown[]): void {
   if (isDev) {
     console.error(message, ...args);
   }
@@ -34,7 +40,7 @@ export function devError(message: string, ...args: any[]): void {
 /**
  * Log warning only in development mode
  */
-export function devWarn(message: string, ...args: any[]): void {
+export function devWarn(message: string, ...args: unknown[]): void {
   if (isDev) {
     console.warn(message, ...args);
   }
@@ -43,7 +49,7 @@ export function devWarn(message: string, ...args: any[]): void {
 /**
  * Log info only in development mode
  */
-export function devLog(message: string, ...args: any[]): void {
+export function devLog(message: string, ...args: unknown[]): void {
   if (isDev) {
     console.log(message, ...args);
   }

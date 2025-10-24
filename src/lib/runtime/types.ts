@@ -7,15 +7,23 @@ export interface VNode {
   key?: string;
   props?: {
     key?: string;
-    props?: any;
-    attrs?: Record<string, any>;
-    directives?: Record<string, { value: string; modifiers: string[]; arg?: string }>;
+    props?: Record<string, unknown>;
+    attrs?: Record<string, string | number | boolean | null | undefined>;
+    directives?: Record<
+      string,
+      { value: string; modifiers: string[]; arg?: string }
+    >;
     ref?: string;
-    reactiveRef?: any; // For reactive state objects
+    reactiveRef?: { value: unknown; [key: string]: unknown }; // For reactive state objects
     /** Compiler-provided hint: whether this VNode represents a custom element (contains a dash) */
     isCustomElement?: boolean;
     /** Transition group metadata */
-    _transitionGroup?: any;
+    _transitionGroup?: {
+      name?: string;
+      appear?: boolean;
+      mode?: 'out-in' | 'in-out' | 'default';
+      [key: string]: unknown;
+    };
   };
   children?: VNode[] | string;
 }
@@ -23,7 +31,7 @@ export interface VNode {
 export type VDomRefs = Record<string, HTMLElement | undefined>;
 
 export interface AnchorBlockVNode extends VNode {
-  tag: "#anchor";
+  tag: '#anchor';
   key: string;
   children: VNode[];
   _startNode?: Comment;
@@ -35,27 +43,26 @@ export interface AnchorBlockVNode extends VNode {
  */
 
 export type LifecycleKeys =
-  | "onConnected"
-  | "onDisconnected"
-  | "onAttributeChanged"
-  | "onError";
-
+  | 'onConnected'
+  | 'onDisconnected'
+  | 'onAttributeChanged'
+  | 'onError';
 
 export interface WatchOptions {
   immediate?: boolean;
   deep?: boolean;
 }
 
-export type WatchCallback<T = any, S = any> = (
+export type WatchCallback<T = unknown, S = unknown> = (
   newValue: T,
   oldValue: T,
   context: S,
 ) => void;
 
-export interface WatcherState {
-  callback: WatchCallback<any, any>;
+export interface WatcherState<T = unknown, S = unknown> {
+  callback: WatchCallback<T, S>;
   options: WatchOptions;
-  oldValue: any;
+  oldValue: T;
 }
 
 export type WatchConfig<S> =
@@ -64,10 +71,15 @@ export type WatchConfig<S> =
         | WatchCallback<S[K], S>
         | [WatchCallback<S[K], S>, WatchOptions?];
     }
-  | Record<string, WatchCallback<any, S> | [WatchCallback<any, S>, WatchOptions?]>;
+  | Record<
+      string,
+      WatchCallback<unknown, S> | [WatchCallback<unknown, S>, WatchOptions?]
+    >;
 
 // Drop the last element from a tuple type
-type DropLast<T extends any[]> = T extends [...infer Rest, any] ? Rest : T;
+type DropLast<T extends unknown[]> = T extends [...infer Rest, unknown]
+  ? Rest
+  : T;
 
 // Wrap a function type by removing its last parameter (the injected ctx)
 type WrapMethod<F> = F extends (...args: infer A) => infer R
@@ -75,7 +87,9 @@ type WrapMethod<F> = F extends (...args: infer A) => infer R
   : never;
 
 export type InferMethods<T> = {
-  [K in keyof T as K extends LifecycleKeys ? never : K]: T[K] extends (...args: any[]) => any
+  [K in keyof T as K extends LifecycleKeys ? never : K]: T[K] extends (
+    ...args: unknown[]
+  ) => unknown
     ? WrapMethod<T[K]>
     : never;
 };
@@ -88,39 +102,54 @@ export type ComponentContext<
   S extends object,
   C extends object,
   P extends object,
-  T extends object = {},
-> = S & C & P & InferMethods<T> & Refs & {
-  requestRender?: () => void;
-  error?: Error | null;
-  hasError?: boolean;
-  isLoading?: boolean;
-  /**
-   * Dispatch a DOM CustomEvent from the host element.
-   * Returns true when the event was not defaultPrevented.
-   */
-  emit: <D = any>(eventName: string, detail?: D, options?: CustomEventInit) => boolean;
-};
+  T extends object = object,
+> = S &
+  C &
+  P &
+  InferMethods<T> &
+  Refs & {
+    requestRender?: () => void;
+    error?: Error | null;
+    hasError?: boolean;
+    isLoading?: boolean;
+    /**
+     * Dispatch a DOM CustomEvent from the host element.
+     * Returns true when the event was not defaultPrevented.
+     */
+    emit: <D = unknown>(
+      eventName: string,
+      detail?: D,
+      options?: CustomEventInit,
+    ) => boolean;
+  } & {
+    // Allow indexing into the component context for runtime helpers where
+    // the context shape is dynamic (props, refs, methods, etc.). This keeps
+    // the runtime flexible while preserving strong typing for known fields.
+    [key: string]: unknown;
+  };
 
 export type ComponentConfig<
   S extends object,
-  C extends object = {},
-  P extends object = {},
-  T extends object = {},
+  C extends object = object,
+  P extends object = object,
+  T extends object = object,
 > = {
   props?: Record<
     string,
     {
-      type: StringConstructor | NumberConstructor | BooleanConstructor | FunctionConstructor;
+      type:
+        | StringConstructor
+        | NumberConstructor
+        | BooleanConstructor
+        | FunctionConstructor;
       default?: string | number | boolean;
     }
   >;
-  render: (context: ComponentContext<S, C, P, T>) => VNode | VNode[] | Promise<VNode | VNode[]>;
-  onConnected?: (
+  render: (
     context: ComponentContext<S, C, P, T>,
-  ) => void;
-  onDisconnected?: (
-    context: ComponentContext<S, C, P, T>,
-  ) => void;
+  ) => VNode | VNode[] | Promise<VNode | VNode[]>;
+  onConnected?: (context: ComponentContext<S, C, P, T>) => void;
+  onDisconnected?: (context: ComponentContext<S, C, P, T>) => void;
   onAttributeChanged?: (
     name: string,
     oldValue: string | null,
@@ -136,5 +165,9 @@ export type ComponentConfig<
   // function properties keep their parameter types when a caller supplies
   // the fourth generic. Lifecycle keys are excluded because they're
   // declared above with explicit signatures.
-  [K in keyof T as K extends LifecycleKeys ? never : K]: T[K] extends Function ? T[K] : never;
+  [K in keyof T as K extends LifecycleKeys ? never : K]: T[K] extends (
+    ...args: unknown[]
+  ) => unknown
+    ? T[K]
+    : never;
 };

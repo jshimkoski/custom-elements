@@ -2,7 +2,7 @@
  * Update Scheduler for batching DOM updates
  * Prevents excessive re-renders and improves performance
  */
-import { devError } from "./logger";
+import { devError } from './logger';
 
 class UpdateScheduler {
   private pendingUpdates = new Map<string | (() => void), () => void>();
@@ -18,15 +18,21 @@ class UpdateScheduler {
     // since Map supports using function references as keys (identity-based comparison)
     const key = componentId || update;
     this.pendingUpdates.set(key, update);
-    
+
     if (!this.isFlushScheduled) {
       this.isFlushScheduled = true;
-      
+
       // Check if we're in a test environment
-      const isTestEnv = typeof (globalThis as any).process !== 'undefined' && 
-                        (globalThis as any).process.env?.NODE_ENV === 'test' ||
-                        typeof window !== 'undefined' && ((window as any).__vitest__ || (window as any).Cypress);
-      
+      const maybeProcess = (
+        globalThis as { process?: { env?: { NODE_ENV?: string } } }
+      ).process;
+      const isTestEnv =
+        (typeof maybeProcess !== 'undefined' &&
+          maybeProcess.env?.NODE_ENV === 'test') ||
+        (typeof window !== 'undefined' &&
+          ((window as { __vitest__?: unknown; Cypress?: unknown }).__vitest__ ||
+            (window as { __vitest__?: unknown; Cypress?: unknown }).Cypress));
+
       if (isTestEnv) {
         // Execute synchronously in test environments to avoid timing issues
         this.flush();
@@ -69,6 +75,9 @@ export const updateScheduler = new UpdateScheduler();
 /**
  * Schedule a DOM update to be batched with optional component identity
  */
-export function scheduleDOMUpdate(update: () => void, componentId?: string): void {
+export function scheduleDOMUpdate(
+  update: () => void,
+  componentId?: string,
+): void {
   updateScheduler.schedule(update, componentId);
 }

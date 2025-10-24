@@ -20,18 +20,20 @@ describe('smoke: VDOM -> custom element mounting', () => {
     // Create the parent element and wait for it to render
     const parent = document.createElement('smoke-parent');
     document.body.appendChild(parent);
-    
+
     // Wait briefly to allow custom element lifecycle to run
     await new Promise((r) => setTimeout(r, 100));
 
-    const child = parent.shadowRoot?.querySelector('smoke-child') as HTMLElement | null;
+    const child = parent.shadowRoot?.querySelector(
+      'smoke-child',
+    ) as HTMLElement | null;
     expect(child).toBeTruthy();
-    
+
     // Its shadowRoot should contain the div with the parent's state value
     const inner = child?.shadowRoot?.querySelector('#val');
     expect(inner).toBeTruthy();
     expect((inner as HTMLElement).textContent).toBe('parent-value');
-    
+
     // Cleanup
     document.body.removeChild(parent);
   });

@@ -1,13 +1,16 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
-import { decodeEntities, clearRegisteredEntityMap } from '../src/lib/runtime/helpers';
+import {
+  decodeEntities,
+  clearRegisteredEntityMap,
+} from '../src/lib/runtime/helpers';
 import * as logger from '../src/lib/runtime/logger';
 
 describe('decodeEntities background loader', () => {
   beforeEach(() => {
     // Ensure SSR path by removing document if present
-    // @ts-ignore
-    if (typeof globalThis.document !== 'undefined') delete (globalThis as any).document;
+    if (typeof globalThis.document !== 'undefined')
+      delete (globalThis as any).document;
 
     clearRegisteredEntityMap();
     (decodeEntities as any)._namedMap = undefined;

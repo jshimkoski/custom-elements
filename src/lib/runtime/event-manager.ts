@@ -7,28 +7,38 @@
  * Manages event listeners and their cleanup for elements
  */
 class EventManager {
-  private static cleanupFunctions = new WeakMap<HTMLElement, Array<{
-    event: string;
-    handler: EventListener;
-    wrapper: EventListener;
-    options?: AddEventListenerOptions;
-    cleanup: () => void;
-    addedAt: number;
-  }>>();
-  
+  private static cleanupFunctions = new WeakMap<
+    HTMLElement,
+    Array<{
+      event: string;
+      handler: EventListener;
+      wrapper: EventListener;
+      options?: AddEventListenerOptions;
+      cleanup: () => void;
+      addedAt: number;
+    }>
+  >();
+
   /**
    * Add an event listener with automatic cleanup tracking
    */
   static addListener(
-    element: HTMLElement, 
-    event: string, 
+    element: HTMLElement,
+    event: string,
     handler: EventListener,
-    options?: AddEventListenerOptions
+    options?: AddEventListenerOptions,
   ): void {
     element.addEventListener(event, handler, options);
-    
+
     const cleanup = () => element.removeEventListener(event, handler, options);
-    const meta = { event, handler, wrapper: handler, options, cleanup, addedAt: Date.now() };
+    const meta = {
+      event,
+      handler,
+      wrapper: handler,
+      options,
+      cleanup,
+      addedAt: Date.now(),
+    };
 
     if (!this.cleanupFunctions.has(element)) {
       this.cleanupFunctions.set(element, []);
@@ -36,23 +46,23 @@ class EventManager {
 
     const list = this.cleanupFunctions.get(element)!;
     list.push(meta);
-    (list as any).__metaList = list;
+    (list as Array<unknown> & { __metaList?: unknown }).__metaList = list;
   }
-  
+
   /**
    * Remove a specific event listener
    */
   static removeListener(
-    element: HTMLElement, 
-    event: string, 
+    element: HTMLElement,
+    event: string,
     handler: EventListener,
-    options?: EventListenerOptions
+    options?: EventListenerOptions,
   ): void {
     element.removeEventListener(event, handler, options);
-    
+
     const cleanups = this.cleanupFunctions.get(element);
     if (!cleanups) return;
-    
+
     // Optimized: find and remove in single pass
     for (let i = 0; i < cleanups.length; i++) {
       const m = cleanups[i];
@@ -65,24 +75,24 @@ class EventManager {
       }
     }
   }
-  
+
   /**
    * Clean up all event listeners for an element
    */
   static cleanup(element: HTMLElement): void {
     const list = this.cleanupFunctions.get(element);
     if (list) {
-      list.forEach(m => {
+      list.forEach((m) => {
         try {
           m.cleanup();
-        } catch (error) {
+        } catch {
           // Silently ignore cleanup errors
         }
       });
       this.cleanupFunctions.delete(element);
     }
   }
-  
+
   /**
    * Clean up all tracked event listeners (useful for testing)
    */
@@ -91,7 +101,7 @@ class EventManager {
     // when elements are garbage collected. Reset internal state for testing.
     this.cleanupFunctions = new WeakMap();
   }
-  
+
   /**
    * Check if an element has any tracked event listeners
    */
@@ -99,7 +109,7 @@ class EventManager {
     const list = this.cleanupFunctions.get(element);
     return !!(list && list.length > 0);
   }
-  
+
   /**
    * Get the number of tracked event listeners for an element
    */
@@ -111,10 +121,20 @@ class EventManager {
   /**
    * Return listener metadata stored for the element (test/debug only)
    */
-  static getListenerInfo(element: HTMLElement): Array<{event:string, handler?: Function, wrapper?: Function, options?: any}> {
+  static getListenerInfo(element: HTMLElement): Array<{
+    event: string;
+    handler?: EventListener;
+    wrapper?: EventListener;
+    options?: AddEventListenerOptions;
+  }> {
     const list = this.cleanupFunctions.get(element);
     if (!list) return [];
-    return list.map(m => ({ event: m.event, handler: m.handler, wrapper: m.wrapper, options: m.options }));
+    return list.map((m) => ({
+      event: m.event,
+      handler: m.handler,
+      wrapper: m.wrapper,
+      options: m.options,
+    }));
   }
 }
 

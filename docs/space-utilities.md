@@ -1,4 +1,4 @@
-# 📏 Space Utilities (space-x-* and space-y-*)
+# 📏 Space Utilities (space-x-_ and space-y-_)
 
 Tailwind CSS-style spacing utilities for adding consistent spacing between child elements.
 
@@ -24,9 +24,15 @@ The `space-x-*` and `space-y-*` utilities add margin between child elements usin
 component('button-group', () => {
   return html`
     <div class="flex space-x-4">
-      <button class="px-4 py-2 bg-primary-500 text-white rounded">Button 1</button>
-      <button class="px-4 py-2 bg-primary-500 text-white rounded">Button 2</button>
-      <button class="px-4 py-2 bg-primary-500 text-white rounded">Button 3</button>
+      <button class="px-4 py-2 bg-primary-500 text-white rounded">
+        Button 1
+      </button>
+      <button class="px-4 py-2 bg-primary-500 text-white rounded">
+        Button 2
+      </button>
+      <button class="px-4 py-2 bg-primary-500 text-white rounded">
+        Button 3
+      </button>
     </div>
   `;
 });
@@ -37,7 +43,7 @@ component('button-group', () => {
 ```typescript
 component('notification-list', () => {
   const notifications = ref([...]);
-  
+
   return html`
     <div class="space-y-2">
       ${each(notifications.value, (notif) => html`
@@ -57,7 +63,7 @@ Perfect for animated lists and notification stacks:
 ```typescript
 component('animated-stack', () => {
   const items = ref([...]);
-  
+
   return html`
     ${TransitionGroup({
       tag: 'div',
@@ -80,10 +86,10 @@ Use `space-x-reverse` or `space-y-reverse` to reverse the spacing direction (use
 
 ```typescript
 // RTL horizontal layout
-html`<div class="flex flex-row-reverse space-x-4 space-x-reverse">...</div>`
+html`<div class="flex flex-row-reverse space-x-4 space-x-reverse">...</div>`;
 
 // Bottom-to-top vertical layout
-html`<div class="flex flex-col-reverse space-y-4 space-y-reverse">...</div>`
+html`<div class="flex flex-col-reverse space-y-4 space-y-reverse">...</div>`;
 ```
 
 ### Negative Spacing
@@ -92,10 +98,10 @@ Pull elements closer together with negative values:
 
 ```typescript
 html`<div class="flex -space-x-2">
-  <img src="avatar1.jpg" class="w-10 h-10 rounded-full border-2 border-white">
-  <img src="avatar2.jpg" class="w-10 h-10 rounded-full border-2 border-white">
-  <img src="avatar3.jpg" class="w-10 h-10 rounded-full border-2 border-white">
-</div>`
+  <img src="avatar1.jpg" class="w-10 h-10 rounded-full border-2 border-white" />
+  <img src="avatar2.jpg" class="w-10 h-10 rounded-full border-2 border-white" />
+  <img src="avatar3.jpg" class="w-10 h-10 rounded-full border-2 border-white" />
+</div>`;
 ```
 
 ### Fractional Values
@@ -103,14 +109,16 @@ html`<div class="flex -space-x-2">
 Use fractions for percentage-based spacing:
 
 ```typescript
-html`<div class="space-x-1/2">...</div>  // 50% spacing`
-html`<div class="space-y-1/4">...</div>  // 25% spacing`
+html`<div class="space-x-1/2">...</div>
+  // 50% spacing`;
+html`<div class="space-y-1/4">...</div>
+  // 25% spacing`;
 ```
 
 ### With Responsive Variants
 
 ```typescript
-html`<div class="space-y-2 md:space-y-4 lg:space-y-8">...</div>`
+html`<div class="space-y-2 md:space-y-4 lg:space-y-8">...</div>`;
 ```
 
 ## How It Works
@@ -123,12 +131,15 @@ The utilities use CSS custom properties and the adjacent sibling selector:
 }
 
 .space-x-4 > :not([hidden]) ~ :not([hidden]) {
-  margin-inline-start: calc(calc(0.25rem * 4) * calc(1 - var(--tw-space-x-reverse)));
+  margin-inline-start: calc(
+    calc(0.25rem * 4) * calc(1 - var(--tw-space-x-reverse))
+  );
   margin-inline-end: calc(calc(0.25rem * 4) * var(--tw-space-x-reverse));
 }
 ```
 
 This ensures:
+
 - Only elements after the first get margin
 - Hidden elements are skipped
 - Reverse direction is supported via CSS variables
@@ -147,15 +158,17 @@ All spacing scale values are supported:
 - `space-x-12`, `space-y-12` (3rem)
 - ... and all other spacing values
 
-## Comparison: space-* vs gap-*
+## Comparison: space-_ vs gap-_
 
 ### Use `space-*` when:
+
 - ✅ You want spacing between stacked elements
 - ✅ You're using TransitionGroup (preserves animations)
 - ✅ You need reverse direction support
 - ✅ You're building notification stacks or breadcrumbs
 
 ### Use `gap-*` when:
+
 - ✅ You're using CSS Grid
 - ✅ You're using flexbox with wrap
 - ✅ You want consistent spacing including first/last items
@@ -165,45 +178,57 @@ All spacing scale values are supported:
 ```typescript
 component('notification-demo', () => {
   const notifications = ref<Array<{ id: number; message: string }>>([]);
-  
+
   const addNotification = () => {
     const id = Date.now();
-    notifications.value = [...notifications.value, {
-      id,
-      message: 'New notification!'
-    }];
-    
+    notifications.value = [
+      ...notifications.value,
+      {
+        id,
+        message: 'New notification!',
+      },
+    ];
+
     setTimeout(() => {
-      notifications.value = notifications.value.filter(n => n.id !== id);
+      notifications.value = notifications.value.filter((n) => n.id !== id);
     }, 3000);
   };
-  
+
   return html`
     <div>
-      <button @click="${addNotification}" class="px-4 py-2 bg-primary-500 text-white rounded">
+      <button
+        @click="${addNotification}"
+        class="px-4 py-2 bg-primary-500 text-white rounded"
+      >
         Add Notification
       </button>
-      
+
       <div class="fixed top-4 right-4 w-80 space-y-2">
-        ${TransitionGroup({
-          tag: 'div',
-          class: 'space-y-2',
-          appear: true,
-          enterFrom: 'translate-x-[100%] opacity-0',
-          enterActive: 'transition-all duration-300',
-          enterTo: 'translate-x-0 opacity-100',
-          leaveFrom: 'translate-x-0 opacity-100',
-          leaveActive: 'transition-all duration-200',
-          leaveTo: 'translate-x-[100%] opacity-0',
-          moveClass: 'transition-transform duration-300'
-        }, each(notifications.value, (notif) => html`
-          <div
-            key="${notif.id}"
-            class="p-4 bg-success-100 text-success-900 rounded-lg shadow-lg"
-          >
-            ${notif.message}
-          </div>
-        `))}
+        ${TransitionGroup(
+          {
+            tag: 'div',
+            class: 'space-y-2',
+            appear: true,
+            enterFrom: 'translate-x-[100%] opacity-0',
+            enterActive: 'transition-all duration-300',
+            enterTo: 'translate-x-0 opacity-100',
+            leaveFrom: 'translate-x-0 opacity-100',
+            leaveActive: 'transition-all duration-200',
+            leaveTo: 'translate-x-[100%] opacity-0',
+            moveClass: 'transition-transform duration-300',
+          },
+          each(
+            notifications.value,
+            (notif) => html`
+              <div
+                key="${notif.id}"
+                class="p-4 bg-success-100 text-success-900 rounded-lg shadow-lg"
+              >
+                ${notif.message}
+              </div>
+            `,
+          ),
+        )}
       </div>
     </div>
   `;
@@ -213,6 +238,7 @@ component('notification-demo', () => {
 ## Implementation Details
 
 The `parseSpaceUtility()` function in `style.ts`:
+
 - Parses `space-x-*` and `space-y-*` classes
 - Supports numeric values (multiplied by `0.25rem`)
 - Supports fractional values (converted to percentages)

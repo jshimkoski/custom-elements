@@ -222,7 +222,7 @@ describe('Gradient Utilities', () => {
       expect(css).toContain('.from-primary-500\\/90');
       expect(css).toContain('.via-secondary-400\\/80');
       expect(css).toContain('.to-success-500\\/70');
-      
+
       // Check that gradient variables are present
       expect(css).toContain('--ce-gradient-from');
       expect(css).toContain('--ce-gradient-to');

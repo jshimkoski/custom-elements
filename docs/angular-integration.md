@@ -7,22 +7,23 @@ Quick guide for using Custom Elements Runtime components inside Angular.
 1. Register a component (same runtime API):
 
 ```ts
-import { component, ref, html, useEmit } from '@jasonshimmy/custom-elements-runtime';
+import {
+  component,
+  ref,
+  html,
+  useEmit,
+} from '@jasonshimmy/custom-elements-runtime';
 
 component('my-counter', ({ initialCount = 0 }: { initialCount?: number }) => {
   const count = ref(initialCount);
   const emit = useEmit();
-  
+
   const handleClick = () => {
     count.value++;
     emit('count-changed', { count: count.value });
   };
-  
-  return html`
-    <button @click="${handleClick}">
-      Count: ${count.value}
-    </button>
-  `;
+
+  return html` <button @click="${handleClick}">Count: ${count.value}</button> `;
 });
 ```
 
@@ -38,7 +39,10 @@ export class AppModule {}
 
 ```html
 <!-- prefer property binding for non-string values -->
-<my-counter [initialCount]="count" (count-changed)="onCountChange($event)"></my-counter>
+<my-counter
+  [initialCount]="count"
+  (count-changed)="onCountChange($event)"
+></my-counter>
 <!-- plain usage for simple/standalone elements -->
 <my-counter></my-counter>
 ```
@@ -49,6 +53,8 @@ export class AppModule {}
 - Static string values may be supplied as attributes (e.g. prop="text").
 - Listen for CustomEvents in templates with `(event)="handler($event)"`. CustomEvent payloads are available on `$event.detail`.
 - For programmatic access or attaching listeners, use `@ViewChild` to get the element reference and call `addEventListener`.
+
+Compatibility note: the runtime's `emit()` helper dispatches standard CustomEvents and will, in some cases, also dispatch alternate event-name variants (for example, emitting `update:model-value` may also dispatch `update:modelValue` to improve framework compatibility). Angular template parsers usually work with kebab-cased event names; if you encounter template parsing issues with colon-containing event names, attach listeners programmatically via `@ViewChild` + `addEventListener` and read the payload from `$event.detail` or the event object's `detail` property.
 
 Note: the runtime's compiler and renderer prefer JS property assignment for bound values in many cases. For native elements a curated list of promotable attributes (for example `value`, `checked`, `disabled`) will be set as properties when bound; for custom elements any bound attribute is promoted to a JS property on the instance and kebab-case attribute names are converted to camelCase property names. This ensures non-string values (objects, functions) and reactivity reach the element immediately.
 
@@ -85,14 +91,17 @@ Compiler behavior: when using the runtime's `html` compiler, `:model` (argument-
 import { Component } from '@angular/core';
 
 @Component({
-	selector: 'my-wrapper',
-	template: `
-		<my-custom [value]="value" (update:value)="value = $event.detail"></my-custom>
-		<p>{{ value }}</p>
-	`,
+  selector: 'my-wrapper',
+  template: `
+    <my-custom
+      [value]="value"
+      (update:value)="value = $event.detail"
+    ></my-custom>
+    <p>{{ value }}</p>
+  `,
 })
 export class MyWrapperComponent {
-	value = 'hello';
+  value = 'hello';
 }
 ```
 

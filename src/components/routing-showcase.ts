@@ -1,11 +1,18 @@
-import { component, html, ref, initRouter } from "../lib";
+import { component, html, ref } from '../lib';
+import { initRouter } from '../lib/router';
 
-component("home-page", () => {
-  const name = ref("testing");
+// Export a top-level function so tests can exercise and cover it directly.
+export function homeDoSomething() {
+  console.log('Doing something');
+}
 
-  const doSomething = () => {
-    console.log("Doing something");
-  };
+component('home-page', () => {
+  const name = ref('testing');
+
+  // Use the top-level function in the template so runtime still wires the
+  // click handler to the same behavior while allowing coverage tools to
+  // attribute execution to a named function.
+  const doSomething = homeDoSomething;
 
   return html`
     <div class="space-y-4 p-4">
@@ -24,7 +31,7 @@ component("home-page", () => {
 });
 
 component(
-  "about-page",
+  'about-page',
   () => html`
     <div>
       <h1>About</h1>
@@ -35,21 +42,21 @@ component(
       >
       <home-page></home-page>
     </div>
-  `
+  `,
 );
 
 const routes = [
-  { path: "/routing", component: "home-page" },
-  { path: "/about", component: "about-page" },
+  { path: '/routing', component: 'home-page' },
+  { path: '/about', component: 'about-page' },
 ];
 
 initRouter({ routes });
 
 component(
-  "routing-showcase",
+  'routing-showcase',
   () => html`
     <div>
       <router-view></router-view>
     </div>
-  `
+  `,
 );

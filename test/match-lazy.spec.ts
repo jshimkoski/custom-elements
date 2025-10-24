@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { match, html } from '../src/lib/index';
+import { html } from '../src/lib/index';
+import { match } from '../src/lib/directives';
 
 describe('match lazy factory', () => {
   it('does not evaluate factory for non-taken branch', () => {

@@ -15,12 +15,12 @@ Directives provide powerful, declarative control over rendering in your custom e
 Render content only if a condition is true.
 
 ```typescript
-import { when } from '@jasonshimmy/custom-elements-runtime';
+import { when } from '@jasonshimmy/custom-elements-runtime/directives';
+import { useProps } from '@jasonshimmy/custom-elements-runtime';
 
-component('conditional-component', ({ isVisible = false }) => {
-  return html`
-    ${when(isVisible, html`<div>Visible!</div>`)}
-  `;
+component('conditional-component', () => {
+  const props = useProps({ isVisible: false });
+  return html` ${when(props.isVisible, html`<div>Visible!</div>`)} `;
 });
 ```
 
@@ -55,41 +55,53 @@ ${when(isVisible, () => html`<div>${computeExpensive()}</div>`) }
 Why this exists (short): JavaScript evaluates template literal interpolations eagerly before the runtime/directive sees them. If the inner expression throws or performs expensive work, the only reliable way to avoid that evaluation at runtime is to defer constructing the VNode(s) with a function.
 
 Notes:
+
 - This is a runtime-only behavior. No build or compile-time transform is required or used.
 - Use the factory form when you need guarded/eager-avoidant behavior.
+
+Implementation note: The runtime wraps conditional content in stable "anchor blocks" which provide consistent start/end boundaries for the renderer. Anchor blocks preserve meaningful falsy children such as `0`, `false`, and the empty string `''` — only `null` and `undefined` are filtered out. This design ensures predictable DOM anchors for `when`/`match` branches and avoids accidental loss of valid falsy values.
 
 ## 🔄 each Directive
 
 Render a list of items.
 
 ```typescript
-import { each } from '@jasonshimmy/custom-elements-runtime';
+import { each } from '@jasonshimmy/custom-elements-runtime/directives';
+import { useProps } from '@jasonshimmy/custom-elements-runtime';
 
-component('list-component', ({ items = [] }) => {
+component('list-component', () => {
+  const props = useProps({ items: [] as any[] });
   return html`
     <ul>
-      ${each(items, (item, i) => html`<li>${i}: ${item}</li>`)}
+      ${each(props.items, (item, i) => html`<li>${i}: ${item}</li>`)}
     </ul>
   `;
 });
 ```
+
 - First argument: array to iterate
 - Second argument: callback receives item and index, returns content
+
+Implementation note: When possible provide a stable key for list items. The runtime will use a primitive value as the key for primitives, or prefer `item.key` or `item.id` for objects. If no key-like property exists the renderer falls back to an index-derived identity (`idx-<index>`). Supplying stable keys prevents unnecessary remounts and keeps form controls and focus stable across updates.
 
 ## 🧩 match Directive
 
 Pattern matching for multiple cases.
 
 ```typescript
-import { match } from '@jasonshimmy/custom-elements-runtime';
+import { match } from '@jasonshimmy/custom-elements-runtime/directives';
+import { useProps } from '@jasonshimmy/custom-elements-runtime';
 
-component('status-display', ({ status = 'loading' }: { status?: string }) => {
+component('status-display', () => {
+  const props = useProps({
+    status: 'loading' as 'loading' | 'error' | 'success',
+  });
   return html`
     ${match()
-      .when(status === 'loading', html`<div>Loading...</div>`)
-      .when(status === 'error', html`<div>Error!</div>`)
-      .when(status === 'success', html`<div>Success!</div>`)
-      .otherwise(true, html`<div>Unknown status</div>`)
+      .when(props.status === 'loading', html`<div>Loading...</div>`)
+      .when(props.status === 'error', html`<div>Error!</div>`)
+      .when(props.status === 'success', html`<div>Success!</div>`)
+      .otherwise(html`<div>Unknown status</div>`)
       .done()}
   `;
 });
@@ -101,42 +113,17 @@ The `match` directive follows the same runtime-only lazy principle. Branch conte
 
 Example:
 
-```ts
-match()
-  .when(false, () => html`<div>${expensive()}</div>`) // not evaluated
-  .when(true, html`<div>fallback</div>`) // evaluated and returned
-  .done();
-```
-
-Notes:
-- The factory is only executed for the branch that matches. This is a runtime-only mechanism (no compiler transforms).
-- Existing `match().when(cond, html`...`)` users are unaffected.
-
-### ✅ When to use the factory overload
-
-- When the interpolated expression may throw (parsing user input, calling a function that can throw).
-- When constructing the children is computationally expensive and you want to avoid that cost while the condition is falsy.
-
-### Anchor child normalization (preserving falsy children)
-
-The runtime's anchor block normalization preserves meaningful falsy children like `0`, `false`, and the empty string `''`. Only `null` and `undefined` are filtered out when an anchor block's children are normalized. This ensures you can reliably render intentionally falsy values inside conditional blocks.
-
-## 🧪 Example: All Directives Together
-
 ```typescript
-component('directive-demo', ({
-  initialItems = [1, 2, 3],
-  initialShow = true,
-  initialStatus = 'loading'
-}: {
-  initialItems?: number[];
-  initialShow?: boolean; 
-  initialStatus?: 'loading' | 'error' | 'success' | 'unknown';
-}) => {
-  const items = ref(initialItems);
-  const show = ref(initialShow);
-  const status = ref(initialStatus);
-  
+component('directive-demo', () => {
+  const props = useProps({
+    initialItems: [1, 2, 3] as number[],
+    initialShow: true,
+    initialStatus: 'loading' as 'loading' | 'error' | 'success' | 'unknown',
+  });
+  const items = ref(props.initialItems);
+  const show = ref(props.initialShow);
+  const status = ref(props.initialStatus);
+
   return html`
     ${when(show.value, html`<h2>List:</h2>`)}
     <ul>
@@ -146,7 +133,7 @@ component('directive-demo', ({
       .when(status.value === 'loading', html`<div>Loading...</div>`)
       .when(status.value === 'error', html`<div>Error!</div>`)
       .when(status.value === 'success', html`<div>Success!</div>`)
-      .otherwise(true, html`<div>Unknown status</div>`)
+      .otherwise(html`<div>Unknown status</div>`)
       .done()}
   `;
 });
