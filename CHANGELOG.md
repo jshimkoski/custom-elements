@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v2.0.0] - 2025-10-24
+
+- BREAKING CHANGE: imports have been split to reduce bundle size. Read docs for details. (ad071aa)
+- fix: fix router-link rendering issues (2cfb6ea)
+
+
 
 ## [v1.2.3] - 2025-10-17
 
