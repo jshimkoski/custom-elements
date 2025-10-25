@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v2.0.1] - 2025-10-24
+
+- fix: correct props examples in documentation (689421f)
+- BREAKING CHANGE: imports have been split to reduce bundle size. Read docs for details. (ad071aa)
+
+
 ## [v2.0.0] - 2025-10-24
 
 - BREAKING CHANGE: imports have been split to reduce bundle size. Read docs for details. (ad071aa)
