@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v2.1.1] - 2025-10-25
+
+- fix: remove css root export (681a276)
+- feat: add global style exports fix: ensure css variables are namespaced (7953507)
+
+
 ## [v2.1.0] - 2025-10-25
 
 - feat: add global style exports fix: ensure css variables are namespaced (7953507)
