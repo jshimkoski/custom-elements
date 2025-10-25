@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v2.0.2] - 2025-10-25
+
+- fix: clean up functional api docs (6e87f34)
+- fix: correct props examples in documentation (689421f)
+
+
 ## [v2.0.1] - 2025-10-24
 
 - fix: correct props examples in documentation (689421f)
