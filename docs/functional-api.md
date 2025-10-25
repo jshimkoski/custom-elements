@@ -26,9 +26,8 @@ The Custom Elements Runtime provides a powerful, intuitive functional component 
 - **🔧 Zero Configuration** - No complex setup required
 - **⚡ Automatic Reactivity** - All props are automatically reactive
 - **🎯 Type Safety** - Full TypeScript inference from function signatures
-- **📦 Props (avoid destructuring)** - Props are provided via `useProps()` with defaults and type inference. Avoid destructuring into local variables if you need reactivity — read from the `props` object or use `computed`/`watch` for derived reactive values.
+- **📦 Props** - Props are provided via `useProps()` with defaults and type inference. Avoid destructuring into local variables if you need reactivity — read from the `props` object or use `computed`/`watch` for derived reactive values.
 - **🚀 Strongly Typed Hooks** - React-style hooks with perfect TypeScript inference
-- **🔄 Automatic Prop Parsing** - Runtime extracts prop defaults from function signature
 - **🔄 Automatic Prop Parsing** - Runtime extracts prop defaults from your `useProps()` calls (via a short discovery render in the browser) and uses them to infer prop types and observed attributes
 - **💡 Intuitive API** - Familiar patterns similar to modern React/Vue components
 
@@ -135,13 +134,66 @@ component('user-card', () => {
 ### Usage in HTML
 
 ```html
+<!-- Primitive values (strings, numbers, booleans) as attributes -->
 <user-card
   name="John Doe"
   age="30"
   email="john@example.com"
   is-active="true"
-  tags='["developer", "typescript"]'
 ></user-card>
+
+<!-- Complex types (arrays/objects) should be passed as JS properties or bound via :bind
+     Attributes containing JSON strings are NOT automatically parsed into arrays/objects. -->
+<script>
+  // Recommended: set as a JavaScript property after creating the element
+  const el = document.createElement('user-card');
+  el.name = 'John Doe';
+  el.tags = ['developer', 'typescript']; // pass an actual array
+  document.body.appendChild(el);
+</script>
+```
+
+### Complex types and attributes
+
+The runtime only performs automatic attribute-to-prop conversion for primitive types (String, Number, Boolean). If you declare a prop with a complex default (for example `tags: [] as string[]`), attribute values remain raw strings — they are not automatically parsed as JSON into arrays or objects.
+
+Recommended patterns:
+
+- Pass complex values as actual JavaScript properties on the element (preferred).
+- Use the runtime's `:bind`/property-binding mechanisms from a parent component so the child receives real JS values.
+- If you must accept a JSON string via an attribute, explicitly parse it inside your component and handle errors gracefully.
+
+Example: safe parsing fallback inside a component
+
+```ts
+component('user-card', () => {
+  const props = useProps({ name: 'Anonymous', tags: [] as string[] });
+
+  // Ensure tags is an array whether it came from a property or an attribute string
+  function parseTags(raw: unknown): string[] {
+    if (Array.isArray(raw)) return raw as string[];
+    if (typeof raw === 'string' && raw.trim()) {
+      try {
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  }
+
+  const tags = parseTags(props.tags as unknown);
+
+  return html`
+    <div>
+      <h3>${props.name}</h3>
+      <ul>
+        ${tags.map((t) => html`<li>${t}</li>`)}
+      </ul>
+    </div>
+  `;
+});
 ```
 
 ### Automatic Type Inference
@@ -483,6 +535,8 @@ component('complex-props', () => {
 });
 ```
 
+Note: `:bind` prefers to assign values as JavaScript properties (not attributes) so complex objects and functions are passed as real JS values to the child. A few caveats: `data-*`, `aria-*`, and `class` keys remain attributes for reliable HTML serialization; native controls (inputs/selects/textareas/buttons) treat `disabled` specially and may prefer attribute semantics unless the value is clearly boolean or a reactive/wrapper; if property assignment throws the runtime will fall back to `setAttribute()` with a serialized value. `:bind` also accepts a string expression (evaluated in the render context) which can produce an object to be bound the same way.
+
 ### Class Binding (`:class`)
 
 Dynamic class management with object and array syntax:
@@ -725,6 +779,20 @@ component('focusable-input', () => {
   `;
 });
 ```
+
+#### Notes about `:ref`
+
+- Supported forms:
+  - Reactive ref objects (e.g. `const r = ref(null)`) — the runtime will assign the element to `r.value`.
+  - Callback refs (functions) — the runtime will call the function with the element when assigned.
+  - String refs (legacy) — the runtime stores the element in the component's internal `refs` map as `refs['name'] = element`.
+
+- Lifecycle & cleanup:
+  - Reactive refs are assigned during render and are available by the time connected hooks (for example `useOnConnected`) run. They are not automatically nulled on unmount — clear them yourself in a disconnect hook if you need `null` to indicate cleanup.
+  - String refs are removed from the internal `refs` map when nodes are cleaned up by the runtime.
+  - Callback refs are invoked on assignment but are not automatically called with `null` on cleanup.
+
+- Browser-only: `:ref` only makes sense in a DOM environment — on the server there is no element to assign.
 
 ## 🔀 Conditional Rendering and Lists
 
