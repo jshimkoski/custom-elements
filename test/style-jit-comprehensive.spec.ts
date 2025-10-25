@@ -101,30 +101,32 @@ describe('JIT CSS Comprehensive Tests', () => {
     it('should parse background colors', () => {
       const result = parseColorClass('bg-primary-500');
       expect(result).toBe(
-        'background-color:var(--color-primary-500, #3b82f6);',
+        'background-color:var(--cer-color-primary-500, #3b82f6);',
       );
     });
 
     it('should parse text colors', () => {
       const result = parseColorClass('text-error-600');
-      expect(result).toBe('color:var(--color-error-600, #dc2626);');
+      expect(result).toBe('color:var(--cer-color-error-600, #dc2626);');
     });
 
     it('should parse border colors', () => {
       const result = parseColorClass('border-success-400');
-      expect(result).toBe('border-color:var(--color-success-400, #4ade80);');
+      expect(result).toBe(
+        'border-color:var(--cer-color-success-400, #4ade80);',
+      );
     });
 
     it('should parse shadow colors', () => {
       const result = parseColorClass('shadow-neutral-500');
       expect(result).toBe(
-        '--ce-shadow-color:var(--color-neutral-500, #71717b);',
+        '--cer-shadow-color:var(--cer-color-neutral-500, #71717b);',
       );
     });
 
     it('should handle DEFAULT shade', () => {
       const result = parseColorClass('bg-white');
-      expect(result).toBe('background-color:var(--color-white, #ffffff);');
+      expect(result).toBe('background-color:var(--cer-color-white, #ffffff);');
     });
 
     it('should return null for invalid colors', () => {
@@ -161,14 +163,14 @@ describe('JIT CSS Comprehensive Tests', () => {
     it('should handle colors without opacity', () => {
       const result = parseColorWithOpacity('bg-primary-500');
       expect(result).toBe(
-        'background-color:var(--color-primary-500, #3b82f6);',
+        'background-color:var(--cer-color-primary-500, #3b82f6);',
       );
     });
 
     it('should handle invalid opacity values', () => {
       const result = parseColorWithOpacity('bg-primary-500/150');
       expect(result).toBe(
-        'background-color:var(--color-primary-500, #3b82f6);',
+        'background-color:var(--cer-color-primary-500, #3b82f6);',
       );
     });
   });
@@ -312,16 +314,18 @@ describe('JIT CSS Comprehensive Tests', () => {
       const html = '<div class="bg-primary-500 text-white">Content</div>';
       const css = jitCSS(html);
       expect(css).toContain(
-        '.bg-primary-500{background-color:var(--color-primary-500, #3b82f6);}',
+        '.bg-primary-500{background-color:var(--cer-color-primary-500, #3b82f6);}',
       );
-      expect(css).toContain('.text-white{color:var(--color-white, #ffffff);}');
+      expect(css).toContain(
+        '.text-white{color:var(--cer-color-white, #ffffff);}',
+      );
     });
 
     it('should generate CSS for hover states', () => {
       const html = '<div class="hover:bg-primary-500">Content</div>';
       const css = jitCSS(html);
       expect(css).toContain(
-        '.hover\\:bg-primary-500:hover{background-color:var(--color-primary-500,',
+        '.hover\\:bg-primary-500:hover{background-color:var(--cer-color-primary-500,',
       );
     });
 

@@ -64,18 +64,20 @@ export const baseReset = css`
   }
   :host {
     display: contents;
-    font: 16px/1.5 var(--font-sans, ui-sans-serif, system-ui, sans-serif);
+    font: 16px/1.5 var(--cer-font-sans, ui-sans-serif, system-ui, sans-serif);
     /* Default CE line-height variable so leading-* can reliably override */
-    --ce-line-height: 1.5;
+    --cer-line-height: 1.5;
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
     /* Default gradient variables to avoid undefined var() usage in generated utilities */
-    --ce-gradient-from-position: 0%;
-    --ce-gradient-to-position: 100%;
-    --ce-gradient-via-position: 50%;
-    --ce-gradient-from: rgba(255, 255, 255, 0);
-    --ce-gradient-to: rgba(255, 255, 255, 0);
-    --ce-gradient-stops: var(--ce-gradient-from), var(--ce-gradient-to);
+    --cer-gradient-from-position: 0%;
+    --cer-gradient-to-position: 100%;
+    --cer-gradient-via-position: 50%;
+    --cer-gradient-from: rgba(255, 255, 255, 0);
+    --cer-gradient-to: rgba(255, 255, 255, 0);
+    --cer-gradient-stops: var(--cer-gradient-from), var(--cer-gradient-to);
   }
   button,
   input,
@@ -130,7 +132,7 @@ export const baseReset = css`
     opacity: 0.5;
   }
   *:focus-visible {
-    outline: 2px solid var(--color-primary-500, #3b82f6);
+    outline: 2px solid var(--cer-color-primary-500, #3b82f6);
     outline-offset: 2px;
   }
   ol,
@@ -283,7 +285,7 @@ export const colors: Record<
     Object.fromEntries(
       Object.entries(shades).map(([shade, hex]) => [
         shade,
-        `var(--color-${name}${shade === 'DEFAULT' ? '' : `-${shade}`}, ${hex})`,
+        `var(--cer-color-${name}${shade === 'DEFAULT' ? '' : `-${shade}`}, ${hex})`,
       ]),
     ),
   ]),
@@ -481,7 +483,7 @@ const generateUtilities = (): CSSMap => {
   });
 
   // Font sizes with proper line heights
-  // Use a CSS variable `--ce-line-height` so `leading-*` utilities can override
+  // Use a CSS variable `--cer-line-height` so `leading-*` utilities can override
   // the line-height set by `text-*` utilities. Each `text-*` will provide a
   // sensible fallback for the variable matching the previous behavior.
   const fontSizes = [
@@ -500,10 +502,10 @@ const generateUtilities = (): CSSMap => {
     ['text-9xl', '8rem', '1'],
   ];
   fontSizes.forEach(([name, size, lineHeight]) => {
-    // Set font-size and use --ce-line-height with the previous numeric fallback.
-    // This allows `leading-*` to set `--ce-line-height` and take precedence.
+    // Set font-size and use --cer-line-height with the previous numeric fallback.
+    // This allows `leading-*` to set `--cer-line-height` and take precedence.
     utils[name] =
-      `font-size:${size};line-height:var(--ce-line-height,${lineHeight});`;
+      `font-size:${size};line-height:var(--cer-line-height,${lineHeight});`;
   });
 
   // Letter spacing (tracking)
@@ -520,7 +522,7 @@ const generateUtilities = (): CSSMap => {
   });
 
   // Line height (leading)
-  // Instead of writing `line-height` directly, set the `--ce-line-height` CSS
+  // Instead of writing `line-height` directly, set the `--cer-line-height` CSS
   // variable. This allows `leading-*` to work alongside `text-*` utilities by
   // overriding the variable rather than fighting with later rule order.
   const leading = [
@@ -541,12 +543,12 @@ const generateUtilities = (): CSSMap => {
   ];
   leading.forEach(([name, value]) => {
     // Include a direct line-height for backwards compatibility/testing while
-    // also setting the --ce-line-height variable and applying the var-based
+    // also setting the --cer-line-height variable and applying the var-based
     // line-height. Having the direct value present satisfies existing tests
     // that look for the literal `line-height:...;` substring, and the
     // var-based declaration allows `leading-*` to reliably override `text-*`.
     utils[name] =
-      `line-height:${value};--ce-line-height:${value};line-height:var(--ce-line-height,${value});`;
+      `line-height:${value};--cer-line-height:${value};line-height:var(--cer-line-height,${value});`;
   });
 
   // Font families
@@ -566,10 +568,10 @@ const generateUtilities = (): CSSMap => {
   }
   Object.assign(utils, {
     'font-sans':
-      'font-family:var(--font-sans, ui-sans-serif,system-ui,sans-serif);',
-    'font-serif': 'font-family:var(--font-serif, ui-serif,Georgia,serif);',
+      'font-family:var(--cer-font-sans, ui-sans-serif,system-ui,sans-serif);',
+    'font-serif': 'font-family:var(--cer-font-serif, ui-serif,Georgia,serif);',
     'font-mono':
-      'font-family:var(--font-mono, ui-monospace,SFMono-Regular,monospace);',
+      'font-family:var(--cer-font-mono, ui-monospace,SFMono-Regular,monospace);',
     border: 'border-width:1px;',
     'border-t': 'border-top-width:1px;',
     'border-r': 'border-right-width:1px;',
@@ -617,21 +619,21 @@ const generateUtilities = (): CSSMap => {
   // Shadows
   Object.assign(utils, {
     'shadow-none':
-      '--ce-shadow-color:rgb(0 0 0 / 0);box-shadow:0 0 var(--ce-shadow-color, #0000);',
+      '--cer-shadow-color:rgb(0 0 0 / 0);box-shadow:0 0 var(--cer-shadow-color, #0000);',
     'shadow-xs':
-      '--ce-shadow-color:rgb(0 0 0 / 0.05);box-shadow:0 1px 2px 0 var(--ce-shadow-color, rgb(0 0 0 / 0.05));',
+      '--cer-shadow-color:rgb(0 0 0 / 0.05);box-shadow:0 1px 2px 0 var(--cer-shadow-color, rgb(0 0 0 / 0.05));',
     'shadow-sm':
-      '--ce-shadow-color:rgb(0 0 0 / 0.1);box-shadow:0 1px 3px 0 var(--ce-shadow-color, rgb(0 0 0 / 0.1)),0 1px 2px -1px var(--ce-shadow-color, rgb(0 0 0 / 0.1));',
+      '--cer-shadow-color:rgb(0 0 0 / 0.1);box-shadow:0 1px 3px 0 var(--cer-shadow-color, rgb(0 0 0 / 0.1)),0 1px 2px -1px var(--cer-shadow-color, rgb(0 0 0 / 0.1));',
     shadow:
-      '--ce-shadow-color:rgb(0 0 0 / 0.1);box-shadow:0 1px 3px 0 var(--ce-shadow-color, rgb(0 0 0 / 0.1)),0 1px 2px -1px var(--ce-shadow-color, rgb(0 0 0 / 0.1));',
+      '--cer-shadow-color:rgb(0 0 0 / 0.1);box-shadow:0 1px 3px 0 var(--cer-shadow-color, rgb(0 0 0 / 0.1)),0 1px 2px -1px var(--cer-shadow-color, rgb(0 0 0 / 0.1));',
     'shadow-md':
-      '--ce-shadow-color:rgb(0 0 0 / 0.1);box-shadow:0 4px 6px -1px var(--ce-shadow-color, rgb(0 0 0 / 0.1)),0 2px 4px -2px var(--ce-shadow-color, rgb(0 0 0 / 0.1));',
+      '--cer-shadow-color:rgb(0 0 0 / 0.1);box-shadow:0 4px 6px -1px var(--cer-shadow-color, rgb(0 0 0 / 0.1)),0 2px 4px -2px var(--cer-shadow-color, rgb(0 0 0 / 0.1));',
     'shadow-lg':
-      '--ce-shadow-color:rgb(0 0 0 / 0.1);box-shadow:0 10px 15px -3px var(--ce-shadow-color, rgb(0 0 0 / 0.1)),0 4px 6px -4px var(--ce-shadow-color, rgb(0 0 0 / 0.1));',
+      '--cer-shadow-color:rgb(0 0 0 / 0.1);box-shadow:0 10px 15px -3px var(--cer-shadow-color, rgb(0 0 0 / 0.1)),0 4px 6px -4px var(--cer-shadow-color, rgb(0 0 0 / 0.1));',
     'shadow-xl':
-      '--ce-shadow-color:rgb(0 0 0 / 0.1);box-shadow:0 20px 25px -5px var(--ce-shadow-color, rgb(0 0 0 / 0.1)),0 8px 10px -6px var(--ce-shadow-color, rgb(0 0 0 / 0.1));',
+      '--cer-shadow-color:rgb(0 0 0 / 0.1);box-shadow:0 20px 25px -5px var(--cer-shadow-color, rgb(0 0 0 / 0.1)),0 8px 10px -6px var(--cer-shadow-color, rgb(0 0 0 / 0.1));',
     'shadow-2xl':
-      '--ce-shadow-color:rgb(0 0 0 / 0.25);box-shadow:0 25px 50px -12px var(--ce-shadow-color, rgb(0 0 0 / 0.25));',
+      '--cer-shadow-color:rgb(0 0 0 / 0.25);box-shadow:0 25px 50px -12px var(--cer-shadow-color, rgb(0 0 0 / 0.25));',
     'shadow-inner': 'box-shadow:inset 0 2px 4px 0 rgb(0 0 0 / 0.05);',
   });
 
@@ -829,79 +831,79 @@ const generateUtilities = (): CSSMap => {
   Object.assign(utils, {
     // Linear gradients
     'bg-linear-to-t':
-      'background-image:linear-gradient(to top, var(--ce-gradient-stops));',
+      'background-image:linear-gradient(to top, var(--cer-gradient-stops));',
     'bg-linear-to-tr':
-      'background-image:linear-gradient(to top right, var(--ce-gradient-stops));',
+      'background-image:linear-gradient(to top right, var(--cer-gradient-stops));',
     'bg-linear-to-r':
-      'background-image:linear-gradient(to right, var(--ce-gradient-stops));',
+      'background-image:linear-gradient(to right, var(--cer-gradient-stops));',
     'bg-linear-to-br':
-      'background-image:linear-gradient(to bottom right, var(--ce-gradient-stops));',
+      'background-image:linear-gradient(to bottom right, var(--cer-gradient-stops));',
     'bg-linear-to-b':
-      'background-image:linear-gradient(to bottom, var(--ce-gradient-stops));',
+      'background-image:linear-gradient(to bottom, var(--cer-gradient-stops));',
     'bg-linear-to-bl':
-      'background-image:linear-gradient(to bottom left, var(--ce-gradient-stops));',
+      'background-image:linear-gradient(to bottom left, var(--cer-gradient-stops));',
     'bg-linear-to-l':
-      'background-image:linear-gradient(to left, var(--ce-gradient-stops));',
+      'background-image:linear-gradient(to left, var(--cer-gradient-stops));',
     'bg-linear-to-tl':
-      'background-image:linear-gradient(to top left, var(--ce-gradient-stops));',
+      'background-image:linear-gradient(to top left, var(--cer-gradient-stops));',
 
     // Radial gradients
     'bg-radial':
-      'background-image:radial-gradient(ellipse at center, var(--ce-gradient-stops));',
+      'background-image:radial-gradient(ellipse at center, var(--cer-gradient-stops));',
     'bg-radial-at-t':
-      'background-image:radial-gradient(ellipse at top, var(--ce-gradient-stops));',
+      'background-image:radial-gradient(ellipse at top, var(--cer-gradient-stops));',
     'bg-radial-at-tr':
-      'background-image:radial-gradient(ellipse at top right, var(--ce-gradient-stops));',
+      'background-image:radial-gradient(ellipse at top right, var(--cer-gradient-stops));',
     'bg-radial-at-r':
-      'background-image:radial-gradient(ellipse at right, var(--ce-gradient-stops));',
+      'background-image:radial-gradient(ellipse at right, var(--cer-gradient-stops));',
     'bg-radial-at-br':
-      'background-image:radial-gradient(ellipse at bottom right, var(--ce-gradient-stops));',
+      'background-image:radial-gradient(ellipse at bottom right, var(--cer-gradient-stops));',
     'bg-radial-at-b':
-      'background-image:radial-gradient(ellipse at bottom, var(--ce-gradient-stops));',
+      'background-image:radial-gradient(ellipse at bottom, var(--cer-gradient-stops));',
     'bg-radial-at-bl':
-      'background-image:radial-gradient(ellipse at bottom left, var(--ce-gradient-stops));',
+      'background-image:radial-gradient(ellipse at bottom left, var(--cer-gradient-stops));',
     'bg-radial-at-l':
-      'background-image:radial-gradient(ellipse at left, var(--ce-gradient-stops));',
+      'background-image:radial-gradient(ellipse at left, var(--cer-gradient-stops));',
     'bg-radial-at-tl':
-      'background-image:radial-gradient(ellipse at top left, var(--ce-gradient-stops));',
+      'background-image:radial-gradient(ellipse at top left, var(--cer-gradient-stops));',
     'bg-radial-circle':
-      'background-image:radial-gradient(circle at center, var(--ce-gradient-stops));',
+      'background-image:radial-gradient(circle at center, var(--cer-gradient-stops));',
     'bg-radial-circle-at-t':
-      'background-image:radial-gradient(circle at top, var(--ce-gradient-stops));',
+      'background-image:radial-gradient(circle at top, var(--cer-gradient-stops));',
     'bg-radial-circle-at-tr':
-      'background-image:radial-gradient(circle at top right, var(--ce-gradient-stops));',
+      'background-image:radial-gradient(circle at top right, var(--cer-gradient-stops));',
     'bg-radial-circle-at-r':
-      'background-image:radial-gradient(circle at right, var(--ce-gradient-stops));',
+      'background-image:radial-gradient(circle at right, var(--cer-gradient-stops));',
     'bg-radial-circle-at-br':
-      'background-image:radial-gradient(circle at bottom right, var(--ce-gradient-stops));',
+      'background-image:radial-gradient(circle at bottom right, var(--cer-gradient-stops));',
     'bg-radial-circle-at-b':
-      'background-image:radial-gradient(circle at bottom, var(--ce-gradient-stops));',
+      'background-image:radial-gradient(circle at bottom, var(--cer-gradient-stops));',
     'bg-radial-circle-at-bl':
-      'background-image:radial-gradient(circle at bottom left, var(--ce-gradient-stops));',
+      'background-image:radial-gradient(circle at bottom left, var(--cer-gradient-stops));',
     'bg-radial-circle-at-l':
-      'background-image:radial-gradient(circle at left, var(--ce-gradient-stops));',
+      'background-image:radial-gradient(circle at left, var(--cer-gradient-stops));',
     'bg-radial-circle-at-tl':
-      'background-image:radial-gradient(circle at top left, var(--ce-gradient-stops));',
+      'background-image:radial-gradient(circle at top left, var(--cer-gradient-stops));',
 
     // Conic gradients
     'bg-conic':
-      'background-image:conic-gradient(from 0deg at center, var(--ce-gradient-stops));',
+      'background-image:conic-gradient(from 0deg at center, var(--cer-gradient-stops));',
     'bg-conic-at-t':
-      'background-image:conic-gradient(from 0deg at top, var(--ce-gradient-stops));',
+      'background-image:conic-gradient(from 0deg at top, var(--cer-gradient-stops));',
     'bg-conic-at-tr':
-      'background-image:conic-gradient(from 0deg at top right, var(--ce-gradient-stops));',
+      'background-image:conic-gradient(from 0deg at top right, var(--cer-gradient-stops));',
     'bg-conic-at-r':
-      'background-image:conic-gradient(from 0deg at right, var(--ce-gradient-stops));',
+      'background-image:conic-gradient(from 0deg at right, var(--cer-gradient-stops));',
     'bg-conic-at-br':
-      'background-image:conic-gradient(from 0deg at bottom right, var(--ce-gradient-stops));',
+      'background-image:conic-gradient(from 0deg at bottom right, var(--cer-gradient-stops));',
     'bg-conic-at-b':
-      'background-image:conic-gradient(from 0deg at bottom, var(--ce-gradient-stops));',
+      'background-image:conic-gradient(from 0deg at bottom, var(--cer-gradient-stops));',
     'bg-conic-at-bl':
-      'background-image:conic-gradient(from 0deg at bottom left, var(--ce-gradient-stops));',
+      'background-image:conic-gradient(from 0deg at bottom left, var(--cer-gradient-stops));',
     'bg-conic-at-l':
-      'background-image:conic-gradient(from 0deg at left, var(--ce-gradient-stops));',
+      'background-image:conic-gradient(from 0deg at left, var(--cer-gradient-stops));',
     'bg-conic-at-tl':
-      'background-image:conic-gradient(from 0deg at top left, var(--ce-gradient-stops));',
+      'background-image:conic-gradient(from 0deg at top left, var(--cer-gradient-stops));',
   });
 
   return utils;
@@ -1054,7 +1056,9 @@ export function parseSpaceUtility(className: string): string | null {
 
   // Handle "reverse" modifier
   if (valueStr === 'reverse') {
-    return isHorizontal ? '--ce-space-x-reverse:1;' : '--ce-space-y-reverse:1;';
+    return isHorizontal
+      ? '--cer-space-x-reverse:1;'
+      : '--cer-space-y-reverse:1;';
   }
 
   // Handle fractions (e.g., space-x-1/2)
@@ -1073,9 +1077,9 @@ export function parseSpaceUtility(className: string): string | null {
     const sign = negative ? '-' : '';
 
     if (isHorizontal) {
-      return `--ce-space-x-reverse:0;& > :not([hidden]) ~ :not([hidden]){margin-inline-start:calc(${sign}${percentage}% * calc(1 - var(--ce-space-x-reverse)));margin-inline-end:calc(${sign}${percentage}% * var(--ce-space-x-reverse));}`;
+      return `--cer-space-x-reverse:0;& > :not([hidden]) ~ :not([hidden]){margin-inline-start:calc(${sign}${percentage}% * calc(1 - var(--cer-space-x-reverse)));margin-inline-end:calc(${sign}${percentage}% * var(--cer-space-x-reverse));}`;
     } else {
-      return `--ce-space-y-reverse:0;& > :not([hidden]) ~ :not([hidden]){margin-top:calc(${sign}${percentage}% * calc(1 - var(--ce-space-y-reverse)));margin-bottom:calc(${sign}${percentage}% * var(--ce-space-y-reverse));}`;
+      return `--cer-space-y-reverse:0;& > :not([hidden]) ~ :not([hidden]){margin-top:calc(${sign}${percentage}% * calc(1 - var(--cer-space-y-reverse)));margin-bottom:calc(${sign}${percentage}% * var(--cer-space-y-reverse));}`;
     }
   }
 
@@ -1087,9 +1091,9 @@ export function parseSpaceUtility(className: string): string | null {
   const value = `calc(${sign}${spacing} * ${num})`;
 
   if (isHorizontal) {
-    return `--ce-space-x-reverse:0;& > :not([hidden]) ~ :not([hidden]){margin-inline-start:calc(${value} * calc(1 - var(--ce-space-x-reverse)));margin-inline-end:calc(${value} * var(--ce-space-x-reverse));}`;
+    return `--cer-space-x-reverse:0;& > :not([hidden]) ~ :not([hidden]){margin-inline-start:calc(${value} * calc(1 - var(--cer-space-x-reverse)));margin-inline-end:calc(${value} * var(--cer-space-x-reverse));}`;
   } else {
-    return `--ce-space-y-reverse:0;& > :not([hidden]) ~ :not([hidden]){margin-top:calc(${value} * calc(1 - var(--ce-space-y-reverse)));margin-bottom:calc(${value} * var(--ce-space-y-reverse));}`;
+    return `--cer-space-y-reverse:0;& > :not([hidden]) ~ :not([hidden]){margin-top:calc(${value} * calc(1 - var(--cer-space-y-reverse)));margin-bottom:calc(${value} * var(--cer-space-y-reverse));}`;
   }
 }
 
@@ -1122,7 +1126,7 @@ export function parseColorClass(className: string): string | null {
   const colorValue = colors[colorName]?.[shade];
   if (!colorValue) return null;
 
-  if (type === 'shadow') return `--ce-shadow-color:${colorValue};`;
+  if (type === 'shadow') return `--cer-shadow-color:${colorValue};`;
   const prop = propMap[type];
   return prop ? `${prop}:${colorValue};` : null;
 }
@@ -1185,11 +1189,11 @@ export function parseGradientColorStop(className: string): string | null {
 
   switch (position) {
     case 'from':
-      return `--ce-gradient-from:${colorValue} var(--ce-gradient-from-position);--ce-gradient-to:rgb(255 255 255 / 0) var(--ce-gradient-to-position);--ce-gradient-stops:var(--ce-gradient-from), var(--ce-gradient-to);`;
+      return `--cer-gradient-from:${colorValue} var(--cer-gradient-from-position);--cer-gradient-to:rgb(255 255 255 / 0) var(--cer-gradient-to-position);--cer-gradient-stops:var(--cer-gradient-from), var(--cer-gradient-to);`;
     case 'to':
-      return `--ce-gradient-to:${colorValue} var(--ce-gradient-to-position);`;
+      return `--cer-gradient-to:${colorValue} var(--cer-gradient-to-position);`;
     case 'via':
-      return `--ce-gradient-to:rgb(255 255 255 / 0) var(--ce-gradient-to-position);--ce-gradient-stops:var(--ce-gradient-from), ${colorValue} var(--ce-gradient-via-position), var(--ce-gradient-to);`;
+      return `--cer-gradient-to:rgb(255 255 255 / 0) var(--cer-gradient-to-position);--cer-gradient-stops:var(--cer-gradient-from), ${colorValue} var(--cer-gradient-via-position), var(--cer-gradient-to);`;
     default:
       return null;
   }

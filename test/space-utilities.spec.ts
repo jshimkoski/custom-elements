@@ -11,7 +11,7 @@ describe('Space utilities (space-x-* and space-y-*)', () => {
     const result = parseSpaceUtility('space-x-4');
 
     expect(result).toBeTruthy();
-    expect(result).toContain('--ce-space-x-reverse:0');
+    expect(result).toContain('--cer-space-x-reverse:0');
     expect(result).toContain('margin-inline-start');
     expect(result).toContain('margin-inline-end');
     expect(result).toContain('> :not([hidden]) ~ :not([hidden])');
@@ -22,7 +22,7 @@ describe('Space utilities (space-x-* and space-y-*)', () => {
     const result = parseSpaceUtility('space-y-2');
 
     expect(result).toBeTruthy();
-    expect(result).toContain('--ce-space-y-reverse:0');
+    expect(result).toContain('--cer-space-y-reverse:0');
     expect(result).toContain('margin-top');
     expect(result).toContain('margin-bottom');
     expect(result).toContain('> :not([hidden]) ~ :not([hidden])');
@@ -49,8 +49,8 @@ describe('Space utilities (space-x-* and space-y-*)', () => {
     const resultX = parseSpaceUtility('space-x-reverse');
     const resultY = parseSpaceUtility('space-y-reverse');
 
-    expect(resultX).toBe('--ce-space-x-reverse:1;');
-    expect(resultY).toBe('--ce-space-y-reverse:1;');
+    expect(resultX).toBe('--cer-space-x-reverse:1;');
+    expect(resultY).toBe('--cer-space-y-reverse:1;');
   });
 
   it('should return null for invalid inputs', () => {
@@ -67,7 +67,7 @@ describe('Space utilities (space-x-* and space-y-*)', () => {
     expect(css).toContain('space-x-4');
     expect(css).toContain('space-x-2');
     expect(css).toContain('space-x-8');
-    expect(css).toContain('--ce-space-x-reverse:0');
+    expect(css).toContain('--cer-space-x-reverse:0');
   });
 
   it('should generate CSS with jitCSS for space-y classes', () => {
@@ -76,7 +76,7 @@ describe('Space utilities (space-x-* and space-y-*)', () => {
 
     expect(css).toContain('space-y-4');
     expect(css).toContain('space-y-2');
-    expect(css).toContain('--ce-space-y-reverse:0');
+    expect(css).toContain('--cer-space-y-reverse:0');
   });
 
   it('should apply space-x in a real component', async () => {

@@ -13,12 +13,12 @@ describe('style - utility class rendering', () => {
     const css = minifyCSS(jitCSS(html));
 
     // Colors
-    expect(css).toContain('background-color:var(--color-white,#ffffff)');
-    expect(css).toContain('color:var(--color-black,#000000)');
+    expect(css).toContain('background-color:var(--cer-color-white,#ffffff)');
+    expect(css).toContain('color:var(--cer-color-black,#000000)');
 
     // Dark variant should be wrapped in prefers-color-scheme media query and reference neutral-950
     expect(css).toContain('@media (prefers-color-scheme:dark)');
-    expect(css).toContain('var(--color-neutral-950,');
+    expect(css).toContain('var(--cer-color-neutral-950,');
 
     // Flex utilities
     expect(css).toContain('display:flex');

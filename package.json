@@ -59,7 +59,9 @@
     "dist/*.d.ts",
     "entities.json"
   ],
-  "sideEffects": false,
+  "sideEffects": [
+    "*.css"
+  ],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -101,7 +103,11 @@
       "import": "./dist/custom-elements-runtime.router.es.js",
       "require": "./dist/custom-elements-runtime.router.cjs.js"
     },
-    "./entities.json": "./entities.json"
+    "./entities.json": "./entities.json",
+    "./css": "./dist/style.css",
+    "./css/style.css": "./dist/style.css",
+    "./css/reset.css": "./dist/reset.css",
+    "./css/variables.css": "./dist/variables.css"
   },
   "publishConfig": {
     "access": "public"

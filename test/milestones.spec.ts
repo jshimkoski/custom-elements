@@ -17,23 +17,23 @@ describe('milestones component JIT CSS', () => {
     expect(css).toContain('.bg-linear-to-r');
 
     // Ensure at least the gradient rule and stops variable are generated
-    expect(css).toContain('--ce-gradient-stops');
+    expect(css).toContain('--cer-gradient-stops');
 
     // The color stop classes must be present with their variable assignments
-    // from-primary-500 => --ce-gradient-from:var(--color-primary-500,#3b82f6)
+    // from-primary-500 => --cer-gradient-from:var(--cer-color-primary-500,#3b82f6)
     expect(css).toContain('.from-primary-500');
-    expect(css).toContain('--ce-gradient-from');
-    expect(css).toContain('var(--color-primary-500');
+    expect(css).toContain('--cer-gradient-from');
+    expect(css).toContain('var(--cer-color-primary-500');
     expect(css).toContain('#3b82f6');
 
     // via-secondary-400 should insert the mid-stop including the palette var
     expect(css).toContain('.via-secondary-400');
-    expect(css).toContain('var(--color-secondary-400');
+    expect(css).toContain('var(--cer-color-secondary-400');
     expect(css).toContain('#818cf8');
 
-    // to-success-500 should define the --ce-gradient-to value
+    // to-success-500 should define the --cer-gradient-to value
     expect(css).toContain('.to-success-500');
-    expect(css).toContain('var(--color-success-500');
+    expect(css).toContain('var(--cer-color-success-500');
     // success-500 palette value is #22c55e
     expect(css).toContain('#22c55e');
 

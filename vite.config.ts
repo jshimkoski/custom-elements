@@ -3,6 +3,7 @@ import { resolve } from 'path';
 
 export default defineConfig({
   build: {
+    cssCodeSplit: true,
     lib: {
       entry: {
         // Use the client-specific entry which omits optional heavy features
@@ -17,6 +18,10 @@ export default defineConfig({
         'event-bus': resolve(__dirname, 'src/lib/event-bus.ts'),
         store: resolve(__dirname, 'src/lib/store.ts'),
         router: resolve(__dirname, 'src/lib/router.ts'),
+        // CSS entries
+        style: 'src/lib/css/style.css',
+        reset: 'src/lib/css/reset.css',
+        variables: 'src/lib/css/variables.css',
       },
       name: 'CustomElementsRuntime',
       fileName: (format, entryName) =>

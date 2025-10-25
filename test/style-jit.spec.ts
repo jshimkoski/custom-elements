@@ -6,9 +6,11 @@ import {
 } from '../src/lib/runtime/style';
 
 describe('style runtime helpers', () => {
-  it('parseColorClass sets --ce-shadow-color for shadow tokens', () => {
+  it('parseColorClass sets --cer-shadow-color for shadow tokens', () => {
     const res = parseColorClass('shadow-primary-500');
-    expect(res).toBe('--ce-shadow-color:var(--color-primary-500, #3b82f6);');
+    expect(res).toBe(
+      '--cer-shadow-color:var(--cer-color-primary-500, #3b82f6);',
+    );
   });
 
   it('parseArbitrary returns padding for p-[2rem]', () => {

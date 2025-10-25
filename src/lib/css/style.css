@@ -1,0 +1,7 @@
+/* 
+ * Custom Elements Style CSS
+ * Main stylesheet that imports variables and reset styles
+ */
+
+@import './variables.css';
+@import './reset.css';

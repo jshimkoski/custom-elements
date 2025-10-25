@@ -59,7 +59,7 @@ describe('🔧 Container Queries', () => {
       const html = '<div class="@md:text-lg"></div>';
       const css = jitCSS(html);
       expect(css).toContain(
-        '@container (min-width:28rem){.\\@md\\:text-lg{font-size:1.125rem;line-height:var(--ce-line-height,1.75);}}',
+        '@container (min-width:28rem){.\\@md\\:text-lg{font-size:1.125rem;line-height:var(--cer-line-height,1.75);}}',
       );
     });
 
@@ -68,13 +68,13 @@ describe('🔧 Container Queries', () => {
         '<div class="@sm:text-base @lg:text-xl @2xl:text-2xl"></div>';
       const css = jitCSS(html);
       expect(css).toContain(
-        '@container (min-width:24rem){.\\@sm\\:text-base{font-size:1rem;line-height:var(--ce-line-height,1.5);}}',
+        '@container (min-width:24rem){.\\@sm\\:text-base{font-size:1rem;line-height:var(--cer-line-height,1.5);}}',
       );
       expect(css).toContain(
-        '@container (min-width:32rem){.\\@lg\\:text-xl{font-size:1.25rem;line-height:var(--ce-line-height,1.75);}}',
+        '@container (min-width:32rem){.\\@lg\\:text-xl{font-size:1.25rem;line-height:var(--cer-line-height,1.75);}}',
       );
       expect(css).toContain(
-        '@container (min-width:42rem){.\\@2xl\\:text-2xl{font-size:1.5rem;line-height:var(--ce-line-height,2);}}',
+        '@container (min-width:42rem){.\\@2xl\\:text-2xl{font-size:1.5rem;line-height:var(--cer-line-height,2);}}',
       );
     });
 
@@ -125,10 +125,10 @@ describe('🔧 Container Queries', () => {
       const html = '<div class="@sm:bg-primary-500 @md:bg-success-600"></div>';
       const css = jitCSS(html);
       expect(css).toContain(
-        '@container (min-width:24rem){.\\@sm\\:bg-primary-500{background-color:var(--color-primary-500, #3b82f6);}}',
+        '@container (min-width:24rem){.\\@sm\\:bg-primary-500{background-color:var(--cer-color-primary-500, #3b82f6);}}',
       );
       expect(css).toContain(
-        '@container (min-width:28rem){.\\@md\\:bg-success-600{background-color:var(--color-success-600, #16a34a);}}',
+        '@container (min-width:28rem){.\\@md\\:bg-success-600{background-color:var(--cer-color-success-600, #16a34a);}}',
       );
     });
 
@@ -137,10 +137,10 @@ describe('🔧 Container Queries', () => {
         '<div class="@lg:text-error-500 @xl:text-warning-400"></div>';
       const css = jitCSS(html);
       expect(css).toContain(
-        '@container (min-width:32rem){.\\@lg\\:text-error-500{color:var(--color-error-500, #ef4444);}}',
+        '@container (min-width:32rem){.\\@lg\\:text-error-500{color:var(--cer-color-error-500, #ef4444);}}',
       );
       expect(css).toContain(
-        '@container (min-width:36rem){.\\@xl\\:text-warning-400{color:var(--color-warning-400, #fbbf24);}}',
+        '@container (min-width:36rem){.\\@xl\\:text-warning-400{color:var(--cer-color-warning-400, #fbbf24);}}',
       );
     });
 
@@ -149,10 +149,10 @@ describe('🔧 Container Queries', () => {
         '<div class="@md:bg-primary-500/50 @lg:text-error-500/75"></div>';
       const css = jitCSS(html);
       expect(css).toContain(
-        '@container (min-width:28rem){.\\@md\\:bg-primary-500\\/50{background-color:var(--color-primary-500, rgb(59 130 246 / 0.5));}}',
+        '@container (min-width:28rem){.\\@md\\:bg-primary-500\\/50{background-color:var(--cer-color-primary-500, rgb(59 130 246 / 0.5));}}',
       );
       expect(css).toContain(
-        '@container (min-width:32rem){.\\@lg\\:text-error-500\\/75{color:var(--color-error-500, rgb(239 68 68 / 0.75));}}',
+        '@container (min-width:32rem){.\\@lg\\:text-error-500\\/75{color:var(--cer-color-error-500, rgb(239 68 68 / 0.75));}}',
       );
     });
   });
@@ -162,10 +162,10 @@ describe('🔧 Container Queries', () => {
       const html = '<div class="@[300px]:text-lg @[500px]:text-xl"></div>';
       const css = jitCSS(html);
       expect(css).toContain(
-        '@container (min-width:300px){.\\@\\[300px\\]\\:text-lg{font-size:1.125rem;line-height:var(--ce-line-height,1.75);}}',
+        '@container (min-width:300px){.\\@\\[300px\\]\\:text-lg{font-size:1.125rem;line-height:var(--cer-line-height,1.75);}}',
       );
       expect(css).toContain(
-        '@container (min-width:500px){.\\@\\[500px\\]\\:text-xl{font-size:1.25rem;line-height:var(--ce-line-height,1.75);}}',
+        '@container (min-width:500px){.\\@\\[500px\\]\\:text-xl{font-size:1.25rem;line-height:var(--cer-line-height,1.75);}}',
       );
     });
 
@@ -199,10 +199,10 @@ describe('🔧 Container Queries', () => {
         '<div class="dark:@md:text-white dark:@lg:bg-neutral-800"></div>';
       const css = jitCSS(html);
       expect(css).toContain(
-        '@media (prefers-color-scheme: dark)@container (min-width:28rem){.dark\\:\\@md\\:text-white{color:var(--color-white, #ffffff);}}',
+        '@media (prefers-color-scheme: dark)@container (min-width:28rem){.dark\\:\\@md\\:text-white{color:var(--cer-color-white, #ffffff);}}',
       );
       expect(css).toContain(
-        '@media (prefers-color-scheme: dark)@container (min-width:32rem){.dark\\:\\@lg\\:bg-neutral-800{background-color:var(--color-neutral-800, #27272a);}}',
+        '@media (prefers-color-scheme: dark)@container (min-width:32rem){.dark\\:\\@lg\\:bg-neutral-800{background-color:var(--cer-color-neutral-800, #27272a);}}',
       );
     });
 
@@ -210,7 +210,7 @@ describe('🔧 Container Queries', () => {
       const html = '<div class="@md:dark:text-primary-400"></div>';
       const css = jitCSS(html);
       expect(css).toContain(
-        '@media (prefers-color-scheme: dark)@container (min-width:28rem){.\\@md\\:dark\\:text-primary-400{color:var(--color-primary-400, #60a5fa);}}',
+        '@media (prefers-color-scheme: dark)@container (min-width:28rem){.\\@md\\:dark\\:text-primary-400{color:var(--cer-color-primary-400, #60a5fa);}}',
       );
     });
   });
@@ -221,11 +221,11 @@ describe('🔧 Container Queries', () => {
       const css = jitCSS(html);
       expect(css).toContain(
         // eslint-disable-next-line no-useless-escape
-        '@media (min-width:768px)@container (min-width:32rem){.md\\:\\\@lg\\:text-xl{font-size:1.25rem;line-height:var(--ce-line-height,1.75);}}',
+        '@media (min-width:768px)@container (min-width:32rem){.md\\:\\\@lg\\:text-xl{font-size:1.25rem;line-height:var(--cer-line-height,1.75);}}',
       );
       expect(css).toContain(
         // eslint-disable-next-line no-useless-escape
-        '@media (min-width:1024px)@container (min-width:36rem){.lg\\:\\\@xl\\:text-2xl{font-size:1.5rem;line-height:var(--ce-line-height,2);}}',
+        '@media (min-width:1024px)@container (min-width:36rem){.lg\\:\\\@xl\\:text-2xl{font-size:1.5rem;line-height:var(--cer-line-height,2);}}',
       );
     });
 
@@ -234,10 +234,10 @@ describe('🔧 Container Queries', () => {
         '<div class="dark:md:@lg:bg-neutral-900 dark:lg:@xl:text-neutral-100"></div>';
       const css = jitCSS(html);
       expect(css).toContain(
-        '@media (prefers-color-scheme: dark) and (min-width:768px)@container (min-width:32rem){.dark\\:md\\:\\@lg\\:bg-neutral-900{background-color:var(--color-neutral-900, #18181b);}}',
+        '@media (prefers-color-scheme: dark) and (min-width:768px)@container (min-width:32rem){.dark\\:md\\:\\@lg\\:bg-neutral-900{background-color:var(--cer-color-neutral-900, #18181b);}}',
       );
       expect(css).toContain(
-        '@media (prefers-color-scheme: dark) and (min-width:1024px)@container (min-width:36rem){.dark\\:lg\\:\\@xl\\:text-neutral-100{color:var(--color-neutral-100, #f4f4f5);}}',
+        '@media (prefers-color-scheme: dark) and (min-width:1024px)@container (min-width:36rem){.dark\\:lg\\:\\@xl\\:text-neutral-100{color:var(--cer-color-neutral-100, #f4f4f5);}}',
       );
     });
   });
@@ -248,10 +248,10 @@ describe('🔧 Container Queries', () => {
         '<div class="@md:hover:bg-primary-500 @lg:hover:text-white"></div>';
       const css = jitCSS(html);
       expect(css).toContain(
-        '@container (min-width:28rem){.\\@md\\:hover\\:bg-primary-500:hover{background-color:var(--color-primary-500, #3b82f6);}}',
+        '@container (min-width:28rem){.\\@md\\:hover\\:bg-primary-500:hover{background-color:var(--cer-color-primary-500, #3b82f6);}}',
       );
       expect(css).toContain(
-        '@container (min-width:32rem){.\\@lg\\:hover\\:text-white:hover{color:var(--color-white, #ffffff);}}',
+        '@container (min-width:32rem){.\\@lg\\:hover\\:text-white:hover{color:var(--cer-color-white, #ffffff);}}',
       );
     });
 
@@ -268,7 +268,7 @@ describe('🔧 Container Queries', () => {
       const html = '<div class="@lg:hover:focus:bg-success-500"></div>';
       const css = jitCSS(html);
       expect(css).toContain(
-        '@container (min-width:32rem){.\\@lg\\:hover\\:focus\\:bg-success-500:hover:focus{background-color:var(--color-success-500, #22c55e);}}',
+        '@container (min-width:32rem){.\\@lg\\:hover\\:focus\\:bg-success-500:hover:focus{background-color:var(--cer-color-success-500, #22c55e);}}',
       );
     });
   });
@@ -305,10 +305,10 @@ describe('🔧 Container Queries', () => {
         '<div class="@md:shadow-md @lg:shadow-xl @xl:shadow-2xl"></div>';
       const css = jitCSS(html);
       expect(css).toContain(
-        '@container (min-width:28rem){.\\@md\\:shadow-md{--ce-shadow-color:rgb(0 0 0 / 0.1);box-shadow:0 4px 6px -1px var(--ce-shadow-color, rgb(0 0 0 / 0.1)),0 2px 4px -2px var(--ce-shadow-color, rgb(0 0 0 / 0.1));}}',
+        '@container (min-width:28rem){.\\@md\\:shadow-md{--cer-shadow-color:rgb(0 0 0 / 0.1);box-shadow:0 4px 6px -1px var(--cer-shadow-color, rgb(0 0 0 / 0.1)),0 2px 4px -2px var(--cer-shadow-color, rgb(0 0 0 / 0.1));}}',
       );
       expect(css).toContain(
-        '@container (min-width:32rem){.\\@lg\\:shadow-xl{--ce-shadow-color:rgb(0 0 0 / 0.1);box-shadow:0 20px 25px -5px var(--ce-shadow-color, rgb(0 0 0 / 0.1)),0 8px 10px -6px var(--ce-shadow-color, rgb(0 0 0 / 0.1));}}',
+        '@container (min-width:32rem){.\\@lg\\:shadow-xl{--cer-shadow-color:rgb(0 0 0 / 0.1);box-shadow:0 20px 25px -5px var(--cer-shadow-color, rgb(0 0 0 / 0.1)),0 8px 10px -6px var(--cer-shadow-color, rgb(0 0 0 / 0.1));}}',
       );
     });
   });
@@ -318,10 +318,10 @@ describe('🔧 Container Queries', () => {
       const html = '<div class="@md:!text-xl @lg:!bg-primary-500"></div>';
       const css = jitCSS(html);
       expect(css).toContain(
-        '@container (min-width:28rem){.\\@md\\:\\!text-xl{font-size:1.25rem !important;line-height:var(--ce-line-height,1.75) !important;}}',
+        '@container (min-width:28rem){.\\@md\\:\\!text-xl{font-size:1.25rem !important;line-height:var(--cer-line-height,1.75) !important;}}',
       );
       expect(css).toContain(
-        '@container (min-width:32rem){.\\@lg\\:\\!bg-primary-500{background-color:var(--color-primary-500, #3b82f6) !important;}}',
+        '@container (min-width:32rem){.\\@lg\\:\\!bg-primary-500{background-color:var(--cer-color-primary-500, #3b82f6) !important;}}',
       );
     });
   });
@@ -352,10 +352,10 @@ describe('🔧 Container Queries', () => {
         '<div class="@md:text-lg @invalid:bg-red @lg:text-xl"></div>';
       const css = jitCSS(html);
       expect(css).toContain(
-        '@container (min-width:28rem){.\\@md\\:text-lg{font-size:1.125rem;line-height:var(--ce-line-height,1.75);}}',
+        '@container (min-width:28rem){.\\@md\\:text-lg{font-size:1.125rem;line-height:var(--cer-line-height,1.75);}}',
       );
       expect(css).toContain(
-        '@container (min-width:32rem){.\\@lg\\:text-xl{font-size:1.25rem;line-height:var(--ce-line-height,1.75);}}',
+        '@container (min-width:32rem){.\\@lg\\:text-xl{font-size:1.25rem;line-height:var(--cer-line-height,1.75);}}',
       );
       expect(css).not.toContain('@invalid');
     });
@@ -365,13 +365,13 @@ describe('🔧 Container Queries', () => {
         '<div class="@[16rem]:text-sm @[400px]:text-base @[25em]:text-lg"></div>';
       const css = jitCSS(html);
       expect(css).toContain(
-        '@container (min-width:16rem){.\\@\\[16rem\\]\\:text-sm{font-size:0.875rem;line-height:var(--ce-line-height,1.25);}}',
+        '@container (min-width:16rem){.\\@\\[16rem\\]\\:text-sm{font-size:0.875rem;line-height:var(--cer-line-height,1.25);}}',
       );
       expect(css).toContain(
-        '@container (min-width:400px){.\\@\\[400px\\]\\:text-base{font-size:1rem;line-height:var(--ce-line-height,1.5);}}',
+        '@container (min-width:400px){.\\@\\[400px\\]\\:text-base{font-size:1rem;line-height:var(--cer-line-height,1.5);}}',
       );
       expect(css).toContain(
-        '@container (min-width:25em){.\\@\\[25em\\]\\:text-lg{font-size:1.125rem;line-height:var(--ce-line-height,1.75);}}',
+        '@container (min-width:25em){.\\@\\[25em\\]\\:text-lg{font-size:1.125rem;line-height:var(--cer-line-height,1.75);}}',
       );
     });
   });

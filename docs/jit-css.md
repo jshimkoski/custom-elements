@@ -391,7 +391,7 @@ JIT CSS provides a rich set of built-in color palettes, all accessible via utili
 <!-- Arbitrary color values -->
 <div class="bg-[#ff00ff]"></div>
 <span class="text-[rgba(0,0,0,0.5)]">Custom RGBA</span>
-<span class="text-[var(--color-primary-500)]">CSS Variable</span>
+<span class="text-[var(--cer-color-primary-500)]">CSS Variable</span>
 
 <!-- Color with opacity modifier -->
 <div class="bg-primary-500/50"></div>
@@ -402,8 +402,8 @@ JIT CSS provides a rich set of built-in color palettes, all accessible via utili
 
 ```css
 :root {
-  --color-primary-500: #007bff;
-  --color-neutral-100: #f0f0f0;
+  --cer-color-primary-500: #007bff;
+  --cer-color-neutral-100: #f0f0f0;
 }
 ```
 
@@ -477,11 +477,11 @@ component('chart-widget', () => {
     () => css`
       .chart-bar {
         transition: all 0.2s ease;
-        background: var(--color-${colorScheme}-500);
+        background: var(--cer-color-${colorScheme}-500);
       }
 
       .chart-bar:hover {
-        background: var(--color-${colorScheme}-600);
+        background: var(--cer-color-${colorScheme}-600);
         transform: translateY(-2px);
       }
 
@@ -605,14 +605,14 @@ component('dashboard-layout', () => {
 
       .sidebar {
         grid-area: sidebar;
-        background: var(--color-neutral-900);
+        background: var(--cer-color-neutral-900);
         transition: all 0.3s ease;
       }
 
       .header {
         grid-area: header;
-        background: var(--color-white);
-        border-bottom: 1px solid var(--color-neutral-200);
+        background: var(--cer-color-white);
+        border-bottom: 1px solid var(--cer-color-neutral-200);
       }
 
       .main {

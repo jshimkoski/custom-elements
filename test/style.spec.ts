@@ -234,7 +234,7 @@ describe('jitCSS - Arbitrary Variants', () => {
     const html = `<div class="[aria-selected=true]:bg-primary-500"></div>`;
     const css = minifyCSS(jitCSS(html));
     expect(css).toContain(
-      '[aria-selected=true].\\[aria-selected\\=true\\]\\:bg-primary-500{background-color:var(--color-primary-500,#3b82f6)}',
+      '[aria-selected=true].\\[aria-selected\\=true\\]\\:bg-primary-500{background-color:var(--cer-color-primary-500,#3b82f6)}',
     );
   });
 
@@ -250,7 +250,7 @@ describe('jitCSS - Arbitrary Variants', () => {
     const html = `<div class="md:[data-open=true]:bg-success-100"></div>`;
     const css = minifyCSS(jitCSS(html));
     expect(css).toContain(
-      '@media (min-width:768px){[data-open=true].md\\:\\[data-open\\=true\\]\\:bg-success-100{background-color:var(--color-success-100,#dcfce7)}}',
+      '@media (min-width:768px){[data-open=true].md\\:\\[data-open\\=true\\]\\:bg-success-100{background-color:var(--cer-color-success-100,#dcfce7)}}',
     );
   });
 
@@ -331,7 +331,7 @@ describe('jitCSS - Arbitrary Variants', () => {
     const css = minifyCSS(jitCSS(html));
     // Should still generate, but selector may be invalid; test for presence
     expect(css).toContain(
-      '[invalid].\\[invalid\\]\\:bg-primary-500{background-color:var(--color-primary-500,#3b82f6)}',
+      '[invalid].\\[invalid\\]\\:bg-primary-500{background-color:var(--cer-color-primary-500,#3b82f6)}',
     );
   });
 
@@ -344,10 +344,10 @@ describe('jitCSS - Arbitrary Variants', () => {
   });
 
   it('should combine multiple variants with arbitrary custom property', () => {
-    const html = `<div class="dark:md:[data-state=active]:text-[var(--color-error-500)]"></div>`;
+    const html = `<div class="dark:md:[data-state=active]:text-[var(--cer-color-error-500)]"></div>`;
     const css = minifyCSS(jitCSS(html));
     expect(css).toContain(
-      '@media (prefers-color-scheme:dark) and (min-width:768px){[data-state=active].dark\\:md\\:\\[data-state\\=active\\]\\:text-\\[var\\(--color-error-500\\)\\]{color:var(--color-error-500)}}',
+      '@media (prefers-color-scheme:dark) and (min-width:768px){[data-state=active].dark\\:md\\:\\[data-state\\=active\\]\\:text-\\[var\\(--cer-color-error-500\\)\\]{color:var(--cer-color-error-500)}}',
     );
   });
 });

@@ -69,7 +69,7 @@ describe('Optimized JIT CSS Tests', () => {
     it('should parse shadow utilities', () => {
       expect(utilityMap['shadow-sm']).toContain('box-shadow:');
       expect(utilityMap['shadow-lg']).toContain('box-shadow:');
-      expect(utilityMap['shadow-none']).toContain('--ce-shadow-color:');
+      expect(utilityMap['shadow-none']).toContain('--cer-shadow-color:');
     });
   });
 
@@ -94,19 +94,19 @@ describe('Optimized JIT CSS Tests', () => {
 
     it('should have line height utilities', () => {
       expect(utilityMap['leading-3']).toBe(
-        'line-height:0.75rem;--ce-line-height:0.75rem;line-height:var(--ce-line-height,0.75rem);',
+        'line-height:0.75rem;--cer-line-height:0.75rem;line-height:var(--cer-line-height,0.75rem);',
       );
       expect(utilityMap['leading-none']).toBe(
-        'line-height:1;--ce-line-height:1;line-height:var(--ce-line-height,1);',
+        'line-height:1;--cer-line-height:1;line-height:var(--cer-line-height,1);',
       );
       expect(utilityMap['leading-tight']).toBe(
-        'line-height:1.25;--ce-line-height:1.25;line-height:var(--ce-line-height,1.25);',
+        'line-height:1.25;--cer-line-height:1.25;line-height:var(--cer-line-height,1.25);',
       );
       expect(utilityMap['leading-normal']).toBe(
-        'line-height:1.5;--ce-line-height:1.5;line-height:var(--ce-line-height,1.5);',
+        'line-height:1.5;--cer-line-height:1.5;line-height:var(--cer-line-height,1.5);',
       );
       expect(utilityMap['leading-loose']).toBe(
-        'line-height:2;--ce-line-height:2;line-height:var(--ce-line-height,2);',
+        'line-height:2;--cer-line-height:2;line-height:var(--cer-line-height,2);',
       );
     });
 
@@ -173,36 +173,36 @@ describe('Optimized JIT CSS Tests', () => {
   describe('Enhanced color system', () => {
     it('should have standard Tailwind colors', () => {
       // Test new colors not in original
-      expect(colors.neutral['500']).toContain('--color-neutral-500');
-      expect(colors.primary['500']).toContain('--color-primary-500');
-      expect(colors.error['500']).toContain('--color-error-500');
-      expect(colors.success['500']).toContain('--color-success-500');
-      expect(colors.info['500']).toContain('--color-info-500');
-      expect(colors.warning['500']).toContain('--color-warning-500');
-      expect(colors.secondary['500']).toContain('--color-secondary-500');
+      expect(colors.neutral['500']).toContain('--cer-color-neutral-500');
+      expect(colors.primary['500']).toContain('--cer-color-primary-500');
+      expect(colors.error['500']).toContain('--cer-color-error-500');
+      expect(colors.success['500']).toContain('--cer-color-success-500');
+      expect(colors.info['500']).toContain('--cer-color-info-500');
+      expect(colors.warning['500']).toContain('--cer-color-warning-500');
+      expect(colors.secondary['500']).toContain('--cer-color-secondary-500');
     });
 
     it('should parse new color names', () => {
       expect(parseColorClass('bg-neutral-500')).toBe(
-        'background-color:var(--color-neutral-500, #71717b);',
+        'background-color:var(--cer-color-neutral-500, #71717b);',
       );
       expect(parseColorClass('text-primary-600')).toBe(
-        'color:var(--color-primary-600, #2563eb);',
+        'color:var(--cer-color-primary-600, #2563eb);',
       );
       expect(parseColorClass('border-error-400')).toBe(
-        'border-color:var(--color-error-400, #f87171);',
+        'border-color:var(--cer-color-error-400, #f87171);',
       );
     });
 
     it('should maintain backward compatibility with semantic colors', () => {
       expect(parseColorClass('bg-primary-500')).toBe(
-        'background-color:var(--color-primary-500, #3b82f6);',
+        'background-color:var(--cer-color-primary-500, #3b82f6);',
       );
       expect(parseColorClass('text-error-600')).toBe(
-        'color:var(--color-error-600, #dc2626);',
+        'color:var(--cer-color-error-600, #dc2626);',
       );
       expect(parseColorClass('border-success-400')).toBe(
-        'border-color:var(--color-success-400, #4ade80);',
+        'border-color:var(--cer-color-success-400, #4ade80);',
       );
     });
   });
@@ -271,7 +271,7 @@ describe('Optimized JIT CSS Tests', () => {
       const css = jitCSS(html);
       expect(css).toContain('.tracking-wide{letter-spacing:0.025em;}');
       expect(css).toContain(
-        '.leading-relaxed{line-height:1.625;--ce-line-height:1.625;line-height:var(--ce-line-height,1.625);}',
+        '.leading-relaxed{line-height:1.625;--cer-line-height:1.625;line-height:var(--cer-line-height,1.625);}',
       );
     });
 
@@ -293,10 +293,10 @@ describe('Optimized JIT CSS Tests', () => {
       const html = '<div class="bg-neutral-800 text-primary-500">Content</div>';
       const css = jitCSS(html);
       expect(css).toContain(
-        '.bg-neutral-800{background-color:var(--color-neutral-800, #27272a);}',
+        '.bg-neutral-800{background-color:var(--cer-color-neutral-800, #27272a);}',
       );
       expect(css).toContain(
-        '.text-primary-500{color:var(--color-primary-500, #3b82f6);}',
+        '.text-primary-500{color:var(--cer-color-primary-500, #3b82f6);}',
       );
     });
 
@@ -304,7 +304,7 @@ describe('Optimized JIT CSS Tests', () => {
       const html = '<div class="hover:bg-primary-500">Content</div>';
       const css = jitCSS(html);
       expect(css).toContain(
-        '.hover\\:bg-primary-500:hover{background-color:var(--color-primary-500,',
+        '.hover\\:bg-primary-500:hover{background-color:var(--cer-color-primary-500,',
       );
     });
 
@@ -317,7 +317,7 @@ describe('Optimized JIT CSS Tests', () => {
       expect(css).toContain('.items-center{align-items:center;}');
       // Check that new colors work
       expect(css).toContain(
-        '.bg-neutral-100{background-color:var(--color-neutral-100, #f4f4f5);}',
+        '.bg-neutral-100{background-color:var(--cer-color-neutral-100, #f4f4f5);}',
       );
       expect(css).toContain('.rounded-lg{border-radius:0.5rem;}');
     });
@@ -329,9 +329,11 @@ describe('Optimized JIT CSS Tests', () => {
       expect(css).toContain('.flex{display:flex;}');
       expect(css).toContain('.items-center{align-items:center;}');
       expect(css).toContain(
-        '.bg-primary-500{background-color:var(--color-primary-500, #3b82f6);}',
+        '.bg-primary-500{background-color:var(--cer-color-primary-500, #3b82f6);}',
       );
-      expect(css).toContain('.text-white{color:var(--color-white, #ffffff);}');
+      expect(css).toContain(
+        '.text-white{color:var(--cer-color-white, #ffffff);}',
+      );
       expect(css).toContain('.p-4{padding:calc(0.25rem * 4);}');
     });
 
@@ -559,7 +561,7 @@ describe('Optimized JIT CSS Tests', () => {
           const className = `bg-${color}-${shade}`;
           const result = parseColorClass(className);
           expect(result).toBeDefined();
-          expect(result).toContain(`--color-${color}-${shade}`);
+          expect(result).toContain(`--cer-color-${color}-${shade}`);
         });
       });
     });

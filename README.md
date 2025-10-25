@@ -205,6 +205,30 @@ Below is the **complete list of public symbols** exported by the runtime and its
 | `renderToString` | Render a VNode tree to HTML for server-side rendering. |
 | `VNode` (type)   | The runtime VNode shape used by renderers and SSR.     |
 
+### Global Styles (CSS)
+
+**Package:** `@jasonshimmy/custom-elements-runtime/css` or `@jasonshimmy/custom-elements-runtime/css/style.css`
+
+| Export      | Description                                              |
+| ----------- | -------------------------------------------------------- |
+| `style.css` | CSS export that contains CSS variables and a base reset. |
+
+### Variables (CSS)
+
+**Package:** `@jasonshimmy/custom-elements-runtime/css/variables.css`
+
+| Export          | Description                                                   |
+| --------------- | ------------------------------------------------------------- |
+| `variables.css` | CSS export that contains design tokens (colors, fonts, etc.). |
+
+### Reset (CSS)
+
+**Package:** `@jasonshimmy/custom-elements-runtime/css/reset.css`
+
+| Export      | Description                                       |
+| ----------- | ------------------------------------------------- |
+| `reset.css` | CSS export that contains a base reset for styles. |
+
 ## 📖 Documentation Index
 
 Explore the complete documentation for every runtime feature:
