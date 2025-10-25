@@ -104,7 +104,6 @@
       "require": "./dist/custom-elements-runtime.router.cjs.js"
     },
     "./entities.json": "./entities.json",
-    "./css": "./dist/style.css",
     "./css/style.css": "./dist/style.css",
     "./css/reset.css": "./dist/reset.css",
     "./css/variables.css": "./dist/variables.css"

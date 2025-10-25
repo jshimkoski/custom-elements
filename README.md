@@ -207,7 +207,7 @@ Below is the **complete list of public symbols** exported by the runtime and its
 
 ### Global Styles (CSS)
 
-**Package:** `@jasonshimmy/custom-elements-runtime/css` or `@jasonshimmy/custom-elements-runtime/css/style.css`
+**Package:** `@jasonshimmy/custom-elements-runtime/css/style.css`
 
 | Export      | Description                                              |
 | ----------- | -------------------------------------------------------- |
