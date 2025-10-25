@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v2.1.0] - 2025-10-25
+
+- feat: add global style exports fix: ensure css variables are namespaced (7953507)
+- fix: clean up functional api docs (6e87f34)
+
+
 ## [v2.0.2] - 2025-10-25
 
 - fix: clean up functional api docs (6e87f34)
