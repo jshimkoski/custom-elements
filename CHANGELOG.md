@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v2.1.2] - 2025-10-25
+
+- fix: undo removal of css root export (0f649e8)
+- fix: remove css root export (681a276)
+
+
 ## [v2.1.1] - 2025-10-25
 
 - fix: remove css root export (681a276)
