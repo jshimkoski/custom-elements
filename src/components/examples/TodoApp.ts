@@ -41,9 +41,9 @@ export const TodoApp = component('todo-app', () => {
       class="max-w-[400px] mx-auto my-8 p-8 bg-white dark:bg-black text-black dark:text-white rounded-lg shadow-lg"
     >
       <h2 class="text-2xl font-medium mb-8">Todo List</h2>
-      <form class="flex gap-2 mb-4" @submit="${submitForm}">
+      <form class="flex gap-2 mb-4" @submit=${submitForm}>
         <input
-          :model="${input}"
+          :model=${input}
           class="grow px-2 py-1 border border-neutral-300 dark:border-neutral-700 rounded-sm"
           type="text"
           placeholder="Add todo"
@@ -64,8 +64,8 @@ export const TodoApp = component('todo-app', () => {
             >
               <input
                 type="checkbox"
-                :checked="${todo.done}"
-                @change="${() => toggleTodo(todo.id)}"
+                :checked=${todo.done}
+                @change=${() => toggleTodo(todo.id)}
               />
               <span
                 :class="${{
@@ -77,8 +77,8 @@ export const TodoApp = component('todo-app', () => {
               >
               <button
                 class="px-4 py-2 bg-error-600 text-white rounded-sm hover:bg-error-700 focus:bg-error-700 disabled:pointer-events-none disabled:opacity-50"
-                :disabled="${!todo.done}"
-                @click="${() => removeTodo(todo.id)}"
+                :disabled=${!todo.done}
+                @click=${() => removeTodo(todo.id)}
               >
                 Remove
               </button>

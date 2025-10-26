@@ -143,19 +143,40 @@ export function parseProps(
   const bound: string[] = [];
 
   // Match attributes with optional prefix and support for single/double quotes
-  // Also matches standalone boolean attributes (without =value)
+  // and unquoted values (so `:model=${...}` or `@click=${...}` work without
+  // requiring surrounding quotes). Also matches standalone boolean attributes
+  // (without =value).
   const attrRegex =
-    /([:@#]?)([a-zA-Z0-9-:.]+)(?:=("([^"\\]*(\\.[^"\\]*)*)"|'([^'\\]*(\\.[^'\\]*)*)'))?/g;
+    /([:@#]?)([a-zA-Z0-9-:.]+)(?:\s*=\s*("([^"\\]*(\\.[^"\\]*)*)"|'([^'\\]*(\\.[^'\\]*)*)'|([^\s>]+)))?/g;
 
   let match: RegExpExecArray | null;
 
   while ((match = attrRegex.exec(str))) {
     const prefix = match[1];
     const rawName = match[2];
-    const rawVal = (match[4] || match[6]) ?? '';
+    // Extract the first non-undefined capture for the attribute value.
+    // We avoid relying on hard-coded group indexes because nested groups
+    // in the regex can shift indexes across environments/transpilers.
+    let rawVal = '';
+    for (let i = 3; i < match.length; i++) {
+      if (match[i] !== undefined) {
+        rawVal = match[i] as string;
+        break;
+      }
+    }
+
+    // Defensive quote stripping if surrounding quotes remain
+    if (
+      rawVal.length >= 2 &&
+      ((rawVal[0] === '"' && rawVal[rawVal.length - 1] === '"') ||
+        (rawVal[0] === "'" && rawVal[rawVal.length - 1] === "'"))
+    ) {
+      rawVal = rawVal.slice(1, -1);
+    }
 
     // If no value was provided (standalone attribute), treat as boolean true
-    const isStandalone = match[3] === undefined && match[6] === undefined;
+    // Determine standalone by checking whether the matched token contains '='
+    const isStandalone = !/=/.test(match[0]);
 
     // Interpolation detection
     const interpMatch = rawVal.match(/^{{(\d+)}}$/);

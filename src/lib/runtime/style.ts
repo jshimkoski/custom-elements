@@ -78,6 +78,8 @@ export const baseReset = css`
     --cer-gradient-from: rgba(255, 255, 255, 0);
     --cer-gradient-to: rgba(255, 255, 255, 0);
     --cer-gradient-stops: var(--cer-gradient-from), var(--cer-gradient-to);
+    /* Default outline style variable */
+    --cer-outline-style: solid;
   }
   button,
   input,
@@ -551,11 +553,13 @@ const generateUtilities = (): CSSMap => {
       `line-height:${value};--cer-line-height:${value};line-height:var(--cer-line-height,${value});`;
   });
 
-  // Font families
-  // Font families and borders
+  // Font families, borders, and outlines
   const borderWidths = [0, 1, 2, 4, 6, 8];
   for (const w of borderWidths) {
     const px = `${w}px`;
+    utils[`outline-${w}`] =
+      `outline-style:var(--cer-outline-style);outline-width:${px};`;
+    utils[`outline-offset-${w}`] = `outline-offset:${px};`;
     utils[`border-${w}`] = `border-width:${px};`;
     utils[`border-t-${w}`] = `border-top-width:${px};`;
     utils[`border-r-${w}`] = `border-right-width:${px};`;
@@ -572,6 +576,14 @@ const generateUtilities = (): CSSMap => {
     'font-serif': 'font-family:var(--cer-font-serif, ui-serif,Georgia,serif);',
     'font-mono':
       'font-family:var(--cer-font-mono, ui-monospace,SFMono-Regular,monospace);',
+    outline: 'outline-style:var(--cer-outline-style);outline-width:1px;',
+    'outline-solid': '--cer-outline-style:solid;outline-style:solid;',
+    'outline-dashed': '--cer-outline-style:dashed;outline-style:dashed;',
+    'outline-dotted': '--cer-outline-style:dotted;outline-style:dotted;',
+    'outline-double': '--cer-outline-style:double;outline-style:double;',
+    'outline-none': '--cer-outline-style:none;outline-style:none;',
+    'outline-hidden':
+      '--cer-outline-style:none;outline:2px solid transparent;outline-offset:2px;',
     border: 'border-width:1px;',
     'border-t': 'border-top-width:1px;',
     'border-r': 'border-right-width:1px;',

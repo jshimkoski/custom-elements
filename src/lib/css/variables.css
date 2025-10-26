@@ -13,6 +13,9 @@
     ui-monospace, 'SFMono-Regular', Menlo, Monaco, 'Roboto Mono', 'Courier New',
     monospace;
 
+  /* Default outline style */
+  --cer-outline-style: solid;
+
   /* neutral */
   --cer-color-neutral-50: #fafafa;
   --cer-color-neutral-100: #f4f4f5;
