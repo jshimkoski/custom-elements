@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v2.2.0] - 2025-10-26
+
+- feat: bindings and events no longer require quotes fix: add missing outline classes (6ae09f7)
+- fix: undo removal of css root export (0f649e8)
+
+
 ## [v2.1.2] - 2025-10-25
 
 - fix: undo removal of css root export (0f649e8)
