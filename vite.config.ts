@@ -22,6 +22,7 @@ export default defineConfig({
         style: 'src/lib/css/style.css',
         reset: 'src/lib/css/reset.css',
         variables: 'src/lib/css/variables.css',
+        prose: 'src/lib/css/prose.css',
       },
       name: 'CustomElementsRuntime',
       fileName: (format, entryName) =>

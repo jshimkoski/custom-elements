@@ -3,7 +3,8 @@
  * CSS variables for colors and fonts
  */
 
-:root {
+:root,
+:host {
   /* Font families (match runtime defaults in src/lib/runtime/style.ts) */
   --cer-font-sans:
     ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
@@ -15,6 +16,13 @@
 
   /* Default outline style */
   --cer-outline-style: solid;
+
+  /* Colors */
+  --cer-color-transparent: transparent;
+  --cer-color-current: currentColor;
+  --cer-color-black: #000000;
+  --cer-color-white: #ffffff;
+  --cer-color-inherit: inherit;
 
   /* neutral */
   --cer-color-neutral-50: #fafafa;

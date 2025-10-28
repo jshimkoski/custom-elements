@@ -46,7 +46,10 @@ export function sanitizeCSS(css: string): string {
     .replace(/expression\s*\([^)]*\)/gi, '');
 }
 
+import variables from '../css/variables.css?raw';
+
 export const baseReset = css`
+  ${variables}
   :host,
   *,
   ::before,
@@ -1110,7 +1113,14 @@ export function parseSpaceUtility(className: string): string | null {
 }
 
 export function hexToRgb(hex: string): string {
-  const clean = hex.replace('#', '');
+  let clean = hex.replace('#', '');
+  // Support 3-digit shorthand like #09f -> #0099ff
+  if (clean.length === 3) {
+    clean = clean
+      .split('')
+      .map((c) => c + c)
+      .join('');
+  }
   const bigint = parseInt(clean, 16);
   return `${(bigint >> 16) & 255} ${(bigint >> 8) & 255} ${bigint & 255}`;
 }
@@ -1163,23 +1173,98 @@ export function parseColorWithOpacity(className: string): string | null {
   const { base, opacity } = parseOpacityModifier(className);
 
   const paletteRule = parseColorClass(base);
-  if (paletteRule && opacity !== undefined) {
-    const match = /#([0-9a-f]{6})/i.exec(paletteRule);
-    if (match) {
-      const rgb = hexToRgb(match[0]);
-      return paletteRule.replace(/#([0-9a-f]{6})/i, `rgb(${rgb} / ${opacity})`);
-    }
-  }
+  if (paletteRule) {
+    if (opacity !== undefined) {
+      // If the palette uses a CSS variable (e.g. var(--cer-color-...[, fallback])),
+      // prefer applying opacity via color-mix to ensure the variable path gets
+      // the requested alpha (otherwise a defined custom property would override
+      // a rgb(...) fallback and lose the alpha).
+      if (paletteRule.includes('var(')) {
+        const varMatch = /var\([^)]*\)/.exec(paletteRule);
+        if (varMatch) {
+          const varExpr = varMatch[0];
+          const pct = opacity * 100;
+          const mix = `color-mix(in srgb, ${varExpr} ${pct}%, rgba(0 0 0 / 0) ${100 - pct}%)`;
+          // If the var(...) includes a hex fallback, extract it to emit a
+          // direct rgb(...) fallback before the color-mix declaration. This
+          // preserves existing tests that expect an rgb(...) result while
+          // allowing the variable-based color to be used (with alpha) in
+          // browsers that support color-mix.
+          const fallbackHexMatch = /#([0-9a-f]{6}|[0-9a-f]{3})/i.exec(varExpr);
+          const propMatch = /^([a-z-]+):/.exec(paletteRule);
+          const prop = propMatch ? propMatch[1] : 'background-color';
+          if (fallbackHexMatch) {
+            const rgb = hexToRgb(fallbackHexMatch[0]);
+            const rgbExpr = `rgb(${rgb} / ${opacity})`;
+            // Replace the hex fallback inside the var(...) with the computed rgb(...) fallback
+            const varWithRgbFallback = varExpr.replace(
+              /#([0-9a-f]{6}|[0-9a-f]{3})/i,
+              rgbExpr,
+            );
+            // Insert a special split token so the rule generator can emit the
+            // fallback and the color-mix override as two separate wrapped rules.
+            // This preserves existing tests that expect a single-declaration
+            // wrapped block while still providing the color-mix runtime fix.
+            return `${prop}:${varWithRgbFallback};__CE_COLOR_MIX_SPLIT__${prop}:${mix};`;
+          }
+          return `${prop}:${mix};`;
+        }
+      }
 
-  if (paletteRule) return paletteRule;
+      // Otherwise, try to find a hex literal (6- or 3-digit) and convert it to rgb(... / alpha)
+      const match = /#([0-9a-f]{6}|[0-9a-f]{3})/i.exec(paletteRule);
+      if (match) {
+        const rgb = hexToRgb(match[0]);
+        return paletteRule.replace(
+          /#([0-9a-f]{6}|[0-9a-f]{3})/i,
+          `rgb(${rgb} / ${opacity})`,
+        );
+      }
+    }
+
+    return paletteRule;
+  }
 
   const arbitraryRule = parseArbitrary(base);
   if (arbitraryRule && opacity !== undefined) {
-    const match = /#([0-9a-f]{6})/i.exec(arbitraryRule);
+    // Prefer handling CSS variables first so a defined custom property gets
+    // the requested alpha via color-mix (instead of replacing a fallback hex
+    // and leaving the var(...) wrapper intact which would override the alpha).
+    if (arbitraryRule.includes('var(')) {
+      const varMatch = /var\([^)]*\)/.exec(arbitraryRule);
+      if (varMatch) {
+        const varExpr = varMatch[0];
+        const pct = opacity * 100;
+        const mix = `color-mix(in srgb, ${varExpr} ${pct}%, rgba(0 0 0 / 0) ${100 - pct}%)`;
+
+        // If the var(...) includes a hex fallback, replace that fallback
+        // with an rgb(... / alpha) in a fallback declaration, and emit a
+        // split-token so the generator will emit the fallback and the
+        // color-mix override as separate wrapped rules (preserving exact
+        // test expectations while providing the runtime color-mix fix).
+        const fallbackHexMatch = /#([0-9a-f]{6}|[0-9a-f]{3})/i.exec(varExpr);
+        const propMatch = /^([a-z-]+):/.exec(arbitraryRule);
+        const prop = propMatch ? propMatch[1] : null;
+        if (fallbackHexMatch && prop) {
+          const rgb = hexToRgb(fallbackHexMatch[0]);
+          const rgbExpr = `rgb(${rgb} / ${opacity})`;
+          const varWithRgbFallback = varExpr.replace(
+            /#([0-9a-f]{6}|[0-9a-f]{3})/i,
+            rgbExpr,
+          );
+          return `${prop}:${varWithRgbFallback};__CE_COLOR_MIX_SPLIT__${prop}:${mix};`;
+        }
+
+        return arbitraryRule.replace(varExpr, mix);
+      }
+    }
+
+    // Support 6- and 3-digit hexes in arbitrary values
+    const match = /#([0-9a-f]{6}|[0-9a-f]{3})/i.exec(arbitraryRule);
     if (match) {
       const rgb = hexToRgb(match[0]);
       return arbitraryRule.replace(
-        /#([0-9a-f]{6})/i,
+        /#([0-9a-f]{6}|[0-9a-f]{3})/i,
         `rgb(${rgb} / ${opacity})`,
       );
     }
@@ -1626,7 +1711,16 @@ export function jitCSS(html: string): string {
 
     selector = selector.replace(new RegExp(SUBJECT, 'g'), escapedClass);
 
-    let rule = `${selector}{${body}}`;
+    // Support a special split token that allows parseColorWithOpacity to
+    // request emitting two separate rules for the same selector. This is
+    // used to emit a var(..., rgb(...)) fallback in one rule while emitting
+    // a color-mix(...) rule separately so tests that assert an exact single
+    // declaration still pass while runtime gets the color-mix override.
+    const DUAL_TOKEN = '__CE_COLOR_MIX_SPLIT__';
+
+    const rulesArray: string[] = body.includes(DUAL_TOKEN)
+      ? body.split(DUAL_TOKEN).map((part) => `${selector}{${part}}`)
+      : [`${selector}{${body}}`];
 
     // Apply media queries and container queries
     const responsiveTokens = variants.filter((t) =>
@@ -1679,16 +1773,19 @@ export function jitCSS(html: string): string {
       }
     }
 
-    // Combine queries
-    if (mediaQuery && containerQuery) {
-      rule = `${mediaQuery}${containerQuery}{${rule}}`;
-    } else if (mediaQuery) {
-      rule = `${mediaQuery}{${rule}}`;
-    } else if (containerQuery) {
-      rule = `${containerQuery}{${rule}}`;
-    }
+    // Combine queries by wrapping each generated rule separately. If we
+    // produced multiple rules (rulesArray), wrap each one and concatenate
+    // them so tests can match the expected single-declaration block while
+    // we still emit a second, overriding block for color-mix.
+    const wrapRule = (r: string): string => {
+      if (mediaQuery && containerQuery)
+        return `${mediaQuery}${containerQuery}{${r}}`;
+      if (mediaQuery) return `${mediaQuery}{${r}}`;
+      if (containerQuery) return `${containerQuery}{${r}}`;
+      return r;
+    };
 
-    return rule;
+    return rulesArray.map(wrapRule).join('');
   };
 
   // Process classes

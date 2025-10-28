@@ -21,6 +21,7 @@ import './components/examples/MinimalExample';
 import './components/examples/ShoppingCart';
 import './components/examples/TodoApp';
 import './components/examples/FormInputValidation';
+import './components/examples/Prose';
 
 // Import design system components
 import './components/design-system';
@@ -59,7 +60,7 @@ component('cer-switch', () => {
   const emit = useEmit();
   return html`
     <label
-      class="inline-flex items-center gap-3 cursor-[pointer]"
+      class="inline-flex items-center gap-3 cursor-pointer"
       role="switch"
       :aria-checked="${props.modelValue}"
     >
@@ -684,6 +685,7 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
     <shopping-cart></shopping-cart>
     <todo-app></todo-app>
     <form-input-validation></form-input-validation>
+    <prose-example></prose-example>
     <my-greeting></my-greeting>
   </div>
 `;
