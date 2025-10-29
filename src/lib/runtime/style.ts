@@ -33,9 +33,20 @@ export function minifyCSS(css: string): string {
 let baseResetSheet: CSSStyleSheet | null = null;
 export function getBaseResetSheet(): CSSStyleSheet {
   if (!baseResetSheet) {
-    baseResetSheet = new CSSStyleSheet();
-    baseResetSheet.replaceSync(minifyCSS(baseReset));
+    if (typeof CSSStyleSheet === 'undefined') {
+      // SSR / older browsers: provide a safe stub that won't throw when
+      // consumed by runtime paths that expect a CSSStyleSheet-like object.
+      baseResetSheet = {
+        cssRules: [],
+        replaceSync: () => {},
+        toString: () => minifyCSS(baseReset),
+      } as unknown as CSSStyleSheet;
+    } else {
+      baseResetSheet = new CSSStyleSheet();
+      baseResetSheet.replaceSync(minifyCSS(baseReset));
+    }
   }
+
   return baseResetSheet;
 }
 

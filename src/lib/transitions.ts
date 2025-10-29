@@ -506,6 +506,17 @@ let transitionStyleSheet: CSSStyleSheet | null = null;
  */
 export function getTransitionStyleSheet(): CSSStyleSheet {
   if (!transitionStyleSheet) {
+    // If constructable stylesheets aren't available (SSR / old browsers),
+    // return a no-op stub to avoid throwing during import or server render.
+    if (typeof CSSStyleSheet === 'undefined') {
+      transitionStyleSheet = {
+        cssRules: [],
+        replaceSync: () => {},
+        toString: () => '',
+      } as unknown as CSSStyleSheet;
+      return transitionStyleSheet;
+    }
+
     const allClasses: string[] = [];
 
     // Collect all classes from presets
@@ -525,17 +536,35 @@ export function getTransitionStyleSheet(): CSSStyleSheet {
     const generatedCSS = jitCSS(fakeHtml);
 
     // Create stylesheet
-    transitionStyleSheet = new CSSStyleSheet();
-    transitionStyleSheet.replaceSync(generatedCSS);
+    try {
+      transitionStyleSheet = new CSSStyleSheet();
+      transitionStyleSheet.replaceSync(generatedCSS);
+    } catch {
+      // If creating a constructable stylesheet fails for any reason,
+      // fallback to a stub to avoid breaking SSR or older environments.
+      transitionStyleSheet = {
+        cssRules: [],
+        replaceSync: () => {},
+        toString: () => generatedCSS || '',
+      } as unknown as CSSStyleSheet;
+    }
   }
 
   return transitionStyleSheet;
 }
 
 function initializeTransitionCSS(): void {
-  // Just initialize the stylesheet on module load
-  getTransitionStyleSheet();
+  // Initialize lazily and only in environments that support it.
+  if (typeof window === 'undefined' || typeof CSSStyleSheet === 'undefined') {
+    return;
+  }
+
+  try {
+    getTransitionStyleSheet();
+  } catch {
+    // swallow errors during initialization to avoid breaking SSR or tests
+  }
 }
 
-// Initialize transition CSS when module loads
+// Attempt to initialize transition CSS in supported environments only
 initializeTransitionCSS();
