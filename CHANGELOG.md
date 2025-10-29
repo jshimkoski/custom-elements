@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v2.2.2] - 2025-10-29
+
+- fix: guard stylesheet logic against SSR (8ecd7b7)
+- fix: fix color opacity with css custom properties fix: add variables to base reset in style.ts fix: add an undocumented trial prose implementation (for refinement and official support later, API will likely change) (e68a8b6)
+
+
 ## [v2.2.1] - 2025-10-28
 
 - fix: fix color opacity with css custom properties fix: add variables to base reset in style.ts fix: add an undocumented trial prose implementation (for refinement and official support later, API will likely change) (e68a8b6)
