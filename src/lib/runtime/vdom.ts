@@ -83,6 +83,23 @@ function unwrapValue(v: unknown): unknown {
 }
 
 /**
+ * Write the authoritative attribute value back into the vnode oldProps bag.
+ * Centralizes try/catch logic so all DOM mutation paths consistently update
+ * `oldProps.attrs` and avoid repeating error-prone try/catch blocks.
+ */
+function writebackAttr(
+  oldProps: VNodePropBag | undefined,
+  key: string,
+  value: unknown,
+) {
+  try {
+    if (oldProps && oldProps.attrs) (oldProps.attrs as PropsMap)[key] = value;
+  } catch {
+    /* best-effort writeback - ignore */
+  }
+}
+
+/**
  * Helper: determine whether an element is a native form control we treat
  * specially for boolean-like attributes (disabled, checked, value).
  */
@@ -148,7 +165,6 @@ export function cleanupRefs(node: Node, refs?: VDomRefs) {
       delete refs[refKey];
     }
   }
-
   // Clean up child nodes
   const children = node.childNodes;
   for (let i = 0; i < children.length; i++) {
@@ -821,7 +837,11 @@ export function processShowDirective(
       attrs.style = newStyle;
     } else {
       // Remove the style attribute entirely if empty
-      delete attrs.style;
+      // Set to undefined so downstream merging with older attrs will
+      // override previous values (spreading objects does not remove
+      // earlier keys). Using `undefined` ensures the attribute-removal
+      // branch in patchProps triggers correctly.
+      attrs.style = undefined;
     }
   }
 }
@@ -851,6 +871,10 @@ export function processClassDirective(
   value: unknown,
   attrs: Record<string, unknown>,
   context?: Record<string, unknown>,
+  // original vnode attrs (if available) - used to derive the static/base
+  // class string so we don't accidentally reuse mutated attrs across
+  // directive processing or renders.
+  originalVnodeAttrs?: Record<string, unknown>,
 ): void {
   let classValue: unknown;
 
@@ -898,11 +922,33 @@ export function processClassDirective(
     }
   }
 
-  const existingClasses = attrs.class || '';
   const classString = classes.join(' ');
-  attrs.class = existingClasses
-    ? `${existingClasses} ${classString}`.trim()
-    : classString;
+
+  // Derive base/static classes from the original vnode attrs when
+  // available. This avoids accidentally concatenating previously
+  // processed dynamic classes that may have been written into the
+  // working `attrs` object in earlier passes.
+  const baseClasses =
+    (originalVnodeAttrs && (originalVnodeAttrs.class as string)) ||
+    (attrs.class as string) ||
+    '';
+
+  // Merge base (static) classes with the computed dynamic classes and
+  // ensure no accidental double-spaces. If there are no resulting
+  // classes, delete the property so downstream code can remove the
+  // attribute when appropriate.
+  const merged = baseClasses
+    ? `${baseClasses} ${classString}`.trim()
+    : classString.trim();
+
+  if (merged) attrs.class = merged;
+  else {
+    // See note above for style: set to undefined so later merging of
+    // processed directives (which is spread last) will override any
+    // previously-present class value from old vnode attrs and allow
+    // patchProps to remove the attribute from the DOM.
+    attrs.class = undefined;
+  }
 }
 
 /**
@@ -1094,7 +1140,7 @@ export function processDirectives(
         processShowDirective(value, attrs, context);
         break;
       case 'class':
-        processClassDirective(value, attrs, context);
+        processClassDirective(value, attrs, context, vnodeAttrs);
         break;
       case 'style':
         processStyleDirective(value, attrs, context);
@@ -1462,8 +1508,69 @@ export function patchProps(
     }
   }
 
-  const oldAttrs = oldProps.attrs ?? {};
+  // Use a copy of oldProps.attrs as the authoritative prior-state for
+  // attribute diffs. We intentionally removed the live-DOM snapshot
+  // fallback here and instead rely on writeback into `oldProps.attrs`
+  // at the moment the runtime mutates the DOM. Reading the live DOM can
+  // capture transient animation classes and lead to incorrect removals.
+  // If writeback is correctly applied on all mutation paths, this
+  // snapshot is unnecessary and harmful; keep it simple and avoid DOM
+  // reads for class/style detection.
+  const oldAttrs = { ...(oldProps.attrs ?? {}) } as Record<string, unknown>;
   const newAttrs = mergedAttrs;
+  // Narrow fallback: if a directive explicitly attempted to clear the
+  // `class` or `style` attribute (processedDirectives set it to
+  // `undefined`) we need to consult the live DOM to detect whether the
+  // attribute actually exists on the element so we can remove it.
+  // This is intentionally narrow: we only read the DOM when a directive
+  // signalled intent to remove the attribute, which matches the prior
+  // behavior but avoids broad DOM reads that interfere with transitions.
+  try {
+    const pdAttrs = (processedDirectives && processedDirectives.attrs) || {};
+    if (
+      Object.prototype.hasOwnProperty.call(pdAttrs, 'class') &&
+      pdAttrs['class'] === undefined &&
+      typeof el.getAttribute === 'function'
+    ) {
+      const actual = el.getAttribute('class');
+      if (actual !== null) oldAttrs['class'] = actual;
+    }
+    if (
+      Object.prototype.hasOwnProperty.call(pdAttrs, 'style') &&
+      pdAttrs['style'] === undefined &&
+      typeof el.getAttribute === 'function'
+    ) {
+      const actual = el.getAttribute('style');
+      if (actual !== null) oldAttrs['style'] = actual;
+    }
+    // Narrow sync: if the real DOM class attribute differs from the
+    // vnode-recorded attrs (oldProps.attrs), prefer the real DOM value so
+    // we detect cases where prior DOM mutations weren't persisted to the
+    // vnode bag. This only applies to native text inputs and only when
+    // a discrepancy is observed to avoid removing transient animation
+    // classes unnecessarily.
+    try {
+      if (typeof el.getAttribute === 'function') {
+        const actualClass = el.getAttribute('class');
+        try {
+          if (
+            el instanceof HTMLInputElement &&
+            (el as HTMLInputElement).type === 'text' &&
+            actualClass !== null &&
+            actualClass !== oldAttrs['class']
+          ) {
+            oldAttrs['class'] = actualClass;
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+    } catch {
+      void 0;
+    }
+  } catch {
+    void 0;
+  }
   for (const key in { ...oldAttrs, ...newAttrs }) {
     const oldVal = oldAttrs[key];
     const newVal = newAttrs[key];
@@ -1491,6 +1598,7 @@ export function patchProps(
         safe(() => {
           el.removeAttribute(key);
         });
+        writebackAttr(oldProps, key, undefined);
 
         // Clear value for native controls when value is removed
         if (key === 'value') {
@@ -1566,6 +1674,16 @@ export function patchProps(
         if (key === 'style') {
           const serialized = safeSerializeAttr(newUnwrapped);
           if (serialized !== null) el.setAttribute(key, serialized);
+          writebackAttr(oldProps, key, newUnwrapped as unknown);
+          continue;
+        }
+
+        // Special handling for class attribute - always use setAttribute so
+        // vnode.attrs stays authoritative and we keep oldProps.attrs in sync
+        if (key === 'class') {
+          const serialized = safeSerializeAttr(newUnwrapped);
+          if (serialized !== null) el.setAttribute(key, serialized);
+          writebackAttr(oldProps, key, newUnwrapped as unknown);
           continue;
         }
 
@@ -1618,6 +1736,7 @@ export function patchProps(
               } catch {
                 /* best-effort */
               }
+              writebackAttr(oldProps, key, newUnwrapped as unknown);
             }
           } else {
             const camelKey = toCamel(key);
@@ -1626,6 +1745,10 @@ export function patchProps(
               hostObj[camelKey] = isReactiveState(newVal)
                 ? (newVal as unknown)
                 : newUnwrapped;
+              // Write back into vnode oldProps.attrs so future diffs see the
+              // authoritative value. This prevents cases where a property
+              // assignment updates the element but the vnode bag remains stale.
+              writebackAttr(oldProps, key, newUnwrapped as unknown);
             } catch {
               // If property assignment fails, fall back to attribute
               const serialized = safeSerializeAttr(newVal ?? newUnwrapped);
@@ -1638,13 +1761,21 @@ export function patchProps(
             hostObj[key] = isReactiveState(newVal)
               ? (newVal as unknown)
               : newUnwrapped;
+            // Write back into vnode attrs after successful property assignment
+            writebackAttr(oldProps, key, newUnwrapped as unknown);
           } catch {
             const serialized = safeSerializeAttr(newUnwrapped);
-            if (serialized !== null) el.setAttribute(key, serialized);
+            if (serialized !== null) {
+              el.setAttribute(key, serialized);
+              writebackAttr(oldProps, key, newUnwrapped as unknown);
+            }
           }
         } else {
           const serialized = safeSerializeAttr(newUnwrapped);
-          if (serialized !== null) el.setAttribute(key, serialized);
+          if (serialized !== null) {
+            el.setAttribute(key, serialized);
+            writebackAttr(oldProps, key, newUnwrapped as unknown);
+          }
         }
       }
     }
@@ -1992,6 +2123,10 @@ export function createElement(
           ) {
             el.removeAttribute('disabled');
           }
+          // Keep vnode attrs in sync with DOM mutation. In the createElement
+          // path there is no `oldProps` bag; write back into the vnode's
+          // own prop bag so future diffs see the authoritative value.
+          writebackAttr(vnode.props, key, unwrappedVal as unknown);
         } catch {
           const serialized = safeSerializeAttr(unwrappedVal);
           if (serialized !== null) el.setAttribute(key, serialized);

@@ -45,6 +45,7 @@ export const TodoApp = component('todo-app', () => {
         <input
           :model=${input}
           class="grow px-2 py-1 border border-neutral-300 dark:border-neutral-700 rounded-sm"
+          :class=${{ 'border-error-500': input.value === 'test' }}
           type="text"
           placeholder="Add todo"
         />
