@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v2.2.1] - 2025-10-28
+
+- fix: fix color opacity with css custom properties fix: add variables to base reset in style.ts fix: add an undocumented trial prose implementation (for refinement and official support later, API will likely change) (e68a8b6)
+- feat: bindings and events no longer require quotes fix: add missing outline classes (6ae09f7)
+
+
 ## [v2.2.0] - 2025-10-26
 
 - feat: bindings and events no longer require quotes fix: add missing outline classes (6ae09f7)
