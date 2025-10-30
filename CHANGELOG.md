@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v2.2.4] - 2025-10-30
+
+- fix: add support for svgs and other namespaced elements (d99525e)
+- fix: fix :class binding issue that prevented classes from being remove when a condition changed (5b60784)
+
+
 ## [v2.2.3] - 2025-10-29
 
 - fix: fix :class binding issue that prevented classes from being remove when a condition changed (5b60784)
