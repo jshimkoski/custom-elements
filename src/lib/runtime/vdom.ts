@@ -14,6 +14,12 @@ import {
   safeSerializeAttr,
   isClassLikeAttr,
 } from './helpers';
+import {
+  setAttributeSmart,
+  removeAttributeSmart,
+  TAG_NAMESPACE_MAP,
+  SVG_NS,
+} from './namespace-helpers';
 import { SecureExpressionEvaluator } from './secure-expression-evaluator';
 import { EventManager } from './event-manager';
 import { isReactiveState } from './reactive';
@@ -104,7 +110,7 @@ function writebackAttr(
  * specially for boolean-like attributes (disabled, checked, value).
  */
 function isNativeControl(
-  el?: HTMLElement,
+  el?: Element,
 ): el is
   | HTMLInputElement
   | HTMLSelectElement
@@ -154,7 +160,7 @@ function coerceBooleanForNative(val: unknown): boolean {
  * @returns
  */
 export function cleanupRefs(node: Node, refs?: VDomRefs) {
-  if (!refs || !(node instanceof HTMLElement)) return;
+  if (!refs || !(node instanceof Element)) return;
 
   // Clean up event listeners for this element
   EventManager.cleanup(node);
@@ -175,7 +181,7 @@ export function cleanupRefs(node: Node, refs?: VDomRefs) {
 /**
  * Assign a ref to an element, supporting both string refs and reactive state objects
  */
-function assignRef(vnode: VNode, element: HTMLElement, refs?: VDomRefs): void {
+function assignRef(vnode: VNode, element: Element, refs?: VDomRefs): void {
   if (typeof vnode === 'string') return;
 
   const reactiveRef =
@@ -192,15 +198,15 @@ function assignRef(vnode: VNode, element: HTMLElement, refs?: VDomRefs): void {
         isReactiveState(reactiveRef) ||
         (typeof reactiveRef === 'object' && 'value' in reactiveRef)
       ) {
-        (reactiveRef as { value: HTMLElement | null }).value = element;
+        (reactiveRef as { value: Element | null }).value = element;
       } else if (typeof reactiveRef === 'function') {
         // support callback refs
-        (reactiveRef as unknown as (el: HTMLElement) => void)(element);
+        (reactiveRef as unknown as (el: Element) => void)(element);
       } else if (typeof reactiveRef === 'string' && refs) {
         // string-style ref passed directly in reactiveRef slot
         try {
           const rk = String(reactiveRef);
-          (refs as Record<string, HTMLElement | null>)[rk] = element;
+          (refs as Record<string, Element | null>)[rk] = element;
         } catch {
           // ignore invalid ref assignments
         }
@@ -212,7 +218,7 @@ function assignRef(vnode: VNode, element: HTMLElement, refs?: VDomRefs): void {
     // Legacy string-based ref - ensure string key and typed index access
     try {
       const rk = String(refKey);
-      (refs as Record<string, HTMLElement | null>)[rk] = element;
+      (refs as Record<string, Element | null>)[rk] = element;
     } catch {
       // ignore invalid ref assignments
     }
@@ -237,7 +243,7 @@ export function processModelDirective(
   attrs: Record<string, unknown>,
   listeners: Record<string, EventListener>,
   context?: Record<string, unknown>,
-  el?: HTMLElement,
+  el?: Element,
   arg?: string,
 ): void {
   if (!context) return;
@@ -674,7 +680,7 @@ export function processBindDirective(
   props: PropsMap,
   attrs: PropsMap,
   context?: Record<string, unknown>,
-  el?: HTMLElement,
+  el?: Element,
 ): void {
   // Support both object and string syntax for :bind
   if (typeof value === 'object' && value !== null) {
@@ -1101,7 +1107,7 @@ export function processDirectives(
     { value: unknown; modifiers: string[]; arg?: string }
   >,
   context?: Record<string, unknown>,
-  el?: HTMLElement,
+  el?: Element,
   vnodeAttrs?: PropsMap,
 ): {
   props: Record<string, unknown>;
@@ -1448,7 +1454,7 @@ export function patchProps(
           /* ignore */
         }
       } else if (newVal === undefined || newVal === null) {
-        el.removeAttribute(key);
+        removeAttributeSmart(el as Element, key);
       } else {
         // Prefer setting DOM properties for custom elements or when the
         // property already exists on the element so that JS properties are
@@ -1472,7 +1478,7 @@ export function patchProps(
               !elIsCustom &&
               isNativeControl(el)
             ) {
-              el.removeAttribute('disabled');
+              removeAttributeSmart(el as Element, 'disabled');
             }
           } catch {
             // Enforce property-only binding: skip silently on failure.
@@ -1480,7 +1486,7 @@ export function patchProps(
         } else {
           // Handle boolean false by removing attribute for non-custom elements
           if (newVal === false) {
-            el.removeAttribute(key);
+            removeAttributeSmart(el as Element, key);
           } else {
             // Property does not exist; skip silently.
           }
@@ -1596,7 +1602,7 @@ export function patchProps(
         newUnwrapped === false
       ) {
         safe(() => {
-          el.removeAttribute(key);
+          removeAttributeSmart(el as Element, key);
         });
         writebackAttr(oldProps, key, undefined);
 
@@ -1673,7 +1679,8 @@ export function patchProps(
         // Special handling for style attribute - always use setAttribute
         if (key === 'style') {
           const serialized = safeSerializeAttr(newUnwrapped);
-          if (serialized !== null) el.setAttribute(key, serialized);
+          if (serialized !== null)
+            setAttributeSmart(el as Element, key, String(serialized));
           writebackAttr(oldProps, key, newUnwrapped as unknown);
           continue;
         }
@@ -1682,7 +1689,8 @@ export function patchProps(
         // vnode.attrs stays authoritative and we keep oldProps.attrs in sync
         if (key === 'class') {
           const serialized = safeSerializeAttr(newUnwrapped);
-          if (serialized !== null) el.setAttribute(key, serialized);
+          if (serialized !== null)
+            setAttributeSmart(el as Element, key, String(serialized));
           writebackAttr(oldProps, key, newUnwrapped as unknown);
           continue;
         }
@@ -1702,11 +1710,11 @@ export function patchProps(
           });
           if (!coerceBooleanForNative(newUnwrapped))
             safe(() => {
-              el.removeAttribute(key);
+              removeAttributeSmart(el as Element, key);
             });
           else
             safe(() => {
-              el.setAttribute(key, '');
+              setAttributeSmart(el as Element, key, '');
             });
           continue;
         }
@@ -1732,7 +1740,7 @@ export function patchProps(
             const serialized = safeSerializeAttr(newVal ?? newUnwrapped);
             if (serialized !== null) {
               try {
-                el.setAttribute(key, serialized);
+                setAttributeSmart(el as Element, key, String(serialized));
               } catch {
                 /* best-effort */
               }
@@ -1752,7 +1760,8 @@ export function patchProps(
             } catch {
               // If property assignment fails, fall back to attribute
               const serialized = safeSerializeAttr(newVal ?? newUnwrapped);
-              if (serialized !== null) el.setAttribute(key, serialized);
+              if (serialized !== null)
+                setAttributeSmart(el as Element, key, String(serialized));
             }
           }
         } else if (!isSVG && key in el) {
@@ -1766,14 +1775,14 @@ export function patchProps(
           } catch {
             const serialized = safeSerializeAttr(newUnwrapped);
             if (serialized !== null) {
-              el.setAttribute(key, serialized);
+              setAttributeSmart(el as Element, key, String(serialized));
               writebackAttr(oldProps, key, newUnwrapped as unknown);
             }
           }
         } else {
           const serialized = safeSerializeAttr(newUnwrapped);
           if (serialized !== null) {
-            el.setAttribute(key, serialized);
+            setAttributeSmart(el as Element, key, String(serialized));
             writebackAttr(oldProps, key, newUnwrapped as unknown);
           }
         }
@@ -1837,11 +1846,11 @@ export function patchProps(
       });
       if (finalDisabled) {
         safe(() => {
-          el.setAttribute('disabled', '');
+          setAttributeSmart(el as Element, 'disabled', '');
         });
       } else {
         safe(() => {
-          el.removeAttribute('disabled');
+          removeAttributeSmart(el as Element, 'disabled');
         });
       }
     }
@@ -1878,6 +1887,8 @@ export function createElement(
   vnode: VNode | string,
   context?: Record<string, unknown>,
   refs?: VDomRefs,
+  // Parent namespace (e.g. SVG_NS) or null for HTML. Propagated from parent → child.
+  parentNamespace: string | null = null,
 ): Node {
   // String VNode → plain text node (no key)
   if (typeof vnode === 'string') {
@@ -1925,7 +1936,13 @@ export function createElement(
     frag.appendChild(start);
 
     for (const child of children) {
-      const childNode = createElement(child, context);
+      const childNode = createElement(
+        child,
+        context,
+        refs,
+        // propagate parent namespace (was previously a boolean)
+        parentNamespace,
+      );
       // Propagate anchor block's key to child elements ONLY if child doesn't have its own key
       // This allows keyed lists (each()) to preserve their own keys
       if (
@@ -1950,7 +1967,36 @@ export function createElement(
   }
 
   // Standard element VNode
-  const el = document.createElement(vnode.tag);
+  // Respect an explicit xmlns attribute on the VNode (don't overwrite it).
+  // Peek at vnode.attrs if provided so we can create the element in the
+  // correct namespace up-front (before processing props/attrs below).
+  const vnodeAttrs =
+    vnode &&
+    typeof vnode === 'object' &&
+    vnode.props &&
+    (vnode.props as VNodePropBag).attrs
+      ? (vnode.props as VNodePropBag).attrs
+      : (undefined as unknown as PropsMap | undefined);
+
+  const declaredNS =
+    vnodeAttrs && typeof vnodeAttrs['xmlns'] === 'string'
+      ? String(vnodeAttrs['xmlns'])
+      : undefined;
+
+  // Decide namespace to use when creating the element (priority):
+  // 1. If an explicit `xmlns` is provided on the vnode, use that.
+  // 2. If parentNamespace is present, inherit that namespace.
+  // 3. If the tag is a well-known namespaced tag (svg, math), use its namespace.
+  // 4. Otherwise create a regular HTML element (null namespace -> createElement).
+  const nsToUse =
+    declaredNS ?? parentNamespace ?? TAG_NAMESPACE_MAP[vnode.tag] ?? null;
+
+  // Create element in the appropriate namespace. For TypeScript compatibility
+  // with existing APIs that expect `HTMLElement`, cast to `HTMLElement` here.
+  // At runtime, SVG elements remain proper SVGElement instances.
+  const el = (nsToUse
+    ? document.createElementNS(nsToUse, vnode.tag)
+    : document.createElement(vnode.tag)) as unknown as HTMLElement;
   if (vnode.key != null) setNodeKey(el, vnode.key);
 
   // Store TransitionGroup metadata on the DOM element for patchChildren to use
@@ -1964,7 +2010,12 @@ export function createElement(
   const { props = {}, attrs = {}, directives = {} } = vnode.props ?? {};
 
   // Process directives first to get merged props/attrs/listeners
-  const processedDirectives = processDirectives(directives, context, el, attrs);
+  const processedDirectives = processDirectives(
+    directives,
+    context,
+    el instanceof HTMLElement ? el : undefined,
+    attrs,
+  );
 
   // Merge processed directive results with existing props/attrs
   const mergedProps = {
@@ -1991,7 +2042,7 @@ export function createElement(
     const serializedHostClass = safeSerializeAttr(hostClass);
     if (serializedHostClass !== null) {
       const cls = String(serializedHostClass).trim();
-      if (cls) el.setAttribute('class', cls);
+      if (cls) setAttributeSmart(el as Element, 'class', cls);
     }
   } catch {
     void 0;
@@ -2043,10 +2094,10 @@ export function createElement(
     if (typeof unwrappedVal === 'boolean') {
       // Use the unwrapped boolean to decide presence of boolean attributes
       if (unwrappedVal) {
-        el.setAttribute(key, '');
+        setAttributeSmart(el as Element, key, '');
       } else {
         safe(() => {
-          el.removeAttribute(key);
+          removeAttributeSmart(el as Element, key);
         });
       }
     } else if (unwrappedVal !== undefined && unwrappedVal !== null) {
@@ -2072,11 +2123,11 @@ export function createElement(
         });
         if (final) {
           safe(() => {
-            el.setAttribute(key, '');
+            setAttributeSmart(el as Element, key, '');
           });
         } else {
           safe(() => {
-            el.removeAttribute(key);
+            removeAttributeSmart(el as Element, key);
           });
         }
         // keep going (do not fallthrough to attribute string path)
@@ -2098,7 +2149,8 @@ export function createElement(
           else el.value = String(unwrappedVal ?? '');
         } catch {
           const serialized = safeSerializeAttr(unwrappedVal);
-          if (serialized !== null) el.setAttribute(key, serialized);
+          if (serialized !== null)
+            setAttributeSmart(el as Element, key, String(serialized));
         }
       } else if (
         !isSVG &&
@@ -2109,7 +2161,8 @@ export function createElement(
           el.checked = !!unwrappedVal;
         } catch {
           const serialized = safeSerializeAttr(unwrappedVal);
-          if (serialized !== null) el.setAttribute(key, serialized);
+          if (serialized !== null)
+            setAttributeSmart(el as Element, key, String(serialized));
         }
       } else if (!isSVG && key in el) {
         try {
@@ -2121,7 +2174,7 @@ export function createElement(
             unwrappedVal === false &&
             isNativeControl(el)
           ) {
-            el.removeAttribute('disabled');
+            removeAttributeSmart(el as Element, 'disabled');
           }
           // Keep vnode attrs in sync with DOM mutation. In the createElement
           // path there is no `oldProps` bag; write back into the vnode's
@@ -2129,7 +2182,8 @@ export function createElement(
           writebackAttr(vnode.props, key, unwrappedVal as unknown);
         } catch {
           const serialized = safeSerializeAttr(unwrappedVal);
-          if (serialized !== null) el.setAttribute(key, serialized);
+          if (serialized !== null)
+            setAttributeSmart(el as Element, key, String(serialized));
         }
       } else {
         // For custom elements, convert kebab-case attributes to camelCase properties
@@ -2141,11 +2195,13 @@ export function createElement(
           } catch {
             // If property assignment fails, fall back to attribute
             const serialized = safeSerializeAttr(unwrappedVal);
-            if (serialized !== null) el.setAttribute(key, serialized);
+            if (serialized !== null)
+              setAttributeSmart(el as Element, key, String(serialized));
           }
         } else {
           const serialized = safeSerializeAttr(unwrappedVal);
-          if (serialized !== null) el.setAttribute(key, serialized);
+          if (serialized !== null)
+            setAttributeSmart(el as Element, key, String(serialized));
         }
       }
     }
@@ -2216,7 +2272,7 @@ export function createElement(
     } else if (key.startsWith('on') && val === undefined) {
       continue; // skip undefined event handlers
     } else if (val === undefined || val === null || val === false) {
-      el.removeAttribute(key);
+      removeAttributeSmart(el as Element, key);
     } else {
       // Prefer setting DOM properties for custom elements or when the
       // property already exists on the element. This ensures JS properties
@@ -2238,7 +2294,8 @@ export function createElement(
       if (key === 'class' || key === 'style') {
         try {
           const serialized = safeSerializeAttr(propValue);
-          if (serialized !== null) el.setAttribute(key, serialized);
+          if (serialized !== null)
+            setAttributeSmart(el as Element, key, String(serialized));
         } catch {
           void 0;
         }
@@ -2273,11 +2330,11 @@ export function createElement(
             });
             if (final) {
               safe(() => {
-                el.setAttribute(key, '');
+                setAttributeSmart(el as Element, key, '');
               });
             } else {
               safe(() => {
-                el.removeAttribute(key);
+                removeAttributeSmart(el as Element, key);
               });
             }
             continue;
@@ -2366,8 +2423,16 @@ export function createElement(
 
   // Append children
   if (Array.isArray(vnode.children)) {
+    // Determine the namespace that should be propagated to children.
+    // Special-case: when inside an SVG `<foreignObject>` the element itself
+    // remains in the SVG namespace but its contents should be HTML.
+    const childParentNamespace =
+      vnode.tag === 'foreignObject' && nsToUse === SVG_NS
+        ? null
+        : ((el as Element).namespaceURI ?? null);
+
     for (const child of vnode.children) {
-      el.appendChild(createElement(child, context, refs));
+      el.appendChild(createElement(child, context, refs, childParentNamespace));
     }
   } else if (typeof vnode.children === 'string') {
     el.textContent = vnode.children;
@@ -2425,11 +2490,11 @@ export function createElement(
       });
       if (!final)
         safe(() => {
-          el.removeAttribute('disabled');
+          removeAttributeSmart(el as Element, 'disabled');
         });
       else
         safe(() => {
-          el.setAttribute('disabled', '');
+          setAttributeSmart(el as Element, 'disabled', '');
         });
     }
   } catch {
@@ -2629,7 +2694,12 @@ export function patchChildren(
           });
         } else {
           // Create new node and insert it immediately (but invisible via enterFrom classes)
-          node = createElement(newVNode, context);
+          node = createElement(
+            newVNode,
+            context,
+            undefined,
+            parent instanceof Element ? (parent.namespaceURI ?? null) : null,
+          );
           setNodeKey(node, String(key));
 
           // For new nodes, immediately insert them into DOM (at the end) and start enter transition
@@ -2905,7 +2975,12 @@ export function patchChildren(
             parent.insertBefore(node, next);
           }
         } else {
-          node = createElement(newVNode, context);
+          node = createElement(
+            newVNode,
+            context,
+            undefined,
+            parent instanceof Element ? (parent.namespaceURI ?? null) : null,
+          );
           parent.insertBefore(node, next);
           usedInRange.add(node);
 
@@ -2959,7 +3034,12 @@ export function patchChildren(
 
       // Add extra new
       for (let i = commonLength; i < newChildren.length; i++) {
-        const node = createElement(newChildren[i], context);
+        const node = createElement(
+          newChildren[i],
+          context,
+          undefined,
+          parent instanceof Element ? (parent.namespaceURI ?? null) : null,
+        );
         parent.insertBefore(node, end);
 
         // Apply enter transition to new nodes ONLY if shouldAnimate is true
@@ -3040,7 +3120,12 @@ export function patchChildren(
         const shouldAnimate = !isInitialVisible || transition.appear;
 
         for (const child of children) {
-          const childNode = createElement(child, context);
+          const childNode = createElement(
+            child,
+            context,
+            refs,
+            parent instanceof Element ? (parent.namespaceURI ?? null) : null,
+          );
           parent.insertBefore(childNode, nextSibling);
 
           // Apply enter transitions to new nodes ONLY if shouldAnimate is true
@@ -3105,7 +3190,12 @@ export function patchChildren(
         parent.insertBefore(node, nextSibling);
       }
     } else {
-      node = createElement(newVNode, context, refs);
+      node = createElement(
+        newVNode,
+        context,
+        refs,
+        parent instanceof Element ? (parent.namespaceURI ?? null) : null,
+      );
       if (nextSibling && !parent.contains(nextSibling)) nextSibling = null;
       parent.insertBefore(node, nextSibling);
       usedNodes.add(node);
@@ -3173,7 +3263,14 @@ export function patch(
     const frag = document.createDocumentFragment();
     frag.appendChild(start);
     for (const child of children) {
-      const childNode = createElement(child, context);
+      const childNode = createElement(
+        child,
+        context,
+        refs,
+        dom.parentNode instanceof Element
+          ? (dom.parentNode.namespaceURI ?? null)
+          : null,
+      );
       frag.appendChild(childNode);
     }
     frag.appendChild(end);
@@ -3190,7 +3287,14 @@ export function patch(
 
   if (!oldVNode || typeof oldVNode === 'string') {
     cleanupRefs(dom, refs);
-    const newEl = createElement(newVNode, context, refs);
+    const newEl = createElement(
+      newVNode,
+      context,
+      refs,
+      dom.parentNode instanceof Element
+        ? (dom.parentNode.namespaceURI ?? null)
+        : null,
+    );
     assignRef(newVNode, newEl as HTMLElement, refs);
     dom.parentNode?.replaceChild(newEl, dom);
     return newEl;
@@ -3214,7 +3318,16 @@ export function patch(
     const frag = document.createDocumentFragment();
     frag.appendChild(start);
     for (const child of children) {
-      frag.appendChild(createElement(child, context));
+      frag.appendChild(
+        createElement(
+          child,
+          context,
+          refs,
+          dom.parentNode instanceof Element
+            ? (dom.parentNode.namespaceURI ?? null)
+            : null,
+        ),
+      );
     }
     frag.appendChild(end);
     dom.parentNode?.replaceChild(frag, dom);
@@ -3262,7 +3375,14 @@ export function patch(
   }
 
   cleanupRefs(dom, refs);
-  const newEl = createElement(newVNode, context, refs);
+  const newEl = createElement(
+    newVNode,
+    context,
+    refs,
+    dom.parentNode instanceof Element
+      ? (dom.parentNode.namespaceURI ?? null)
+      : null,
+  );
   assignRef(newVNode, newEl as HTMLElement, refs);
   dom.parentNode?.replaceChild(newEl, dom);
   return newEl;
@@ -3333,11 +3453,21 @@ export function vdomRenderer(
     ) {
       newDom = patch(prevDom, prevVNode, newVNode, context, refs);
     } else {
-      newDom = createElement(newVNode, context, refs);
+      newDom = createElement(
+        newVNode,
+        context,
+        refs,
+        root.host instanceof Element ? (root.host.namespaceURI ?? null) : null,
+      );
       root.replaceChild(newDom, prevDom);
     }
   } else {
-    newDom = createElement(newVNode, context, refs);
+    newDom = createElement(
+      newVNode,
+      context,
+      refs,
+      root.host instanceof Element ? (root.host.namespaceURI ?? null) : null,
+    );
     if (root.firstChild) root.replaceChild(newDom, root.firstChild);
     else root.appendChild(newDom);
   }

@@ -35,7 +35,7 @@ export interface TransitionMetadata {
   [key: string]: unknown;
 }
 
-const elementTransitionMap = new WeakMap<HTMLElement, TransitionMetadata>();
+const elementTransitionMap = new WeakMap<Element, TransitionMetadata>();
 
 /**
  * Retrieve the stored node key for a Node.
@@ -73,6 +73,7 @@ export function getNodeKey(node: Node | null | undefined): string | undefined {
  * @internal
  */
 import { safeSerializeAttr } from './helpers';
+import { setAttributeSmart } from './namespace-helpers';
 
 export function setNodeKey(node: Node, key: string): void {
   try {
@@ -88,7 +89,7 @@ export function setNodeKey(node: Node, key: string): void {
   try {
     if (node instanceof Element) {
       const s = safeSerializeAttr(key);
-      if (s !== null) node.setAttribute('data-anchor-key', s);
+      if (s !== null) setAttributeSmart(node, 'data-anchor-key', s);
     }
   } catch {
     void 0;
@@ -104,7 +105,7 @@ export function setNodeKey(node: Node, key: string): void {
  * @internal
  */
 export function getElementTransition(
-  el: HTMLElement | null | undefined,
+  el: Element | null | undefined,
 ): TransitionMetadata | undefined {
   if (!el) return undefined;
   const wm = elementTransitionMap.get(el);
@@ -128,7 +129,7 @@ export function getElementTransition(
  * @internal
  */
 export function setElementTransition(
-  el: HTMLElement,
+  el: Element,
   value: TransitionMetadata,
 ): void {
   try {

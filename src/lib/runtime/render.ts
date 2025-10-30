@@ -1,4 +1,5 @@
 import { vdomRenderer } from './vdom';
+import { setAttributeSmart } from './namespace-helpers';
 import {
   minifyCSS,
   getBaseResetSheet,
@@ -228,7 +229,7 @@ export function applyStyle<
       ) as HTMLStyleElement | null;
       if (!el) {
         el = document.createElement('style');
-        el.setAttribute('data-cer-runtime', 'true');
+        setAttributeSmart(el, 'data-cer-runtime', 'true');
         shadowRoot.appendChild(el);
       }
       try {
@@ -320,7 +321,7 @@ export function applyStyle<
   ) as HTMLStyleElement | null;
   if (!el) {
     el = document.createElement('style');
-    el.setAttribute('data-cer-runtime', 'true');
+    setAttributeSmart(el, 'data-cer-runtime', 'true');
     shadowRoot.appendChild(el);
   }
   try {

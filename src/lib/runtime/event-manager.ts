@@ -8,7 +8,7 @@
  */
 class EventManager {
   private static cleanupFunctions = new WeakMap<
-    HTMLElement,
+    Element,
     Array<{
       event: string;
       handler: EventListener;
@@ -23,14 +23,15 @@ class EventManager {
    * Add an event listener with automatic cleanup tracking
    */
   static addListener(
-    element: HTMLElement,
+    element: Element,
     event: string,
     handler: EventListener,
     options?: AddEventListenerOptions,
   ): void {
-    element.addEventListener(event, handler, options);
+    (element as EventTarget).addEventListener(event, handler, options);
 
-    const cleanup = () => element.removeEventListener(event, handler, options);
+    const cleanup = () =>
+      (element as EventTarget).removeEventListener(event, handler, options);
     const meta = {
       event,
       handler,
@@ -53,12 +54,12 @@ class EventManager {
    * Remove a specific event listener
    */
   static removeListener(
-    element: HTMLElement,
+    element: Element,
     event: string,
     handler: EventListener,
     options?: EventListenerOptions,
   ): void {
-    element.removeEventListener(event, handler, options);
+    (element as EventTarget).removeEventListener(event, handler, options);
 
     const cleanups = this.cleanupFunctions.get(element);
     if (!cleanups) return;
@@ -79,7 +80,7 @@ class EventManager {
   /**
    * Clean up all event listeners for an element
    */
-  static cleanup(element: HTMLElement): void {
+  static cleanup(element: Element): void {
     const list = this.cleanupFunctions.get(element);
     if (list) {
       list.forEach((m) => {
@@ -105,7 +106,7 @@ class EventManager {
   /**
    * Check if an element has any tracked event listeners
    */
-  static hasListeners(element: HTMLElement): boolean {
+  static hasListeners(element: Element): boolean {
     const list = this.cleanupFunctions.get(element);
     return !!(list && list.length > 0);
   }
@@ -113,7 +114,7 @@ class EventManager {
   /**
    * Get the number of tracked event listeners for an element
    */
-  static getListenerCount(element: HTMLElement): number {
+  static getListenerCount(element: Element): number {
     const list = this.cleanupFunctions.get(element);
     return list ? list.length : 0;
   }
@@ -121,7 +122,7 @@ class EventManager {
   /**
    * Return listener metadata stored for the element (test/debug only)
    */
-  static getListenerInfo(element: HTMLElement): Array<{
+  static getListenerInfo(element: Element): Array<{
     event: string;
     handler?: EventListener;
     wrapper?: EventListener;

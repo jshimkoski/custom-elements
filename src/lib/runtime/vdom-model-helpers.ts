@@ -10,6 +10,7 @@ import {
   safe,
   safeSerializeAttr,
 } from './helpers';
+import { setAttributeSmart, removeAttributeSmart } from './namespace-helpers';
 
 /**
  * Check if two values have changed, handling arrays specially
@@ -78,7 +79,7 @@ export function triggerStateUpdate(
  * Emit custom update events for model binding
  */
 export function emitUpdateEvents(
-  target: HTMLElement,
+  target: Element,
   propName: string,
   newValue: unknown,
 ): void {
@@ -105,7 +106,7 @@ export function emitUpdateEvents(
  * Update element properties and attributes to sync with state
  */
 export function syncElementWithState(
-  target: HTMLElement | Record<string, unknown>,
+  target: Element | Record<string, unknown>,
   propName: string,
   propValue: unknown,
   isReactive: boolean,
@@ -138,14 +139,18 @@ export function syncElementWithState(
     const serialized = safeSerializeAttr(propToSet);
     if (serialized !== null) {
       safe(() => {
-        if (typeof (target as HTMLElement).setAttribute === 'function') {
-          (target as HTMLElement).setAttribute(toKebab(propName), serialized);
+        if (typeof (target as Element).setAttribute === 'function') {
+          setAttributeSmart(
+            target as Element,
+            toKebab(propName),
+            String(serialized),
+          );
         }
       });
     } else {
       safe(() => {
-        if (typeof (target as HTMLElement).removeAttribute === 'function') {
-          (target as HTMLElement).removeAttribute(toKebab(propName));
+        if (typeof (target as Element).removeAttribute === 'function') {
+          removeAttributeSmart(target as Element, toKebab(propName));
         }
       });
     }

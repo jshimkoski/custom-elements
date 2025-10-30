@@ -28,7 +28,7 @@ export interface VNode {
   children?: VNode[] | string;
 }
 
-export type VDomRefs = Record<string, HTMLElement | undefined>;
+export type VDomRefs = Record<string, Element | undefined>;
 
 export interface AnchorBlockVNode extends VNode {
   tag: '#anchor';
@@ -95,7 +95,7 @@ export type InferMethods<T> = {
 };
 
 export interface Refs {
-  refs: Record<string, HTMLElement | undefined>;
+  refs: Record<string, Element | undefined>;
 }
 
 export type ComponentContext<

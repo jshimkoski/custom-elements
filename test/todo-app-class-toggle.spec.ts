@@ -34,9 +34,9 @@ describe('TodoApp :class toggle', () => {
 
     console.log(
       'assert before initial check ->',
-      input.classList.contains('border-error-500'),
+      input.classList.contains('border-error-600'),
     );
-    expect(input.classList.contains('border-error-500')).toBe(false);
+    expect(input.classList.contains('border-error-600')).toBe(false);
 
     // Simulate typing 'test'
     input.value = 'test';
@@ -49,7 +49,7 @@ describe('TodoApp :class toggle', () => {
       input.getAttribute('class'),
       Array.from(input.classList),
     );
-    expect(input.classList.contains('border-error-500')).toBe(true);
+    expect(input.classList.contains('border-error-600')).toBe(true);
 
     // Change away
     input.value = 'nope';
@@ -61,6 +61,6 @@ describe('TodoApp :class toggle', () => {
       input.getAttribute('class'),
       Array.from(input.classList),
     );
-    expect(input.classList.contains('border-error-500')).toBe(false);
+    expect(input.classList.contains('border-error-600')).toBe(false);
   });
 });

@@ -44,7 +44,7 @@ component('ssr-demo', () => {
 - On the server: `render` returns a VNode, which is converted to HTML.
 - On the client: The runtime hydrates the markup and enables interactivity.
 
-## ✉️ Rendering to string with `renderToString`
+Rendering to string with `renderToString`
 
 The runtime provides `renderToString` for SSR. The small SSR entrypoint is `src/lib/ssr.ts` (it re-exports the internal `runtime/vdom-ssr` helper) — import `renderToString` from the SSR entry so bundlers don't pull server-only code into the client bundle. Use `html` to build VNodes on the server and `renderToString` to produce markup.
 
@@ -103,7 +103,7 @@ http
 
 Client-side hydration example
 
-On the client register the same component and let the runtime hydrate existing server markup. The runtime attaches listeners and enables bindings without re-rendering the initial content.
+On the client register the same component and let the runtime hydrate existing server markup. The runtime attaches listeners and enables bindings; note that the client renderer reconciles VNodes and may replace server nodes in certain cases (keep server/client output shapes identical to avoid visual/hydration mismatches).
 
 ```html
 <!doctype html>
@@ -134,9 +134,57 @@ On the client register the same component and let the runtime hydrate existing s
 
 Notes
 
-- `renderToString` serializes HTML only; Adopted StyleSheets / JIT CSS are not automatically included server-side — collect and inline styles if needed.
+- `renderToString` serializes VNode attributes from the `props.attrs` bag only; runtime-only values (functions, reactive state objects, directive metadata) are intentionally excluded from serialization.
+  - Supports two rendering options:
+    - `injectSvgNamespace?: boolean` (default: `true`) — when true, the SSR renderer will inject the standard SVG namespace attribute (`xmlns=\"http://www.w3.org/2000/svg\"`) onto `<svg>` elements that do not already provide an explicit `xmlns`.
+    - `injectKnownNamespaces?: boolean` (default: follows `injectSvgNamespace`) — when true, the renderer will also inject known non-HTML namespaces for well-known top-level tags (for example `<math>` will receive the MathML namespace) when the vnode doesn't provide an explicit `xmlns`.
 - Server rendering does not execute client lifecycle hooks.
 - Ensure server and client render shapes match to avoid hydration mismatches.
+
+## 🖼️ SVG namespace behavior
+
+When rendering SVGs on the server you can encounter subtle differences between
+server-produced markup and the client DOM unless namespaces are handled
+explicitly. The client runtime creates SVG elements using the SVG namespace
+internally (equivalent to `document.createElementNS('http://www.w3.org/2000/svg', ...)`).
+To avoid hydration/namespace mismatches, the SSR renderer injects the standard
+SVG namespace attribute on `<svg>` elements by default.
+
+Key points:
+
+- By default, `renderToString(vnode)` will add `xmlns="http://www.w3.org/2000/svg"`
+  to any `<svg>` vnode that doesn't already include an explicit `xmlns` attribute.
+  This mirrors client-side behavior and makes the server output portable across
+  parsers (HTML/XML).
+- If a vnode already provides an `xmlns` on the `<svg>` or any child element,
+  the renderer preserves that value verbatim (child overrides parent).
+- You can opt out of the automatic injection when you need minimal markup by
+  passing the `injectSvgNamespace: false` option.
+
+API and examples
+
+```ts
+import { renderToString } from '@jasonshimmy/custom-elements-runtime/ssr';
+
+// Default: injects xmlns on <svg> if missing
+const htmlDefault = renderToString(vnodeTree);
+
+// Opt-out: do not auto-insert the SVG namespace
+const htmlNoNs = renderToString(vnodeTree, { injectSvgNamespace: false });
+```
+
+When to keep the default (recommended)
+
+- If you plan to hydrate server markup with the client runtime, leave the
+  default enabled so namespaces match and hydration is reliable.
+- If your server output may be parsed by an XML/XHTML consumer or re-used in
+  contexts where the HTML parser isn't available, an explicit xmlns is safer.
+
+When to opt out
+
+- If you intentionally need the smallest possible HTML output and you control
+  the client parsing context (and are sure hydration won't be affected), you
+  can set `injectSvgNamespace: false`.
 
 ## 🛠️ SSR Fallback Logic
 
