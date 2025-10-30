@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v2.2.3] - 2025-10-29
+
+- fix: fix :class binding issue that prevented classes from being remove when a condition changed (5b60784)
+- fix: guard stylesheet logic against SSR (8ecd7b7)
+
+
 ## [v2.2.2] - 2025-10-29
 
 - fix: guard stylesheet logic against SSR (8ecd7b7)
