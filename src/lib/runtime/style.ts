@@ -990,6 +990,7 @@ export const selectorVariants: SelectorVariantMap = {
   'peer-focus': (sel, body) => `.peer:focus ~ ${sel}{${body}}`,
   'peer-checked': (sel, body) => `.peer:checked ~ ${sel}{${body}}`,
   'peer-disabled': (sel, body) => `.peer:disabled ~ ${sel}{${body}}`,
+  'dark-class': (sel, body) => `:host(.dark) ${sel}{${body}}`,
 };
 
 export const mediaVariants: MediaVariantMap = {

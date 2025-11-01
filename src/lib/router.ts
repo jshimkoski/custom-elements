@@ -65,8 +65,8 @@ export interface RouterLinkProps {
   ariaCurrentValue: string;
   disabled: boolean;
   external: boolean;
-  linkClass?: string;
-  linkStyle?: string;
+  class?: string;
+  style?: string;
 }
 
 export interface RouterLinkComputed {
@@ -498,8 +498,9 @@ export function initRouter(config: RouterConfig) {
       ariaCurrentValue: 'page',
       disabled: false,
       external: false,
-      linkClass: '',
-      linkStyle: '',
+      // allow host `class` and `style` attributes to be read via useProps
+      class: '',
+      style: '',
     });
 
     // Prefer the latest initialized router (tests may re-init). Fallback
@@ -511,11 +512,19 @@ export function initRouter(config: RouterConfig) {
     // cleanup during render time.
     let unsubRouterLink: (() => void) | undefined;
 
-    useStyle(
-      () => (`a,button{display:inline-block;}` + props.linkStyle) as string,
-    );
+    // Keep a minimal internal host-scoped style for element display.
+    // Host `style` will be applied to the inner anchor/button element.
+    useStyle(() => `a,button{display:inline-block;}`);
 
-    useOnConnected(() => {
+    // We capture host attributes at connection time and migrate them to
+    // internal refs so we can remove them from the host. This prevents
+    // global/author CSS targeting the host from styling the host element
+    // itself while still allowing authors to use `class`/`style` on the
+    // router-link to style the inner anchor/button.
+    const hostClassRef = ref((props.class as string) || '');
+    const hostStyleRef = ref((props.style as string) || '');
+
+    useOnConnected((ctx?: unknown) => {
       try {
         if (r && typeof r.subscribe === 'function') {
           unsubRouterLink = r.subscribe((s) => {
@@ -528,6 +537,23 @@ export function initRouter(config: RouterConfig) {
         }
       } catch (e) {
         devWarn('router-link subscribe failed', e);
+      }
+
+      // Migrate host `class`/`style` into internal refs and remove them
+      // from the host so only the inner element is styled.
+      try {
+        const host = (ctx as { _host?: HTMLElement } | undefined)?._host;
+        if (host instanceof HTMLElement) {
+          const hc = host.getAttribute('class');
+          const hs = host.getAttribute('style');
+          if (hc) hostClassRef.value = hc;
+          if (hs) hostStyleRef.value = hs;
+          // Remove attributes from host to avoid styling the host
+          if (hc !== null) host.removeAttribute('class');
+          if (hs !== null) host.removeAttribute('style');
+        }
+      } catch (e) {
+        devWarn('router-link host migration failed', e);
       }
     });
 
@@ -552,12 +578,13 @@ export function initRouter(config: RouterConfig) {
           : false,
     );
 
-    // Build user classes reactively from the `linkClass` prop.
-    // We intentionally do NOT read the host `class` attribute to avoid
-    // duplicate styling applied to both host and inner element.
+    // Build user classes reactively from the host `class` attribute prop.
+    // We intentionally apply classes to the inner element so the consumer
+    // can style the link via `class="..."`.
     const userClasses = computed(() => {
-      const raw = (props.linkClass as string) || '';
-      const list = raw.split(/\s+/).filter(Boolean);
+      const rawHost =
+        (hostClassRef && hostClassRef.value) || (props.class as string) || '';
+      const list = rawHost.split(/\s+/).filter(Boolean);
       const map: Record<string, boolean> = {};
       for (const c of list) map[c] = true;
       return map;
@@ -569,6 +596,14 @@ export function initRouter(config: RouterConfig) {
       [(props.exactActiveClass as string) || 'exact-active']:
         isExactActive.value,
     }));
+
+    // Compute a final class string (template accepts object or string; we
+    // convert to string to safely include host classes and conditionals).
+    const classString = computed(() =>
+      Object.keys(classObject.value)
+        .filter((k) => classObject.value[k])
+        .join(' '),
+    );
 
     const isButton = computed(() => (props.tag as string) === 'button');
     // Instead of pre-building attribute fragments as strings (which can
@@ -583,6 +618,12 @@ export function initRouter(config: RouterConfig) {
       () =>
         !!props.external &&
         ((props.tag as string) === 'a' || !(props.tag as string)),
+    );
+
+    // Inline style from host `style` attribute.
+    const inlineStyle = computed(
+      () =>
+        (hostStyleRef && hostStyleRef.value) || (props.style as string) || '',
     );
 
     const navigate = (e: MouseEvent) => {
@@ -611,7 +652,8 @@ export function initRouter(config: RouterConfig) {
           html`
             <button
               part="button"
-              :class="${classObject.value}"
+              class="${classString.value}"
+              style="${inlineStyle.value || null}"
               aria-current="${ariaCurrentValue.value}"
               disabled="${isDisabled.value ? '' : null}"
               aria-disabled="${isDisabled.value ? 'true' : null}"
@@ -626,7 +668,8 @@ export function initRouter(config: RouterConfig) {
           <a
             part="link"
             href="${props.to}"
-            :class="${classObject.value}"
+            class="${classString.value}"
+            style="${inlineStyle.value || null}"
             aria-current="${ariaCurrentValue.value}"
             aria-disabled="${isDisabled.value ? 'true' : null}"
             tabindex="${isDisabled.value ? '-1' : null}"

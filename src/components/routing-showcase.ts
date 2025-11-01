@@ -19,8 +19,8 @@ component('home-page', () => {
       <h1>Home</h1>
       <router-link
         to="/about"
-        linkClass="block rounded bg-primary-600 hover:bg-primary-500 text-white px-4 py-2"
-        exactActiveClass="bg-primary-800"
+        class="block rounded bg-primary-600 hover:bg-primary-500 text-white px-4 py-2"
+        exact-active-class="bg-primary-800"
         >Go to About Page</router-link
       >
       <input class="px-2 py-1 border" type="text" :model="${name}" />
@@ -37,7 +37,7 @@ component(
       <h1>About</h1>
       <router-link
         to="/routing"
-        link-class="rounded bg-primary-600 hover:bg-primary-500 text-white px-4 py-2"
+        class="rounded bg-primary-600 hover:bg-primary-500 text-white px-4 py-2"
         >Go to Home Page</router-link
       >
       <home-page></home-page>

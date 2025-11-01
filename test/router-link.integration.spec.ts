@@ -29,7 +29,7 @@ describe('router-link integration', () => {
       return html`
         <div>
           <h1>Test Home</h1>
-          <router-link to="/about" link-class="nav-link" style="color: red;"
+          <router-link to="/about" class="nav-link" style="color: red;"
             >About</router-link
           >
         </div>
@@ -70,7 +70,7 @@ describe('router-link integration', () => {
 
     const rl = document.createElement(tag) as HTMLElement;
     rl.setAttribute('to', '/about');
-    rl.setAttribute('link-class', 'standalone-link');
+    rl.setAttribute('class', 'standalone-link');
     rl.setAttribute('style', 'font-weight: bold;');
     document.body.appendChild(rl);
     await nextTick();
@@ -95,7 +95,7 @@ describe('router-link integration', () => {
 
     const rl = document.createElement('router-link') as HTMLElement;
     rl.setAttribute('to', '/about');
-    rl.setAttribute('link-class', 'p-4 text-xl');
+    rl.setAttribute('class', 'p-4 text-xl');
     document.body.appendChild(rl);
     await nextTick();
 

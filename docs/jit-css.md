@@ -211,7 +211,9 @@ For a complete list, see the `utilityMap` in [`src/lib/runtime/style.ts`](../src
 
 **Arbitrary Container Queries:** `@[value]:` (e.g., `@[300px]:`, `@[20rem]:`, `@[50%]:`)
 
-**Dark Mode:** `dark:`
+**Dark Mode (Prefers-color-scheme):** `dark:`
+
+**Dark Mode (Class-based, e.g.; `.dark` on host element):** `dark-class:`
 
 **Example:**
 
@@ -228,7 +230,8 @@ For a complete list, see the `utilityMap` in [`src/lib/runtime/style.ts`](../src
 <div class="@container">
   <div class="@lg:p-4 @2xl:p-8">Container Query</div>
 </div>
-<div class="dark:bg-neutral-900">Dark Mode</div>
+<div class="dark:bg-neutral-900">Dark Mode (Prefers-color-scheme)</div>
+<div class="dark-class:bg-neutral-900">Dark Mode (Class-based)</div>
 ```
 
 ## 🚀 Arbitrary Values

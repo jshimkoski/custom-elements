@@ -720,14 +720,18 @@ export function component(
 
   // Store lifecycle hooks from the render function
   const lifecycleHooks: {
-    onConnected?: () => void;
-    onDisconnected?: () => void;
+    // Forward context to hooks so user-provided lifecycle callbacks
+    // (registered via useOnConnected/useOnDisconnected) can access the
+    // component context and its internal _host reference when invoked.
+    onConnected?: (context?: unknown) => void;
+    onDisconnected?: (context?: unknown) => void;
     onAttributeChanged?: (
       name: string,
       oldValue: string | null,
       newValue: string | null,
+      context?: unknown,
     ) => void;
-    onError?: (error: Error) => void;
+    onError?: (error: Error, context?: unknown) => void;
   } = {};
 
   // Create component config
@@ -736,27 +740,43 @@ export function component(
     props: {},
 
     // Add lifecycle hooks from the stored functions
-    onConnected: () => {
+    onConnected: (context) => {
       if (lifecycleHooks.onConnected) {
-        lifecycleHooks.onConnected();
+        try {
+          lifecycleHooks.onConnected(context);
+        } catch {
+          // swallow user errors in lifecycle hooks
+        }
       }
     },
 
-    onDisconnected: () => {
+    onDisconnected: (context) => {
       if (lifecycleHooks.onDisconnected) {
-        lifecycleHooks.onDisconnected();
+        try {
+          lifecycleHooks.onDisconnected(context);
+        } catch {
+          /* swallow */
+        }
       }
     },
 
-    onAttributeChanged: (name, oldValue, newValue) => {
+    onAttributeChanged: (name, oldValue, newValue, context) => {
       if (lifecycleHooks.onAttributeChanged) {
-        lifecycleHooks.onAttributeChanged(name, oldValue, newValue);
+        try {
+          lifecycleHooks.onAttributeChanged(name, oldValue, newValue, context);
+        } catch {
+          /* swallow */
+        }
       }
     },
 
-    onError: (error) => {
+    onError: (error, context) => {
       if (lifecycleHooks.onError && error) {
-        lifecycleHooks.onError(error);
+        try {
+          lifecycleHooks.onError(error, context);
+        } catch {
+          /* swallow */
+        }
       }
     },
 

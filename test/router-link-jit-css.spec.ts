@@ -41,10 +41,10 @@ describe('router-link JIT CSS integration', () => {
     component('test-nav', () => {
       return html`
         <nav>
-          <router-link to="/" link-class="text-blue-500 hover:text-blue-700"
+          <router-link to="/" class="text-blue-500 hover:text-blue-700"
             >Home</router-link
           >
-          <router-link to="/about" link-class="px-4 py-2 bg-green-500"
+          <router-link to="/about" class="px-4 py-2 bg-green-500"
             >About</router-link
           >
         </nav>
@@ -165,7 +165,7 @@ describe('router-link JIT CSS integration', () => {
         <nav>
           <router-link
             to="/settings"
-            link-class="px-4 py-2 rounded-lg transition-colors"
+            class="px-4 py-2 rounded-lg transition-colors"
             active-class="bg-purple-500 text-white"
             exact-active-class="ring-2 ring-purple-700"
             exact
@@ -220,7 +220,7 @@ describe('router-link JIT CSS integration', () => {
         <nav>
           <router-link
             to="/profile"
-            link-class="inline-block"
+            class="inline-block"
             active-class="font-bold underline"
             exact-active-class="text-orange-500"
             exact
@@ -268,7 +268,7 @@ describe('router-link JIT CSS integration', () => {
         <nav>
           <router-link
             to="/mobile"
-            link-class="block md:inline-block lg:flex"
+            class="block md:inline-block lg:flex"
             active-class="bg-blue-500 hover:bg-blue-600 dark:bg-blue-400"
             exact-active-class="shadow-lg md:shadow-xl"
             exact
