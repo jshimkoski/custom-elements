@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v2.2.5] - 2025-11-01
+
+- fix: router-link style and class now work properly fix: fix missing dark mode capability (add dark-class jit css variant that works with a .dark class on the host element) (84697b5)
+- fix: add support for svgs and other namespaced elements (d99525e)
+
+
 ## [v2.2.4] - 2025-10-30
 
 - fix: add support for svgs and other namespaced elements (d99525e)
