@@ -463,10 +463,11 @@ describe('Optimized JIT CSS Tests', () => {
     });
 
     it('should maintain escapeClassName behavior', () => {
+      // CSS.escape() includes the dot prefix
       expect(escapeClassName('hover:bg-primary-500')).toBe(
-        'hover\\:bg-primary-500',
+        '.hover\\:bg-primary-500',
       );
-      expect(escapeClassName('[color:error]')).toBe('\\[color\\:error\\]');
+      expect(escapeClassName('[color:error]')).toBe('.\\[color\\:error\\]');
     });
 
     it('should maintain hexToRgb behavior', () => {

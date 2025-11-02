@@ -42,11 +42,12 @@ describe('parseArbitraryVariant', () => {
 // --- escapeClassName ---
 describe('escapeClassName', () => {
   it('escapes special selector characters', () => {
-    expect(escapeClassName('foo:bar/baz')).toBe('foo\\:bar\\/baz');
-    expect(escapeClassName('foo.bar')).toBe('foo\\.bar');
+    // CSS.escape() includes the dot prefix
+    expect(escapeClassName('foo:bar/baz')).toBe('.foo\\:bar\\/baz');
+    expect(escapeClassName('foo.bar')).toBe('.foo\\.bar');
   });
   it('escapes brackets', () => {
-    expect(escapeClassName('foo-[bar]')).toBe('foo-\\[bar\\]');
+    expect(escapeClassName('foo-[bar]')).toBe('.foo-\\[bar\\]');
   });
 });
 

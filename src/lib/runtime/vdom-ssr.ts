@@ -16,6 +16,24 @@ export type RenderOptions = {
   injectKnownNamespaces?: boolean;
 };
 
+// HTML void elements that should be self-closing
+const VOID_ELEMENTS = new Set([
+  'area',
+  'base',
+  'br',
+  'col',
+  'embed',
+  'hr',
+  'img',
+  'input',
+  'link',
+  'meta',
+  'param',
+  'source',
+  'track',
+  'wbr',
+]);
+
 export function renderToString(vnode: VNode, opts?: RenderOptions): string {
   if (typeof vnode === 'string') return escapeHTML(vnode) as string;
 
@@ -69,6 +87,11 @@ export function renderToString(vnode: VNode, opts?: RenderOptions): string {
     .map(([k, v]) => ` ${k}="${escapeHTML(String(v))}"`)
     .join('');
 
+  // Handle void elements (self-closing tags)
+  if (VOID_ELEMENTS.has(vnode.tag)) {
+    return `<${vnode.tag}${attrsString}>`;
+  }
+
   const children = Array.isArray(vnode.children)
     ? vnode.children
         .filter((c) => c !== null && c !== undefined)
@@ -77,7 +100,7 @@ export function renderToString(vnode: VNode, opts?: RenderOptions): string {
     : typeof vnode.children === 'string'
       ? escapeHTML(vnode.children)
       : vnode.children
-        ? renderToString(vnode.children)
+        ? renderToString(vnode.children, opts)
         : '';
 
   return `<${vnode.tag}${attrsString}>${children}</${vnode.tag}>`;

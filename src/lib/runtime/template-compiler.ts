@@ -437,13 +437,22 @@ export function htmlImpl(
   // character in the DOM). This should NOT be used for interpolated values
   // where the runtime should preserve the original string provided by the
   // consumer.
-  function decodedTextVNode(text: string, key: string): VNode {
+  function decodedTextVNode(
+    text: string,
+    key: string,
+    preserveWhitespace = false,
+  ): VNode {
     let decoded = typeof text === 'string' ? decodeEntities(text) : text;
     // If the literal template text contains newlines or carriage returns,
     // collapse any run of whitespace (including newlines and indentation)
     // into a single space. This preserves single-space separators while
     // eliminating incidental indentation/newline leakage inside elements.
-    if (typeof decoded === 'string' && /[\r\n]/.test(decoded)) {
+    // EXCEPT when inside whitespace-preserving elements like <pre>, <code>, <textarea>
+    if (
+      !preserveWhitespace &&
+      typeof decoded === 'string' &&
+      /[\r\n]/.test(decoded)
+    ) {
       decoded = decoded.replace(/\s+/g, ' ');
     }
     return h('#text', {}, decoded as string, key);
@@ -498,6 +507,29 @@ export function htmlImpl(
   let currentKey: string | number | undefined = undefined;
   let nodeIndex = 0;
   const fragmentChildren: VNode[] = []; // Track root-level nodes for fragments
+
+  // Whitespace-preserving elements: pre, code, textarea, script, style
+  const whitespacePreservingTags = new Set([
+    'pre',
+    'code',
+    'textarea',
+    'script',
+    'style',
+  ]);
+
+  // Helper to check if we're inside a whitespace-preserving element
+  function isInWhitespacePreservingContext(): boolean {
+    if (currentTag && whitespacePreservingTags.has(currentTag.toLowerCase())) {
+      return true;
+    }
+    // Check stack for nested contexts
+    for (const frame of stack) {
+      if (whitespacePreservingTags.has(frame.tag.toLowerCase())) {
+        return true;
+      }
+    }
+    return false;
+  }
 
   // Helper: merge object-like interpolation into currentProps
   type MaybeVNodeLike =
@@ -1238,8 +1270,10 @@ export function htmlImpl(
         } else {
           const key = `text-${nodeIndex++}`;
           // This branch is for literal template text (not interpolation markers)
-          // so decode entity sequences here.
-          targetChildren.push(decodedTextVNode(part, key));
+          // so decode entity sequences here. Check if we're in a whitespace-preserving
+          // context (pre, code, textarea) and pass that info to decodedTextVNode.
+          const preserveWhitespace = isInWhitespacePreservingContext();
+          targetChildren.push(decodedTextVNode(part, key, preserveWhitespace));
         }
       }
     }

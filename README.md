@@ -258,6 +258,7 @@ Explore the complete documentation for every runtime feature:
 ### 🎨 **Styling**
 
 - [🎨 JIT CSS](./docs/jit-css.md) - On-demand utility-first styling system
+- [📝 Prose Typography](./docs/prose.md) - Beautiful typography for long-form content
 
 ### 🔗 **Communication & State**
 

@@ -177,7 +177,8 @@ describe('additional style tests', () => {
   });
 
   it('escapeClassName escapes selector chars', () => {
-    expect(escapeClassName('foo:bar/baz')).toBe('foo\\:bar\\/baz');
+    // CSS.escape() now includes the dot prefix and properly escapes all characters
+    expect(escapeClassName('foo:bar/baz')).toBe('.foo\\:bar\\/baz');
   });
 
   it('extractClassesFromHTML extracts classes', () => {

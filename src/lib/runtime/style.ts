@@ -1,3 +1,5 @@
+import { generateProseCSS, generateProseElementModifier } from './prose';
+
 /**
  * Optimized JIT CSS implementation with reduced bloat and enhanced utilities
  */
@@ -48,6 +50,65 @@ export function getBaseResetSheet(): CSSStyleSheet {
   }
 
   return baseResetSheet;
+}
+
+// --- Shared prose stylesheet (singleton like baseReset) ---
+let proseSheet: CSSStyleSheet | null = null;
+const detectedProseSizes = new Set<string>();
+let proseCSSCache = ''; // Cache the actual CSS text for environments where cssRules doesn't work
+
+export function getProseSheet(): CSSStyleSheet | null {
+  if (detectedProseSizes.size === 0) return null;
+
+  if (!proseSheet) {
+    if (typeof CSSStyleSheet === 'undefined') {
+      // SSR / older browsers: provide a safe stub
+      proseSheet = {
+        cssRules: [],
+        replaceSync: () => {},
+        toString: () => proseCSSCache,
+      } as unknown as CSSStyleSheet;
+    } else {
+      proseSheet = new CSSStyleSheet();
+      // Override toString to return cached CSS (for jsdom/test environments)
+      (proseSheet as { toString?: () => string }).toString = () =>
+        proseCSSCache;
+    }
+  }
+
+  // Regenerate prose CSS for all detected sizes
+  let combinedProseCSS = '';
+  for (const size of detectedProseSizes) {
+    // Import happens at top of file - tree-shaken if prose never used
+    const css = generateProseCSS(size);
+    if (css) {
+      combinedProseCSS += css;
+    }
+  }
+
+  // Cache the CSS text
+  proseCSSCache = minifyCSS(combinedProseCSS);
+
+  if (typeof proseSheet.replaceSync === 'function' && combinedProseCSS) {
+    try {
+      proseSheet.replaceSync(proseCSSCache);
+    } catch {
+      // Ignore errors in environments that don't support replaceSync
+    }
+  }
+
+  return proseSheet;
+}
+
+export function registerProseSize(size: string): void {
+  const sizesChanged = !detectedProseSizes.has(size);
+  detectedProseSizes.add(size);
+
+  // If new size detected, regenerate prose sheet (if it exists)
+  // Note: If proseSheet is null, it will be generated fresh when getProseSheet() is called
+  if (sizesChanged && proseSheet) {
+    getProseSheet();
+  }
 }
 
 export function sanitizeCSS(css: string): string {
@@ -180,7 +241,7 @@ export const baseReset = css`
 `;
 
 // Types
-type CSSMap = Record<string, string>;
+export type CSSMap = Record<string, string>;
 type SelectorVariantMap = Record<
   string,
   (selector: string, body: string) => string
@@ -932,11 +993,126 @@ const generateUtilities = (): CSSMap => {
       'background-image:conic-gradient(from 0deg at top left, var(--cer-gradient-stops));',
   });
 
+  // Prose utilities
+  Object.assign(utils, {
+    // prose-invert: dark mode color inversion
+    'prose-invert': `
+      --cer-prose-body:var(--cer-color-neutral-200);
+      --cer-prose-headings:var(--cer-color-neutral-50);
+      --cer-prose-lead:var(--cer-color-neutral-300);
+      --cer-prose-bold:var(--cer-color-neutral-50);
+      --cer-prose-quotes:var(--cer-color-neutral-300);
+      --cer-prose-quote-border:var(--cer-color-neutral-700);
+      --cer-prose-code:var(--cer-color-neutral-200);
+      --cer-prose-code-bg:var(--cer-color-neutral-900);
+      --cer-prose-pre-code:var(--cer-color-neutral-200);
+      --cer-prose-pre-bg:var(--cer-color-neutral-900);
+      --cer-prose-pre-border:var(--cer-color-neutral-800);
+      --cer-prose-hr:var(--cer-color-neutral-700);
+      --cer-prose-caps:var(--cer-color-neutral-400);
+      --cer-prose-list-marker:var(--cer-color-neutral-400);
+      --cer-prose-list-marker-strong:var(--cer-color-neutral-300);
+      --cer-prose-counters:var(--cer-color-neutral-300);
+      --cer-prose-bullets:var(--cer-color-neutral-300);
+      --cer-prose-img-caption:var(--cer-color-neutral-400);
+      --cer-prose-table-border:var(--cer-color-neutral-700);
+      --cer-prose-table-head:var(--cer-color-neutral-200);
+      --cer-prose-links:var(--cer-prose-invert-links,var(--cer-color-neutral-300));
+      --cer-prose-links-hover:var(--cer-prose-invert-links-hover,var(--cer-color-neutral-100));
+    `.replace(/\s+/g, ''),
+
+    // prose-primary: primary color scheme (sets invert variables)
+    'prose-primary': `
+      --cer-prose-links:var(--cer-color-primary-700);
+      --cer-prose-links-hover:var(--cer-color-primary-500);
+      --cer-prose-invert-links:var(--cer-color-primary-300);
+      --cer-prose-invert-links-hover:var(--cer-color-primary-100);
+    `.replace(/\s+/g, ''),
+
+    // prose-secondary: secondary color scheme (sets invert variables)
+    'prose-secondary': `
+      --cer-prose-links:var(--cer-color-secondary-700);
+      --cer-prose-links-hover:var(--cer-color-secondary-500);
+      --cer-prose-invert-links:var(--cer-color-secondary-300);
+      --cer-prose-invert-links-hover:var(--cer-color-secondary-100);
+    `.replace(/\s+/g, ''),
+
+    // prose-success: success color scheme (sets invert variables)
+    'prose-success': `
+      --cer-prose-links:var(--cer-color-success-700);
+      --cer-prose-links-hover:var(--cer-color-success-500);
+      --cer-prose-invert-links:var(--cer-color-success-300);
+      --cer-prose-invert-links-hover:var(--cer-color-success-100);
+    `.replace(/\s+/g, ''),
+
+    // prose-warning: warning color scheme (sets invert variables)
+    'prose-warning': `
+      --cer-prose-links:var(--cer-color-warning-700);
+      --cer-prose-links-hover:var(--cer-color-warning-500);
+      --cer-prose-invert-links:var(--cer-color-warning-300);
+      --cer-prose-invert-links-hover:var(--cer-color-warning-100);
+    `.replace(/\s+/g, ''),
+
+    // prose-error: error color scheme (sets invert variables)
+    'prose-error': `
+      --cer-prose-links:var(--cer-color-error-700);
+      --cer-prose-links-hover:var(--cer-color-error-500);
+      --cer-prose-invert-links:var(--cer-color-error-300);
+      --cer-prose-invert-links-hover:var(--cer-color-error-100);
+    `.replace(/\s+/g, ''),
+
+    // prose-info: info color scheme (sets invert variables)
+    'prose-info': `
+      --cer-prose-links:var(--cer-color-info-700);
+      --cer-prose-links-hover:var(--cer-color-info-500);
+      --cer-prose-invert-links:var(--cer-color-info-300);
+      --cer-prose-invert-links-hover:var(--cer-color-info-100);
+    `.replace(/\s+/g, ''),
+  });
+
   return utils;
 };
 
 // Generate static utilities once
 export const utilityMap: CSSMap = generateUtilities();
+
+/**
+ * Parse prose base classes (prose, prose-sm, prose-lg, prose-xl, prose-2xl)
+ * Registers prose sizes for the singleton prose stylesheet instead of returning CSS
+ */
+export function parseProseClass(className: string): string | null {
+  // Quick pattern check before calling prose module
+  if (!/^prose(?:-(sm|lg|xl|2xl))?$/.test(className)) return null;
+
+  // Register this prose size with the singleton sheet
+  registerProseSize(className);
+
+  // Return empty string to indicate prose was detected but CSS will come from shared sheet
+  return '';
+}
+
+/**
+ * Parse prose element modifiers like prose-a:text-primary-600
+ * Uses separate prose module for treeshaking
+ */
+export function parseProseElementModifier(className: string): string | null {
+  // Quick pattern check before calling prose module
+  if (!/^prose-([a-z0-9]+):(.+)$/.test(className)) {
+    return null;
+  }
+
+  // Call imported function - tree-shaken if never called
+  return generateProseElementModifier(
+    className,
+    utilityMap,
+    parseSpacing,
+    parseSpaceUtility,
+    parseOpacity,
+    parseColorWithOpacity,
+    parseGradientColorStop,
+    parseArbitrary,
+  );
+}
 
 // Optimized parsing functions with better performance
 function insertPseudoBeforeCombinator(sel: string, pseudo: string): string {
@@ -1423,8 +1599,78 @@ export function parseArbitraryVariant(token: string): string | null {
   return null;
 }
 
+/**
+ * Polyfill for CSS.escape() for SSR environments
+ * Based on https://drafts.csswg.org/cssom/#serialize-an-identifier
+ */
+export function cssEscape(value: string): string {
+  // Use native CSS.escape if available (browser)
+  if (typeof CSS !== 'undefined' && CSS.escape) {
+    return CSS.escape(value);
+  }
+
+  // SSR fallback: Manual implementation
+  const str = String(value);
+  const length = str.length;
+  let result = '';
+  let i = 0;
+
+  while (i < length) {
+    const char = str.charAt(i);
+    const code = str.charCodeAt(i);
+
+    if (code === 0x0000) {
+      result += '\uFFFD';
+    } else if (
+      // If the character is in the range [\1-\1f] (U+0001 to U+001F) or is U+007F
+      (code >= 0x0001 && code <= 0x001f) ||
+      code === 0x007f ||
+      // If the character is the first character and is in the range [0-9] (U+0030 to U+0039)
+      (i === 0 && code >= 0x0030 && code <= 0x0039) ||
+      // If the character is the second character and is in the range [0-9] (U+0030 to U+0039) and the first character is a "-" (U+002D)
+      (i === 1 &&
+        code >= 0x0030 &&
+        code <= 0x0039 &&
+        str.charCodeAt(0) === 0x002d)
+    ) {
+      result += '\\' + code.toString(16) + ' ';
+    } else if (
+      // If the character is the first character and is a "-" (U+002D), and there is no second character
+      i === 0 &&
+      length === 1 &&
+      code === 0x002d
+    ) {
+      result += '\\' + char;
+    } else if (
+      // If the character is not handled by one of the above rules and is one of the following
+      code >= 0x0080 ||
+      code === 0x002d || // -
+      code === 0x005f || // _
+      (code >= 0x0030 && code <= 0x0039) || // 0-9
+      (code >= 0x0041 && code <= 0x005a) || // A-Z
+      (code >= 0x0061 && code <= 0x007a) // a-z
+    ) {
+      result += char;
+    } else {
+      // Otherwise, escape it
+      result += '\\' + char;
+    }
+
+    i++;
+  }
+
+  return result;
+}
+
 export function escapeClassName(name: string): string {
-  return name.replace(/([!"#$%&'()*+,./:;<=>?@[\\\]^`{|}~])/g, '\\$1');
+  // Use CSS.escape() API which properly handles all special characters including:
+  // - Leading digits (e.g., "2xl" -> "\32 xl")
+  // - Colons (e.g., ":" -> "\:")
+  // This works in CSSStyleSheet.replaceSync() unlike manual backslash escaping
+  return '.' + cssEscape(name);
+}
+export function escapeRegExp(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 // Optimized HTML class extraction
@@ -1450,11 +1696,34 @@ export const jitCssCache = new Map<
 export const JIT_CSS_THROTTLE_MS = 16;
 const MAX_CACHE_SIZE = 1000;
 
+// HMR: Clear all caches on hot update to prevent stale CSS
+// Wrapped in function to avoid side effects at module load time
+if (typeof import.meta !== 'undefined' && import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    jitCssCache.clear();
+    detectedProseSizes.clear();
+    proseSheet = null;
+    proseCSSCache = '';
+    baseResetSheet = null;
+  });
+
+  // Also clear on accept to force regeneration
+  import.meta.hot.accept(() => {
+    jitCssCache.clear();
+    detectedProseSizes.clear();
+    proseSheet = null;
+    proseCSSCache = '';
+  });
+}
+
 export function jitCSS(html: string): string {
-  const now = Date.now();
+  // Optimization: Check cache first, only compute timestamp if cached entry exists
   const cached = jitCssCache.get(html);
-  if (cached && now - cached.timestamp < JIT_CSS_THROTTLE_MS) {
-    return cached.css;
+  if (cached) {
+    const now = Date.now();
+    if (now - cached.timestamp < JIT_CSS_THROTTLE_MS) {
+      return cached.css;
+    }
   }
 
   const classes = extractClassesFromHTML(html);
@@ -1554,6 +1823,9 @@ export function jitCSS(html: string): string {
 
     if (!basePart) return null;
 
+    // Prose element modifiers are handled separately by parseProseElementModifier
+    // This is checked in parseClassName() before reaching here
+
     const cleanBase = basePart.replace(/^!/, '');
     const baseRule =
       utilityMap[cleanBase] ??
@@ -1570,7 +1842,7 @@ export function jitCSS(html: string): string {
     let variants = baseIndex >= 0 ? parts.slice(0, baseIndex) : [];
     if (stripDark) variants = variants.filter((t) => t !== 'dark');
 
-    const escapedClass = `.${escapeClassName(cls)}`;
+    const escapedClass = escapeClassName(cls);
     const body = important ? baseRule.replace(/;/g, ' !important;') : baseRule;
     const SUBJECT = '__SUBJECT__';
     let selector = SUBJECT;
@@ -1802,7 +2074,253 @@ export function jitCSS(html: string): string {
 
   // Process classes
   for (const cls of seen) {
+    // Check for prose base classes first (prose, prose-sm, prose-lg, prose-xl, prose-2xl) - before splitting
     const parts = splitVariants(cls);
+    const variants = parts.slice(0, -1);
+    const base = parts[parts.length - 1];
+    const proseDetected = parseProseClass(base);
+    if (proseDetected !== null) {
+      // Prose base class detected
+      if (variants.length === 0) {
+        // No variants - register with singleton prose sheet
+        // Add placeholder to mark class as processed but no actual CSS
+        buckets[0].push(`${escapeClassName(cls)}{}`);
+      } else {
+        // Has variants (e.g., 2xl:prose-lg, dark:prose)
+        // Must generate inline CSS with variants applied since singleton sheet doesn't support variants
+        const proseCSS = generateProseCSS(base);
+        if (!proseCSS) continue;
+
+        const escapedClass = escapeClassName(cls);
+
+        // Replace the base class selector with the full variant class
+        // e.g., replace ".prose-lg" with "[class~="2xl:prose-lg"]"
+        const baseClassEscaped = escapeClassName(base);
+        let variantCSS = proseCSS.replace(
+          new RegExp(escapeRegExp(baseClassEscaped), 'g'),
+          escapedClass,
+        );
+
+        // Apply responsive variants (wrap in media query)
+        const responsiveVariants = variants.filter((v) =>
+          responsiveOrder.includes(v),
+        );
+        if (responsiveVariants.length > 0) {
+          const lastResponsive =
+            responsiveVariants[responsiveVariants.length - 1];
+          const mediaQuery = `@media ${mediaVariants[lastResponsive]}`;
+          variantCSS = `${mediaQuery}{${variantCSS}}`;
+        }
+
+        // Apply dark mode
+        if (variants.includes('dark')) {
+          variantCSS = `@media (prefers-color-scheme: dark){${variantCSS}}`;
+        }
+
+        const bucketNum = classify(variants);
+        buckets[bucketNum].push(variantCSS);
+      }
+      continue;
+    }
+
+    // Check for prose element modifiers (prose-a:text-blue-600, hover:prose-a:text-blue-600)
+    // Detect by finding 'prose-{element}' pattern in any part
+    let proseModIndex = -1;
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const potentialProseMod = parts.slice(i).join(':');
+      if (parseProseElementModifier(potentialProseMod)) {
+        proseModIndex = i;
+        break;
+      }
+    }
+
+    if (proseModIndex >= 0) {
+      // Found prose element modifier - generate CSS with variants applied
+      const proseModBase = parts.slice(proseModIndex).join(':');
+      const variants = parts.slice(0, proseModIndex);
+
+      // Generate the base prose CSS (without variants)
+      const baseProseCSS = parseProseElementModifier(proseModBase);
+
+      if (!baseProseCSS) continue;
+
+      // If no variants, use the generated CSS as-is without modification
+      if (variants.length === 0) {
+        buckets[0].push(baseProseCSS);
+        continue;
+      }
+
+      // Has variants - replace the base class selector with the full escaped class name
+      const fullEscaped = cssEscape(cls);
+      const baseEscaped = cssEscape(proseModBase);
+
+      // Replace all occurrences of the base class with the full class
+      // e.g., ".prose-h1\:text-4xl" → ".md\:prose-h1\:text-4xl"
+      const fullProseCSS = baseProseCSS.replace(
+        new RegExp(
+          `\\.${baseEscaped.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`,
+          'g',
+        ),
+        `.${fullEscaped}`,
+      );
+
+      // Extract each rule and apply media/pseudo variants
+      const ruleRegex = /(.+?)\s+(.+?)\{([^}]+)\}/g;
+      const matches = [...fullProseCSS.matchAll(ruleRegex)];
+
+      if (matches.length === 0) {
+        // Can't parse, use as-is
+        buckets[0].push(baseProseCSS);
+        continue;
+      }
+
+      const bucketNum = classify(variants);
+
+      // Define pseudo map inline for prose variant handling
+      const prosePseudoMap: Record<string, string> = {
+        hover: ':hover',
+        focus: ':focus',
+        active: ':active',
+        visited: ':visited',
+        disabled: ':disabled',
+        checked: ':checked',
+        first: ':first-child',
+        last: ':last-child',
+        odd: ':nth-child(odd)',
+        even: ':nth-child(even)',
+        'focus-within': ':focus-within',
+        'focus-visible': ':focus-visible',
+      };
+
+      // Separate variants by type (once for all rules)
+      const structuralVariants: string[] = [];
+      const pseudoVariants: string[] = [];
+      const arbitraryVariants: string[] = [];
+      const responsiveVariants: string[] = [];
+      const containerVariants: string[] = [];
+      let hasDark = false;
+
+      for (const v of variants) {
+        if (v.startsWith('group-')) {
+          structuralVariants.push(v);
+        } else if (v.startsWith('peer-')) {
+          structuralVariants.push(v);
+        } else if (v === 'dark' || v === 'dark-class') {
+          hasDark = true;
+        } else if (responsiveOrder.includes(v)) {
+          responsiveVariants.push(v);
+        } else if (
+          v.startsWith('@') &&
+          (containerOrder.includes(v.slice(1)) || v.match(/^@\[.+\]$/))
+        ) {
+          containerVariants.push(v);
+        } else if (v.startsWith('[') && v.endsWith(']')) {
+          arbitraryVariants.push(v);
+        } else if (prosePseudoMap[v] || selectorVariants[v]) {
+          pseudoVariants.push(v);
+        }
+      }
+
+      // Process each rule with variants
+      for (const match of matches) {
+        const [, baseClassSelector, elementSelector, body] = match;
+
+        // Apply variants to the element selector
+        let finalSelector = `${baseClassSelector} ${elementSelector}`;
+
+        // Apply structural variants (group, peer)
+        for (const v of structuralVariants) {
+          if (v.startsWith('group-')) {
+            const pseudo = v.slice(6);
+            const pseudoSelector = prosePseudoMap[pseudo] || `:${pseudo}`;
+            finalSelector = `.group${pseudoSelector} ${finalSelector}`;
+          } else if (v.startsWith('peer-')) {
+            const pseudo = v.slice(5);
+            const pseudoSelector = prosePseudoMap[pseudo] || `:${pseudo}`;
+            finalSelector = `.peer${pseudoSelector}~${finalSelector}`;
+          }
+        }
+
+        // Apply pseudo-class variants (append to element, not class)
+        if (pseudoVariants.length > 0) {
+          const pseudoStr = pseudoVariants
+            .map((v) => prosePseudoMap[v] || `:${v}`)
+            .join('');
+          // Append pseudos to the end of the element selector
+          // .prose-a\:text-error-600 a:not(...) → .prose-a\:text-error-600 a:not(...):hover
+          finalSelector = `${finalSelector}${pseudoStr}`;
+        }
+
+        // Apply arbitrary variants
+        for (const v of arbitraryVariants) {
+          const arbVariant = parseArbitraryVariant(v);
+          if (arbVariant && arbVariant.includes('&')) {
+            const idx = arbVariant.indexOf('&');
+            const pre = arbVariant.slice(0, idx);
+            const post = arbVariant.slice(idx + 1);
+            finalSelector = `${pre}${finalSelector}${post}`;
+          }
+        }
+
+        let wrappedCSS = `${finalSelector}{${body}}`;
+
+        // Apply dark mode
+        if (hasDark) {
+          wrappedCSS = `@media (prefers-color-scheme: dark){${wrappedCSS}}`;
+        }
+
+        // Apply container queries
+        if (containerVariants.length > 0) {
+          const lastContainer = containerVariants[containerVariants.length - 1];
+          if (lastContainer.startsWith('@[') && lastContainer.endsWith(']')) {
+            const value = lastContainer.slice(2, -1);
+            if (
+              /^-?\d*\.?\d+(px|rem|em|%|vh|vw|ch|ex|cm|mm|in|pt|pc)$/.test(
+                value,
+              )
+            ) {
+              wrappedCSS = `@container (min-width:${value}){${wrappedCSS}}`;
+            }
+          } else {
+            const containerKey = lastContainer.slice(1);
+            const sizes: Record<string, string> = {
+              xs: '20rem',
+              sm: '24rem',
+              md: '28rem',
+              lg: '32rem',
+              xl: '36rem',
+              '2xl': '42rem',
+              '3xl': '48rem',
+              '4xl': '56rem',
+              '5xl': '64rem',
+              '6xl': '72rem',
+              '7xl': '80rem',
+            };
+            const breakpoint = sizes[containerKey];
+            if (breakpoint) {
+              // Extract container name from class if present (e.g., @container-name/lg)
+              const containerName = cls.match(/@([^/]+)\//)?.[1] || '';
+              wrappedCSS = containerName
+                ? `@container ${containerName} (min-width: ${breakpoint}){${wrappedCSS}}`
+                : `@container (min-width: ${breakpoint}){${wrappedCSS}}`;
+            }
+          }
+        }
+
+        // Apply responsive variants
+        if (responsiveVariants.length > 0) {
+          const lastResponsive =
+            responsiveVariants[responsiveVariants.length - 1];
+          const mediaQuery = `@media ${mediaVariants[lastResponsive]}`;
+          wrappedCSS = `${mediaQuery}{${wrappedCSS}}`;
+        }
+
+        buckets[bucketNum].push(wrappedCSS);
+      }
+      continue;
+    }
+
+    // Regular utilities - already have parts, variants, base from above
     const basePart = parts.find(
       (p) =>
         utilityMap[p.replace(/^!/, '')] ||
@@ -1816,8 +2334,8 @@ export function jitCSS(html: string): string {
     if (!basePart) continue;
 
     const baseIndex = parts.indexOf(basePart);
-    const variants = baseIndex >= 0 ? parts.slice(0, baseIndex) : [];
-    const bucketNum = classify(variants);
+    const variantsForBucket = baseIndex >= 0 ? parts.slice(0, baseIndex) : [];
+    const bucketNum = classify(variantsForBucket);
 
     const rule = generateRuleCached(cls);
     if (rule) buckets[bucketNum].push(rule);
@@ -1834,7 +2352,7 @@ export function jitCSS(html: string): string {
       // If we already generated a rule for this class, skip. Evaluate
       // current generated output from buckets instead of `css` var.
       const generatedBuckets = buckets.flat().join('');
-      if (generatedBuckets.includes(`.${escapeClassName(cls)}`)) continue;
+      if (generatedBuckets.includes(escapeClassName(cls))) continue;
       const generated = generateRuleCached(cls);
       if (generated) buckets[0].push(generated);
     }
@@ -1928,6 +2446,7 @@ export function jitCSS(html: string): string {
     keysToDelete.forEach((key) => jitCssCache.delete(key));
   }
 
-  jitCssCache.set(html, { css, timestamp: now });
+  // Store generated CSS with current timestamp
+  jitCssCache.set(html, { css, timestamp: Date.now() });
   return css;
 }

@@ -412,6 +412,96 @@ JIT CSS provides a rich set of built-in color palettes, all accessible via utili
 
 **Tip:** You can use any palette with `bg-`, `text-`, `border-`, `shadow-`, `outline-`, `caret`, `accent`, `fill`, and `stroke` utilities for full flexibility.
 
+## 📝 Prose Typography
+
+The Prose typography system provides beautiful, professional typography defaults for long-form content like blog posts, articles, and documentation. Simply add the `prose` class to your content container:
+
+```html
+<article class="prose">
+  <h1>My Blog Post</h1>
+  <p class="lead">Beautiful typography with zero configuration.</p>
+  <p>All HTML elements are automatically styled for optimal readability.</p>
+  <ul>
+    <li>Styled lists</li>
+    <li>Proper spacing</li>
+  </ul>
+</article>
+```
+
+**Size Variants:**
+
+- `prose-sm` - Compact content (0.875rem)
+- `prose` - Default body text (1rem)
+- `prose-lg` - Prominent content (1.125rem)
+- `prose-xl` - Large displays (1.25rem)
+- `prose-2xl` - Extra large (1.5rem)
+
+**Dark Mode with `prose-invert`:**
+
+```html
+<!-- Automatic dark mode inversion -->
+<article class="prose prose-invert bg-neutral-900">
+  <h1>Dark Mode Article</h1>
+  <p>All colors automatically optimized for dark backgrounds.</p>
+</article>
+
+<!-- Responsive dark mode -->
+<article class="prose dark:prose-invert">
+  <p>Adapts to system dark mode preference.</p>
+</article>
+```
+
+**Color Schemes:**
+
+Apply semantic color schemes with automatic dark mode support:
+
+```html
+<!-- Primary colored links (adapts to light/dark) -->
+<article class="prose prose-primary">
+  <p><a href="#">Primary colored link</a></p>
+</article>
+
+<!-- Available: prose-primary, prose-secondary, prose-success, 
+     prose-info, prose-warning, prose-error -->
+```
+
+**Element Modifiers:**
+
+Customize specific elements within prose content:
+
+```html
+<article
+  class="prose prose-a:text-primary-600 prose-headings:font-black prose-code:text-secondary-700"
+>
+  <h1>Custom styled heading</h1>
+  <p><a href="#">Custom styled link</a></p>
+  <code>Custom styled code</code>
+</article>
+```
+
+**Available modifiers:** `prose-headings`, `prose-h1`, `prose-h2`, `prose-h3`, `prose-h4`, `prose-h5`, `prose-h6`, `prose-p`, `prose-a`, `prose-blockquote`, `prose-figure`, `prose-figcaption`, `prose-strong`, `prose-em`, `prose-kbd`, `prose-code`, `prose-pre`, `prose-ol`, `prose-ul`, `prose-li`, `prose-dl`, `prose-dt`, `prose-dd`, `prose-table`, `prose-thead`, `prose-tbody`, `prose-tr`, `prose-th`, `prose-td`, `prose-img`, `prose-picture`, `prose-video`, `prose-hr`, `prose-lead`.
+
+**Opt-out with `.not-prose`:**
+
+```html
+<article class="prose">
+  <p>This paragraph has prose styling.</p>
+  <div class="not-prose">
+    <button class="px-4 py-2 bg-primary-500">Custom styled button</button>
+  </div>
+</article>
+```
+
+**Responsive Typography:**
+
+```html
+<article class="prose sm:prose-lg lg:prose-xl">
+  Scales up on larger screens for better readability.
+</article>
+```
+
+For complete documentation, see the [Prose Typography Guide](./prose.md).
+
 ## 🎨 Dynamic Styling with `useStyle`
 
 The `useStyle` hook allows you to inject dynamic CSS-in-JS styles that can react to component props and state. This is perfect for complex styling logic that goes beyond utility classes.

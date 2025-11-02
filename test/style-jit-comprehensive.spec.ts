@@ -237,9 +237,10 @@ describe('JIT CSS Comprehensive Tests', () => {
 
   describe('Class name escaping', () => {
     it('should escape special characters', () => {
-      expect(escapeClassName('hover:bg-blue-500')).toBe('hover\\:bg-blue-500');
-      expect(escapeClassName('[color:red]')).toBe('\\[color\\:red\\]');
-      expect(escapeClassName('sm:text-lg')).toBe('sm\\:text-lg');
+      // CSS.escape() includes the dot prefix
+      expect(escapeClassName('hover:bg-blue-500')).toBe('.hover\\:bg-blue-500');
+      expect(escapeClassName('[color:red]')).toBe('.\\[color\\:red\\]');
+      expect(escapeClassName('sm:text-lg')).toBe('.sm\\:text-lg');
     });
   });
 

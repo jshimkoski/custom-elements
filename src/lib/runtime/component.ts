@@ -14,7 +14,13 @@ import {
   handleDisconnected,
   handleAttributeChanged,
 } from './lifecycle';
-import { renderComponent, requestRender, applyStyle } from './render';
+import {
+  renderComponent,
+  requestRender,
+  applyStyle,
+  registerChildComponent,
+  unregisterChildComponent,
+} from './render';
 import { scheduleDOMUpdate } from './scheduler';
 import {
   setCurrentComponentContext,
@@ -322,6 +328,12 @@ export function createElementClass<
 
     connectedCallback() {
       this._runLogicWithinErrorBoundary(config, () => {
+        // Register this component with parent's shadowRoot for optimized child HTML aggregation
+        const parentHost = this.getRootNode() as ShadowRoot | Document;
+        if (parentHost && parentHost !== document && 'host' in parentHost) {
+          registerChildComponent(parentHost as ShadowRoot, this);
+        }
+
         // Ensure props reflect attributes set by the parent renderer before
         // invoking lifecycle hooks.
         this._applyProps(config);
@@ -335,6 +347,12 @@ export function createElementClass<
 
     disconnectedCallback() {
       this._runLogicWithinErrorBoundary(config, () => {
+        // Unregister this component from parent's shadowRoot cache
+        const parentHost = this.getRootNode() as ShadowRoot | Document;
+        if (parentHost && parentHost !== document && 'host' in parentHost) {
+          unregisterChildComponent(parentHost as ShadowRoot, this);
+        }
+
         handleDisconnected(
           config,
           this.context,

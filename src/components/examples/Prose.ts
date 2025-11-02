@@ -1,11 +1,10 @@
-import { component, html, useStyle } from '../../lib';
-import prose from '../../lib/css/prose.css?raw';
+import { component, html } from '../../lib';
 
 component('prose-example', () => {
-  useStyle(() => prose);
-
   return html`
-    <div class="prose text-left">
+    <div
+      class="prose prose-error dark:prose-a:bg-error-500 dark:prose-headings:bg-primary-500 2xl:prose-2xl dark:prose-invert text-left"
+    >
       <h1>Introducing the Typography Plugin</h1>
       <p class="lead">
         Until now, trying to style an article, document, or blog post with

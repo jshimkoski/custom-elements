@@ -107,8 +107,7 @@
     "./css": "./dist/style.css",
     "./css/style.css": "./dist/style.css",
     "./css/reset.css": "./dist/reset.css",
-    "./css/variables.css": "./dist/variables.css",
-    "./css/prose.css": "./dist/prose.css"
+    "./css/variables.css": "./dist/variables.css"
   },
   "publishConfig": {
     "access": "public"

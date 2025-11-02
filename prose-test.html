@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Prose Test</title>
+    <script type="module">
+      import { jitCSS } from './src/lib/runtime/style.ts';
+
+      // Test prose rendering
+      const html = `
+      <article class="prose">
+        <h1>Test Heading 1</h1>
+        <p class="lead">This is a lead paragraph with larger text.</p>
+        <p>This is a regular paragraph with <strong>bold text</strong> and <em>italic text</em>.</p>
+        
+        <h2>Lists Test</h2>
+        <ul>
+          <li>Unordered list item 1</li>
+          <li>Unordered list item 2</li>
+          <li>Unordered list item 3</li>
+        </ul>
+        
+        <ol>
+          <li>Ordered list item 1</li>
+          <li>Ordered list item 2</li>
+          <li>Ordered list item 3</li>
+        </ol>
+        
+        <h3>Code Test</h3>
+        <p>Inline code: <code>const x = 42;</code></p>
+        
+        <pre><code>function test() {
+  console.log("Hello World");
+  return true;
+}</code></pre>
+        
+        <blockquote>
+          <p>This is a blockquote with some wise words.</p>
+        </blockquote>
+        
+        <hr>
+        
+        <p>Text after horizontal rule.</p>
+      </article>
+    `;
+
+      const css = jitCSS(html);
+      console.log('Generated CSS length:', css.length);
+      console.log('Generated CSS preview:', css.substring(0, 500) + '...');
+
+      // Inject CSS
+      const style = document.createElement('style');
+      style.textContent = css;
+      document.head.appendChild(style);
+
+      // Inject HTML
+      document.body.innerHTML = html;
+    </script>
+    <style>
+      body {
+        max-width: 800px;
+        margin: 40px auto;
+        padding: 20px;
+        font-family:
+          system-ui,
+          -apple-system,
+          sans-serif;
+      }
+    </style>
+  </head>
+  <body>
+    <p>Loading prose test...</p>
+  </body>
+</html>
