@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v2.2.6] - 2025-11-02
+
+- fix: replace alpha prose export with built-in prose functionality fix: fix whitespace rendering in elements that require it (e.g.; pre) fix: improve performance (aa7a719)
+- fix: router-link style and class now work properly fix: fix missing dark mode capability (add dark-class jit css variant that works with a .dark class on the host element) (84697b5)
+
+
 ## [v2.2.5] - 2025-11-01
 
 - fix: router-link style and class now work properly fix: fix missing dark mode capability (add dark-class jit css variant that works with a .dark class on the host element) (84697b5)
