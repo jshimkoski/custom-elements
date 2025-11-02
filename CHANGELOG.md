@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v2.2.7] - 2025-11-02
+
+- fix: remove :host from variables.css to fix global css variable overrides (e32f6fa)
+- fix: replace alpha prose export with built-in prose functionality fix: fix whitespace rendering in elements that require it (e.g.; pre) fix: improve performance (aa7a719)
+
+
 ## [v2.2.6] - 2025-11-02
 
 - fix: replace alpha prose export with built-in prose functionality fix: fix whitespace rendering in elements that require it (e.g.; pre) fix: improve performance (aa7a719)
