@@ -1301,11 +1301,18 @@ export function patchProps(
   // Process directives first
   const newDirectives =
     (newProps.directives as Record<string, DirectiveSpec> | undefined) ?? {};
+
+  // Create a shallow copy of attrs to prevent mutations from affecting
+  // the cached vnode. This is critical because vnodes are cached and reused
+  // across renders, and writebackAttr mutates oldProps.attrs which can
+  // pollute the cache if oldProps and the cached vnode share references.
+  const newPropsAttrsCopy = newProps.attrs ? { ...newProps.attrs } : {};
+
   const processedDirectives = processDirectives(
     newDirectives,
     context,
     el,
-    newProps.attrs,
+    newPropsAttrsCopy,
   );
 
   // Merge processed directive results with existing props/attrs
@@ -1316,7 +1323,7 @@ export function patchProps(
   };
   const mergedAttrs: PropsMap = {
     ...((oldProps.attrs as PropsMap) || {}),
-    ...((newProps.attrs as PropsMap) || {}),
+    ...(newPropsAttrsCopy || {}),
     ...(processedDirectives.attrs || {}),
   };
 
@@ -1522,8 +1529,36 @@ export function patchProps(
   // If writeback is correctly applied on all mutation paths, this
   // snapshot is unnecessary and harmful; keep it simple and avoid DOM
   // reads for class/style detection.
+  //
+  // EXCEPTION: When a :class or :style directive is present, we MUST
+  // read the actual DOM value to ensure we have the current merged state,
+  // because the writeback system may not be reliable when vnodes are
+  // cached and reused across renders.
   const oldAttrs = { ...(oldProps.attrs ?? {}) } as Record<string, unknown>;
   const newAttrs = mergedAttrs;
+
+  // If a :class directive exists, read the actual DOM class to ensure
+  // we have the current state for comparison
+  const pdAttrs = (processedDirectives && processedDirectives.attrs) || {};
+  if (
+    Object.prototype.hasOwnProperty.call(pdAttrs, 'class') &&
+    typeof el.getAttribute === 'function'
+  ) {
+    const actual = el.getAttribute('class');
+    if (actual !== null) {
+      oldAttrs['class'] = actual;
+    }
+  }
+  if (
+    Object.prototype.hasOwnProperty.call(pdAttrs, 'style') &&
+    typeof el.getAttribute === 'function'
+  ) {
+    const actual = el.getAttribute('style');
+    if (actual !== null) {
+      oldAttrs['style'] = actual;
+    }
+  }
+
   // Narrow fallback: if a directive explicitly attempted to clear the
   // `class` or `style` attribute (processedDirectives set it to
   // `undefined`) we need to consult the live DOM to detect whether the
@@ -1532,7 +1567,6 @@ export function patchProps(
   // signalled intent to remove the attribute, which matches the prior
   // behavior but avoids broad DOM reads that interfere with transitions.
   try {
-    const pdAttrs = (processedDirectives && processedDirectives.attrs) || {};
     if (
       Object.prototype.hasOwnProperty.call(pdAttrs, 'class') &&
       pdAttrs['class'] === undefined &&
