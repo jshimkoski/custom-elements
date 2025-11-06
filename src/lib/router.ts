@@ -92,26 +92,140 @@ export const parseQuery = (search: string): Record<string, string> => {
   return Object.fromEntries(new URLSearchParams(search));
 };
 
+// Cache compiled route regexes to avoid rebuilding on every navigation.
+type CompiledRoute =
+  | { regex: RegExp; paramNames: string[] }
+  | { invalid: true };
+const compileCache: WeakMap<Route, CompiledRoute> = new WeakMap();
+
+function escapeSeg(seg: string) {
+  return seg.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function normalizePathForRoute(p: string) {
+  if (!p) return '/';
+  // Collapse duplicate slashes, ensure leading slash, remove trailing slash
+  let out = p.replace(/\/+/g, '/');
+  if (!out.startsWith('/')) out = '/' + out;
+  if (out.length > 1 && out.endsWith('/')) out = out.slice(0, -1);
+  return out;
+}
+
+function compileRoute(route: Route): CompiledRoute {
+  const raw = route.path || '/';
+  const routePath = normalizePathForRoute(raw);
+
+  const segments =
+    routePath === '/' ? [] : routePath.split('/').filter(Boolean);
+
+  const paramNames: string[] = [];
+  const regexParts: string[] = [];
+
+  for (let i = 0; i < segments.length; i++) {
+    const seg = segments[i];
+
+    // Anonymous wildcard
+    if (seg === '*') {
+      // splat must be terminal
+      if (i !== segments.length - 1) {
+        devWarn(
+          `Route '${route.path}' contains a '*' splat in a non-terminal position; splats must be the last segment. This route will be ignored.`,
+        );
+        return { invalid: true };
+      }
+      const name = `splat${paramNames.length}`;
+      paramNames.push(name);
+      // mark splat token; pattern will be built specially so the
+      // preceding slash can be optional (allow empty splat)
+      regexParts.push('__SPLAT__');
+      continue;
+    }
+
+    const paramMatch = seg.match(/^:([A-Za-z0-9_-]+)(\*)?$/);
+    if (paramMatch) {
+      const name = paramMatch[1];
+      const isSplat = !!paramMatch[2];
+      // If splat, ensure terminal
+      if (isSplat && i !== segments.length - 1) {
+        devWarn(
+          `Route '${route.path}' contains a splat param ':${name}*' in a non-terminal position; splats must be the last segment. This route will be ignored.`,
+        );
+        return { invalid: true };
+      }
+      paramNames.push(name);
+      regexParts.push(isSplat ? '__SPLAT__' : '([^/]+)');
+      continue;
+    }
+
+    // Static
+    regexParts.push(escapeSeg(seg));
+  }
+
+  let pattern: string;
+  if (regexParts.length === 0) {
+    pattern = '^/$';
+  } else {
+    const last = regexParts[regexParts.length - 1];
+    if (last === '__SPLAT__') {
+      const prefix = regexParts.slice(0, -1).join('/');
+      if (!prefix) {
+        // route is like '/:rest*' or '/*' -> allow '/' or '/x' etc.
+        pattern = '^(?:/(.*))?(?:/)?$';
+      } else {
+        pattern = `^/${prefix}(?:/(.*))?(?:/)?$`;
+      }
+    } else {
+      pattern = `^/${regexParts.join('/')}(?:/)?$`;
+    }
+  }
+  try {
+    const regex = new RegExp(pattern);
+    return { regex, paramNames };
+  } catch (e) {
+    devWarn(`Failed to compile route regex for '${route.path}': ${String(e)}`);
+    return { invalid: true };
+  }
+}
+
 export const matchRoute = (
   routes: Route[],
   path: string,
 ): { route: Route | null; params: Record<string, string> } => {
+  const incoming = normalizePathForRoute(path);
+
   for (const route of routes) {
-    const paramNames: string[] = [];
-    const regexPath = route.path.replace(/:[^/]+/g, (m) => {
-      paramNames.push(m.slice(1));
-      return '([^/]+)';
-    });
-    const regex = new RegExp(`^${regexPath}$`);
-    const match = path.match(regex);
-    if (match) {
+    let compiled = compileCache.get(route);
+    if (!compiled) {
+      compiled = compileRoute(route);
+      compileCache.set(route, compiled);
+    }
+
+    if ((compiled as { invalid?: true }).invalid) continue;
+
+    const { regex, paramNames } = compiled as {
+      regex: RegExp;
+      paramNames: string[];
+    };
+    const m = regex.exec(incoming);
+    if (m) {
       const params: Record<string, string> = {};
-      paramNames.forEach((name, i) => {
-        params[name] = match[i + 1];
-      });
+      const safeDecode = (v: string) => {
+        try {
+          return decodeURIComponent(v);
+        } catch {
+          return v;
+        }
+      };
+
+      for (let i = 0; i < paramNames.length; i++) {
+        const raw = m[i + 1] || '';
+        params[paramNames[i]] = raw ? safeDecode(raw) : '';
+      }
+
       return { route, params };
     }
   }
+
   return { route: null, params: {} };
 };
 

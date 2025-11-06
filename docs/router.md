@@ -52,6 +52,7 @@ const routes = [
 
 - Static: `/about`
 - Dynamic: `/user/:id`
+- Catch-all / splat: `/*` or `/:rest*` (terminal-only — must be the last segment)
 
 ## 🏃 Navigation
 
@@ -68,6 +69,10 @@ router.push('/profile/jane');
 const route = router.getCurrent();
 console.log(route.path); // '/profile/jane'
 console.log(route.params.username); // 'jane'
+
+Notes on params:
+- Param names may include letters, numbers, underscores and hyphens (for example `:user-id`).
+- Captured values are `decodeURIComponent`-decoded where possible; if decoding throws the raw value is used as-is.
 ```
 
 ## 🧩 Asynchronous Routing Example
@@ -308,6 +313,17 @@ const noMatch = matchRoute(routes, '/nonexistent');
 
 **Returns:** `{ route: Route | null; params: Record<string, string> }`
 
+Implementation details (accurate behavior):
+
+- Matching is performed in the given `routes` array order. The first configured route that matches the path is returned — there is no automatic specificity-based re-ordering. If you rely on specificity, order your routes accordingly.
+- Supported param syntax: `:name` (single segment) and `:name*` (terminal splat capturing the rest of the path). An anonymous `*` is also supported as a terminal splat.
+- Terminal-only splats: `:rest*` and `*` must be the final segment in the route. If a splat appears in a non-terminal position (for example `/a/*/b` or `/:rest*/more`) the router emits a dev warning and that route will be ignored at compile time.
+- Splat semantics: splats use a `(.*)` style capture that allows matching an empty string. For example `/docs/:rest*` matches `/docs` with `rest === ''` and `/docs/a/b` with `rest === 'a/b'`.
+- Trailing slash tolerance: routes tolerate a trailing slash when matching (so `/about` matches both `/about` and `/about/`).
+- Static segments are regex-escaped during compile so literal regex characters in static segments are matched literally.
+- Captured param values are decoded (via `decodeURIComponent`) when possible.
+- Route regexes are compiled once per `Route` object and cached (WeakMap) for performance.
+
 ### `matchRouteSSR(routes: Route[], path: string)`
 
 Match routes during server-side rendering:
@@ -332,6 +348,8 @@ if (result.route) {
 **Returns:** `{ route: Route | null; params: Record<string, string> }`
 
 **Note:** This function is identical to `matchRoute()` but named specifically for SSR use cases to make code intent clearer.
+
+In SSR usage you should supply `initialUrl` to `initRouter` / `useRouter` so the router can derive the initial `path` and `query` server-side. When `initialUrl` is provided the router runs in an SSR-mode code path: `push`/`replace` call into `navigateSSR` which will throw on missing routes or guard failures so server-side code can observe and handle navigation errors. SSR navigation does not attempt to update browser history.
 
 ### `initRouter(config: RouterConfig)`
 
