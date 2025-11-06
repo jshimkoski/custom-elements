@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v2.2.9] - 2025-11-06
+
+- fix: improve router catch all (0a7671d)
+- fix: fix binding issue when class and :class (or style and :style) were both used on the same element (81a351f)
+
+
 ## [v2.2.8] - 2025-11-04
 
 - fix: fix binding issue when class and :class (or style and :style) were both used on the same element (81a351f)
