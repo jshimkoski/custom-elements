@@ -389,6 +389,11 @@ export function watch<T>(
   options?: { immediate?: boolean },
 ): () => void;
 export function watch<T>(
+  source: () => T,
+  callback: (newValue: T, oldValue?: T) => void,
+  options?: { immediate?: boolean },
+): () => void;
+export function watch<T>(
   source: ReactiveState<T> | (() => T),
   callback: (newValue: T, oldValue?: T) => void,
   options?: { immediate?: boolean },
