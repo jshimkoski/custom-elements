@@ -28,11 +28,45 @@ try {
   isDev = true;
 }
 
+// Runtime-overridable flag. Consumers can set `globalThis.__CE_RUNTIME_DEV__ = true`
+// before importing the library, or call `setDevMode(true)` at runtime to enable
+// dev logging. We keep `isDev` for build-time detection but consult the
+// runtime flag at each call so bundlers cannot safely remove the console calls
+// if consumers rely on runtime toggling.
+let runtimeFlag: boolean | undefined;
+
+/**
+ * Programmatically toggle dev-mode logging at runtime.
+ * Prefer setting `globalThis.__CE_RUNTIME_DEV__ = true` before importing
+ * the runtime so logs are enabled as early as possible.
+ */
+export function setDevMode(v: boolean): void {
+  runtimeFlag = !!v;
+  try {
+    const g = globalThis as unknown as { __CE_RUNTIME_DEV__?: unknown };
+    g.__CE_RUNTIME_DEV__ = runtimeFlag;
+  } catch (_err: unknown) {
+    void _err;
+  }
+}
+
+function runtimeDevEnabled(): boolean {
+  try {
+    const g = globalThis as unknown as { __CE_RUNTIME_DEV__?: unknown };
+    if (typeof g.__CE_RUNTIME_DEV__ !== 'undefined')
+      return Boolean(g.__CE_RUNTIME_DEV__);
+  } catch {
+    // ignore
+  }
+  // fall back to build-time detection
+  return runtimeFlag === true || isDev;
+}
+
 /**
  * Log error only in development mode
  */
 export function devError(message: string, ...args: unknown[]): void {
-  if (isDev) {
+  if (runtimeDevEnabled()) {
     console.error(message, ...args);
   }
 }
@@ -41,7 +75,7 @@ export function devError(message: string, ...args: unknown[]): void {
  * Log warning only in development mode
  */
 export function devWarn(message: string, ...args: unknown[]): void {
-  if (isDev) {
+  if (runtimeDevEnabled()) {
     console.warn(message, ...args);
   }
 }
@@ -50,7 +84,7 @@ export function devWarn(message: string, ...args: unknown[]): void {
  * Log info only in development mode
  */
 export function devLog(message: string, ...args: unknown[]): void {
-  if (isDev) {
+  if (runtimeDevEnabled()) {
     console.log(message, ...args);
   }
 }

@@ -6,7 +6,10 @@ import { devWarn } from './logger';
  * Global reactive system for tracking dependencies and triggering updates
  */
 class ReactiveSystem {
-  private currentComponent: string | null = null;
+  // Use a stack to support nested callers (component render -> watcher)
+  // so that watchers can temporarily become the "current component" while
+  // establishing dependencies without clobbering the outer component id.
+  private currentComponentStack: string[] = [];
   // Consolidated component data: stores dependencies, render function, state index, and last warning time
   private componentData = new Map<
     string,
@@ -15,6 +18,8 @@ class ReactiveSystem {
       renderFn: () => void;
       stateIndex: number;
       lastWarnTime: number;
+      // watchers registered by the component during render
+      watchers: Map<string, string>;
     }
   >();
   // Flat storage: compound key `${componentId}:${stateIndex}` -> ReactiveState
@@ -25,16 +30,30 @@ class ReactiveSystem {
    * Set the current component being rendered for dependency tracking
    */
   setCurrentComponent(componentId: string, renderFn: () => void): void {
-    this.currentComponent = componentId;
+    // Push onto the stack so nested calls can restore previous component
+    this.currentComponentStack.push(componentId);
+    // (no-op) push logged in debug builds
     if (!this.componentData.has(componentId)) {
       this.componentData.set(componentId, {
         dependencies: new Set(),
         renderFn,
         stateIndex: 0,
         lastWarnTime: 0,
+        watchers: new Map(),
       });
     } else {
       const data = this.componentData.get(componentId)!;
+      // Clean up watchers from previous renders so they don't accumulate
+      if (data.watchers && data.watchers.size) {
+        for (const wid of data.watchers.values()) {
+          try {
+            this.cleanup(wid);
+          } catch {
+            // swallow
+          }
+        }
+        data.watchers.clear();
+      }
       data.renderFn = renderFn;
       data.stateIndex = 0; // Reset state index for this render
     }
@@ -44,7 +63,26 @@ class ReactiveSystem {
    * Clear the current component after rendering
    */
   clearCurrentComponent(): void {
-    this.currentComponent = null;
+    // Pop the current component off the stack and restore the previous one
+    this.currentComponentStack.pop();
+  }
+
+  /**
+   * Get the current component id (top of stack) or null
+   */
+  getCurrentComponentId(): string | null {
+    return this.currentComponentStack.length
+      ? this.currentComponentStack[this.currentComponentStack.length - 1]
+      : null;
+  }
+
+  /**
+   * Register a watcher id under a component so it can be cleaned up on re-render
+   */
+  registerWatcher(componentId: string, watcherId: string): void {
+    const data = this.componentData.get(componentId);
+    if (!data) return;
+    data.watchers.set(watcherId, watcherId);
   }
 
   /**
@@ -65,7 +103,7 @@ class ReactiveSystem {
    * Check if a component is currently rendering
    */
   isRenderingComponent(): boolean {
-    return this.currentComponent !== null;
+    return this.currentComponentStack.length > 0;
   }
 
   /**
@@ -73,8 +111,11 @@ class ReactiveSystem {
    * This throttles warnings to avoid spamming the console for legitimate rapid updates.
    */
   shouldEmitRenderWarning(): boolean {
-    if (!this.currentComponent) return true;
-    const data = this.componentData.get(this.currentComponent);
+    const current = this.currentComponentStack.length
+      ? this.currentComponentStack[this.currentComponentStack.length - 1]
+      : null;
+    if (!current) return true;
+    const data = this.componentData.get(current);
     if (!data) return true;
 
     const now = Date.now();
@@ -102,16 +143,18 @@ class ReactiveSystem {
    * Get or create a state instance for the current component
    */
   getOrCreateState<T>(initialValue: T): ReactiveState<T> {
-    if (!this.currentComponent) {
+    const current = this.currentComponentStack.length
+      ? this.currentComponentStack[this.currentComponentStack.length - 1]
+      : null;
+    if (!current) {
       return new ReactiveState(initialValue);
     }
 
-    const data = this.componentData.get(this.currentComponent);
+    const data = this.componentData.get(current);
     if (!data) {
       return new ReactiveState(initialValue);
     }
-
-    const stateKey = `${this.currentComponent}:${data.stateIndex++}`;
+    const stateKey = `${current}:${data.stateIndex++}`;
     let state = this.stateStorage.get(stateKey) as ReactiveState<T> | undefined;
 
     if (!state) {
@@ -126,12 +169,17 @@ class ReactiveSystem {
    * Track a dependency for the current component
    */
   trackDependency(state: ReactiveState<unknown>): void {
-    if (this.trackingDisabled || !this.currentComponent) return;
+    if (this.trackingDisabled) return;
+    const current = this.currentComponentStack.length
+      ? this.currentComponentStack[this.currentComponentStack.length - 1]
+      : null;
+    if (!current) return;
 
-    const data = this.componentData.get(this.currentComponent);
+    const data = this.componentData.get(current);
     if (data) {
       data.dependencies.add(state);
-      state.addDependent(this.currentComponent);
+      state.addDependent(current);
+      // dependency tracked
     }
   }
 
@@ -140,6 +188,7 @@ class ReactiveSystem {
    */
   triggerUpdate(state: ReactiveState<unknown>): void {
     const deps = state.getDependents();
+    // trigger update for dependents
     for (const componentId of deps) {
       const data = this.componentData.get(componentId);
       if (data) {
@@ -335,22 +384,51 @@ export function computed<T>(fn: () => T): { readonly value: T } {
  * ```
  */
 export function watch<T>(
-  source: () => T,
-  callback: (newValue: T, oldValue: T) => void,
-  options: { immediate?: boolean } = {},
+  source: ReactiveState<T>,
+  callback: (newValue: T, oldValue?: T) => void,
+  options?: { immediate?: boolean },
+): () => void;
+export function watch<T>(
+  source: ReactiveState<T> | (() => T),
+  callback: (newValue: T, oldValue?: T) => void,
+  options?: { immediate?: boolean },
 ): () => void {
-  let oldValue = source();
-
-  if (options.immediate) {
-    callback(oldValue, oldValue);
-  }
+  // Note: we must establish reactive dependencies first (a tracked
+  // call) and only then capture the initial `oldValue`. Capturing
+  // `oldValue` before registering as a dependent means the first
+  // tracked value may differ and lead to missed or spurious callbacks.
+  let oldValue: T;
+  // Normalize source: accept either a ReactiveState or a getter function
+  const getter: () => T = ((): (() => T) => {
+    // runtime check for ReactiveState instances
+    try {
+      if (isReactiveState(source as unknown)) {
+        // cast to unknown first to avoid incorrect direct cast from function type
+        return () => (source as unknown as ReactiveState<T>).value;
+      }
+    } catch {
+      // ignore and treat as function
+    }
+    return source as () => T;
+  })();
 
   // Create a dummy component to track dependencies
   const watcherId = `watch-${Math.random().toString(36).substr(2, 9)}`;
 
+  // If called during a component render, register this watcher under that
+  // component so watchers created in render are cleaned up on re-render.
+  try {
+    const parentComp = reactiveSystem.getCurrentComponentId();
+    if (parentComp) {
+      reactiveSystem.registerWatcher(parentComp, watcherId);
+    }
+  } catch {
+    /* ignore */
+  }
+
   const updateWatcher = () => {
     reactiveSystem.setCurrentComponent(watcherId, updateWatcher);
-    const newValue = source();
+    const newValue = getter();
     reactiveSystem.clearCurrentComponent();
 
     if (newValue !== oldValue) {
@@ -361,8 +439,16 @@ export function watch<T>(
 
   // Initial run to establish dependencies
   reactiveSystem.setCurrentComponent(watcherId, updateWatcher);
-  source();
+  // Capture the tracked initial value as the baseline
+  oldValue = getter();
   reactiveSystem.clearCurrentComponent();
+
+  // If immediate is requested, invoke the callback once with the
+  // current value as `newValue` and `undefined` as the previous value
+  // to match Vue's common semantics.
+  if (options && options.immediate) {
+    callback(oldValue, undefined);
+  }
 
   // Return cleanup function
   return () => {

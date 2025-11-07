@@ -28,6 +28,7 @@ The Custom Elements Runtime provides a powerful, intuitive functional component 
 - **🎯 Type Safety** - Full TypeScript inference from function signatures
 - **📦 Props** - Props are provided via `useProps()` with defaults and type inference. Avoid destructuring into local variables if you need reactivity — read from the `props` object or use `computed`/`watch` for derived reactive values.
 - **🚀 Strongly Typed Hooks** - React-style hooks with perfect TypeScript inference
+- **📝 Runtime logging toggle** - The runtime exports a `setDevMode(boolean)` helper so consumers can enable or disable development logs at runtime. Note: setting a global runtime flag in server-side environments is process-wide (per-process) and not per-request.
 - **🔄 Automatic Prop Parsing** - Runtime extracts prop defaults from your `useProps()` calls (via a short discovery render in the browser) and uses them to infer prop types and observed attributes
 - **💡 Intuitive API** - Familiar patterns similar to modern React/Vue components
 
@@ -1185,6 +1186,13 @@ The `useStyle` hook provides a powerful way to apply styles reactively based on 
 - **⚡ Performance**: Efficient updates only when dependencies change
 - **🧹 Scoped**: Styles are automatically scoped to the component
 - **💡 Intuitive**: Familiar CSS template literal syntax
+
+Implementation notes
+
+- `useStyle` is a render-time hook: the callback you provide is executed during component render so any reactive reads inside will be tracked. The callback should return a CSS string (commonly produced via the `css` template helper). The runtime stores that computed CSS string on the component render context and applies it as part of the component's stylesheet update step.
+- The runtime prefers to apply styles using constructable `CSSStyleSheet` (adoptedStyleSheets) when available and falls back to injecting a single `<style data-cer-runtime>` element in the shadow root for environments that don't support constructable stylesheets (or when creation fails). Tests and some environments may also see a stubbed `adoptedStyleSheets` array for compatibility.
+- The runtime no longer expects or supports a `useStyle` flavor that receives the host element as an argument (i.e. `useStyle((el) => ...)`). The canonical API is `useStyle(() => css`...`)` which returns a CSS string.
+- SSR / non-DOM environments: `useStyle` still runs during server-side discovery or render when possible, but constructable stylesheet behavior is platform-dependent. The runtime uses safe fallbacks to avoid throwing in SSR.
 
 #### 📖 Basic Usage
 

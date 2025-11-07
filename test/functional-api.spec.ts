@@ -144,7 +144,7 @@ describe('Functional API', () => {
 
       watch(() => count.value, callback, { immediate: true });
 
-      expect(callback).toHaveBeenCalledWith(5, 5);
+      expect(callback).toHaveBeenCalledWith(5, undefined);
     });
 
     it('should provide cleanup function', () => {

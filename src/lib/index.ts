@@ -19,3 +19,6 @@ export { ref, computed, watch } from './runtime/reactive';
 export { html } from './runtime/template-compiler';
 export { css } from './runtime/style';
 export { unsafeHTML, decodeEntities } from './runtime/helpers';
+
+// Logger utilities
+export { setDevMode } from './runtime/logger';

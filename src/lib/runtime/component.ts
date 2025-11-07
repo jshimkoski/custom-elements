@@ -815,7 +815,6 @@ export function component(
           style?: (el: HTMLElement) => void;
           props?: Record<string, unknown>;
         };
-        _styleCallback?: (el: HTMLElement) => void;
       };
 
       const ictx = context as InternalContext;
@@ -878,12 +877,13 @@ export function component(
               err: Error,
             ) => void;
           }
-          if (hookCallbacks.style) {
-            // Store the style callback in the context for applyStyle to use
-            ictx._styleCallback = hookCallbacks.style as (
-              el: HTMLElement,
-            ) => void;
-          }
+          // Note: `useStyle()` stores a computed style string directly on
+          // the current context as `_computedStyle`. The runtime reads
+          // `_computedStyle` in `applyStyle`. Historically the code also
+          // supported a style callback taking an HTMLElement; that path is
+          // deprecated and not used by `useStyle`. We intentionally avoid
+          // storing a `_styleCallback` here to keep the contract simple and
+          // consistent (string-returning `useStyle`).
           // If useProps() was called, update config.props with the defaults
           if (hookCallbacks.props) {
             const propsDefaults = hookCallbacks.props as Record<

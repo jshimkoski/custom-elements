@@ -2,7 +2,7 @@
  * TodoApp: A classic todo list example.
  * Demonstrates ctx, directives, and input binding.
  */
-import { component, html, ref } from '../../lib';
+import { component, html, ref, watch } from '../../lib';
 import { each } from '../../lib/directives';
 
 interface Todo {
@@ -35,6 +35,11 @@ export const TodoApp = component('todo-app', () => {
   const removeTodo = (id: number) => {
     todos.value = todos.value.filter((todo) => todo.id !== id);
   };
+
+  watch(input, (value) => {
+    // Example of reacting to input changes if needed
+    console.log('Input changed:', value);
+  });
 
   return html`
     <div
