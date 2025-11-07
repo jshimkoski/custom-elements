@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v2.3.0] - 2025-11-07
+
+- feat: add setDevMode to expose logging to developers feat: add ability to just use ref in watch instead of function call fix: fix regression in watch (ba4936a)
+- fix: improve router catch all (0a7671d)
+
+
 ## [v2.2.9] - 2025-11-06
 
 - fix: improve router catch all (0a7671d)
