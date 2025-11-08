@@ -35,9 +35,16 @@ router.back();
   - `subscribe(fn)`: Listen for route changes
   - `matchRoute(path: string)`: Manually match a path against configured routes (returns `{ route, params }`)
   - `resolveRouteComponent(route: Route)`: Helper that loads a route's component (supports static `component` or async `load`)
+  - `base`: The configured base path (string). When provided in `initRouter({ base: '/app' })` this value
+    is used by the runtime (for example `<router-link>`) when constructing normalized absolute hrefs.
+  - `scrollToFragment(frag?: string)`: Programmatically request scrolling to a fragment/anchor on the current page. Returns `Promise<boolean>` which resolves `true` when the scroll was performed or `false` on timeout/cancellation.
   - `store`: Low-level store object (exposes `getState()` and `subscribe()`) — primarily useful for tests or advanced integration.
 
-Note: query parsing is performed for the initial browser location and for popstate (back/forward) events. Programmatic calls like `router.push('/path?x=1')` currently do not parse the query string into `getCurrent().query` (the runtime stores an empty query object for programmatic navigations). See "Behavior notes" below for details.
+Note: The runtime now exports a small TypeScript surface that is handy for npm consumers (see "TypeScript types" below). In particular the
+value returned from `initRouter(...)` conforms to an exported `Router` interface which includes the `base` property and the methods
+listed above.
+
+Note: query parsing is performed for the initial browser location, for popstate (back/forward) events, and for programmatic navigations such as `router.push('/path?x=1')` and `router.replace('/path?x=1')`. Programmatic navigations now parse and store query parameters on the current route state and include the serialized query string in the browser history entry. The runtime exports a small `serializeQuery` helper that is used internally to produce the canonical `?a=b` portion of pushed URLs.
 
 Also: `push()` and `replace()` only update the browser URL/history when the router is running in browser mode (i.e. when `initialUrl` is not provided). When `initialUrl` is supplied (SSR/static rendering), navigation occurs via the server-side code path and may reject if a route or guard fails — server-side navigation does not mutate the client's history.
 
@@ -62,6 +69,55 @@ router.push('/profile/jane');
 
 - Updates browser URL
 - Renders matching component in `<router-view>`
+
+## #️⃣ Fragment (hash) handling and scrollToFragment
+
+The router preserves URL fragments (the part after `#`) on navigation and provides a robust, configurable
+mechanism to scroll to an element with the fragment id when it appears in the DOM.
+
+Behavior overview:
+
+- By default the router will attempt to scroll to the fragment after navigation when running in browser mode.
+- The built-in flow is resilient: it first tries an immediate scroll (to handle synchronous renders), then retries
+  after the next animation frame, and finally uses a MutationObserver fallback to detect the element when it
+  is appended asynchronously. A bounded timeout prevents observers from lingering indefinitely.
+- If the user navigates again while a scroll attempt is in flight, the attempt is cancelled so no stale scrolls
+  occur on the new page.
+
+Configuration (via `initRouter({ scrollToFragment })`):
+
+- `scrollToFragment` may be a boolean (enable/disable) or an object with options:
+  - `enabled?: boolean` — whether automatic fragment scrolling is enabled (default: `true`).
+  - `offset?: number` — pixel offset to apply when computing scroll position (useful for fixed headers). Default `0`.
+  - `timeoutMs?: number` — how long (ms) to wait for the target element to appear before giving up. Default `2000`.
+
+Public API:
+
+- `router.scrollToFragment(frag?: string): Promise<boolean>` — programmatically request scrolling to the fragment.
+  If `frag` is omitted, the router uses the current route state's `fragment`. The returned Promise resolves to
+  `true` if the scroll was performed, or `false` if the attempt timed out or was cancelled by a subsequent
+  navigation.
+
+Recommended usage:
+
+- When a route's component inserts the anchor asynchronously (e.g. after fetching data or lazy-rendering),
+  prefer calling `router.scrollToFragment()` from the component's mount lifecycle (for example, in `useOnConnected`
+  or an equivalent hook) once the DOM node is present. This is deterministic and avoids relying on heuristics.
+- If you cannot modify the component (third-party code), rely on the router's automatic flow — it's robust and
+  includes a MutationObserver fallback, but you may want to increase `timeoutMs` for very slow loads.
+
+Example:
+
+```ts
+// init
+const router = initRouter({
+  routes,
+  scrollToFragment: { enabled: true, offset: 64, timeoutMs: 3000 },
+});
+
+// Inside a route component, after the target element is appended:
+router.scrollToFragment(); // resolves true when scrolled
+```
 
 ## 🔍 Accessing Route Data
 
@@ -212,12 +268,15 @@ Router links automatically compute active classes based on the current route:
 - **Exact Active**: Applied when `current.path === to`
 - **`aria-current`**: Automatically added with value from `ariaCurrentValue` when exactly active
 
+Note: the router now special-cases the root target (`'/'`) so a `<router-link to="/">` will only be considered active when the current route is exactly `/`. Without this special case the root link would appear active on every route because every path starts with `/`.
+
 ### Accessibility Features
 
 - Disabled links get `aria-disabled="true"` and `tabindex="-1"`
 - Buttons get `disabled` attribute when disabled
 - Active links get `aria-current` attribute for screen readers
 - External links get `rel="noopener noreferrer"` for security
+- Dangerous `javascript:` URIs are blocked by `<router-link>`: the runtime omits the `href` for such targets and prevents activation (a development warning is emitted). If you need to allow non-http schemes (for example `mailto:` or `tel:`) consider validating/whitelisting schemes at the application level.
 
 # 🛡️ Navigation Guards
 
@@ -282,6 +341,16 @@ const params2 = parseQuery('foo=bar');
 - `search`: string - URL query string (with or without leading '?')
 
 **Returns:** `Record<string, string>` - Parsed query parameters. Note: this uses the platform `URLSearchParams` when available; in environments where `URLSearchParams` is unavailable (some server runtimes) the function falls back to returning an empty object.
+
+### `serializeQuery(q: Record<string,string> | undefined)`
+
+Serialize a query object into a leading `?a=b&c=d` string. Returns an empty string when the object is empty or when serialization fails. This helper is used by the runtime when constructing history entries for programmatic navigations (`push`/`replace`).
+
+```ts
+import { serializeQuery } from '@jasonshimmy/custom-elements-runtime/router';
+
+serializeQuery({ x: '1', y: 'two' }); // '?x=1&y=two'
+```
 
 ### `matchRoute(routes: Route[], path: string)`
 
@@ -392,11 +461,34 @@ const router = initRouter({
 
 Behavior notes:
 
-- Query parsing: when the router initializes in browser mode it parses the current URL's search string into `getCurrent().query`. The `popstate` handler also parses queries. However, calling `router.push('/some?x=1')` or `router.replace('/some?x=1')` programmatically will not populate `getCurrent().query` — the implementation stores an empty object for programmatic navigations. If you need query parsing for programmatic navigations, parse the path before calling `push`/`replace` or extract the query yourself.
+- Query parsing: when the router initializes in browser mode it parses the current URL's search string into `getCurrent().query`. The `popstate` handler also parses queries. Programmatic navigations (for example `router.push('/some?x=1')` or `router.replace('/some?x=1')`) now parse and store query parameters on the current route state and include the serialized query string in the browser history entry. Use `router.getCurrent().query` to access parsed params after programmatic navigation.
 
 - Async `load` behavior: `load()` is supported and cached. The built-in `router-view` accepts module defaults that are either a string tag name (rendered as a custom element) or a function component (sync or async). Function components should return a VNode, VNode[] or a string tag (or a Promise resolving to one of those). If `router-view` receives another type it will render the "Invalid route component" fallback. Use the exported `resolveRouteComponent` helper when you need to load or inspect module results programmatically — it will load and cache the module default for the route and surface clear errors if the loader fails or the route has no component.
 
 - SSR `initialUrl`: for server-side or static rendering, pass `initialUrl` into `initRouter`/`useRouter` so the router can derive the initial `path` and `query` server-side. If you explicitly pass `initialUrl` the runtime will honor it and initialize from that URL even when a `window` object exists (useful for SSR hydration and deterministic tests). If you omit `initialUrl` the router operates in normal browser mode and derives its initial state from `window.location`.
+
+## 🧾 TypeScript types (exports)
+
+The package now exports a small set of types that are useful for TypeScript/npm consumers. The most important is the `Router` interface which
+describes the runtime object returned from `initRouter()`:
+
+```ts
+import { initRouter } from '@jasonshimmy/custom-elements-runtime/router';
+import type { Router } from '@jasonshimmy/custom-elements-runtime/router';
+
+const router: Router = initRouter({ routes, base: '/app' });
+console.log(router.base); // -> '/app'
+```
+
+Key exported types you can import from the package:
+
+- `Router` — the runtime instance returned by `initRouter()` (includes `push`, `replace`, `back`, `getCurrent`, `subscribe`, `matchRoute`, `resolveRouteComponent`, `base`, and `scrollToFragment`).
+- `RouterConfig` — the configuration object accepted by `initRouter()` (includes `routes`, optional `base`, and `scrollToFragment` options).
+- `Route`, `RouteState`, `RouteComponent` — route definitions and runtime state shapes.
+- `parseQuery`, `matchRoute`, `matchRouteSSR`, `resolveRouteComponent`, `normalizePathForRoute` — small utility exports that can be useful in server rendering or custom tooling.
+
+These types are lightweight and intended to make it easier to integrate the router into TypeScript projects and server-side code (for example
+typing the return value of `initRouter()` or annotating handler functions that call `router.push()`).
 
 ## 📚 See Also
 

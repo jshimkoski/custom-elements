@@ -86,12 +86,44 @@ export interface RouterConfig {
   routes: Route[];
   base?: string;
   initialUrl?: string; // For SSR: explicitly pass the URL
+  /**
+   * Configure fragment (hash) scrolling behavior. Either a boolean to enable/disable
+   * or an object to enable and provide an offset in pixels to account for fixed
+   * headers.
+   */
+  scrollToFragment?:
+    | boolean
+    | {
+        enabled?: boolean;
+        offset?: number; // pixels
+        timeoutMs?: number; // ms to wait for element to appear
+      };
 }
 
 export const parseQuery = (search: string): Record<string, string> => {
   if (!search) return {};
   if (typeof URLSearchParams === 'undefined') return {};
   return Object.fromEntries(new URLSearchParams(search));
+};
+
+// Serialize a query object into a leading `?a=b&c=d` string. Returns empty
+// string when there are no keys. Centralized so client history URLs and
+// other code use consistent encoding.
+export const serializeQuery = (q: Record<string, string> | undefined) => {
+  if (!q || Object.keys(q).length === 0) return '';
+  try {
+    return '?' + new URLSearchParams(q as Record<string, string>).toString();
+  } catch {
+    return '';
+  }
+};
+
+// Detect obviously dangerous javascript: URIs. We intentionally block these
+// from becoming clickable hrefs to avoid accidental XSS when `to` is
+// derived from untrusted input.
+const isDangerousScheme = (s: string) => {
+  if (!s) return false;
+  return /^\s*javascript\s*:/i.test(s);
 };
 
 // Cache compiled route regexes to avoid rebuilding on every navigation.
@@ -271,10 +303,39 @@ export async function resolveRouteComponent(
 }
 
 export function useRouter(config: RouterConfig) {
-  const { routes, base = '', initialUrl } = config;
+  const { routes, base = '', initialUrl, scrollToFragment = true } = config;
 
-  let getLocation: () => { path: string; query: Record<string, string> };
-  let initial: { path: string; query: Record<string, string> };
+  // Canonicalize base so callers and internal logic have a single
+  // representation. Normalized base will be '' for root or '/x' (no
+  // trailing slash). This prevents accidental double-prefixing like
+  // '/app/app/about' and makes startsWith checks reliable.
+  const canonicalBase = (() => {
+    if (!base) return '';
+    const nb = normalizePathForRoute(base);
+    return nb === '/' ? '' : nb;
+  })();
+
+  // Normalize scroll config: either boolean or object { enabled?, offset?, timeoutMs }
+  const _scrollConfig =
+    typeof scrollToFragment === 'boolean'
+      ? { enabled: !!scrollToFragment, offset: 0, timeoutMs: 2000 }
+      : {
+          enabled: scrollToFragment.enabled ?? true,
+          offset: scrollToFragment.offset ?? 0,
+          timeoutMs: scrollToFragment.timeoutMs ?? 2000,
+        };
+
+  // getLocation/initial include an optional `fragment` field in practice.
+  let getLocation: () => {
+    path: string;
+    query: Record<string, string>;
+    fragment?: string;
+  };
+  let initial: {
+    path: string;
+    query: Record<string, string>;
+    fragment?: string;
+  };
   let store: Store<RouteState>;
   let update: (replace?: boolean) => Promise<void>;
   let push: (path: string) => Promise<void>;
@@ -325,6 +386,226 @@ export function useRouter(config: RouterConfig) {
     }
   };
 
+  // Scroll-to-fragment helpers: a cancellable per-navigation flow that
+  // first attempts immediate scroll, then uses rAF and MutationObserver as
+  // a robust fallback. Resolves true if scroll executed, false if timed out
+  // or cancelled.
+  let _navToken = 0;
+  let _activeObserver: MutationObserver | null = null;
+  let _activeTimeout: number | null = null;
+  let _activeResolve: ((v: boolean) => void) | null = null;
+
+  async function doScrollToElement(id: string, offset = 0) {
+    try {
+      const el = document.getElementById(id) as HTMLElement | null;
+      if (!el) return false;
+      if (offset && offset > 0) {
+        try {
+          const rect = el.getBoundingClientRect();
+          const top = Math.max(0, window.scrollY + rect.top - offset);
+          if (typeof window.scrollTo === 'function') {
+            window.scrollTo({ top, behavior: 'auto' });
+          }
+        } catch {
+          try {
+            el.scrollIntoView();
+          } catch {
+            /* swallow */
+          }
+        }
+      } else {
+        if (typeof el.scrollIntoView === 'function') {
+          try {
+            el.scrollIntoView({
+              behavior: 'auto',
+              block: 'start',
+              inline: 'nearest',
+            });
+          } catch {
+            try {
+              el.scrollIntoView();
+            } catch {
+              /* swallow */
+            }
+          }
+        }
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  function clearActiveScrollAttempt() {
+    if (_activeObserver) {
+      try {
+        _activeObserver.disconnect();
+      } catch {
+        /* swallow */
+      }
+      _activeObserver = null;
+    }
+    if (_activeTimeout) {
+      try {
+        clearTimeout(_activeTimeout);
+      } catch {
+        /* swallow */
+      }
+      _activeTimeout = null;
+    }
+    // NOTE: do NOT resolve/clear `_activeResolve` here. Resolution of the
+    // active promise must be handled explicitly by the creator/canceller so
+    // we avoid double-resolve races where both cleanup and the active
+    // flow attempt try to resolve the same promise. Clearing observer/timeout
+    // here is sufficient for cleanup; callers should resolve any prior
+    // `_activeResolve` before calling this helper.
+  }
+
+  function startScrollForNavigation(
+    id: string,
+    offset: number | undefined,
+    timeoutMs: number | undefined,
+  ) {
+    _navToken += 1;
+    const myToken = _navToken;
+
+    // If there is a previous pending resolver, resolve it as cancelled
+    // (false) so callers awaiting it observe cancellation before we clear
+    // internal observers/timeouts. This ensures the previous Promise is
+    // resolved exactly once with `false` when a new navigation/scroll
+    // attempt starts.
+    if (_activeResolve) {
+      try {
+        _activeResolve(false);
+      } catch {
+        /* swallow */
+      }
+      _activeResolve = null;
+    }
+
+    clearActiveScrollAttempt();
+
+    return new Promise<boolean>((resolve) => {
+      // Register the new active resolver for potential cancellation by a
+      // future navigation. We deliberately set this after clearing prior
+      // observers/timeouts and resolving any previous resolver above.
+      _activeResolve = resolve;
+
+      const finish = (did: boolean) => {
+        if (myToken !== _navToken) return;
+        clearActiveScrollAttempt();
+        try {
+          resolve(did);
+        } finally {
+          // Avoid retaining a reference to the resolver after it has
+          // been used — prevents later attempts from re-calling an old
+          // function and keeps lifecycle explicit.
+          _activeResolve = null;
+        }
+      };
+
+      const tryNow = async () => {
+        if (myToken !== _navToken) return finish(false);
+        if (await doScrollToElement(id, offset)) return finish(true);
+
+        // After rAF try once more so layout can settle
+        if (typeof window.requestAnimationFrame === 'function') {
+          window.requestAnimationFrame(async () => {
+            if (myToken !== _navToken) return finish(false);
+            if (await doScrollToElement(id, offset)) return finish(true);
+
+            if (myToken !== _navToken) return finish(false);
+            const container =
+              document.querySelector('router-view') || document.body;
+            try {
+              const obs = new MutationObserver(async () => {
+                if (myToken !== _navToken) return;
+                if (await doScrollToElement(id, offset)) {
+                  finish(true);
+                }
+              });
+              _activeObserver = obs;
+              obs.observe(container as Node, {
+                childList: true,
+                subtree: true,
+                attributes: false,
+              });
+
+              _activeTimeout = window.setTimeout(() => {
+                if (myToken !== _navToken) return;
+                try {
+                  obs.disconnect();
+                } catch {
+                  /* swallow */
+                }
+                _activeObserver = null;
+                _activeTimeout = null;
+                finish(false);
+              }, timeoutMs ?? 2000);
+            } catch {
+              // Fallback to polling
+              const MAX_RETRIES = 40;
+              const RETRY_DELAY = 50;
+              let n = 0;
+              const poll = async () => {
+                if (myToken !== _navToken) return finish(false);
+                if (await doScrollToElement(id, offset)) return finish(true);
+                n += 1;
+                if (n < MAX_RETRIES) window.setTimeout(poll, RETRY_DELAY);
+                else finish(false);
+              };
+              poll();
+            }
+          });
+        } else {
+          // no rAF — try MutationObserver immediately
+          const container =
+            document.querySelector('router-view') || document.body;
+          try {
+            const obs = new MutationObserver(async () => {
+              if (myToken !== _navToken) return;
+              if (await doScrollToElement(id, offset)) {
+                finish(true);
+              }
+            });
+            _activeObserver = obs;
+            obs.observe(container as Node, {
+              childList: true,
+              subtree: true,
+              attributes: false,
+            });
+            _activeTimeout = window.setTimeout(() => {
+              if (myToken !== _navToken) return;
+              try {
+                obs.disconnect();
+              } catch {
+                /* swallow */
+              }
+              _activeObserver = null;
+              _activeTimeout = null;
+              finish(false);
+            }, timeoutMs ?? 2000);
+          } catch {
+            // fallback polling
+            const MAX_RETRIES = 40;
+            const RETRY_DELAY = 50;
+            let n = 0;
+            const poll = async () => {
+              if (myToken !== _navToken) return finish(false);
+              if (await doScrollToElement(id, offset)) return finish(true);
+              n += 1;
+              if (n < MAX_RETRIES) window.setTimeout(poll, RETRY_DELAY);
+              else finish(false);
+            };
+            poll();
+          }
+        }
+      };
+
+      queueMicrotask(tryNow);
+    });
+  }
+
   const navigate = async (path: string, replace = false) => {
     try {
       // Separate fragment (hash) from path so matching ignores it while
@@ -332,9 +613,18 @@ export function useRouter(config: RouterConfig) {
       const hashIndex = path.indexOf('#');
       const fragment = hashIndex >= 0 ? path.slice(hashIndex + 1) : '';
       const rawPath = hashIndex >= 0 ? path.slice(0, hashIndex) : path;
+      // Parse query string (if any) so queries are available on RouteState
+      // and do not end up inside the normalized path used for matching.
+      const qIndex = rawPath.indexOf('?');
+      const pathBeforeQuery = qIndex >= 0 ? rawPath.slice(0, qIndex) : rawPath;
+      const query = qIndex >= 0 ? parseQuery(rawPath.slice(qIndex)) : {};
+      const stripped = pathBeforeQuery.startsWith(canonicalBase)
+        ? pathBeforeQuery.slice(canonicalBase.length)
+        : pathBeforeQuery;
+      const normalized = normalizePathForRoute(stripped || '/');
       const loc = {
-        path: rawPath.replace(base, '') || '/',
-        query: {},
+        path: normalized,
+        query,
         fragment,
       };
       const match = matchRoute(routes, loc.path);
@@ -357,10 +647,16 @@ export function useRouter(config: RouterConfig) {
       if (!allowedOn) return;
 
       if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+        const qstr = serializeQuery(loc.query);
+        const href =
+          canonicalBase +
+          loc.path +
+          (qstr || '') +
+          (loc.fragment ? '#' + loc.fragment : '');
         if (replace) {
-          window.history.replaceState({}, '', base + path);
+          window.history.replaceState({}, '', href);
         } else {
-          window.history.pushState({}, '', base + path);
+          window.history.pushState({}, '', href);
         }
       }
 
@@ -368,6 +664,27 @@ export function useRouter(config: RouterConfig) {
 
       // afterEnter hook (post commit)
       runAfterEnter(to, from);
+
+      // If there's a fragment (hash) preserve it on the URL and attempt to
+      // scroll to the element with that id on client-side navigation.
+      try {
+        const frag = (to as { fragment?: string }).fragment;
+        if (
+          _scrollConfig.enabled &&
+          frag &&
+          typeof window !== 'undefined' &&
+          typeof document !== 'undefined'
+        ) {
+          // Start the robust scroll flow (observer + timeout + cancellation)
+          startScrollForNavigation(
+            String(frag),
+            _scrollConfig.offset,
+            _scrollConfig.timeoutMs,
+          ).catch(() => {});
+        }
+      } catch {
+        /* swallow */
+      }
     } catch (err) {
       devError('Navigation error:', err);
     }
@@ -384,7 +701,11 @@ export function useRouter(config: RouterConfig) {
     // Browser mode
     getLocation = () => {
       const url = new URL(window.location.href);
-      const path = url.pathname.replace(base, '') || '/';
+      const raw = url.pathname;
+      const stripped = raw.startsWith(canonicalBase)
+        ? raw.slice(canonicalBase.length)
+        : raw;
+      const path = normalizePathForRoute(stripped || '/');
       const query = parseQuery(url.search);
       const fragment = url.hash && url.hash.length ? url.hash.slice(1) : '';
       return { path, query, fragment };
@@ -413,7 +734,11 @@ export function useRouter(config: RouterConfig) {
     // SSR mode
     getLocation = () => {
       const url = new URL(initialUrl || '/', 'http://localhost');
-      const path = url.pathname.replace(base, '') || '/';
+      const raw = url.pathname;
+      const stripped = raw.startsWith(canonicalBase)
+        ? raw.slice(canonicalBase.length)
+        : raw;
+      const path = normalizePathForRoute(stripped || '/');
       const query = parseQuery(url.search);
       const fragment = url.hash && url.hash.length ? url.hash.slice(1) : '';
       return { path, query, fragment };
@@ -448,9 +773,19 @@ export function useRouter(config: RouterConfig) {
         const hashIndex = path.indexOf('#');
         const fragment = hashIndex >= 0 ? path.slice(hashIndex + 1) : '';
         const rawPath = hashIndex >= 0 ? path.slice(0, hashIndex) : path;
+        // Parse query on SSR navigation as well so server-side logic and
+        // tests can observe query params.
+        const qIndex = rawPath.indexOf('?');
+        const pathBeforeQuery =
+          qIndex >= 0 ? rawPath.slice(0, qIndex) : rawPath;
+        const query = qIndex >= 0 ? parseQuery(rawPath.slice(qIndex)) : {};
+        const stripped = pathBeforeQuery.startsWith(canonicalBase)
+          ? pathBeforeQuery.slice(canonicalBase.length)
+          : pathBeforeQuery;
+        const normalized = normalizePathForRoute(stripped || '/');
         const loc = {
-          path: rawPath.replace(base, '') || '/',
-          query: {},
+          path: normalized,
+          query,
           fragment,
         };
         const match = matchRoute(routes, loc.path);
@@ -517,7 +852,41 @@ export function useRouter(config: RouterConfig) {
     matchRoute: (path: string) => matchRoute(routes, path),
     getCurrent: (): RouteState => store.getState(),
     resolveRouteComponent,
+    base: canonicalBase,
+    // Public API: allow components or tests to explicitly request scrolling to
+    // a fragment when they know their DOM is ready. Returns true if scrolled.
+    scrollToFragment: (frag?: string) => {
+      const id = frag || (store.getState() as RouteState).fragment;
+      if (!id) return Promise.resolve(false);
+      if (typeof window === 'undefined' || typeof document === 'undefined')
+        return Promise.resolve(false);
+      return startScrollForNavigation(
+        String(id),
+        _scrollConfig.offset,
+        _scrollConfig.timeoutMs,
+      );
+    },
   };
+}
+
+/**
+ * Explicit Router instance type exported for clearer typing across the
+ * codebase and tests.
+ */
+export interface Router {
+  store: Store<RouteState>;
+  push: (path: string) => Promise<void>;
+  replace: (path: string) => Promise<void>;
+  back: () => void;
+  subscribe: Store<RouteState>['subscribe'];
+  matchRoute: (path: string) => {
+    route: Route | null;
+    params: Record<string, string>;
+  };
+  getCurrent: () => RouteState;
+  resolveRouteComponent: typeof resolveRouteComponent;
+  base: string;
+  scrollToFragment: (frag?: string) => Promise<boolean>;
 }
 
 // SSR/static site support: match route for a given path
@@ -539,6 +908,10 @@ let activeRouter: ReturnType<typeof useRouter> | null = null;
 
 export function initRouter(config: RouterConfig) {
   const router = useRouter(config);
+  // Expose the most recently initialized router to components defined
+  // earlier in the process (tests may call initRouter multiple times).
+  // Components reference `activeRouter` so re-calling initRouter updates
+  // the router instance they use.
   // Expose the most recently initialized router to components defined
   // earlier in the process (tests may call initRouter multiple times).
   // Components reference `activeRouter` so re-calling initRouter updates
@@ -700,27 +1073,61 @@ export function initRouter(config: RouterConfig) {
     });
 
     const isExactActive = computed(() => {
+      const runtimeBase = r?.base ?? '';
       const targetRaw = (props.to as string) || '';
-      // strip fragment from target when comparing
-      const targetPathOnly = targetRaw.split('#')[0];
+      // If the target is an absolute or protocol-relative URL, it's external
+      // and should not be considered active.
+      if (
+        /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(targetRaw) ||
+        targetRaw.startsWith('//')
+      )
+        return false;
+      // strip fragment and query from target when comparing. Default to '/'
+      const targetPathOnly = (targetRaw.split('#')[0] || '/').split('?')[0];
       try {
-        return (
-          normalizePathForRoute(current.value.path) ===
-          normalizePathForRoute(targetPathOnly)
-        );
+        // Remove runtime base if present on the provided target so comparisons
+        // are made against the router-internal path format (paths stored
+        // without base).
+        let tgtCandidate = targetPathOnly;
+        if (runtimeBase && tgtCandidate.startsWith(runtimeBase)) {
+          tgtCandidate = tgtCandidate.slice(runtimeBase.length) || '/';
+        }
+        const cur = normalizePathForRoute(current.value.path);
+        const tgt = normalizePathForRoute(tgtCandidate);
+        return cur === tgt;
       } catch {
         return current.value.path === targetPathOnly;
       }
     });
 
     const isActive = computed(() => {
+      const runtimeBase = r?.base ?? '';
       const targetRaw = (props.to as string) || '';
-      const targetPathOnly = targetRaw.split('#')[0];
+      // External targets are never "active" in the SPA sense
+      if (
+        /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(targetRaw) ||
+        targetRaw.startsWith('//')
+      )
+        return false;
+      // strip fragment and query from target when comparing
+      const targetPathOnly = (targetRaw.split('#')[0] || '/').split('?')[0];
       if (props.exact) return isExactActive.value;
       try {
+        // Normalize and strip base from target to compare against
+        let tgtCandidate = targetPathOnly;
+        if (runtimeBase && tgtCandidate.startsWith(runtimeBase)) {
+          tgtCandidate = tgtCandidate.slice(runtimeBase.length) || '/';
+        }
         const cur = normalizePathForRoute(current.value.path);
-        const tgt = normalizePathForRoute(targetPathOnly);
-        return cur.startsWith(tgt);
+        const tgt = normalizePathForRoute(tgtCandidate);
+        // Special-case the root target: '/' should only be active when
+        // the current path is exactly '/'. Without this, '/' matches all
+        // routes (every path starts with '/').
+        if (tgt === '/') return cur === '/';
+        // Consider active when current is the target or a child of the target
+        if (cur === tgt) return true;
+        // Ensure we match whole path segment (avoid '/guide-api' matching '/guide')
+        return cur.startsWith(tgt.endsWith('/') ? tgt : tgt + '/');
       } catch {
         return (
           current.value &&
@@ -728,6 +1135,42 @@ export function initRouter(config: RouterConfig) {
           current.value.path.startsWith(targetPathOnly)
         );
       }
+    });
+
+    // Compute a normalized href for the inner anchor so middle-click / open-in-new-tab
+    // uses a canonical absolute path (includes base and fragment). We keep using
+    // props.to for router navigation so current behavior (literal `to`) remains.
+    const hrefTarget = computed(() => {
+      const raw = String(props.to || '');
+      // Block obviously dangerous javascript: URIs from becoming clickable
+      // hrefs. See isDangerousScheme for rationale.
+      if (isDangerousScheme(raw)) return null;
+
+      // Preserve absolute URLs with a scheme (http:, mailto:, data:, etc.)
+      // and protocol-relative URLs that begin with `//`.
+      if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(raw) || raw.startsWith('//'))
+        return raw;
+
+      // Split fragment and query explicitly so both are preserved.
+      const [pathWithQuery, frag] = raw.split('#');
+      const [pathOnly, query] = (pathWithQuery || '').split('?');
+
+      // Read base dynamically from the current router instance so repeated
+      // calls to initRouter (tests) do not leave a stale captured value.
+      const runtimeBase = r?.base ?? '';
+      // If the provided path already contains the runtime base, strip it to
+      // avoid duplicating e.g. '/app/app/about'. Keep a fallback of '/'.
+      let candidate = pathOnly || '/';
+      if (runtimeBase && candidate.startsWith(runtimeBase)) {
+        candidate = candidate.slice(runtimeBase.length) || '/';
+      }
+      const norm = normalizePathForRoute(candidate || '/');
+      return (
+        runtimeBase +
+        norm +
+        (query ? '?' + query : '') +
+        (frag ? '#' + frag : '')
+      );
     });
 
     // Build user classes reactively from the host `class` attribute prop.
@@ -757,20 +1200,26 @@ export function initRouter(config: RouterConfig) {
         .join(' '),
     );
 
-    const isButton = computed(() => (props.tag as string) === 'button');
+    const tagName = computed(() => (props.tag as string) || 'a');
+    const isButton = computed(() => tagName.value === 'button');
     // Instead of pre-building attribute fragments as strings (which can
     // accidentally inject invalid attribute names into the template and
     // cause DOMExceptions), compute simple booleans/values and apply
     // attributes explicitly in the template below.
-    const ariaCurrentValue = computed(() =>
-      isExactActive.value ? (props.ariaCurrentValue as string) : '',
+    // Return null when not exact so the attribute is omitted from the DOM
+    const ariaCurrentValue = computed<null | string>(() =>
+      isExactActive.value ? (props.ariaCurrentValue as string) : null,
     );
     const isDisabled = computed(() => !!props.disabled);
-    const isExternal = computed(
-      () =>
-        !!props.external &&
-        ((props.tag as string) === 'a' || !(props.tag as string)),
-    );
+    // External should only apply to anchor tags (links). Make the check explicit.
+    // Detect absolute/protocol-relative URLs as external even if the prop
+    // wasn't explicitly set by the caller. Only apply to anchor tags.
+    const isExternal = computed(() => {
+      const toStr = String(props.to || '');
+      const looksAbsolute =
+        /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(toStr) || toStr.startsWith('//');
+      return (looksAbsolute || !!props.external) && tagName.value === 'a';
+    });
 
     // Inline style from host `style` attribute.
     const inlineStyle = computed(
@@ -779,16 +1228,39 @@ export function initRouter(config: RouterConfig) {
     );
 
     const navigate = (e: MouseEvent) => {
-      if (props.disabled) {
+      // Respect pre-handled events, non-left clicks, and modifier keys so
+      // default browser behaviors (open-in-new-tab, context menu) work.
+      if (
+        e.defaultPrevented ||
+        e.button !== 0 ||
+        e.metaKey ||
+        e.altKey ||
+        e.ctrlKey ||
+        e.shiftKey
+      )
+        return;
+
+      if (isDisabled.value) {
+        // Prevent navigation and let assistive tech see disabled state
         e.preventDefault();
         return;
       }
-      if (
-        props.external &&
-        ((props.tag as string) === 'a' || !(props.tag as string))
-      ) {
+
+      // Block dangerous javascript: URIs explicitly to avoid accidental XSS
+      const _targetRaw = String(props.to || '');
+      if (isDangerousScheme(_targetRaw)) {
+        try {
+          e.preventDefault();
+        } catch {
+          /* swallow */
+        }
+        devWarn('Blocked unsafe javascript: URI in router-link.to');
         return;
       }
+
+      // If this is an external anchor, allow default browser behavior
+      if (isExternal.value) return;
+
       e.preventDefault();
       if (props.replace) {
         r.replace(props.to as string);
@@ -819,7 +1291,7 @@ export function initRouter(config: RouterConfig) {
         .otherwise(html`
           <a
             part="link"
-            href="${props.to}"
+            href="${isDisabled.value ? null : hrefTarget.value}"
             class="${classString.value}"
             style="${inlineStyle.value || null}"
             aria-current="${ariaCurrentValue.value}"
