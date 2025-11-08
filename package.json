@@ -1,7 +1,7 @@
 {
   "name": "@jasonshimmy/custom-elements-runtime",
   "description": "A powerful, modern, and lightweight runtime for creating reactive web components with TypeScript",
-  "version": "2.3.1",
+  "version": "2.4.0",
   "type": "module",
   "keywords": [
     "web-components",
