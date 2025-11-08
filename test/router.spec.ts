@@ -73,7 +73,12 @@ describe('router.ts', () => {
       router = useRouter({ routes });
     });
     it('returns initial state', () => {
-      expect(router.getCurrent()).toEqual({ path: '/', params: {}, query: {} });
+      expect(router.getCurrent()).toEqual({
+        path: '/',
+        params: {},
+        query: {},
+        fragment: '',
+      });
     });
     it('matchRoute works', () => {
       const result = router.matchRoute('/user/99');
@@ -96,7 +101,12 @@ describe('router.ts', () => {
       router.subscribe(fn);
       // Should be called once with initial state
       expect(fn).toHaveBeenCalledTimes(1);
-      expect(fn).toHaveBeenCalledWith({ path: '/', params: {}, query: {} });
+      expect(fn).toHaveBeenCalledWith({
+        path: '/',
+        params: {},
+        query: {},
+        fragment: '',
+      });
     });
   });
 
@@ -508,7 +518,12 @@ describe('router.ts', () => {
       const router = initRouter(config);
       const current = router.getCurrent();
       // The actual current path is '/other' in this test context
-      expect(current).toEqual({ path: '/other', params: {}, query: {} });
+      expect(current).toEqual({
+        path: '/other',
+        params: {},
+        query: {},
+        fragment: '',
+      });
       // Simulate computed className
       const isExactActive = current.path === '/';
       // The actual isExactActive is false in this test context
@@ -592,6 +607,7 @@ describe('router.ts', () => {
         path: '/ssr',
         params: {},
         query: {},
+        fragment: '',
       });
       // In SSR mode navigating to an unknown path now rejects so callers can
       // observe and handle server-side routing failures.

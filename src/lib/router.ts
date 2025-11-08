@@ -19,6 +19,8 @@ export interface RouteState {
   path: string;
   params: Record<string, string>;
   query: Record<string, string>;
+  // Optional fragment (hash) portion of the URL, without the leading '#'
+  fragment?: string;
 }
 
 export type GuardResult = boolean | string | Promise<boolean | string>;
@@ -102,7 +104,7 @@ function escapeSeg(seg: string) {
   return seg.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-function normalizePathForRoute(p: string) {
+export function normalizePathForRoute(p: string) {
   if (!p) return '/';
   // Collapse duplicate slashes, ensure leading slash, remove trailing slash
   let out = p.replace(/\/+/g, '/');
@@ -325,9 +327,15 @@ export function useRouter(config: RouterConfig) {
 
   const navigate = async (path: string, replace = false) => {
     try {
+      // Separate fragment (hash) from path so matching ignores it while
+      // the fragment is preserved on the RouteState.
+      const hashIndex = path.indexOf('#');
+      const fragment = hashIndex >= 0 ? path.slice(hashIndex + 1) : '';
+      const rawPath = hashIndex >= 0 ? path.slice(0, hashIndex) : path;
       const loc = {
-        path: path.replace(base, '') || '/',
+        path: rawPath.replace(base, '') || '/',
         query: {},
+        fragment,
       };
       const match = matchRoute(routes, loc.path);
       if (!match.route) throw new Error(`No route found for ${loc.path}`);
@@ -337,6 +345,7 @@ export function useRouter(config: RouterConfig) {
         path: loc.path,
         params: match.params,
         query: loc.query,
+        fragment: (loc as { fragment?: string }).fragment,
       };
 
       // beforeEnter guard
@@ -377,7 +386,8 @@ export function useRouter(config: RouterConfig) {
       const url = new URL(window.location.href);
       const path = url.pathname.replace(base, '') || '/';
       const query = parseQuery(url.search);
-      return { path, query };
+      const fragment = url.hash && url.hash.length ? url.hash.slice(1) : '';
+      return { path, query, fragment };
     };
 
     initial = getLocation();
@@ -386,6 +396,7 @@ export function useRouter(config: RouterConfig) {
       path: initial.path,
       params: match.params,
       query: initial.query,
+      fragment: (initial as { fragment?: string }).fragment,
     });
 
     update = async (replace = false) => {
@@ -404,7 +415,8 @@ export function useRouter(config: RouterConfig) {
       const url = new URL(initialUrl || '/', 'http://localhost');
       const path = url.pathname.replace(base, '') || '/';
       const query = parseQuery(url.search);
-      return { path, query };
+      const fragment = url.hash && url.hash.length ? url.hash.slice(1) : '';
+      return { path, query, fragment };
     };
 
     initial = getLocation();
@@ -413,6 +425,7 @@ export function useRouter(config: RouterConfig) {
       path: initial.path,
       params: match.params,
       query: initial.query,
+      fragment: (initial as { fragment?: string }).fragment,
     });
 
     update = async () => {
@@ -432,9 +445,13 @@ export function useRouter(config: RouterConfig) {
     //   no-op in SSR mode.
     const navigateSSR = async (path: string) => {
       try {
+        const hashIndex = path.indexOf('#');
+        const fragment = hashIndex >= 0 ? path.slice(hashIndex + 1) : '';
+        const rawPath = hashIndex >= 0 ? path.slice(0, hashIndex) : path;
         const loc = {
-          path: path.replace(base, '') || '/',
+          path: rawPath.replace(base, '') || '/',
           query: {},
+          fragment,
         };
         const match = matchRoute(routes, loc.path);
         // In SSR mode we intentionally surface navigation errors (missing
@@ -447,6 +464,7 @@ export function useRouter(config: RouterConfig) {
           path: loc.path,
           params: match.params,
           query: loc.query,
+          fragment: (loc as { fragment?: string }).fragment,
         };
 
         // beforeEnter guard
@@ -681,16 +699,36 @@ export function initRouter(config: RouterConfig) {
       }
     });
 
-    const isExactActive = computed(
-      () => current.value.path === (props.to as string),
-    );
-    const isActive = computed(() =>
-      props.exact
-        ? isExactActive.value
-        : current.value && typeof current.value.path === 'string'
-          ? current.value.path.startsWith(props.to as string)
-          : false,
-    );
+    const isExactActive = computed(() => {
+      const targetRaw = (props.to as string) || '';
+      // strip fragment from target when comparing
+      const targetPathOnly = targetRaw.split('#')[0];
+      try {
+        return (
+          normalizePathForRoute(current.value.path) ===
+          normalizePathForRoute(targetPathOnly)
+        );
+      } catch {
+        return current.value.path === targetPathOnly;
+      }
+    });
+
+    const isActive = computed(() => {
+      const targetRaw = (props.to as string) || '';
+      const targetPathOnly = targetRaw.split('#')[0];
+      if (props.exact) return isExactActive.value;
+      try {
+        const cur = normalizePathForRoute(current.value.path);
+        const tgt = normalizePathForRoute(targetPathOnly);
+        return cur.startsWith(tgt);
+      } catch {
+        return (
+          current.value &&
+          typeof current.value.path === 'string' &&
+          current.value.path.startsWith(targetPathOnly)
+        );
+      }
+    });
 
     // Build user classes reactively from the host `class` attribute prop.
     // We intentionally apply classes to the inner element so the consumer
