@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v2.4.0] - 2025-11-08
+
+- feat: add fragment support to RouteState and update router functionality (7c8acc2)
+- fix: add missing watch overload (2d228ca)
+
+
 ## [v2.3.1] - 2025-11-07
 
 - fix: add missing watch overload (2d228ca)
