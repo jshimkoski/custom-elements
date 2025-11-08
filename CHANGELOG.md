@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v2.5.0] - 2025-11-08
+
+- feat: enhance router with fragment scrolling and query parsing improvements (6101d1d)
+- feat: add fragment support to RouteState and update router functionality (7c8acc2)
+
+
 ## [v2.4.0] - 2025-11-08
 
 - feat: add fragment support to RouteState and update router functionality (7c8acc2)
