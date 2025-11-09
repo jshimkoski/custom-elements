@@ -919,13 +919,14 @@ export function initRouter(config: RouterConfig) {
   activeRouter = router;
 
   component('router-view', async () => {
-    // Prefer the latest initialized router (tests may re-init). Fallback
-    // to the router captured at init time.
-    const r = activeRouter || router;
+    // Prefer the latest initialized router (tests may re-init). Resolve the
+    // router lazily so components connect to whichever router is currently
+    // active instead of capturing a stale instance at definition time.
+    const getRouter = () => activeRouter || router;
     // Reactive current route so the component re-renders when router updates
-    if (!r) return html`<div>Router not initialized.</div>`;
+    if (!getRouter()) return html`<div>Router not initialized.</div>`;
 
-    const current = ref(r.getCurrent());
+    const current = ref(getRouter().getCurrent());
 
     // We'll capture the unsubscribe function when the component connects
     // and register a disconnect cleanup during render-time (useOnDisconnected
@@ -934,8 +935,8 @@ export function initRouter(config: RouterConfig) {
 
     useOnConnected(() => {
       try {
-        if (r && typeof r.subscribe === 'function') {
-          unsubRouterView = r.subscribe((s) => {
+        if (getRouter() && typeof getRouter().subscribe === 'function') {
+          unsubRouterView = getRouter().subscribe((s) => {
             try {
               current.value = s;
             } catch (e) {
@@ -958,12 +959,12 @@ export function initRouter(config: RouterConfig) {
       }
     });
 
-    const match = r.matchRoute(current.value.path);
+    const match = getRouter().matchRoute(current.value.path);
     if (!match || !match.route) return html`<div>Not found</div>`;
 
     // Resolve the component (supports cached async loaders)
     try {
-      const compRaw = await r.resolveRouteComponent(match.route);
+      const compRaw = await getRouter().resolveRouteComponent(match.route);
       const comp = compRaw as
         | string
         | HTMLElement
@@ -1008,11 +1009,12 @@ export function initRouter(config: RouterConfig) {
       style: '',
     });
 
-    // Prefer the latest initialized router (tests may re-init). Fallback
-    // to the router captured at init time.
-    const r = activeRouter || router;
+    // Prefer the latest initialized router (tests may re-init). Resolve the
+    // router lazily so components connect to whichever router is currently
+    // active instead of capturing a stale instance at definition time.
+    const getRouter = () => activeRouter || router;
     // Reactive current state so link updates when route changes
-    const current = ref(r.getCurrent());
+    const current = ref(getRouter().getCurrent());
     // Capture unsubscribe for link subscriptions and register disconnect
     // cleanup during render time.
     let unsubRouterLink: (() => void) | undefined;
@@ -1031,8 +1033,8 @@ export function initRouter(config: RouterConfig) {
 
     useOnConnected((ctx?: unknown) => {
       try {
-        if (r && typeof r.subscribe === 'function') {
-          unsubRouterLink = r.subscribe((s) => {
+        if (getRouter() && typeof getRouter().subscribe === 'function') {
+          unsubRouterLink = getRouter().subscribe((s) => {
             try {
               current.value = s;
             } catch (e) {
@@ -1073,7 +1075,7 @@ export function initRouter(config: RouterConfig) {
     });
 
     const isExactActive = computed(() => {
-      const runtimeBase = r?.base ?? '';
+      const runtimeBase = getRouter().base ?? '';
       const targetRaw = (props.to as string) || '';
       // If the target is an absolute or protocol-relative URL, it's external
       // and should not be considered active.
@@ -1101,7 +1103,7 @@ export function initRouter(config: RouterConfig) {
     });
 
     const isActive = computed(() => {
-      const runtimeBase = r?.base ?? '';
+      const runtimeBase = getRouter().base ?? '';
       const targetRaw = (props.to as string) || '';
       // External targets are never "active" in the SPA sense
       if (
@@ -1157,7 +1159,7 @@ export function initRouter(config: RouterConfig) {
 
       // Read base dynamically from the current router instance so repeated
       // calls to initRouter (tests) do not leave a stale captured value.
-      const runtimeBase = r?.base ?? '';
+      const runtimeBase = getRouter().base ?? '';
       // If the provided path already contains the runtime base, strip it to
       // avoid duplicating e.g. '/app/app/about'. Keep a fallback of '/'.
       let candidate = pathOnly || '/';
@@ -1262,10 +1264,11 @@ export function initRouter(config: RouterConfig) {
       if (isExternal.value) return;
 
       e.preventDefault();
+      const rr = getRouter();
       if (props.replace) {
-        r.replace(props.to as string);
+        rr.replace(props.to as string);
       } else {
-        r.push(props.to as string);
+        rr.push(props.to as string);
       }
     };
 
