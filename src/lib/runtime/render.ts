@@ -277,7 +277,7 @@ function prepareStyleApplication<
     aggregatedHtmlCache.set(shadowRoot, aggregatedHtml);
   }
 
-  const jitCss = shouldUpdateStyles ? jitCSS(aggregatedHtml) : '';
+  const jitCss = jitCSS(aggregatedHtml);
   const proseSheet = getProseSheet();
   const userStyle =
     (context as { _computedStyle?: string })._computedStyle || '';

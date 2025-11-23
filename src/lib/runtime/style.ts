@@ -1717,13 +1717,10 @@ if (typeof import.meta !== 'undefined' && import.meta.hot) {
 }
 
 export function jitCSS(html: string): string {
-  // Optimization: Check cache first, only compute timestamp if cached entry exists
+  // Check cache first - use exact HTML as key for proper cache invalidation
   const cached = jitCssCache.get(html);
   if (cached) {
-    const now = Date.now();
-    if (now - cached.timestamp < JIT_CSS_THROTTLE_MS) {
-      return cached.css;
-    }
+    return cached.css;
   }
 
   const classes = extractClassesFromHTML(html);

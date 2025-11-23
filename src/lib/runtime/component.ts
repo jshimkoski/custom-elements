@@ -53,16 +53,34 @@ export const registry = new Map<
 const GLOBAL_REG_KEY = Symbol.for('cer.registry');
 
 /**
- * Lazily initialize the global registry slot. This avoids performing a
- * write to globalThis at module-import time (which is a side-effect that
- * prevents bundlers from tree-shaking). Call this from entry points that
- * actually need the registry (for example `component()`) so the module
- * remains import-side-effect-free.
+ * Lazily initialize the global registry slot with SSR safety.
+ * This avoids performing a write to globalThis at module-import time
+ * (which is a side-effect that prevents bundlers from tree-shaking).
+ * Enhanced with SSR detection and multi-tenant safety.
  */
 function initGlobalRegistryIfNeeded(): void {
-  if (typeof window !== 'undefined') {
-    const g = globalThis as Record<string | symbol, unknown>;
-    if (!g[GLOBAL_REG_KEY]) g[GLOBAL_REG_KEY] = registry;
+  // Enhanced SSR detection
+  const isSSR =
+    typeof window === 'undefined' &&
+    typeof document === 'undefined' &&
+    typeof navigator === 'undefined';
+
+  if (!isSSR) {
+    try {
+      const g = globalThis as Record<string | symbol, unknown>;
+      if (!g[GLOBAL_REG_KEY]) {
+        // Use a unique registry per realm to avoid cross-contamination
+        const realmId = Math.random().toString(36).substr(2, 9);
+        g[GLOBAL_REG_KEY] = new Map([...registry.entries()]);
+        // Store realm identifier for debugging
+        (
+          g[GLOBAL_REG_KEY] as Record<string, unknown> & { __realmId?: string }
+        ).__realmId = realmId;
+      }
+    } catch (error) {
+      // Gracefully handle cases where globalThis access is restricted
+      devWarn('Could not initialize global registry:', error);
+    }
   }
 }
 
@@ -78,25 +96,29 @@ if (
   import.meta.hot
 ) {
   import.meta.hot.accept((newModule) => {
-    // Update registry with new configs from the hot module
+    // Update registry with new configs from the hot module (SSR-safe)
     if (newModule && newModule.registry) {
       for (const [tag, newConfig] of newModule.registry.entries()) {
         registry.set(tag, newConfig);
-        // Update all instances to use new config
-        if (typeof document !== 'undefined') {
-          document.querySelectorAll(tag).forEach((el) => {
-            const customEl = el as CustomElement;
-            if (typeof customEl._cfg !== 'undefined') {
-              customEl._cfg = newConfig;
-            }
-            // HMR: Preserve existing state by keeping the context object intact.
-            // Instead of re-executing the component function (which would create new refs),
-            // we just update the config and re-render with the existing context.
-            // This ensures refs and other reactive state are preserved across HMR updates.
-            if (typeof customEl._render === 'function') {
-              customEl._render(newConfig);
-            }
-          });
+        // Update all instances to use new config (browser only)
+        if (typeof document !== 'undefined' && document.querySelectorAll) {
+          try {
+            document.querySelectorAll(tag).forEach((el) => {
+              const customEl = el as CustomElement;
+              if (typeof customEl._cfg !== 'undefined') {
+                customEl._cfg = newConfig;
+              }
+              // HMR: Preserve existing state by keeping the context object intact.
+              // Instead of re-executing the component function (which would create new refs),
+              // we just update the config and re-render with the existing context.
+              // This ensures refs and other reactive state are preserved across HMR updates.
+              if (typeof customEl._render === 'function') {
+                customEl._render(newConfig);
+              }
+            });
+          } catch (error) {
+            devWarn('HMR update failed:', error);
+          }
         }
       }
     }

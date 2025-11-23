@@ -25,3 +25,10 @@ export { setDevMode } from './runtime/logger';
 
 // Testing utilities
 export { flushDOMUpdates } from './runtime/scheduler';
+
+// Health monitoring
+export {
+  getHealthMonitor,
+  getHealthStatus,
+  updateHealthMetric,
+} from './runtime/monitoring/health-monitor';

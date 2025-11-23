@@ -406,13 +406,9 @@ export function watch<T>(
   // Normalize source: accept either a ReactiveState or a getter function
   const getter: () => T = ((): (() => T) => {
     // runtime check for ReactiveState instances
-    try {
-      if (isReactiveState(source as unknown)) {
-        // cast to unknown first to avoid incorrect direct cast from function type
-        return () => (source as unknown as ReactiveState<T>).value;
-      }
-    } catch {
-      // ignore and treat as function
+    if (isReactiveState(source)) {
+      // cast to ReactiveState<T> and return getter
+      return () => (source as ReactiveState<T>).value;
     }
     return source as () => T;
   })();

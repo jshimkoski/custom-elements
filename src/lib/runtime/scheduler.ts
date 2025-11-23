@@ -2,7 +2,7 @@
  * Update Scheduler for batching DOM updates
  * Prevents excessive re-renders and improves performance
  */
-import { devError } from './logger';
+import { devWarn, devError } from './logger';
 
 /**
  * Environment detection utilities
@@ -60,10 +60,14 @@ class UpdateScheduler {
   private isFlushScheduled = false;
   private isFlushing = false;
   private readonly testEnv: TestEnvironment;
+  private lastCleanup = 0;
+  private readonly CLEANUP_INTERVAL = 5 * 60 * 1000; // 5 minutes
+  private readonly MAX_PENDING_SIZE = 10000; // Prevent memory bloat
 
   constructor() {
     // Cache environment detection result to avoid repeated checks
     this.testEnv = detectTestEnvironment();
+    this.schedulePeriodicCleanup();
   }
 
   /**
@@ -75,6 +79,12 @@ class UpdateScheduler {
     // Use the componentId if provided, otherwise use the function reference directly as the key
     // since Map supports using function references as keys (identity-based comparison)
     const key = componentId || update;
+
+    // Prevent memory bloat by limiting pending updates
+    if (this.pendingUpdates.size >= this.MAX_PENDING_SIZE) {
+      this.performEmergencyCleanup();
+    }
+
     this.pendingUpdates.set(key, update);
 
     if (!this.isFlushScheduled) {
@@ -164,6 +174,57 @@ class UpdateScheduler {
    */
   get isFlushingUpdates(): boolean {
     return this.isFlushing;
+  }
+
+  /**
+   * Schedule periodic cleanup to prevent memory leaks
+   */
+  private schedulePeriodicCleanup(): void {
+    if (this.testEnv.isTest) return; // Skip in tests
+
+    const cleanup = () => {
+      this.performPeriodicCleanup();
+      if (!this.testEnv.isTest) {
+        setTimeout(cleanup, this.CLEANUP_INTERVAL);
+      }
+    };
+
+    setTimeout(cleanup, this.CLEANUP_INTERVAL);
+  }
+
+  /**
+   * Perform periodic cleanup of stale entries
+   */
+  private performPeriodicCleanup(): void {
+    const now = Date.now();
+    if (now - this.lastCleanup < this.CLEANUP_INTERVAL) return;
+
+    // In normal operation, pending updates should be processed quickly
+    // If we have many pending updates for a long time, something might be wrong
+    if (this.pendingUpdates.size > 100) {
+      devWarn(
+        `Scheduler has ${this.pendingUpdates.size} pending updates. Consider investigating.`,
+      );
+    }
+
+    this.lastCleanup = now;
+  }
+
+  /**
+   * Emergency cleanup when pending updates exceed safe limits
+   */
+  private performEmergencyCleanup(): void {
+    devWarn(
+      'Scheduler emergency cleanup: too many pending updates, clearing oldest entries',
+    );
+
+    // Clear half of the pending updates (oldest first by insertion order)
+    const entries = Array.from(this.pendingUpdates.entries());
+    const toRemove = Math.floor(entries.length / 2);
+
+    for (let i = 0; i < toRemove; i++) {
+      this.pendingUpdates.delete(entries[i][0]);
+    }
   }
 }
 

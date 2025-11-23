@@ -139,8 +139,6 @@ const DEFAULT_SCROLL_CONFIG = {
   timeoutMs: 2000,
 } as const;
 
-
-
 // ============================================================================
 // UTILITY FUNCTIONS
 // ============================================================================
@@ -371,7 +369,10 @@ let componentCache: Record<
 > = {};
 
 // Separate cache for loading promises to prevent race conditions
-let loadingCache: Record<string, Promise<string | HTMLElement | ((...args: unknown[]) => unknown)>> = {};
+let loadingCache: Record<
+  string,
+  Promise<string | HTMLElement | ((...args: unknown[]) => unknown)>
+> = {};
 
 /**
  * Clear component cache to prevent memory leaks
@@ -389,8 +390,13 @@ function evictLRUComponents(): void {
   if (entries.length <= MAX_COMPONENT_CACHE_SIZE) return;
 
   // Sort by lastAccessed (oldest first) and remove oldest entries
-  const sortedEntries = entries.sort(([, a], [, b]) => a.lastAccessed - b.lastAccessed);
-  const toRemove = sortedEntries.slice(0, entries.length - MAX_COMPONENT_CACHE_SIZE);
+  const sortedEntries = entries.sort(
+    ([, a], [, b]) => a.lastAccessed - b.lastAccessed,
+  );
+  const toRemove = sortedEntries.slice(
+    0,
+    entries.length - MAX_COMPONENT_CACHE_SIZE,
+  );
 
   for (const [path] of toRemove) {
     delete componentCache[path];
@@ -424,32 +430,37 @@ export async function resolveRouteComponent(
 
     try {
       // Create loading promise
-      const loadPromise = route.load().then(mod => {
-        // Evict old components if cache is full
-        evictLRUComponents();
+      const loadPromise = route
+        .load()
+        .then((mod) => {
+          // Evict old components if cache is full
+          evictLRUComponents();
 
-        const component = mod.default;
-        componentCache[route.path] = {
-          component,
-          lastAccessed: Date.now(),
-        };
+          const component = mod.default;
+          componentCache[route.path] = {
+            component,
+            lastAccessed: Date.now(),
+          };
 
-        // Remove from loading cache
-        delete loadingCache[route.path];
+          // Remove from loading cache
+          delete loadingCache[route.path];
 
-        return component;
-      }).catch(err => {
-        // Remove from loading cache on error
-        delete loadingCache[route.path];
-        const errorMsg = err instanceof Error ? err.message : String(err);
-        if (isSSR) {
-          // In SSR, surface errors more prominently
-          devError(`SSR component load failed for route: ${route.path}. ${errorMsg}`);
-        }
-        throw new Error(
-          `Failed to load component for route: ${route.path}. ${errorMsg}`,
-        );
-      });
+          return component;
+        })
+        .catch((err) => {
+          // Remove from loading cache on error
+          delete loadingCache[route.path];
+          const errorMsg = err instanceof Error ? err.message : String(err);
+          if (isSSR) {
+            // In SSR, surface errors more prominently
+            devError(
+              `SSR component load failed for route: ${route.path}. ${errorMsg}`,
+            );
+          }
+          throw new Error(
+            `Failed to load component for route: ${route.path}. ${errorMsg}`,
+          );
+        });
 
       // Store loading promise to prevent concurrent loads
       loadingCache[route.path] = loadPromise;
@@ -504,7 +515,10 @@ export function useRouter(config: RouterConfig) {
   let redirectDepth = 0;
 
   // Run matching route guards/hooks
-  const runBeforeEnter = async (to: RouteState, from: RouteState): Promise<boolean | string> => {
+  const runBeforeEnter = async (
+    to: RouteState,
+    from: RouteState,
+  ): Promise<boolean | string> => {
     const matched = findMatchedRoute(routes, to.path);
     if (!matched || !matched.beforeEnter) return true;
     try {
@@ -512,7 +526,10 @@ export function useRouter(config: RouterConfig) {
       if (typeof result === 'string') {
         // Check for redirect loops
         const redirectKey = `${to.path}->${result}`;
-        if (redirectTracker.has(redirectKey) || redirectDepth >= MAX_REDIRECT_DEPTH) {
+        if (
+          redirectTracker.has(redirectKey) ||
+          redirectDepth >= MAX_REDIRECT_DEPTH
+        ) {
           devError(`Redirect loop detected: ${redirectKey}`);
           return false;
         }
@@ -532,7 +549,10 @@ export function useRouter(config: RouterConfig) {
     }
   };
 
-  const runOnEnter = async (to: RouteState, from: RouteState): Promise<boolean | string> => {
+  const runOnEnter = async (
+    to: RouteState,
+    from: RouteState,
+  ): Promise<boolean | string> => {
     const matched = findMatchedRoute(routes, to.path);
     if (!matched || !matched.onEnter) return true;
     try {
@@ -540,7 +560,10 @@ export function useRouter(config: RouterConfig) {
       if (typeof result === 'string') {
         // Check for redirect loops
         const redirectKey = `${to.path}->${result}`;
-        if (redirectTracker.has(redirectKey) || redirectDepth >= MAX_REDIRECT_DEPTH) {
+        if (
+          redirectTracker.has(redirectKey) ||
+          redirectDepth >= MAX_REDIRECT_DEPTH
+        ) {
           devError(`Redirect loop detected: ${redirectKey}`);
           return false;
         }
@@ -571,7 +594,10 @@ export function useRouter(config: RouterConfig) {
   };
 
   // Cache for route matching to avoid repeated expensive operations
-  const matchCache = new Map<string, { route: Route | null; params: Record<string, string> }>();
+  const matchCache = new Map<
+    string,
+    { route: Route | null; params: Record<string, string> }
+  >();
   const MATCH_CACHE_SIZE = 100;
 
   const cachedMatchRoute = (path: string) => {
@@ -715,8 +741,6 @@ export function useRouter(config: RouterConfig) {
     });
   }
 
-
-
   // Navigation lock to prevent concurrent navigation race conditions
   let isNavigating = false;
 
@@ -759,7 +783,10 @@ export function useRouter(config: RouterConfig) {
     };
   };
 
-  const performNavigation = async (path: string, replace = false): Promise<void> => {
+  const performNavigation = async (
+    path: string,
+    replace = false,
+  ): Promise<void> => {
     try {
       const loc = parseNavigationPath(path);
       const match = cachedMatchRoute(loc.path);
@@ -837,7 +864,11 @@ export function useRouter(config: RouterConfig) {
       devError('Navigation error:', err);
 
       // If this is a guard error, re-throw it so the promise rejects properly
-      if (err instanceof Error && (err.stack?.includes('runBeforeEnter') || err.stack?.includes('runOnEnter'))) {
+      if (
+        err instanceof Error &&
+        (err.stack?.includes('runBeforeEnter') ||
+          err.stack?.includes('runOnEnter'))
+      ) {
         throw err;
       }
 
@@ -850,7 +881,9 @@ export function useRouter(config: RouterConfig) {
           let fallbackRoute = routes.find((r) => r.path === '/');
           if (!fallbackRoute) {
             // Find any route that doesn't have dynamic segments as fallback
-            fallbackRoute = routes.find((r) => !r.path.includes(':') && !r.path.includes('*'));
+            fallbackRoute = routes.find(
+              (r) => !r.path.includes(':') && !r.path.includes('*'),
+            );
           }
           if (!fallbackRoute && routes.length > 0) {
             fallbackRoute = routes[0];
@@ -868,7 +901,10 @@ export function useRouter(config: RouterConfig) {
           }
         }
       } catch (recoveryError) {
-        devWarn('State recovery failed during navigation error:', recoveryError);
+        devWarn(
+          'State recovery failed during navigation error:',
+          recoveryError,
+        );
       }
     }
   };
@@ -903,7 +939,8 @@ export function useRouter(config: RouterConfig) {
   validateRoutes(routes);
 
   // Pre-compile all routes for better SSR performance
-  const isSSRMode = typeof window === 'undefined' || typeof initialUrl !== 'undefined';
+  const isSSRMode =
+    typeof window === 'undefined' || typeof initialUrl !== 'undefined';
   if (isSSRMode) {
     for (const route of routes) {
       // Force compilation of all routes during SSR initialization
@@ -972,7 +1009,10 @@ export function useRouter(config: RouterConfig) {
         const fragment = url.hash && url.hash.length ? url.hash.slice(1) : '';
         return { path, query, fragment };
       } catch (error) {
-        devWarn('Invalid SSR URL detected, falling back to safe defaults', error);
+        devWarn(
+          'Invalid SSR URL detected, falling back to safe defaults',
+          error,
+        );
         return { path: '/', query: {}, fragment: '' };
       }
     };
@@ -1097,7 +1137,11 @@ export function useRouter(config: RouterConfig) {
       if (!id) return Promise.resolve(false);
       if (typeof window === 'undefined' || typeof document === 'undefined')
         return Promise.resolve(false);
-      return startScrollForNavigation(id, _scrollConfig.offset, _scrollConfig.timeoutMs);
+      return startScrollForNavigation(
+        id,
+        _scrollConfig.offset,
+        _scrollConfig.timeoutMs,
+      );
     },
   };
 
@@ -1199,6 +1243,17 @@ function _rebindProxy() {
       // single initial snapshot so listeners that were registered while
       // no active router existed receive the current state exactly once.
       if (!innerCalledSync) {
+        const cur = activeRouter.getCurrent();
+        for (const listener of _proxyListeners) {
+          try {
+            listener(cur);
+          } catch {
+            /* swallow */
+          }
+        }
+      } else {
+        // Even if inner subscription called synchronously, ensure all listeners
+        // receive the current state immediately to handle router re-initialization
         const cur = activeRouter.getCurrent();
         for (const listener of _proxyListeners) {
           try {
@@ -1393,6 +1448,23 @@ export function initRouter(config: RouterConfig) {
     } catch {
       // Ignore DOM flush errors
     }
+
+    // Additional flush after rebind to ensure all router-link components
+    // have updated their active states before any synchronous inspection
+    try {
+      if (typeof window !== 'undefined') {
+        // Use a microtask to allow reactive computations to complete
+        queueMicrotask(() => {
+          try {
+            flushDOMUpdates();
+          } catch {
+            /* swallow */
+          }
+        });
+      }
+    } catch {
+      /* swallow */
+    }
   } catch {
     // Ignore proxy rebind errors
   }
@@ -1406,8 +1478,6 @@ export function initRouter(config: RouterConfig) {
 
     const current = ref(activeRouterProxy.getCurrent());
     const isSSR = typeof window === 'undefined';
-
-
 
     // We'll capture the unsubscribe function when the component connects
     // and register a disconnect cleanup during render-time (useOnDisconnected
@@ -1517,11 +1587,21 @@ export function initRouter(config: RouterConfig) {
     const targetPath = String(props.to || '');
 
     // Pre-compute SSR-safe active states
-    const ssrActiveStates = isSSR ? {
-      isExactActive: computeExactActive(stableCurrentPath, targetPath, activeRouterProxy.base),
-      isActive: computeActive(stableCurrentPath, targetPath, activeRouterProxy.base),
-      isExternal: isAbsoluteUrl(targetPath) || !!props.external
-    } : null;
+    const ssrActiveStates = isSSR
+      ? {
+          isExactActive: computeExactActive(
+            stableCurrentPath,
+            targetPath,
+            activeRouterProxy.base,
+          ),
+          isActive: computeActive(
+            stableCurrentPath,
+            targetPath,
+            activeRouterProxy.base,
+          ),
+          isExternal: isAbsoluteUrl(targetPath) || !!props.external,
+        }
+      : null;
 
     let unsubRouterLink: (() => void) | undefined;
 
@@ -1539,6 +1619,8 @@ export function initRouter(config: RouterConfig) {
 
     // Only set up DOM interactions in browser environment
     if (!isSSR) {
+      let syncCheckInterval: ReturnType<typeof setInterval> | null = null;
+
       useOnConnected((ctx?: unknown) => {
         try {
           if (typeof activeRouterProxy.subscribe === 'function') {
@@ -1562,6 +1644,36 @@ export function initRouter(config: RouterConfig) {
                 }
               }
             });
+
+            // Immediately sync current state after subscription to ensure
+            // correct active state even if router was initialized after component creation
+            try {
+              const currentState = activeRouterProxy.getCurrent();
+              if (currentState && typeof currentState.path === 'string') {
+                current.value = currentState;
+              }
+            } catch (e) {
+              devWarn('router-link initial state sync failed', e);
+            }
+
+            // Set up periodic sync check to ensure state accuracy after router changes
+            // This catches edge cases where subscription updates might be missed
+            syncCheckInterval = setInterval(() => {
+              try {
+                const latestState = activeRouterProxy.getCurrent();
+                if (latestState && typeof latestState.path === 'string') {
+                  // Only update if state actually changed to avoid unnecessary re-renders
+                  if (
+                    JSON.stringify(current.value) !==
+                    JSON.stringify(latestState)
+                  ) {
+                    current.value = latestState;
+                  }
+                }
+              } catch {
+                // Silent failure - don't spam console with periodic check errors
+              }
+            }, 100); // Check every 100ms
           }
         } catch (e) {
           devWarn('router-link subscribe failed', e);
@@ -1606,6 +1718,7 @@ export function initRouter(config: RouterConfig) {
       });
 
       useOnDisconnected(() => {
+        // Clean up router subscription
         if (typeof unsubRouterLink === 'function') {
           try {
             unsubRouterLink();
@@ -1613,6 +1726,17 @@ export function initRouter(config: RouterConfig) {
             devWarn('router-link unsubscribe failed', e);
           } finally {
             unsubRouterLink = undefined; // Clear reference to prevent memory leaks
+          }
+        }
+
+        // Clean up sync check interval
+        if (syncCheckInterval) {
+          try {
+            clearInterval(syncCheckInterval);
+          } catch (e) {
+            devWarn('router-link sync interval cleanup failed', e);
+          } finally {
+            syncCheckInterval = null;
           }
         }
       });
@@ -1842,7 +1966,11 @@ export function initRouter(config: RouterConfig) {
 }
 
 // Helper functions for SSR-safe active state computation
-function computeExactActive(currentPath: string, targetRaw: string, runtimeBase: string): boolean {
+function computeExactActive(
+  currentPath: string,
+  targetRaw: string,
+  runtimeBase: string,
+): boolean {
   if (isAbsoluteUrl(targetRaw)) return false;
 
   const targetPathOnly = (targetRaw.split('#')[0] || '/').split('?')[0];
@@ -1863,7 +1991,11 @@ function computeExactActive(currentPath: string, targetRaw: string, runtimeBase:
   return cur === tgt;
 }
 
-function computeActive(currentPath: string, targetRaw: string, runtimeBase: string): boolean {
+function computeActive(
+  currentPath: string,
+  targetRaw: string,
+  runtimeBase: string,
+): boolean {
   if (isAbsoluteUrl(targetRaw)) return false;
 
   const targetPathOnly = (targetRaw.split('#')[0] || '/').split('?')[0];
