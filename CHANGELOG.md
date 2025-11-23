@@ -1,6 +1,15 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v2.5.2] - 2025-11-23
+
+- fix: update vitest dependency (946bb29)
+- feat(router-link): Enhance active state reliability and synchronization (1ddc269)
+- fix: improve router implementation (187c894)
+- improve router (d601dcc)
+- fix: improve router initialization to resolve active router lazily (952672e)
+
+
 
 ## [v2.5.1] - 2025-11-09
 
