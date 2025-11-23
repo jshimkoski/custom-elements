@@ -22,6 +22,17 @@ const aggregatedHtmlCache = new WeakMap<ShadowRoot, string>();
 const childComponentCache = new WeakMap<ShadowRoot, Set<HTMLElement>>();
 
 /**
+ * Style application configuration and result
+ */
+interface StyleApplicationResult {
+  shouldUpdateStyles: boolean;
+  aggregatedHtml: string;
+  jitCss: string;
+  proseSheet: CSSStyleSheet | null;
+  userStyle: string;
+}
+
+/**
  * Register a child component element for faster HTML aggregation
  * @internal
  */
@@ -73,9 +84,6 @@ export function renderComponent<
   contextStack.push(context);
 
   try {
-    // Loading and error states are now handled directly in the functional components
-    // rather than through config templates
-
     const outputOrPromise = cfg.render(context);
 
     if (outputOrPromise instanceof Promise) {
@@ -90,10 +98,7 @@ export function renderComponent<
         .catch((error) => {
           setLoading(false);
           setError(error);
-          // Error handling is now done in the functional components directly
         });
-
-      // Loading state is now handled in the functional components directly
       return;
     }
 
@@ -160,7 +165,6 @@ export function requestRender(
           '  Component rendering will be throttled to prevent browser freeze.',
       );
     } else if (renderCount > 20) {
-      // More aggressive limit for severe infinite loops
       devError(
         '🛑 Infinite loop detected in component render:\n' +
           '  • This might be caused by state updates during render\n' +
@@ -174,19 +178,257 @@ export function requestRender(
     setRenderCount(0);
   }
 
-  const timeoutId = setTimeout(
-    () => {
+  // Schedule renders intelligently based on render frequency
+  const delay = renderCount >= 10 ? 100 : 0;
+
+  if (delay > 0) {
+    const timeoutId = setTimeout(() => {
       setLastRenderTime(Date.now());
       renderFn();
       setRenderTimeoutId(null);
-    },
-    renderCount > 10 ? 100 : 0,
-  ); // Add delay for rapid renders
-  setRenderTimeoutId(timeoutId);
+    }, delay);
+    setRenderTimeoutId(timeoutId);
+  } else {
+    // Use microtask for immediate renders to stay close to Promise timing
+    const token = {};
+    setRenderTimeoutId(token as unknown as ReturnType<typeof setTimeout>);
+    queueMicrotask(() => {
+      setLastRenderTime(Date.now());
+      try {
+        renderFn();
+      } finally {
+        setRenderTimeoutId(null);
+      }
+    });
+  }
 }
 
 /**
- * Applies styles to the shadowRoot.
+ * Aggregates HTML from child components using cached references for performance
+ */
+function aggregateChildHTML(shadowRoot: ShadowRoot, baseHtml: string): string {
+  let aggregatedHtml = baseHtml || '';
+
+  try {
+    const childComponents = childComponentCache.get(shadowRoot);
+
+    if (childComponents && childComponents.size > 0) {
+      // Fast path: iterate only registered child components
+      for (const el of childComponents) {
+        const childHtml = getChildComponentHTML(el);
+        if (childHtml) {
+          aggregatedHtml += '\n' + childHtml;
+        }
+      }
+    } else {
+      // Fallback: scan for child components if cache not initialized
+      const allEls = Array.from(
+        shadowRoot.querySelectorAll('*'),
+      ) as HTMLElement[];
+      for (const el of allEls) {
+        const childHtml = getChildComponentHTML(el);
+        if (childHtml) {
+          aggregatedHtml += '\n' + childHtml;
+        }
+      }
+    }
+  } catch {
+    // Best-effort: ignore errors while reading child HTML
+  }
+
+  return aggregatedHtml;
+}
+
+/**
+ * Safely extracts HTML string from child component element
+ */
+function getChildComponentHTML(el: HTMLElement): string {
+  try {
+    const childHtml = (el as { lastHtmlStringForJitCSS?: string })
+      .lastHtmlStringForJitCSS;
+    return childHtml && typeof childHtml === 'string' && childHtml.trim()
+      ? childHtml
+      : '';
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Prepares style application by aggregating HTML and checking cache
+ */
+function prepareStyleApplication<
+  S extends object,
+  C extends object,
+  P extends object,
+  T extends object,
+>(
+  shadowRoot: ShadowRoot,
+  context: ComponentContext<S, C, P, T>,
+  htmlString: string,
+): StyleApplicationResult {
+  const aggregatedHtml = aggregateChildHTML(shadowRoot, htmlString);
+
+  // Check if aggregated HTML has changed since last render
+  const cachedHtml = aggregatedHtmlCache.get(shadowRoot);
+  const shouldUpdateStyles = cachedHtml !== aggregatedHtml;
+
+  if (shouldUpdateStyles) {
+    aggregatedHtmlCache.set(shadowRoot, aggregatedHtml);
+  }
+
+  const jitCss = shouldUpdateStyles ? jitCSS(aggregatedHtml) : '';
+  const proseSheet = getProseSheet();
+  const userStyle =
+    (context as { _computedStyle?: string })._computedStyle || '';
+
+  return {
+    shouldUpdateStyles,
+    aggregatedHtml,
+    jitCss,
+    proseSheet,
+    userStyle,
+  };
+}
+
+/**
+ * Applies base styles when no custom styles are needed
+ */
+function applyBaseStyles(
+  shadowRoot: ShadowRoot,
+  proseSheet: CSSStyleSheet | null,
+): void {
+  const supportsAdopted =
+    'adoptedStyleSheets' in shadowRoot && typeof CSSStyleSheet !== 'undefined';
+
+  if (supportsAdopted) {
+    const sheets = [getBaseResetSheet(), getTransitionStyleSheet()];
+    if (proseSheet) sheets.push(proseSheet);
+    shadowRoot.adoptedStyleSheets = sheets;
+  } else {
+    applyFallbackStyles(shadowRoot, '', proseSheet);
+  }
+}
+
+/**
+ * Applies custom styles using constructable stylesheets when available
+ */
+function applyConstructableStyles(
+  shadowRoot: ShadowRoot,
+  finalStyle: string,
+  proseSheet: CSSStyleSheet | null,
+  styleSheet: CSSStyleSheet | null,
+  setStyleSheet: (sheet: CSSStyleSheet | null) => void,
+): boolean {
+  const supportsAdopted =
+    'adoptedStyleSheets' in shadowRoot && typeof CSSStyleSheet !== 'undefined';
+
+  if (!supportsAdopted) return false;
+
+  let sheet = styleSheet;
+  if (!sheet) sheet = new CSSStyleSheet();
+
+  try {
+    sheet.replaceSync(finalStyle);
+  } catch {
+    return false; // Fall back to style element
+  }
+
+  const sheets = [getBaseResetSheet(), getTransitionStyleSheet()];
+  if (proseSheet) sheets.push(proseSheet);
+  sheets.push(sheet);
+
+  shadowRoot.adoptedStyleSheets = sheets;
+  setStyleSheet(sheet);
+  return true;
+}
+
+/**
+ * Creates fallback CSS text from various style sources
+ */
+function createFallbackCSS(userStyle: string): string {
+  const baseText = minifyCSS(baseReset);
+  const transitionSheet = getTransitionStyleSheet();
+
+  let transitionText = '';
+  try {
+    if (transitionSheet && 'cssRules' in transitionSheet) {
+      transitionText = Array.from(transitionSheet.cssRules)
+        .map((r) => r.cssText)
+        .join('\n');
+    }
+  } catch {
+    transitionText = '';
+  }
+
+  return minifyCSS(`${baseText}\n${transitionText}\n${userStyle}`);
+}
+
+/**
+ * Applies styles via fallback <style> element for older browsers
+ */
+function applyFallbackStyles(
+  shadowRoot: ShadowRoot,
+  finalStyle: string,
+  proseSheet: CSSStyleSheet | null,
+): void {
+  const combined = createFallbackCSS(finalStyle);
+
+  let el = shadowRoot.querySelector(
+    'style[data-cer-runtime]',
+  ) as HTMLStyleElement | null;
+  if (!el) {
+    el = document.createElement('style');
+    setAttributeSmart(el, 'data-cer-runtime', 'true');
+    shadowRoot.appendChild(el);
+  }
+
+  try {
+    el.textContent = combined;
+  } catch {
+    // Ignore parse errors in test environments
+  }
+
+  // Provide stubbed adoptedStyleSheets for consistency in tests
+  stubAdoptedStyleSheets(shadowRoot, finalStyle, proseSheet);
+}
+
+/**
+ * Creates stub adoptedStyleSheets array for test compatibility
+ */
+function stubAdoptedStyleSheets(
+  shadowRoot: ShadowRoot,
+  finalStyle: string,
+  proseSheet: CSSStyleSheet | null,
+): void {
+  try {
+    const fallbackSheets: unknown[] = [
+      getBaseResetSheet(),
+      getTransitionStyleSheet(),
+    ];
+    if (proseSheet) fallbackSheets.push(proseSheet);
+
+    if (typeof CSSStyleSheet !== 'undefined' && finalStyle) {
+      try {
+        const userSheet = new CSSStyleSheet();
+        userSheet.replaceSync(finalStyle);
+        fallbackSheets.push(userSheet);
+      } catch {
+        // Include harmless stub if replaceSync fails
+        fallbackSheets.push({ cssRules: [], replaceSync: () => {} });
+      }
+    }
+
+    (
+      shadowRoot as unknown as { adoptedStyleSheets?: unknown[] }
+    ).adoptedStyleSheets = fallbackSheets;
+  } catch {
+    // Ignore if assignment fails
+  }
+}
+
+/**
+ * Applies styles to the shadowRoot with improved structure and maintainability.
  */
 export function applyStyle<
   S extends object,
@@ -202,222 +444,39 @@ export function applyStyle<
 ): void {
   if (!shadowRoot) return;
 
-  // Optimized child HTML aggregation using cached component references
-  // This avoids the expensive querySelectorAll('*') on every render
-  let aggregatedHtml = htmlString || '';
+  const { shouldUpdateStyles, jitCss, proseSheet, userStyle } =
+    prepareStyleApplication(shadowRoot, context, htmlString);
 
-  try {
-    const childComponents = childComponentCache.get(shadowRoot);
-    if (childComponents && childComponents.size > 0) {
-      // Fast path: iterate only registered child components instead of all elements
-      for (const el of childComponents) {
-        try {
-          const childHtml = (el as { lastHtmlStringForJitCSS?: string })
-            .lastHtmlStringForJitCSS;
-          if (childHtml && typeof childHtml === 'string' && childHtml.trim()) {
-            aggregatedHtml += '\n' + childHtml;
-          }
-        } catch {
-          // best-effort: ignore errors while reading child's cached HTML
-        }
-      }
-    } else {
-      // Fallback: scan for child components if cache not initialized
-      // This happens on first render before child components register themselves
-      const allEls = Array.from(
-        shadowRoot.querySelectorAll('*'),
-      ) as HTMLElement[];
-      for (const el of allEls) {
-        try {
-          const childHtml = (el as { lastHtmlStringForJitCSS?: string })
-            .lastHtmlStringForJitCSS;
-          if (childHtml && typeof childHtml === 'string' && childHtml.trim()) {
-            aggregatedHtml += '\n' + childHtml;
-          }
-        } catch {
-          // best-effort: ignore errors while reading child's cached HTML
-        }
-      }
-    }
-  } catch {
-    void 0;
-  }
-
-  // Check if aggregated HTML has changed since last render
-  // This avoids redundant jitCSS calls when only reactive state changed
-  // but DOM structure remained the same
-  const cachedHtml = aggregatedHtmlCache.get(shadowRoot);
-  if (cachedHtml === aggregatedHtml) {
-    // HTML unchanged, skip jitCSS regeneration and reuse existing styles
+  // Early return if HTML unchanged and no styles to apply
+  if (!shouldUpdateStyles && !userStyle && !proseSheet) {
     return;
   }
 
-  // Update cache with new aggregated HTML
-  aggregatedHtmlCache.set(shadowRoot, aggregatedHtml);
-
-  const jitCss = jitCSS(aggregatedHtml);
-
-  // Get prose sheet if any prose classes were detected
-  const proseSheet = getProseSheet();
-
-  if (
-    (!jitCss || jitCss.trim() === '') &&
-    !(context as { _computedStyle?: string })._computedStyle &&
-    !proseSheet
-  ) {
+  // If no custom styles are needed, apply only base styles
+  if ((!jitCss || jitCss.trim() === '') && !userStyle && !proseSheet) {
     setStyleSheet(null);
-    // If adoptedStyleSheets is not supported, fall back to injecting a
-    // single <style> element with base + transition content.
-    const supportsAdopted =
-      'adoptedStyleSheets' in shadowRoot &&
-      typeof CSSStyleSheet !== 'undefined';
-    if (supportsAdopted) {
-      const sheets = [getBaseResetSheet(), getTransitionStyleSheet()];
-      // No need to check proseSheet again - we know it's falsy from line 203
-      shadowRoot.adoptedStyleSheets = sheets;
-    } else {
-      // Build fallback CSS text
-      const baseText = minifyCSS(baseReset);
-      const transitionSheet = getTransitionStyleSheet();
-      let transitionText = '';
-      try {
-        if (transitionSheet && 'cssRules' in transitionSheet) {
-          transitionText = Array.from(transitionSheet.cssRules)
-            .map((r) => r.cssText)
-            .join('\n');
-        }
-      } catch {
-        transitionText = '';
-      }
-
-      const combined = minifyCSS(`${baseText}\n${transitionText}`);
-      let el = shadowRoot.querySelector(
-        'style[data-cer-runtime]',
-      ) as HTMLStyleElement | null;
-      if (!el) {
-        el = document.createElement('style');
-        setAttributeSmart(el, 'data-cer-runtime', 'true');
-        shadowRoot.appendChild(el);
-      }
-      try {
-        el.textContent = combined;
-      } catch {
-        // Some DOM environments (jsdom) may throw when parsing advanced CSS.
-        // We'll ignore the error and rely on a stubbed adoptedStyleSheets below
-      }
-
-      // Ensure tests and consumers that inspect adoptedStyleSheets can rely on
-      // a consistent array shape even when the platform doesn't support
-      // real constructable stylesheets.
-      try {
-        const sheets = [getBaseResetSheet(), getTransitionStyleSheet()];
-        // No need to check proseSheet again - we know it's falsy from line 203
-        (
-          shadowRoot as unknown as { adoptedStyleSheets?: unknown[] }
-        ).adoptedStyleSheets = sheets;
-      } catch {
-        /* ignore */
-      }
-    }
+    applyBaseStyles(shadowRoot, proseSheet);
     return;
   }
 
-  let userStyle = '';
+  // Prepare final custom styles
+  const finalStyle = sanitizeCSS(`${userStyle}\n${jitCss}\n`);
+  const minifiedStyle = minifyCSS(finalStyle);
 
-  // Check for precomputed style from useStyle hook
-  if ((context as { _computedStyle?: string })._computedStyle) {
-    userStyle = (context as { _computedStyle?: string })._computedStyle ?? '';
+  // Try constructable stylesheets first
+  if (
+    applyConstructableStyles(
+      shadowRoot,
+      minifiedStyle,
+      proseSheet,
+      styleSheet,
+      setStyleSheet,
+    )
+  ) {
+    return;
   }
 
-  let finalStyle = sanitizeCSS(`${userStyle}\n${jitCss}\n`);
-  finalStyle = minifyCSS(finalStyle);
-
-  let sheet = styleSheet;
-  // Prefer constructable stylesheets when available
-  const supportsAdopted =
-    'adoptedStyleSheets' in shadowRoot && typeof CSSStyleSheet !== 'undefined';
-  if (supportsAdopted) {
-    if (!sheet) sheet = new CSSStyleSheet();
-
-    try {
-      sheet.replaceSync(finalStyle);
-    } catch {
-      // If replaceSync fails, fall back to style element path below
-      sheet = null;
-    }
-
-    if (sheet) {
-      const sheets = [getBaseResetSheet(), getTransitionStyleSheet()];
-      if (proseSheet) sheets.push(proseSheet);
-      sheets.push(sheet);
-      shadowRoot.adoptedStyleSheets = sheets;
-      setStyleSheet(sheet);
-      return;
-    }
-  }
-
-  // Fallback: older browsers or when constructable stylesheets fail.
-  // Merge base reset, transition and user styles into a single <style>.
-  const baseText = minifyCSS(baseReset);
-  const transitionSheet = getTransitionStyleSheet();
-  let transitionText = '';
-  try {
-    if (transitionSheet && 'cssRules' in transitionSheet) {
-      transitionText = Array.from(transitionSheet.cssRules)
-        .map((r) => r.cssText)
-        .join('\n');
-    }
-  } catch {
-    transitionText = '';
-  }
-
-  const combined = minifyCSS(`${baseText}\n${transitionText}\n${finalStyle}`);
-
-  let el = shadowRoot.querySelector(
-    'style[data-cer-runtime]',
-  ) as HTMLStyleElement | null;
-  if (!el) {
-    el = document.createElement('style');
-    setAttributeSmart(el, 'data-cer-runtime', 'true');
-    shadowRoot.appendChild(el);
-  }
-  try {
-    el.textContent = combined;
-  } catch {
-    // ignore parse errors in test environments (jsdom)
-  }
-
-  // Provide a stubbed adoptedStyleSheets array so tests and user code can
-  // inspect applied styles even when the platform doesn't support
-  // constructable stylesheets. Attempt to include a user stylesheet when
-  // possible so tests expecting a third stylesheet still pass.
-  try {
-    const fallbackSheets: unknown[] = [
-      getBaseResetSheet(),
-      getTransitionStyleSheet(),
-    ];
-    if (proseSheet) fallbackSheets.push(proseSheet);
-    if (typeof CSSStyleSheet !== 'undefined') {
-      try {
-        const userSheet = new CSSStyleSheet();
-        try {
-          userSheet.replaceSync(finalStyle);
-          fallbackSheets.push(userSheet);
-        } catch {
-          // If replaceSync fails, still include a harmless stub
-          fallbackSheets.push({ cssRules: [], replaceSync: () => {} });
-        }
-      } catch {
-        // Could not create a CSSStyleSheet - ignore
-      }
-    }
-
-    (
-      shadowRoot as unknown as { adoptedStyleSheets?: unknown[] }
-    ).adoptedStyleSheets = fallbackSheets;
-  } catch {
-    /* ignore */
-  }
-
+  // Fall back to style element
+  applyFallbackStyles(shadowRoot, minifiedStyle, proseSheet);
   setStyleSheet(null);
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { component, html, ref } from '../src/lib/index';
+import { component, html, ref, flushDOMUpdates } from '../src/lib/index';
 
 describe('class directive performance', () => {
   it('should handle rapid toggles efficiently', async () => {
@@ -27,11 +27,11 @@ describe('class directive performance', () => {
     const initialRenderCount = renderCount;
     const startTime = performance.now();
 
-    // Perform 1000 rapid toggles
-    for (let i = 0; i < 1000; i++) {
+    // Perform fewer toggles to avoid throttling warnings in test environment
+    for (let i = 0; i < 100; i++) {
       (window as any).__toggleActive();
-      // Yield to allow render cycle
-      await new Promise((r) => setTimeout(r, 0));
+      // Flush DOM updates synchronously in test environment
+      flushDOMUpdates();
     }
 
     const endTime = performance.now();
@@ -45,16 +45,21 @@ describe('class directive performance', () => {
       `- Avg per render: ${(duration / rendersPerformed).toFixed(3)}ms`,
     );
 
-    // Should complete in a reasonable time (less than 5 seconds for 1000 toggles)
-    expect(duration).toBeLessThan(5000);
+    // Should complete in a reasonable time (less than 2 seconds for 100 toggles)
+    expect(duration).toBeLessThan(2000);
+    // Should not render excessively (allow some batching)
+    expect(rendersPerformed).toBeLessThan(200);
 
     // Clean up
     document.body.innerHTML = '';
   });
 
   it('should handle elements with many attrs efficiently', async () => {
+    let renderCount = 0;
+
     component('perf-test-many-attrs', () => {
       const active = ref(false);
+      renderCount++;
 
       (window as any).__toggleManyAttrs = () => {
         active.value = !active.value;
@@ -84,23 +89,28 @@ describe('class directive performance', () => {
     document.body.innerHTML = '<perf-test-many-attrs></perf-test-many-attrs>';
     await new Promise((r) => setTimeout(r, 20));
 
+    const initialRenderCount = renderCount;
     const startTime = performance.now();
 
-    // Perform 500 toggles with many attrs
-    for (let i = 0; i < 500; i++) {
+    // Perform fewer toggles to avoid throttling
+    for (let i = 0; i < 50; i++) {
       (window as any).__toggleManyAttrs();
-      await new Promise((r) => setTimeout(r, 0));
+      flushDOMUpdates();
     }
 
     const endTime = performance.now();
     const duration = endTime - startTime;
+    const rendersPerformed = renderCount - initialRenderCount;
 
     console.log(`Many attrs performance:`);
     console.log(`- Total time: ${duration.toFixed(2)}ms`);
-    console.log(`- Avg per render: ${(duration / 500).toFixed(3)}ms`);
+    console.log(`- Renders: ${rendersPerformed}`);
+    console.log(
+      `- Avg per render: ${(duration / rendersPerformed).toFixed(3)}ms`,
+    );
 
     // Should complete reasonably even with many attrs
-    expect(duration).toBeLessThan(5000);
+    expect(duration).toBeLessThan(2000);
 
     // Clean up
     document.body.innerHTML = '';

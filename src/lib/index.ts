@@ -22,3 +22,6 @@ export { unsafeHTML, decodeEntities } from './runtime/helpers';
 
 // Logger utilities
 export { setDevMode } from './runtime/logger';
+
+// Testing utilities
+export { flushDOMUpdates } from './runtime/scheduler';

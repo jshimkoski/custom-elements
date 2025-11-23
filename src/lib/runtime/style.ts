@@ -1799,12 +1799,18 @@ export function jitCSS(html: string): string {
     let basePart = '';
     let important = false;
 
-    // Find the base utility
+    // Find the base utility. Accept '!' as an important marker either
+    // before or after the base token (e.g. `!text-xl` or `text-xl!`).
     for (const part of parts) {
       let checkPart = part;
+      // Leading or trailing '!' marks importance
       if (checkPart.startsWith('!')) {
         important = true;
         checkPart = checkPart.slice(1);
+      }
+      if (checkPart.endsWith('!')) {
+        important = true;
+        checkPart = checkPart.slice(0, -1);
       }
 
       if (
@@ -1826,7 +1832,7 @@ export function jitCSS(html: string): string {
     // Prose element modifiers are handled separately by parseProseElementModifier
     // This is checked in parseClassName() before reaching here
 
-    const cleanBase = basePart.replace(/^!/, '');
+    const cleanBase = basePart.replace(/^!/, '').replace(/!$/, '');
     const baseRule =
       utilityMap[cleanBase] ??
       parseSpacing(cleanBase) ??
@@ -1842,6 +1848,8 @@ export function jitCSS(html: string): string {
     let variants = baseIndex >= 0 ? parts.slice(0, baseIndex) : [];
     if (stripDark) variants = variants.filter((t) => t !== 'dark');
 
+    // Build escaped class name from the original class token so any
+    // leading or trailing '!' remains in the selector (escaped).
     const escapedClass = escapeClassName(cls);
     const body = important ? baseRule.replace(/;/g, ' !important;') : baseRule;
     const SUBJECT = '__SUBJECT__';
@@ -2321,16 +2329,18 @@ export function jitCSS(html: string): string {
     }
 
     // Regular utilities - already have parts, variants, base from above
-    const basePart = parts.find(
-      (p) =>
-        utilityMap[p.replace(/^!/, '')] ||
-        parseSpacing(p.replace(/^!/, '')) ||
-        parseSpaceUtility(p.replace(/^!/, '')) ||
-        parseOpacity(p.replace(/^!/, '')) ||
-        parseColorWithOpacity(p.replace(/^!/, '')) ||
-        parseGradientColorStop(p.replace(/^!/, '')) ||
-        parseArbitrary(p.replace(/^!/, '')),
-    );
+    const basePart = parts.find((p) => {
+      const cleaned = p.replace(/^!/, '').replace(/!$/, '');
+      return (
+        utilityMap[cleaned] ||
+        parseSpacing(cleaned) ||
+        parseSpaceUtility(cleaned) ||
+        parseOpacity(cleaned) ||
+        parseColorWithOpacity(cleaned) ||
+        parseGradientColorStop(cleaned) ||
+        parseArbitrary(cleaned)
+      );
+    });
     if (!basePart) continue;
 
     const baseIndex = parts.indexOf(basePart);

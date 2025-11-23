@@ -7,6 +7,7 @@ import {
   useStyle,
 } from './runtime/hooks';
 import { ref, computed } from './runtime/reactive';
+import { flushDOMUpdates } from './runtime/scheduler';
 import { createStore, type Store } from './store';
 import { devError, devWarn } from './runtime/logger';
 import { match } from './directives';
@@ -274,8 +275,8 @@ function findMatchedRoute(routes: Route[], path: string): Route | null {
   return null;
 }
 
-// Async component loader cache
-const componentCache: Record<
+// Async component loader cache - cleared on router reinitialization to prevent stale components
+let componentCache: Record<
   string,
   string | HTMLElement | ((...args: unknown[]) => unknown)
 > = {};
@@ -295,8 +296,12 @@ export async function resolveRouteComponent(
       const mod = await route.load();
       componentCache[route.path] = mod.default;
       return mod.default;
-    } catch {
-      throw new Error(`Failed to load component for route: ${route.path}`);
+    } catch (err) {
+      // More descriptive error with original error details
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      throw new Error(
+        `Failed to load component for route: ${route.path}. ${errorMsg}`,
+      );
     }
   }
   throw new Error(`No component or loader defined for route: ${route.path}`);
@@ -356,6 +361,12 @@ export function useRouter(config: RouterConfig) {
       return result !== false;
     } catch (err) {
       devError('beforeEnter error', err);
+      // Reset store to previous state on guard error to maintain consistency
+      try {
+        store.setState(from);
+      } catch {
+        /* swallow setState errors */
+      }
       return false;
     }
   };
@@ -372,6 +383,12 @@ export function useRouter(config: RouterConfig) {
       return result !== false;
     } catch (err) {
       devError('onEnter error', err);
+      // Reset store to previous state on guard error to maintain consistency
+      try {
+        store.setState(from);
+      } catch {
+        /* swallow setState errors */
+      }
       return false;
     }
   };
@@ -394,6 +411,35 @@ export function useRouter(config: RouterConfig) {
   let _activeObserver: MutationObserver | null = null;
   let _activeTimeout: number | null = null;
   let _activeResolve: ((v: boolean) => void) | null = null;
+
+  // Clean up any existing scroll state from previous router instance
+  const cleanupScrollState = () => {
+    _navToken += 1; // Invalidate any pending scroll attempts
+    if (_activeObserver) {
+      try {
+        _activeObserver.disconnect();
+      } catch {
+        /* swallow */
+      }
+      _activeObserver = null;
+    }
+    if (_activeTimeout) {
+      try {
+        clearTimeout(_activeTimeout);
+      } catch {
+        /* swallow */
+      }
+      _activeTimeout = null;
+    }
+    if (_activeResolve) {
+      try {
+        _activeResolve(false);
+      } catch {
+        /* swallow */
+      }
+      _activeResolve = null;
+    }
+  };
 
   async function doScrollToElement(id: string, offset = 0) {
     try {
@@ -687,6 +733,25 @@ export function useRouter(config: RouterConfig) {
       }
     } catch (err) {
       devError('Navigation error:', err);
+      // Ensure store state remains consistent even on navigation errors
+      try {
+        const current = store.getState();
+        const targetMatches = matchRoute(routes, current.path);
+        if (!targetMatches.route) {
+          // If current state is invalid, reset to a valid route or root
+          const fallbackRoute = routes.find((r) => r.path === '/') || routes[0];
+          if (fallbackRoute) {
+            const fallbackMatch = matchRoute(routes, fallbackRoute.path);
+            store.setState({
+              path: fallbackRoute.path,
+              params: fallbackMatch.params,
+              query: {},
+            });
+          }
+        }
+      } catch {
+        /* swallow state recovery errors */
+      }
     }
   };
 
@@ -844,6 +909,7 @@ export function useRouter(config: RouterConfig) {
   }
 
   return {
+    _cleanupScrollState: cleanupScrollState,
     store,
     push,
     replace: replaceFn,
@@ -899,6 +965,213 @@ export function matchRouteSSR(routes: Route[], path: string) {
 // so exposing this lets components pick up the most recent instance.
 let activeRouter: ReturnType<typeof useRouter> | null = null;
 
+// Proxy that provides a stable API for consumers (components/tests).
+// Subscriptions and method calls are forwarded to the currently active
+// router instance. When `activeRouter` changes (via `initRouter`) the
+// proxy rebinds and forwards updates to its listeners so components do
+// not need to re-register on re-init.
+type RouterListener = (s: RouteState) => void;
+const _proxyListeners: RouterListener[] = [];
+let _proxyInnerUnsub: (() => void) | null = null;
+
+function _rebindProxy() {
+  // Unsubscribe previous inner subscription
+  if (_proxyInnerUnsub) {
+    try {
+      _proxyInnerUnsub();
+    } catch {
+      /* swallow */
+    }
+    _proxyInnerUnsub = null;
+  }
+
+  if (activeRouter) {
+    // Subscribe to the new router and forward updates
+    try {
+      // We'll detect whether the inner subscription invokes synchronously.
+      // Some store implementations call subscribers immediately; others
+      // don't. To guarantee exactly-one initial delivery we record whether
+      // the inner callback ran during subscribe and only emit a manual
+      // snapshot when it did not.
+      let innerCalledSync = false;
+      _proxyInnerUnsub = activeRouter.subscribe((s) => {
+        innerCalledSync = true;
+        // Forward to a snapshot of listeners to avoid mutation issues
+        for (const l of _proxyListeners.slice()) {
+          try {
+            l(s);
+          } catch {
+            /* swallow listener errors */
+          }
+        }
+      });
+
+      // Update proxy base to reflect active router
+      try {
+        activeRouterProxy.base = activeRouter.base;
+      } catch {
+        /* swallow */
+      }
+
+      // If the inner subscription did not synchronously invoke, emit a
+      // single initial snapshot so listeners that were registered while
+      // no active router existed receive the current state exactly once.
+      if (!innerCalledSync) {
+        const cur = activeRouter.getCurrent();
+        for (const l of _proxyListeners.slice()) {
+          try {
+            l(cur);
+          } catch {
+            /* swallow */
+          }
+        }
+      }
+
+      // After synchronously forwarding the current snapshot to proxy
+      // listeners, flush any pending DOM updates in browser environments
+      // so callers that immediately inspect the DOM observe the updated
+      // rendered state.
+      try {
+        if (typeof window !== 'undefined') flushDOMUpdates();
+      } catch {
+        /* swallow */
+      }
+    } catch {
+      _proxyInnerUnsub = null;
+    }
+  }
+}
+
+export const activeRouterProxy: Router = {
+  store: {
+    subscribe(listener: RouterListener) {
+      if (activeRouter) return activeRouter.store.subscribe(listener);
+      // immediate no-op subscribe - provide safe fallback state
+      try {
+        listener({ path: '/', params: {}, query: {} });
+      } catch {
+        /* swallow listener errors */
+      }
+      return () => {};
+    },
+    getState() {
+      return activeRouter
+        ? activeRouter.getCurrent()
+        : { path: '/', params: {}, query: {} };
+    },
+    setState(
+      partial:
+        | Partial<RouteState>
+        | ((prev: RouteState) => Partial<RouteState>),
+    ) {
+      if (!activeRouter) return;
+      try {
+        if (typeof partial === 'function') {
+          activeRouter.store.setState(
+            partial as (prev: RouteState) => Partial<RouteState>,
+          );
+        } else {
+          activeRouter.store.setState(partial as Partial<RouteState>);
+        }
+      } catch {
+        /* swallow */
+      }
+    },
+  },
+  subscribe(listener: RouterListener) {
+    // Defensive check - ensure listener is a function
+    if (typeof listener !== 'function') {
+      devWarn('activeRouterProxy.subscribe: listener must be a function');
+      return () => {};
+    }
+
+    // Add the listener to the proxy list
+    _proxyListeners.push(listener);
+
+    // Ensure we are bound to the active router. If not bound, rebind so
+    // the inner subscription will forward updates to `_proxyListeners`.
+    if (activeRouter) {
+      if (!_proxyInnerUnsub) {
+        // Rebind will synchronously forward the current state to all
+        // proxy listeners (including the one we just pushed). Don't
+        // call the listener again here to avoid double-invocation.
+        _rebindProxy();
+      } else {
+        // Inner subscription already present; deliver a synchronous
+        // snapshot only to the newly added listener.
+        try {
+          const currentState = activeRouter.getCurrent();
+          if (currentState) {
+            listener(currentState);
+          }
+        } catch (err) {
+          devWarn('activeRouterProxy subscription failed', err);
+        }
+      }
+    } else {
+      // No active router yet - provide fallback state
+      try {
+        listener({ path: '/', params: {}, query: {} });
+      } catch (err) {
+        devWarn('activeRouterProxy fallback state delivery failed', err);
+      }
+    }
+
+    // Return unsubscribe with additional safety checks
+    return () => {
+      try {
+        const i = _proxyListeners.indexOf(listener);
+        if (i !== -1) _proxyListeners.splice(i, 1);
+        // If no more proxy listeners remain, unsubscribe inner subscription
+        // to avoid retaining unused references. It will be rebound on demand.
+        if (_proxyListeners.length === 0 && _proxyInnerUnsub) {
+          try {
+            _proxyInnerUnsub();
+          } catch (err) {
+            devWarn('activeRouterProxy inner unsubscribe failed', err);
+          }
+          _proxyInnerUnsub = null;
+        }
+      } catch (err) {
+        devWarn('activeRouterProxy unsubscribe failed', err);
+      }
+    };
+  },
+  getCurrent() {
+    return activeRouter
+      ? activeRouter.getCurrent()
+      : { path: '/', params: {}, query: {} };
+  },
+  async push(path: string) {
+    if (!activeRouter) return Promise.resolve();
+    return activeRouter.push(path);
+  },
+  async replace(path: string) {
+    if (!activeRouter) return Promise.resolve();
+    return activeRouter.replace(path);
+  },
+  back() {
+    if (!activeRouter) return;
+    return activeRouter.back();
+  },
+  matchRoute(path: string) {
+    return activeRouter
+      ? activeRouter.matchRoute(path)
+      : { route: null, params: {} };
+  },
+  resolveRouteComponent(route: Route) {
+    return activeRouter
+      ? activeRouter.resolveRouteComponent(route)
+      : Promise.reject(new Error('No active router'));
+  },
+  base: '',
+  scrollToFragment(frag?: string) {
+    return activeRouter
+      ? activeRouter.scrollToFragment(frag)
+      : Promise.resolve(false);
+  },
+};
+
 /**
  * Singleton router instance for global access.
  *
@@ -907,7 +1180,18 @@ let activeRouter: ReturnType<typeof useRouter> | null = null;
  */
 
 export function initRouter(config: RouterConfig) {
+  // Clear component cache on reinitialization to prevent stale components
+  componentCache = {};
+
   const router = useRouter(config);
+
+  // Clean up scroll state from any previous router instance to prevent interference
+  try {
+    // Access the cleanup function from the router's closure
+    router._cleanupScrollState?.();
+  } catch {
+    /* swallow - cleanup function may not exist in older instances */
+  }
   // Expose the most recently initialized router to components defined
   // earlier in the process (tests may call initRouter multiple times).
   // Components reference `activeRouter` so re-calling initRouter updates
@@ -917,16 +1201,28 @@ export function initRouter(config: RouterConfig) {
   // Components reference `activeRouter` so re-calling initRouter updates
   // the router instance they use.
   activeRouter = router;
+  // Rebind the proxy so any existing subscribers are forwarded to the
+  // newly initialized router immediately.
+  try {
+    _rebindProxy();
+    try {
+      // Only attempt to flush DOM updates in browser environments.
+      if (typeof window !== 'undefined') flushDOMUpdates();
+    } catch {
+      /* swallow */
+    }
+  } catch {
+    /* swallow */
+  }
 
   component('router-view', async () => {
     // Prefer the latest initialized router (tests may re-init). Resolve the
     // router lazily so components connect to whichever router is currently
     // active instead of capturing a stale instance at definition time.
-    const getRouter = () => activeRouter || router;
     // Reactive current route so the component re-renders when router updates
-    if (!getRouter()) return html`<div>Router not initialized.</div>`;
+    if (!activeRouter) return html`<div>Router not initialized.</div>`;
 
-    const current = ref(getRouter().getCurrent());
+    const current = ref(activeRouterProxy.getCurrent());
 
     // We'll capture the unsubscribe function when the component connects
     // and register a disconnect cleanup during render-time (useOnDisconnected
@@ -935,12 +1231,25 @@ export function initRouter(config: RouterConfig) {
 
     useOnConnected(() => {
       try {
-        if (getRouter() && typeof getRouter().subscribe === 'function') {
-          unsubRouterView = getRouter().subscribe((s) => {
+        if (typeof activeRouterProxy.subscribe === 'function') {
+          unsubRouterView = activeRouterProxy.subscribe((s) => {
             try {
-              current.value = s;
+              // Validate state before updating to prevent corruption
+              if (s && typeof s === 'object' && typeof s.path === 'string') {
+                current.value = s;
+              } else {
+                devWarn('router-view received invalid state', s);
+                // Fallback to safe default state
+                current.value = { path: '/', params: {}, query: {} };
+              }
             } catch (e) {
               devWarn('router-view subscription update failed', e);
+              // Attempt to recover with safe state
+              try {
+                current.value = { path: '/', params: {}, query: {} };
+              } catch {
+                /* swallow recovery errors */
+              }
             }
           });
         }
@@ -959,12 +1268,14 @@ export function initRouter(config: RouterConfig) {
       }
     });
 
-    const match = getRouter().matchRoute(current.value.path);
+    const match = activeRouterProxy.matchRoute(current.value.path);
     if (!match || !match.route) return html`<div>Not found</div>`;
 
     // Resolve the component (supports cached async loaders)
     try {
-      const compRaw = await getRouter().resolveRouteComponent(match.route);
+      const compRaw = await activeRouterProxy.resolveRouteComponent(
+        match.route,
+      );
       const comp = compRaw as
         | string
         | HTMLElement
@@ -1009,12 +1320,11 @@ export function initRouter(config: RouterConfig) {
       style: '',
     });
 
-    // Prefer the latest initialized router (tests may re-init). Resolve the
-    // router lazily so components connect to whichever router is currently
-    // active instead of capturing a stale instance at definition time.
-    const getRouter = () => activeRouter || router;
     // Reactive current state so link updates when route changes
-    const current = ref(getRouter().getCurrent());
+    // Always render the full router-link logic so instances that are
+    // created before `initRouter()` will subscribe to the proxy and
+    // receive updates when the router is later initialized.
+    const current = ref(activeRouterProxy.getCurrent());
     // Capture unsubscribe for link subscriptions and register disconnect
     // cleanup during render time.
     let unsubRouterLink: (() => void) | undefined;
@@ -1033,12 +1343,25 @@ export function initRouter(config: RouterConfig) {
 
     useOnConnected((ctx?: unknown) => {
       try {
-        if (getRouter() && typeof getRouter().subscribe === 'function') {
-          unsubRouterLink = getRouter().subscribe((s) => {
+        if (typeof activeRouterProxy.subscribe === 'function') {
+          unsubRouterLink = activeRouterProxy.subscribe((s) => {
             try {
-              current.value = s;
+              // Validate state before updating to prevent corruption
+              if (s && typeof s === 'object' && typeof s.path === 'string') {
+                current.value = s;
+              } else {
+                devWarn('router-link received invalid state', s);
+                // Fallback to safe default state
+                current.value = { path: '/', params: {}, query: {} };
+              }
             } catch (e) {
               devWarn('router-link subscription update failed', e);
+              // Attempt to recover with safe state
+              try {
+                current.value = { path: '/', params: {}, query: {} };
+              } catch {
+                /* swallow recovery errors */
+              }
             }
           });
         }
@@ -1058,6 +1381,26 @@ export function initRouter(config: RouterConfig) {
           // Remove attributes from host to avoid styling the host
           if (hc !== null) host.removeAttribute('class');
           if (hs !== null) host.removeAttribute('style');
+          // Re-render to ensure migrated host classes/styles are applied
+          // to the internal anchor/button element.
+          try {
+            // The `ctx` passed into useOnConnected is the component context
+            // which exposes `_requestRender`. Call that to re-render after
+            // migrating host attributes into internal refs.
+            (
+              ctx as unknown as { _requestRender?: () => void }
+            )?._requestRender?.();
+            // Ensure DOM updates from the scheduled render are flushed so
+            // callers (and tests) can synchronously observe migrated
+            // classes/styles on the inner anchor/button.
+            try {
+              flushDOMUpdates();
+            } catch {
+              /* ignore */
+            }
+          } catch {
+            /* ignore */
+          }
         }
       } catch (e) {
         devWarn('router-link host migration failed', e);
@@ -1070,72 +1413,125 @@ export function initRouter(config: RouterConfig) {
           unsubRouterLink();
         } catch (e) {
           devWarn('router-link unsubscribe failed', e);
+        } finally {
+          unsubRouterLink = undefined; // Clear reference to prevent memory leaks
         }
       }
     });
 
     const isExactActive = computed(() => {
-      const runtimeBase = getRouter().base ?? '';
-      const targetRaw = (props.to as string) || '';
-      // If the target is an absolute or protocol-relative URL, it's external
-      // and should not be considered active.
-      if (
-        /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(targetRaw) ||
-        targetRaw.startsWith('//')
-      )
-        return false;
-      // strip fragment and query from target when comparing. Default to '/'
-      const targetPathOnly = (targetRaw.split('#')[0] || '/').split('?')[0];
       try {
-        // Remove runtime base if present on the provided target so comparisons
-        // are made against the router-internal path format (paths stored
-        // without base).
-        let tgtCandidate = targetPathOnly;
-        if (runtimeBase && tgtCandidate.startsWith(runtimeBase)) {
-          tgtCandidate = tgtCandidate.slice(runtimeBase.length) || '/';
+        const runtimeBase = activeRouterProxy.base ?? '';
+        const targetRaw = (props.to as string) || '';
+
+        // Defensive check for current value
+        if (!current.value || typeof current.value.path !== 'string') {
+          return false;
         }
-        const cur = normalizePathForRoute(current.value.path);
-        const tgt = normalizePathForRoute(tgtCandidate);
-        return cur === tgt;
-      } catch {
-        return current.value.path === targetPathOnly;
+
+        // If the target is an absolute or protocol-relative URL, it's external
+        // and should not be considered active.
+        if (
+          /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(targetRaw) ||
+          targetRaw.startsWith('//')
+        )
+          return false;
+        // strip fragment and query from target when comparing. Default to '/'
+        const targetPathOnly = (targetRaw.split('#')[0] || '/').split('?')[0];
+        try {
+          // Remove runtime base if present on the provided target so comparisons
+          // are made against the router-internal path format (paths stored
+          // without base). Use more robust base removal that handles edge cases.
+          let tgtCandidate = targetPathOnly;
+          if (runtimeBase && runtimeBase !== '/') {
+            // Normalize base to ensure consistent comparison
+            const normalizedBase = normalizePathForRoute(runtimeBase);
+            const normalizedTarget = normalizePathForRoute(tgtCandidate);
+            if (normalizedTarget.startsWith(normalizedBase)) {
+              tgtCandidate =
+                normalizedTarget.slice(normalizedBase.length) || '/';
+            } else {
+              tgtCandidate = normalizedTarget;
+            }
+          }
+          const cur = normalizePathForRoute(current.value.path);
+          const tgt = normalizePathForRoute(tgtCandidate);
+          return cur === tgt;
+        } catch (err) {
+          devWarn('isExactActive computation failed', err);
+          // Safe fallback comparison
+          try {
+            return current.value?.path === targetPathOnly;
+          } catch {
+            return false;
+          }
+        }
+      } catch (err) {
+        devWarn('isExactActive computation error', err);
+        return false;
       }
     });
 
     const isActive = computed(() => {
-      const runtimeBase = getRouter().base ?? '';
-      const targetRaw = (props.to as string) || '';
-      // External targets are never "active" in the SPA sense
-      if (
-        /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(targetRaw) ||
-        targetRaw.startsWith('//')
-      )
-        return false;
-      // strip fragment and query from target when comparing
-      const targetPathOnly = (targetRaw.split('#')[0] || '/').split('?')[0];
-      if (props.exact) return isExactActive.value;
       try {
-        // Normalize and strip base from target to compare against
-        let tgtCandidate = targetPathOnly;
-        if (runtimeBase && tgtCandidate.startsWith(runtimeBase)) {
-          tgtCandidate = tgtCandidate.slice(runtimeBase.length) || '/';
+        const runtimeBase = activeRouterProxy.base ?? '';
+        const targetRaw = (props.to as string) || '';
+
+        // Defensive check for current value
+        if (!current.value || typeof current.value.path !== 'string') {
+          return false;
         }
-        const cur = normalizePathForRoute(current.value.path);
-        const tgt = normalizePathForRoute(tgtCandidate);
-        // Special-case the root target: '/' should only be active when
-        // the current path is exactly '/'. Without this, '/' matches all
-        // routes (every path starts with '/').
-        if (tgt === '/') return cur === '/';
-        // Consider active when current is the target or a child of the target
-        if (cur === tgt) return true;
-        // Ensure we match whole path segment (avoid '/guide-api' matching '/guide')
-        return cur.startsWith(tgt.endsWith('/') ? tgt : tgt + '/');
-      } catch {
-        return (
-          current.value &&
-          typeof current.value.path === 'string' &&
-          current.value.path.startsWith(targetPathOnly)
-        );
+
+        // External targets are never "active" in the SPA sense
+        if (
+          /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(targetRaw) ||
+          targetRaw.startsWith('//')
+        )
+          return false;
+        // strip fragment and query from target when comparing
+        const targetPathOnly = (targetRaw.split('#')[0] || '/').split('?')[0];
+        if (props.exact) return isExactActive.value;
+        try {
+          // Normalize and strip base from target to compare against
+          // Use more robust base removal that handles edge cases.
+          let tgtCandidate = targetPathOnly;
+          if (runtimeBase && runtimeBase !== '/') {
+            // Normalize base to ensure consistent comparison
+            const normalizedBase = normalizePathForRoute(runtimeBase);
+            const normalizedTarget = normalizePathForRoute(tgtCandidate);
+            if (normalizedTarget.startsWith(normalizedBase)) {
+              tgtCandidate =
+                normalizedTarget.slice(normalizedBase.length) || '/';
+            } else {
+              tgtCandidate = normalizedTarget;
+            }
+          }
+          const cur = normalizePathForRoute(current.value.path);
+          const tgt = normalizePathForRoute(tgtCandidate);
+          // Special-case the root target: '/' should only be active when
+          // the current path is exactly '/'. Without this, '/' matches all
+          // routes (every path starts with '/').
+          if (tgt === '/') return cur === '/';
+          // Consider active when current is the target or a child of the target
+          if (cur === tgt) return true;
+          // Ensure we match whole path segment (avoid '/guide-api' matching '/guide')
+          return cur.startsWith(tgt.endsWith('/') ? tgt : tgt + '/');
+        } catch (err) {
+          devWarn('isActive computation failed', err);
+          // Safe fallback comparison
+          try {
+            return (
+              current.value &&
+              typeof current.value.path === 'string' &&
+              current.value.path.startsWith(targetPathOnly)
+            );
+          } catch {
+            return false;
+          }
+        }
+      } catch (err) {
+        devWarn('isActive computation error', err);
+        return false;
       }
     });
 
@@ -1159,12 +1555,20 @@ export function initRouter(config: RouterConfig) {
 
       // Read base dynamically from the current router instance so repeated
       // calls to initRouter (tests) do not leave a stale captured value.
-      const runtimeBase = getRouter().base ?? '';
+      const runtimeBase = activeRouterProxy.base ?? '';
       // If the provided path already contains the runtime base, strip it to
       // avoid duplicating e.g. '/app/app/about'. Keep a fallback of '/'.
+      // Use more robust base removal that handles normalization edge cases.
       let candidate = pathOnly || '/';
-      if (runtimeBase && candidate.startsWith(runtimeBase)) {
-        candidate = candidate.slice(runtimeBase.length) || '/';
+      if (runtimeBase && runtimeBase !== '/') {
+        // Normalize both base and candidate to ensure consistent comparison
+        const normalizedBase = normalizePathForRoute(runtimeBase);
+        const normalizedCandidate = normalizePathForRoute(candidate);
+        if (normalizedCandidate.startsWith(normalizedBase)) {
+          candidate = normalizedCandidate.slice(normalizedBase.length) || '/';
+        } else {
+          candidate = normalizedCandidate;
+        }
       }
       const norm = normalizePathForRoute(candidate || '/');
       return (
@@ -1264,11 +1668,10 @@ export function initRouter(config: RouterConfig) {
       if (isExternal.value) return;
 
       e.preventDefault();
-      const rr = getRouter();
       if (props.replace) {
-        rr.replace(props.to as string);
+        activeRouterProxy.replace(props.to as string);
       } else {
-        rr.push(props.to as string);
+        activeRouterProxy.push(props.to as string);
       }
     };
 
