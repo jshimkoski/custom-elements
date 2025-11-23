@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v2.5.1] - 2025-11-09
+
+- fix: improve router initialization to resolve active router lazily (952672e)
+- feat: enhance router with fragment scrolling and query parsing improvements (6101d1d)
+
 ## [v2.5.0] - 2025-11-08
 
 - feat: enhance router with fragment scrolling and query parsing improvements (6101d1d)
