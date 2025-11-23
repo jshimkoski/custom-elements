@@ -160,21 +160,33 @@ function coerceBooleanForNative(val: unknown): boolean {
  * @returns
  */
 export function cleanupRefs(node: Node, refs?: VDomRefs) {
-  if (!refs || !(node instanceof Element)) return;
+  if (!refs) return;
 
-  // Clean up event listeners for this element
-  EventManager.cleanup(node);
+  // Optimized cleanup with early returns and better memory management
+  if (node instanceof Element) {
+    // Clean up event listeners for this element
+    EventManager.cleanup(node);
 
-  // Clean up refs
-  for (const refKey in refs) {
-    if (refs[refKey] === node) {
-      delete refs[refKey];
+    // Clean up refs more efficiently
+    const keysToDelete: string[] = [];
+    for (const refKey in refs) {
+      if (refs[refKey] === node) {
+        keysToDelete.push(refKey);
+      }
+    }
+
+    // Batch delete refs to avoid repeated object restructuring
+    for (const key of keysToDelete) {
+      delete refs[key];
     }
   }
-  // Clean up child nodes
-  const children = node.childNodes;
-  for (let i = 0; i < children.length; i++) {
-    cleanupRefs(children[i], refs);
+
+  // Clean up child nodes with better iteration
+  if (node.hasChildNodes()) {
+    const children = node.childNodes;
+    for (let i = children.length - 1; i >= 0; i--) {
+      cleanupRefs(children[i], refs);
+    }
   }
 }
 

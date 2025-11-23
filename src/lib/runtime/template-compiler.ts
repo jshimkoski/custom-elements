@@ -18,36 +18,95 @@ import { devWarn } from './logger';
 class LRUCache<K, V> {
   private map = new Map<K, V>();
   private maxSize: number;
+  private accessOrder = new Map<K, number>();
+  private accessCounter = 0;
+
   constructor(maxSize: number) {
-    this.maxSize = maxSize;
+    this.maxSize = Math.max(1, maxSize);
   }
+
   get(key: K): V | undefined {
-    const v = this.map.get(key);
-    if (v === undefined) return undefined;
-    // move to end (LRU ordering)
-    this.map.delete(key);
-    this.map.set(key, v);
-    return v;
+    const value = this.map.get(key);
+    if (value === undefined) return undefined;
+
+    // Update access order efficiently
+    this.accessOrder.set(key, ++this.accessCounter);
+    return value;
   }
-  set(key: K, value: V) {
-    // Delete if exists to maintain insertion order
-    this.map.delete(key);
+
+  set(key: K, value: V): void {
+    const exists = this.map.has(key);
     this.map.set(key, value);
-    if (this.map.size > this.maxSize) {
-      // remove oldest (first key)
-      const firstKey = this.map.keys().next().value;
-      if (firstKey !== undefined) this.map.delete(firstKey);
+    this.accessOrder.set(key, ++this.accessCounter);
+
+    // Only evict if we're over limit and this is a new key
+    if (!exists && this.map.size > this.maxSize) {
+      this.evictLRU();
     }
   }
+
+  private evictLRU(): void {
+    let lruKey: K | undefined;
+    let lruAccess = Infinity;
+
+    // Find least recently used key
+    for (const [key, access] of this.accessOrder) {
+      if (access < lruAccess) {
+        lruAccess = access;
+        lruKey = key;
+      }
+    }
+
+    if (lruKey !== undefined) {
+      this.map.delete(lruKey);
+      this.accessOrder.delete(lruKey);
+    }
+  }
+
   has(key: K): boolean {
     return this.map.has(key);
   }
-  clear() {
+
+  clear(): void {
     this.map.clear();
+    this.accessOrder.clear();
+    this.accessCounter = 0;
+  }
+
+  get size(): number {
+    return this.map.size;
   }
 }
 
-const TEMPLATE_COMPILE_CACHE = new LRUCache<string, VNode | VNode[]>(500);
+// Adaptive cache size based on environment
+const getCacheSize = (): number => {
+  if (typeof navigator !== 'undefined' && 'deviceMemory' in navigator) {
+    // Use device memory to determine cache size (GB * 100, min 200, max 1000)
+    const deviceMemory = (navigator as Navigator & { deviceMemory?: number })
+      .deviceMemory;
+    if (deviceMemory) {
+      return Math.min(1000, Math.max(200, deviceMemory * 100));
+    }
+  }
+  // Default cache size with environment detection
+  const isTest = (() => {
+    try {
+      const globalObj = globalThis as Record<string, unknown>;
+      const processObj = globalObj.process as
+        | Record<string, unknown>
+        | undefined;
+      const envObj = processObj?.env as Record<string, unknown> | undefined;
+      return envObj?.NODE_ENV === 'test';
+    } catch {
+      return false;
+    }
+  })();
+  return isTest ? 100 : 500; // Smaller cache in tests
+};
+
+const TEMPLATE_COMPILE_CACHE = new LRUCache<string, VNode | VNode[]>(
+  getCacheSize(),
+);
 
 /**
  * Validates event handlers to prevent common mistakes that lead to infinite loops

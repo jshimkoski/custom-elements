@@ -315,13 +315,13 @@ describe('🔧 Container Queries', () => {
 
   describe('💡 Important Modifier with Container Queries', () => {
     it('should handle important modifier with container queries', () => {
-      const html = '<div class="@md:!text-xl @lg:!bg-primary-500"></div>';
+      const html = '<div class="@md:!text-xl @lg:bg-primary-500!"></div>';
       const css = jitCSS(html);
       expect(css).toContain(
         '@container (min-width:28rem){.\\@md\\:\\!text-xl{font-size:1.25rem !important;line-height:var(--cer-line-height,1.75) !important;}}',
       );
       expect(css).toContain(
-        '@container (min-width:32rem){.\\@lg\\:\\!bg-primary-500{background-color:var(--cer-color-primary-500, #3b82f6) !important;}}',
+        '@container (min-width:32rem){.\\@lg\\:bg-primary-500\\!{background-color:var(--cer-color-primary-500, #3b82f6) !important;}}',
       );
     });
   });

@@ -1,132 +1,111 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+
 ## [v2.5.1] - 2025-11-09
 
 - fix: improve router initialization to resolve active router lazily (952672e)
 - feat: enhance router with fragment scrolling and query parsing improvements (6101d1d)
-
 
 ## [v2.5.0] - 2025-11-08
 
 - feat: enhance router with fragment scrolling and query parsing improvements (6101d1d)
 - feat: add fragment support to RouteState and update router functionality (7c8acc2)
 
-
 ## [v2.4.0] - 2025-11-08
 
 - feat: add fragment support to RouteState and update router functionality (7c8acc2)
 - fix: add missing watch overload (2d228ca)
-
 
 ## [v2.3.1] - 2025-11-07
 
 - fix: add missing watch overload (2d228ca)
 - feat: add setDevMode to expose logging to developers feat: add ability to just use ref in watch instead of function call fix: fix regression in watch (ba4936a)
 
-
 ## [v2.3.0] - 2025-11-07
 
 - feat: add setDevMode to expose logging to developers feat: add ability to just use ref in watch instead of function call fix: fix regression in watch (ba4936a)
 - fix: improve router catch all (0a7671d)
-
 
 ## [v2.2.9] - 2025-11-06
 
 - fix: improve router catch all (0a7671d)
 - fix: fix binding issue when class and :class (or style and :style) were both used on the same element (81a351f)
 
-
 ## [v2.2.8] - 2025-11-04
 
 - fix: fix binding issue when class and :class (or style and :style) were both used on the same element (81a351f)
 - fix: remove :host from variables.css to fix global css variable overrides (e32f6fa)
-
 
 ## [v2.2.7] - 2025-11-02
 
 - fix: remove :host from variables.css to fix global css variable overrides (e32f6fa)
 - fix: replace alpha prose export with built-in prose functionality fix: fix whitespace rendering in elements that require it (e.g.; pre) fix: improve performance (aa7a719)
 
-
 ## [v2.2.6] - 2025-11-02
 
 - fix: replace alpha prose export with built-in prose functionality fix: fix whitespace rendering in elements that require it (e.g.; pre) fix: improve performance (aa7a719)
 - fix: router-link style and class now work properly fix: fix missing dark mode capability (add dark-class jit css variant that works with a .dark class on the host element) (84697b5)
-
 
 ## [v2.2.5] - 2025-11-01
 
 - fix: router-link style and class now work properly fix: fix missing dark mode capability (add dark-class jit css variant that works with a .dark class on the host element) (84697b5)
 - fix: add support for svgs and other namespaced elements (d99525e)
 
-
 ## [v2.2.4] - 2025-10-30
 
 - fix: add support for svgs and other namespaced elements (d99525e)
 - fix: fix :class binding issue that prevented classes from being remove when a condition changed (5b60784)
-
 
 ## [v2.2.3] - 2025-10-29
 
 - fix: fix :class binding issue that prevented classes from being remove when a condition changed (5b60784)
 - fix: guard stylesheet logic against SSR (8ecd7b7)
 
-
 ## [v2.2.2] - 2025-10-29
 
 - fix: guard stylesheet logic against SSR (8ecd7b7)
 - fix: fix color opacity with css custom properties fix: add variables to base reset in style.ts fix: add an undocumented trial prose implementation (for refinement and official support later, API will likely change) (e68a8b6)
-
 
 ## [v2.2.1] - 2025-10-28
 
 - fix: fix color opacity with css custom properties fix: add variables to base reset in style.ts fix: add an undocumented trial prose implementation (for refinement and official support later, API will likely change) (e68a8b6)
 - feat: bindings and events no longer require quotes fix: add missing outline classes (6ae09f7)
 
-
 ## [v2.2.0] - 2025-10-26
 
 - feat: bindings and events no longer require quotes fix: add missing outline classes (6ae09f7)
 - fix: undo removal of css root export (0f649e8)
-
 
 ## [v2.1.2] - 2025-10-25
 
 - fix: undo removal of css root export (0f649e8)
 - fix: remove css root export (681a276)
 
-
 ## [v2.1.1] - 2025-10-25
 
 - fix: remove css root export (681a276)
 - feat: add global style exports fix: ensure css variables are namespaced (7953507)
-
 
 ## [v2.1.0] - 2025-10-25
 
 - feat: add global style exports fix: ensure css variables are namespaced (7953507)
 - fix: clean up functional api docs (6e87f34)
 
-
 ## [v2.0.2] - 2025-10-25
 
 - fix: clean up functional api docs (6e87f34)
 - fix: correct props examples in documentation (689421f)
-
 
 ## [v2.0.1] - 2025-10-24
 
 - fix: correct props examples in documentation (689421f)
 - BREAKING CHANGE: imports have been split to reduce bundle size. Read docs for details. (ad071aa)
 
-
 ## [v2.0.0] - 2025-10-24
 
 - BREAKING CHANGE: imports have been split to reduce bundle size. Read docs for details. (ad071aa)
 - fix: fix router-link rendering issues (2cfb6ea)
-
-
 
 ## [v1.2.3] - 2025-10-17
 
