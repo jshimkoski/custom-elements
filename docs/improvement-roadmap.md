@@ -2,143 +2,29 @@
 
 > **Scope:** Actionable improvements needed for `@jasonshimmy/custom-elements-runtime` to surpass React 19, Vue 3, and Svelte 5. This document supersedes the resolved portions of `audit.md` and focuses entirely on what remains to be done.
 >
-> **All items from `audit.md` marked ✅ RESOLVED have been independently verified as correctly implemented.** `npm run all:ci` passes with zero warnings or errors.
+> **All items previously listed under "Remaining Open Bugs", "Remaining Dead Code", "Code Style Violations", "Architecture Improvements", and "JIT CSS Priority Improvements" have been independently verified as correctly implemented.** `npm run all:ci` passes with zero warnings or errors.
 
 ---
 
-## 🐛 Remaining Open Bugs
+## ✅ Recently Resolved (since last audit — March 2026)
 
-### 1. `GlobalEventBus.once()` — Dual-Output API
+The following items from the previous roadmap version have been fully implemented and verified:
 
-**File:** `src/lib/event-bus.ts` — line ~134
-
-```ts
-once<T>(eventName: string, handler: EventHandler<T>): Promise<T> {
-  return new Promise((resolve) => {
-    const unsubscribe = this.on(eventName, (data: T) => {
-      unsubscribe();
-      handler(data);   // ← calls the handler
-      resolve(data);   // ← AND resolves the promise
-    });
-  });
-}
-```
-
-The method both invokes a callback **and** returns a Promise, forcing callers to pass a no-op handler just to use the Promise form. Standard practice picks one output channel per overload.
-
-**Fix:** Two clean overloads:
-
-```ts
-// Callback form — no return value
-once<T>(eventName: string, handler: EventHandler<T>): void;
-// Promise form — no handler argument
-once<T>(eventName: string): Promise<T>;
-```
-
-**Impact:** API ergonomics, eliminates confusing dual-path behavior.
-
----
-
-## ⚰️ Remaining Dead Code
-
-### 2. `_styleCallback` Deprecated Path
-
-**File:** `src/lib/runtime/component.ts` — line ~980
-
-A comment explicitly explains that the `_styleCallback` path (a hook accepting an `HTMLElement`) is deprecated and not invoked. The comment documents the deliberate non-use but the associated legacy typing still appears in internal interfaces.
-
-**Fix:** Remove any residual `_styleCallback` field from internal contextual interfaces and types to ensure no external code can accidentally rely on the old contract.
-
----
-
-### 3. `devLog` — Exported But Never Used Internally
-
-**File:** `src/lib/runtime/logger.ts` — line ~86
-
-`devLog` is defined and exported from the module but is never called from any `src/lib` file and is not re-exported from the public `src/lib/index.ts`. It exists as dead internal code.
-
-**Fix (choose one):**
-
-- **Option A — Remove it:** Delete `devLog` from `logger.ts` and clean up any test references.
-- **Option B — Promote it:** Export it from `src/lib/index.ts` as a deliberate consumer-facing debug utility and document it in the API reference table in `README.md`.
-
----
-
-## 🚨 Remaining Code-Style Violations
-
-### 4. `as any` in `event-bus.ts`
-
-**File:** `src/lib/event-bus.ts` — lines 210, 220
-
-```ts
-const val = (inst as any)[prop as any]; // ← line 210
-return (inst as any).apply(thisArg, args); // ← line 220
-```
-
-Project guidelines state: _"Never use `any` type; always prefer strongly typed definitions."_
-
-**Fix:** Use `unknown` with type-safe narrowing or a typed `Record<string, unknown>` interface for the proxy target.
-
----
-
-### 5. Large Files — Pending Splits
-
-The `vdom.ts` decomposition established the pattern. These three files exceed the maintainability threshold:
-
-| File                                   | Lines | Suggested modules                                                       |
-| -------------------------------------- | ----- | ----------------------------------------------------------------------- |
-| `src/lib/router.ts`                    | 2,021 | `router-core.ts`, `router-link.ts`, `router-view.ts`, `router-guard.ts` |
-| `src/lib/runtime/template-compiler.ts` | 1,407 | `template-parser.ts`, `template-expression.ts`, `template-cache.ts`     |
-| `src/lib/runtime/component.ts`         | 1,124 | `component-factory.ts`, `component-init.ts`, `component-hmr.ts`         |
-
-Each split should follow the `vdom.ts` convention: a thin barrel `export { ... } from './sub-module'` for backwards compatibility.
-
----
-
-### 6. `forEach` in `store.ts`
-
-**File:** `src/lib/store.ts` — line ~40
-
-```ts
-function notify() {
-  listeners.forEach((fn) => fn(state)); // ← prefer for...of
-}
-```
-
-Project guidelines prefer `for...of` iteration over `forEach`. The `for...of` form is also faster in V8 and avoids creating an implicit closure scope.
-
-**Fix:**
-
-```ts
-function notify() {
-  for (const fn of listeners) fn(state);
-}
-```
-
----
-
-### 7. `HealthMonitor` is a Class
-
-**File:** `src/lib/runtime/monitoring/health-monitor.ts` — line ~24
-
-Project guidelines state: _"Use functional and declarative programming patterns; avoid classes."_ `HealthMonitor` is a class with mutable instance state. The `stop()` method is already implemented (Bug #4 from the original audit), so the interface contract is stable.
-
-**Fix:** Convert to a factory function returning a plain object:
-
-```ts
-export interface HealthMonitorInstance {
-  start(): void;
-  stop(): void;
-  getMetrics(): HealthReport;
-  updateMetric(name: string, value: number): void;
-}
-
-export function createHealthMonitor(): HealthMonitorInstance {
-  let timerId: ReturnType<typeof setTimeout> | null = null;
-  // ... internal state as closures
-  return { start, stop, getMetrics, updateMetric };
-}
-```
+| #   | Item                                            | Resolution                                                                                                                                                                                                                                |
+| --- | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `GlobalEventBus.once()` Dual-Output API         | Two clean overloads — callback form returns `void`, Promise form takes no handler                                                                                                                                                         |
+| 2   | `_styleCallback` Deprecated Path                | All `_styleCallback` references removed from internal interfaces and types                                                                                                                                                                |
+| 3   | `devLog` Dead Export                            | Promoted to public API — re-exported from `src/lib/index.ts`                                                                                                                                                                              |
+| 4   | `as any` casts in `event-bus.ts`                | Replaced with `unknown` + `Record<PropertyKey, unknown>` narrowing                                                                                                                                                                        |
+| 5   | `forEach` in `store.ts` `notify()`              | Converted to `for...of` iteration                                                                                                                                                                                                         |
+| 6   | `HealthMonitor` class                           | Converted to `createHealthMonitor()` factory function with closure-based state                                                                                                                                                            |
+| 7   | `router.ts` (2,021 lines) file split            | Split into `router/instance.ts`, `router/types.ts`, `router/path-utils.ts`, `router/matcher.ts`, `router/component-loader.ts`, `router/active-proxy.ts`; `router.ts` is now a 27-line barrel                                              |
+| 8   | `template-compiler.ts` (1,407 lines) file split | Split into `template-compiler/impl.ts`, `template-compiler/lru-cache.ts`, `template-compiler/props-parser.ts`, `template-compiler/vnode-utils.ts`; `template-compiler.ts` is a 31-line barrel                                             |
+| 9   | `component.ts` (1,124 lines) file split         | Split into `component/element-class.ts`, `component/factory.ts`, `component/registry.ts`; `component.ts` is a 3-line barrel                                                                                                               |
+| 10  | FLIP list animation (Priority 10)               | Full FLIP move animation implemented in `vdom-patch.ts`; tested in `test/transitiongroup-flip.spec.ts`                                                                                                                                    |
+| 11  | All JIT CSS Critical gaps (1–4)                 | CSS-variable-based transform composition, `translate-x/y`/`skew-x/y` statics, `ring-*` utilities, filter/backdrop-filter CSS variable system — all implemented in `src/lib/runtime/style.ts`                                              |
+| 12  | All JIT CSS High-Value gaps (5–10)              | Fractional `w-`/`h-` dynamic parsing, `bg-cover`/`center`/`clip-*`, `delay-*`, `motion-reduce:`/`motion-safe:`, `rtl:`/`ltr:`, `divide-x/y-*` — all implemented                                                                           |
+| 13  | All JIT CSS Medium gaps (11–19)                 | `text-decoration-color`/style/thickness, `list-disc`/decimal/none, `scroll-smooth`/`snap-*`, `z-auto`, `will-change-*`, `touch-action`, `print:` variant, `columns-*`, extended color palette (`src/lib/css/colors.ts`) — all implemented |
 
 ---
 
@@ -146,36 +32,37 @@ export function createHealthMonitor(): HealthMonitorInstance {
 
 The table below shows the current state of capability parity. Items marked ❌ or ⚠️ represent direct gaps that prevent the library from being considered a full-featured framework alternative.
 
-| Capability                          | React 19 | Vue 3 | Svelte 5 | This Library | Action Required      |
-| ----------------------------------- | :------: | :---: | :------: | :----------: | -------------------- |
-| Reactive state                      |    ✅    |  ✅   |    ✅    |      ✅      | —                    |
-| Derived/computed state              |    ✅    |  ✅   |    ✅    |      ✅      | —                    |
-| Side-effect hook                    |    ✅    |  ✅   |    ✅    |      ✅      | —                    |
-| Shadow DOM isolation                |    ❌    |  ❌   |    ❌    |      ✅      | **Unique advantage** |
-| Zero external deps                  |    ❌    |  ❌   |    ❌    |      ✅      | **Unique advantage** |
-| Works without build step            |    ❌    |  ❌   |    ❌    |      ✅      | **Unique advantage** |
-| Framework-agnostic                  |    ❌    |  ❌   |    ❌    |      ✅      | **Unique advantage** |
-| JIT utility CSS (built-in)          |    ❌    |  ❌   |    ❌    |      ✅      | **Unique advantage** |
-| Built-in router                     |    ❌    |  ✅   |    ❌    |      ✅      | —                    |
-| Context / provide-inject            |    ✅    |  ✅   |    ✅    |      ✅      | —                    |
-| Teleport / Portal                   |    ✅    |  ✅   |    ✅    |      ✅      | —                    |
-| KeepAlive                           |    ✅    |  ✅   |    ❌    |      ✅      | —                    |
-| nextTick / queue flush              |    ✅    |  ✅   |    ✅    |      ✅      | —                    |
-| Composables outside render          |    ✅    |  ✅   |    ✅    |      ✅      | —                    |
-| HMR                                 |    ✅    |  ✅   |    ✅    |      ✅      | —                    |
-| Health monitoring / metrics         |    ❌    |  ❌   |    ❌    |      ✅      | **Unique advantage** |
-| Two-way bind with modifiers         |    ❌    |  ✅   |    ✅    |      ✅      | —                    |
-| SSR (renderToString)                |    ✅    |  ✅   |    ✅    |      ✅      | —                    |
-| **Suspense boundary**               |    ✅    |  ✅   |    ❌    |      ❌      | See Priority 1       |
-| **Client-side hydration**           |    ✅    |  ✅   |    ✅    |      ❌      | See Priority 2       |
-| **Error boundary component**        |    ✅    |  ✅   |    ❌    |      ❌      | See Priority 3       |
-| **Browser DevTools extension**      |    ✅    |  ✅   |    ✅    |      ❌      | See Priority 4       |
-| **`defineExpose()` equivalent**     |    ✅    |  ✅   |    ✅    |      ❌      | See Priority 5       |
-| **SFC / co-located template**       |    ❌    |  ✅   |    ✅    |      ❌      | See Priority 6       |
-| **Compile-time optimization**       |    ✅    |  ✅   |    ✅    |      ❌      | See Priority 7       |
-| **Concurrent / priority rendering** |    ✅    |  ❌   |    ❌    |      ❌      | See Priority 8       |
-| **Fine-grained slot API**           |    ✅    |  ✅   |    ✅    |  ⚠️ native   | See Priority 9       |
-| **Animate list reorders (FLIP)**    |    ❌    |  ✅   |    ✅    |  ⚠️ partial  | See Priority 10      |
+| Capability                           | React 19 | Vue 3 | Svelte 5 | This Library | Action Required      |
+| ------------------------------------ | :------: | :---: | :------: | :----------: | -------------------- |
+| Reactive state                       |    ✅    |  ✅   |    ✅    |      ✅      | —                    |
+| Derived/computed state               |    ✅    |  ✅   |    ✅    |      ✅      | —                    |
+| Side-effect hook                     |    ✅    |  ✅   |    ✅    |      ✅      | —                    |
+| Shadow DOM isolation                 |    ❌    |  ❌   |    ❌    |      ✅      | **Unique advantage** |
+| Zero external deps                   |    ❌    |  ❌   |    ❌    |      ✅      | **Unique advantage** |
+| Works without build step             |    ❌    |  ❌   |    ❌    |      ✅      | **Unique advantage** |
+| Framework-agnostic                   |    ❌    |  ❌   |    ❌    |      ✅      | **Unique advantage** |
+| JIT utility CSS (built-in)           |    ❌    |  ❌   |    ❌    |      ✅      | **Unique advantage** |
+| Built-in router                      |    ❌    |  ✅   |    ❌    |      ✅      | —                    |
+| Context / provide-inject             |    ✅    |  ✅   |    ✅    |      ✅      | —                    |
+| Teleport / Portal                    |    ✅    |  ✅   |    ✅    |      ✅      | —                    |
+| KeepAlive                            |    ✅    |  ✅   |    ❌    |      ✅      | —                    |
+| nextTick / queue flush               |    ✅    |  ✅   |    ✅    |      ✅      | —                    |
+| Composables outside render           |    ✅    |  ✅   |    ✅    |      ✅      | —                    |
+| HMR                                  |    ✅    |  ✅   |    ✅    |      ✅      | —                    |
+| Health monitoring / metrics          |    ❌    |  ❌   |    ❌    |      ✅      | **Unique advantage** |
+| Two-way bind with modifiers          |    ❌    |  ✅   |    ✅    |      ✅      | —                    |
+| SSR (renderToString)                 |    ✅    |  ✅   |    ✅    |      ✅      | —                    |
+| Animate list reorders (FLIP)         |    ❌    |  ✅   |    ✅    |      ✅      | —                    |
+| Extended JIT CSS (ring, filter, etc) |    ❌    |  ❌   |    ❌    |      ✅      | **Unique advantage** |
+| **Suspense boundary**                |    ✅    |  ✅   |    ❌    |      ❌      | See Priority 1       |
+| **Client-side hydration**            |    ✅    |  ✅   |    ✅    |      ❌      | See Priority 2       |
+| **Error boundary component**         |    ✅    |  ✅   |    ❌    |      ❌      | See Priority 3       |
+| **Browser DevTools extension**       |    ✅    |  ✅   |    ✅    |      ❌      | See Priority 4       |
+| **`defineExpose()` equivalent**      |    ✅    |  ✅   |    ✅    |      ❌      | See Priority 5       |
+| **SFC / co-located template**        |    ❌    |  ✅   |    ✅    |      ❌      | See Priority 6       |
+| **Compile-time optimization**        |    ✅    |  ✅   |    ✅    |      ❌      | See Priority 7       |
+| **Concurrent / priority rendering**  |    ✅    |  ❌   |    ❌    |      ❌      | See Priority 8       |
+| **Fine-grained slot API**            |    ✅    |  ✅   |    ✅    |  ⚠️ native   | See Priority 9       |
 
 ---
 
@@ -220,13 +107,13 @@ Hydration strategy for a Web Components runtime differs from React/Vue because c
 1. Add a `hydrateComponent(element: HTMLElement)` function that detects an existing shadow root and skips initial DOM creation, only attaching the reactive runtime to the existing nodes.
 2. Add `renderToString` support for [Declarative Shadow DOM](https://developer.chrome.com/docs/css-ui/declarative-shadow-dom) (`<template shadowrootmode="open">`) so SSR output is natively hydratable.
 
-**Effort:** High — significant architectural work in `vdom-patch.ts` and `component.ts`.
+**Effort:** High — significant architectural work in `vdom-patch.ts` and `component/element-class.ts`.
 
 ---
 
 ### Priority 3 — `<ce-error-boundary>` Component
 
-**Impact:** Matches React's `ErrorBoundary` and Vue's `onErrorCaptured`. Currently errors bubble to `useOnError` on the individual component only — there is no way to catch errors from an entire subtree.
+**Impact:** Matches React's `ErrorBoundary` and Vue's `onErrorCaptured`. Currently `_runLogicWithinErrorBoundary` exists as an internal method in `component/element-class.ts` — there is no way to catch errors from an entire subtree via a declarative ancestor component.
 
 ```ts
 component('ce-error-boundary', () => {
@@ -270,7 +157,7 @@ The runtime already supports `useOnError` per component. The remaining work is b
 | Performance | Render times per component, update frequency, scheduled/pending updates  |
 | Event Bus   | Live feed of `emit`/`on` activity with payload inspection                |
 | Store       | Current state snapshots, subscriber count, state diffs over time         |
-| Health      | Expose `HealthMonitor` metrics to the panel                              |
+| Health      | Expose `createHealthMonitor()` metrics to the panel                      |
 
 **Architecture:** A Chrome/Firefox DevTools extension with a content script that reads from a global `window.__CER_DEVTOOLS__` registry populated by the runtime in dev mode.
 
@@ -357,7 +244,7 @@ component('my-counter', () => {
 
 **Impact:** This is how Svelte achieves its performance ceiling. Pre-compiling `html\`...\``tagged template literals into direct`h()` VNode calls at build time eliminates the runtime string parsing phase entirely.
 
-The runtime already has a `template-compiler.ts` with parse logic. The Vite plugin would run the same parser at build time and replace tagged template usages with pre-computed VNode trees:
+The runtime already has `template-compiler/impl.ts` with parse logic. The Vite plugin would run the same parser at build time and replace tagged template usages with pre-computed VNode trees:
 
 ```ts
 // Before (runtime parsed)
@@ -423,154 +310,63 @@ component('my-card', () => {
 
 ---
 
-### Priority 10 — Complete FLIP List Animation
-
-**Impact:** Matches Vue's `<TransitionGroup>` and Svelte's `animate:flip`. The current `TransitionGroup` implementation handles enter/leave but FLIP (First, Last, Invert, Play) move animations for reordering are incomplete.
-
-FLIP move animations are triggered when a list item changes position in the DOM (e.g., after a sort). The algorithm:
-
-1. **First:** Record current bounding rect for each keyed child
-2. **Last:** Apply DOM update (items reorder)
-3. **Invert:** Calculate the delta and apply a CSS `transform` to put items back at their old position instantly (no visual jump)
-4. **Play:** Animate the transform back to `0` using a CSS transition
-
-**Effort:** Medium — changes in `transition-group-handler.ts` and `vdom-patch.ts`.
-
----
-
-## 🎨 JIT CSS Priority Improvements
-
-The following gaps prevent the built-in JIT CSS engine from being a full Tailwind replacement. See [docs/jit-css-audit.md](./jit-css-audit.md) for the complete analysis.
-
-### Critical (Adoption Blockers)
-
-| #   | Gap                                              | Fix Location                            | Effort |
-| --- | ------------------------------------------------ | --------------------------------------- | ------ |
-| 1   | Non-composable transforms (scale + rotate clash) | `style.ts` — CSS variable rewrite       | Medium |
-| 2   | No `translate-x/y-*` / `skew-x/y-*` statics      | `style.ts` — `generateUtilities()`      | Low    |
-| 3   | No `ring-*` focus ring utilities                 | `style.ts` — CSS variable ring system   | Medium |
-| 4   | No CSS filter / backdrop-filter utilities        | `style.ts` — CSS variable filter system | Medium |
-
-### High-Value (Frequent Developer Needs)
-
-| #   | Gap                                           | Fix Location                            | Effort  |
-| --- | --------------------------------------------- | --------------------------------------- | ------- |
-| 5   | No numeric + fractional width/height scale    | `style.ts` — `generateUtilities()` loop | Low     |
-| 6   | No `bg-cover`, `bg-center`, `bg-clip-*`       | `style.ts` — background suite           | Low     |
-| 7   | No `delay-*` transition delay statics         | `style.ts`                              | Trivial |
-| 8   | No `motion-reduce:` / `motion-safe:` variants | `style.ts` — `mediaVariants`            | Low     |
-| 9   | No `rtl:` / `ltr:` variants                   | `style.ts` — `selectorVariants`         | Low     |
-| 10  | No `divide-x/y-*` sibling border utilities    | `style.ts` — new sibling selector path  | Medium  |
-
-### Medium (Quality of Life)
-
-| #   | Gap                                         | Fix Location                 | Effort  |
-| --- | ------------------------------------------- | ---------------------------- | ------- |
-| 11  | No `text-decoration-color/style/thickness`  | `style.ts`                   | Low     |
-| 12  | No `list-disc`, `list-decimal`, `list-none` | `style.ts`                   | Trivial |
-| 13  | No `scroll-smooth`, `scroll-snap-*`         | `style.ts`                   | Low     |
-| 14  | No `z-auto` / intermediate z-index values   | `style.ts`                   | Trivial |
-| 15  | No `will-change-*` utilities                | `style.ts`                   | Trivial |
-| 16  | No `touch-action` utilities                 | `style.ts`                   | Trivial |
-| 17  | No `print:` variant                         | `style.ts` — `mediaVariants` | Trivial |
-| 18  | No `columns-*` multi-column layout          | `style.ts`                   | Low     |
-| 19  | Extended color palette (opt-in module)      | New `src/lib/css/colors.ts`  | Low     |
-
-The **architectural prerequisite** for items 1–4 is CSS custom property–based composition for transforms, filters, and rings. This must land first before the static utility additions for those categories.
-
----
-
-## 🏗️ Architecture Improvements
-
-### File Splits (from Code Violation #5)
-
-Apply the `vdom.ts` barrel pattern to the remaining oversized files:
-
-**`router.ts` (2,021 lines) → 4 modules:**
-
-```
-router-core.ts        # useRouter, initRouter, matchRoute, matchRouteSSR, parseQuery
-router-link.ts        # RouterLink component registration + RouterLinkProps types
-router-view.ts        # RouterView component registration
-router-guard.ts       # Guard evaluation, resolveRouteComponent
-router.ts             # Barrel re-export (backwards compat)
-```
-
-**`template-compiler.ts` (1,407 lines) → 3 modules:**
-
-```
-template-parser.ts      # HTML tokenizer, node tree construction
-template-expression.ts  # Expression extraction, binding detection
-template-cache.ts       # Compiled template caching (htmlCache)
-template-compiler.ts    # Barrel re-export
-```
-
-**`component.ts` (1,124 lines) → 3 modules:**
-
-```
-component-factory.ts  # component() definition, customElements.define
-component-init.ts     # Shadow DOM setup, prop wiring, lifecycle dispatch
-component-hmr.ts      # HMR accept / re-register logic
-component.ts          # Barrel re-export
-```
-
 ---
 
 ## 📐 Testing Coverage Gaps
 
 ### Untested or Under-Tested Areas
 
-| Area                                         | Recommended Test File                         |
-| -------------------------------------------- | --------------------------------------------- |
-| `GlobalEventBus.once()` Promise-only form    | `test/event-bus.spec.ts` — new overload tests |
-| `HealthMonitor.stop()` halts the timer chain | `test/health-monitor.spec.ts`                 |
-| `useTeleport()` across shadow boundary       | `test/teleport.spec.ts` — shadow root target  |
-| `TransitionGroup` FLIP move animations       | `cypress/e2e/transition-group-flip.cy.ts`     |
-| JIT CSS composable transforms                | `test/jit-css-transform-compose.spec.ts`      |
-| `provide/inject` across 3+ nesting levels    | `test/provide-inject-deep.spec.ts`            |
-| HMR re-registration preserves reactive state | `test/hmr-state.spec.ts`                      |
-| `<ce-suspense>` (once implemented)           | `test/suspense.spec.ts`                       |
-| `<ce-error-boundary>` (once implemented)     | `test/error-boundary.spec.ts`                 |
+| Area                                         | Recommended Test File                         | Status                                                     |
+| -------------------------------------------- | --------------------------------------------- | ---------------------------------------------------------- |
+| `GlobalEventBus.once()` Promise-only form    | `test/event-bus.spec.ts` — new overload tests | ❌ Missing                                                 |
+| `HealthMonitor.stop()` halts the timer chain | `test/health-monitor.spec.ts`                 | ❌ Missing                                                 |
+| `useTeleport()` across shadow boundary       | `test/teleport.spec.ts` — shadow root target  | ⚠️ File exists; shadow-boundary case may be missing        |
+| `TransitionGroup` FLIP move animations       | `test/transitiongroup-flip.spec.ts`           | ✅ Exists                                                  |
+| JIT CSS composable transforms                | `test/jit-css-new-utilities.spec.ts`          | ✅ Exists                                                  |
+| `provide/inject` across 3+ nesting levels    | `test/provide-inject.spec.ts`                 | ⚠️ File exists; deep-nesting case needs verification       |
+| HMR re-registration preserves reactive state | `test/smoke.native-and-hmr.spec.ts`           | ⚠️ File exists; state-preservation case needs verification |
+| `<ce-suspense>` (once implemented)           | `test/suspense.spec.ts`                       | ❌ Not yet — blocked on Priority 1                         |
+| `<ce-error-boundary>` (once implemented)     | `test/error-boundary.spec.ts`                 | ❌ Not yet — blocked on Priority 3                         |
+| `useExpose()` (once implemented)             | `test/expose.spec.ts`                         | ❌ Not yet — blocked on Priority 5                         |
+| `useSlots()` typed detection (once built)    | `test/slots.spec.ts`                          | ❌ Not yet — blocked on Priority 9                         |
 
 ---
 
 ## 📝 Documentation Gaps
 
-| Gap                                       | Action                                                                     |
-| ----------------------------------------- | -------------------------------------------------------------------------- |
-| `jit-css-audit.md` not linked in README   | Add link under **Styling** section pointing to the competitive analysis    |
-| `devLog` function has no public docs      | Either remove or add to API reference table in `README.md`                 |
-| `useExpose()` (once implemented)          | New `docs/expose.md` + entry in README API table                           |
-| `<ce-suspense>` (once implemented)        | New `docs/suspense.md` + entry in README API table                         |
-| `<ce-error-boundary>` (once implemented)  | Extend `docs/troubleshooting.md` + add standalone `docs/error-boundary.md` |
-| `.ce` SFC format (once plugin exists)     | New `docs/sfc.md`                                                          |
-| Client-side hydration (once implemented)  | Extend `docs/ssr.md` with hydration section                                |
-| Compile-time template plugin (once built) | New `docs/vite-plugin.md`                                                  |
+| Gap                                       | Action                                                                     | Status                   |
+| ----------------------------------------- | -------------------------------------------------------------------------- | ------------------------ |
+| `jit-css-audit.md` not linked in README   | Add link under **Styling** section pointing to the competitive analysis    | ❌ Open                  |
+| `src/lib/css/colors.ts` extended palette  | Document opt-in import path in README **Styling** section                  | ❌ Open                  |
+| `useExpose()` (once implemented)          | New `docs/expose.md` + entry in README API table                           | ❌ Blocked on Priority 5 |
+| `<ce-suspense>` (once implemented)        | New `docs/suspense.md` + entry in README API table                         | ❌ Blocked on Priority 1 |
+| `<ce-error-boundary>` (once implemented)  | Extend `docs/troubleshooting.md` + add standalone `docs/error-boundary.md` | ❌ Blocked on Priority 3 |
+| `.ce` SFC format (once plugin exists)     | New `docs/sfc.md`                                                          | ❌ Blocked on Priority 6 |
+| Client-side hydration (once implemented)  | Extend `docs/ssr.md` with hydration section                                | ❌ Blocked on Priority 2 |
+| Compile-time template plugin (once built) | New `docs/vite-plugin.md`                                                  | ❌ Blocked on Priority 7 |
 
 ---
 
 ## 🎯 Summary: What It Takes to Surpass the Big Three
 
-The library already leads in three areas that none of React, Vue, or Svelte can match simultaneously: **native Shadow DOM isolation**, **zero-dependency zero-build-step usage**, and **built-in JIT CSS**. Closing the remaining gaps transforms it from a strong Web Components solution into the definitive full-stack component framework.
+The library already leads in areas none of React, Vue, or Svelte can match simultaneously: **native Shadow DOM isolation**, **zero-dependency zero-build-step usage**, **built-in JIT CSS** (including ring, filter, backdrop-filter, FLIP animations, full Tailwind-compatible utility set, and extended color palette). All internal code quality issues and architecture splits have been completed.
 
-| Priority | Deliverable                     | Closes Gap Against   | Effort |
-| -------- | ------------------------------- | -------------------- | ------ |
-| 1        | `<ce-suspense>` boundary        | React, Vue           | Medium |
-| 2        | Client-side hydration           | React, Vue, Svelte   | High   |
-| 3        | `<ce-error-boundary>`           | React, Vue           | Medium |
-| 4        | Browser DevTools extension      | React, Vue, Svelte   | High   |
-| 5        | `useExpose()` hook              | React, Vue, Svelte   | Low    |
-| 6        | `.ce` SFC Vite plugin           | Vue, Svelte          | High   |
-| 7        | Compile-time template plugin    | React, Vue, Svelte   | High   |
-| 8        | Concurrent-style rendering      | React                | Medium |
-| 9        | Typed named slot API            | Vue, Svelte          | Medium |
-| 10       | Complete FLIP list animation    | Vue, Svelte          | Medium |
-| 11       | JIT CSS transform composition   | Tailwind CSS         | Medium |
-| 12       | JIT CSS ring + filter utilities | Tailwind CSS         | Medium |
-| 13       | Fix open code violations (1–7)  | Internal code health | Low    |
+| Priority | Deliverable                       | Closes Gap Against   | Effort  |
+| -------- | --------------------------------- | -------------------- | ------- |
+| 1        | `<ce-suspense>` boundary          | React, Vue           | Medium  |
+| 2        | Client-side hydration             | React, Vue, Svelte   | High    |
+| 3        | `<ce-error-boundary>`             | React, Vue           | Medium  |
+| 4        | Browser DevTools extension        | React, Vue, Svelte   | High    |
+| 5        | `useExpose()` hook                | React, Vue, Svelte   | Low     |
+| 6        | `.ce` SFC Vite plugin             | Vue, Svelte          | High    |
+| 7        | Compile-time template plugin      | React, Vue, Svelte   | High    |
+| 8        | Concurrent-style rendering        | React                | Medium  |
+| 9        | Typed named slot API              | Vue, Svelte          | Medium  |
+| 10       | Fill missing test coverage        | Internal code health | Low     |
+| 11       | Link `jit-css-audit.md` in README | Internal docs health | Trivial |
 
-Completing priorities 1–5 and 11–13 can be achieved without new package dependencies and without breaking the zero-dependency guarantee. Priorities 6, 7, and 4 are separate deliverables (Vite plugins and a browser extension) and do not affect the core runtime bundle.
+Completing priorities 1, 3, 5, and 9 can be achieved without new package dependencies. Priorities 2, 4, 6, and 7 are higher-effort or separate deliverables and do not affect the core runtime bundle.
 
 ---
 
-_Roadmap created: March 2026 — `@jasonshimmy/custom-elements-runtime` based on verified v2.5.1 implementation_
+_Roadmap updated: March 2026 — `@jasonshimmy/custom-elements-runtime` based on verified post-v2.5.1 implementation_

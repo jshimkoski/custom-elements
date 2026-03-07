@@ -127,18 +127,37 @@ export class GlobalEventBus extends EventTarget {
   }
 
   /**
-   * Register a one-time event handler. Returns a promise that resolves with the event data.
+   * Register a one-time event handler (callback form).
+   * The handler is invoked exactly once, then automatically unsubscribed.
    * @param eventName - Name of the event
    * @param handler - Handler function
    */
-  once<T = unknown>(eventName: string, handler: EventHandler<T>): Promise<T> {
-    return new Promise((resolve) => {
+  once<T = unknown>(eventName: string, handler: EventHandler<T>): void;
+  /**
+   * Returns a Promise that resolves with the first emission of the event
+   * (Promise form — no handler argument).
+   * @param eventName - Name of the event
+   */
+  once<T = unknown>(eventName: string): Promise<T>;
+  once<T = unknown>(
+    eventName: string,
+    handler?: EventHandler<T>,
+  ): void | Promise<T> {
+    if (handler !== undefined) {
+      // Callback form: fire-and-forget, returns void
       const unsubscribe = this.on(eventName, (data: T) => {
         unsubscribe();
         handler(data);
-        resolve(data);
       });
-    });
+    } else {
+      // Promise form: resolves on first emission
+      return new Promise<T>((resolve) => {
+        const unsubscribe = this.on(eventName, (data: T) => {
+          unsubscribe();
+          resolve(data);
+        });
+      });
+    }
   }
 
   /**
@@ -206,18 +225,15 @@ export const eventBus = new Proxy(
   {
     get(_target, prop: PropertyKey) {
       const inst = GlobalEventBus.getInstance();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const val = (inst as any)[prop as any];
+      const val = (inst as unknown as Record<PropertyKey, unknown>)[prop];
       // If the property is a function (method), bind it to the instance
       // so callers using `eventBus.method(...)` get the correct `this`.
-      if (typeof val === 'function') return val.bind(inst);
+      if (typeof val === 'function')
+        return (val as (...args: unknown[]) => unknown).bind(inst);
       return val;
     },
-    // Support direct function calls (unlikely) and other traps defensively
-    apply(_target, thisArg, args) {
-      const inst = GlobalEventBus.getInstance();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return (inst as any).apply(thisArg, args);
+    apply() {
+      throw new TypeError('eventBus is not a callable function');
     },
   },
 ) as unknown as GlobalEventBus;
@@ -241,12 +257,27 @@ export const off = <T = unknown>(eventName: string, handler: EventHandler<T>) =>
   eventBus.off(eventName, handler);
 
 /**
- * Register a one-time handler for a global event
+ * Register a one-time handler for a global event (callback form).
+ * The handler fires once then auto-unsubscribes.
  */
-export const once = <T = unknown>(
+export function once<T = unknown>(
   eventName: string,
   handler: EventHandler<T>,
-) => eventBus.once(eventName, handler);
+): void;
+/**
+ * Returns a Promise that resolves with the next emission of the event
+ * (Promise form — no handler argument needed).
+ */
+export function once<T = unknown>(eventName: string): Promise<T>;
+export function once<T = unknown>(
+  eventName: string,
+  handler?: EventHandler<T>,
+): void | Promise<T> {
+  if (handler !== undefined) {
+    return eventBus.once(eventName, handler);
+  }
+  return eventBus.once<T>(eventName);
+}
 
 /**
  * Listen for a native CustomEvent

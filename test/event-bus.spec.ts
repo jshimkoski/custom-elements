@@ -22,15 +22,40 @@ describe('event-bus', () => {
     expect(handler).not.toHaveBeenCalled();
   });
 
-  it('should support once for one-time event', async () => {
+  it('once() callback form — fires handler exactly once, returns void', async () => {
     const handler = vi.fn();
-    const promise = once('test', handler);
+    const ret = once('test', handler);
+    // Callback form must return void, not a Promise
+    expect(ret).toBeUndefined();
     emit('test', 'hello');
-    const result = await promise;
     expect(handler).toHaveBeenCalledWith('hello');
-    expect(result).toBe('hello');
     emit('test', 'again');
     expect(handler).toHaveBeenCalledTimes(1);
+  });
+
+  it('once() promise form — resolves on first emission, no handler needed', async () => {
+    const promise = once<string>('test-promise');
+    // Must return a real Promise
+    expect(promise).toBeInstanceOf(Promise);
+    emit('test-promise', 'data');
+    const result = await promise;
+    expect(result).toBe('data');
+  });
+
+  it('once() promise form — does not resolve for subsequent emissions', async () => {
+    let resolvedValue: string | undefined;
+    const promise = once<string>('test-once-only');
+    promise.then((v) => {
+      resolvedValue = v;
+    });
+    emit('test-once-only', 'first');
+    // Allow microtask queue to flush
+    await Promise.resolve();
+    expect(resolvedValue).toBe('first');
+    // second emission should not change the already-resolved promise
+    emit('test-once-only', 'second');
+    await Promise.resolve();
+    expect(resolvedValue).toBe('first');
   });
 
   it('should support listen for native CustomEvent', () => {

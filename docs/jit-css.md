@@ -28,9 +28,11 @@ Custom Elements Runtime provides a high-performance, zero-dependency JIT CSS eng
 **Semantic Sizes:**
 `w-3xs` to `w-7xl`, `h-3xs` to `h-7xl`, `max-w-3xs` to `max-w-7xl`, `max-h-3xs` to `max-h-7xl`, `min-w-3xs` to `min-w-7xl`, `min-h-3xs` to `min-h-7xl`
 
-### **Spacing (Margin/Padding/Gap):**
+### **Spacing (Margin/Padding/Gap/Inset):**
 
 `m-auto`, `mx-auto`, `my-auto`, `p-4`, `m-2`, `mx-auto`, `gap-2`, `gap-x-2`, `gap-y-2`, etc. (all axis and negative values supported)
+
+**Inset (position offset):** `inset-*`, `inset-x-*`, `inset-y-*`, `top-*`, `bottom-*`, `left-*`, `right-*` (all accept the same numeric, fraction, and negative values as margin/padding)
 
 ### **Space Between (Tailwind-style)**
 
@@ -57,7 +59,8 @@ Custom Elements Runtime provides a high-performance, zero-dependency JIT CSS eng
 
 ### **Z-index**
 
-`z-0`, `z-10`, `z-20`, `z-30`, `z-40`, `z-50`
+`z-0`, `z-1`, `z-2`, `z-3`, `z-4`, `z-5`, `z-6`, `z-7`, `z-8`, `z-9`, `z-10`, `z-20`, `z-30`, `z-40`, `z-50`
+`-z-10`, `-z-20`, `-z-30`, `-z-40`, `-z-50`
 
 ### **Grid**
 
@@ -139,12 +142,38 @@ Custom Elements Runtime provides a high-performance, zero-dependency JIT CSS eng
 
 ### **Transforms**
 
-**Scale:**
+> All transform utilities (**translate**, **rotate**, **scale**, **skew**) compose via CSS custom properties. Stacking multiple transform utilities on the same element works correctly — e.g., `translate-x-4 rotate-45 scale-110` all apply simultaneously without any conflicts.
+
+**Scale (uniform):**
 `scale-0`, `scale-50`, `scale-75`, `scale-90`, `scale-95`, `scale-100`, `scale-105`, `scale-110`, `scale-125`, `scale-150`
+
+**Scale X axis only:**
+`scale-x-0`, `scale-x-50`, `scale-x-75`, `scale-x-90`, `scale-x-95`, `scale-x-100`, `scale-x-105`, `scale-x-110`, `scale-x-125`, `scale-x-150`
+
+**Scale Y axis only:**
+`scale-y-0`, `scale-y-50`, `scale-y-75`, `scale-y-90`, `scale-y-95`, `scale-y-100`, `scale-y-105`, `scale-y-110`, `scale-y-125`, `scale-y-150`
 
 **Rotate:**
 `rotate-0`, `rotate-1`, `rotate-2`, `rotate-3`, `rotate-6`, `rotate-12`, `rotate-45`, `rotate-90`, `rotate-180`
 `-rotate-1`, `-rotate-2`, `-rotate-3`, `-rotate-6`, `-rotate-12`, `-rotate-45`, `-rotate-90`, `-rotate-180`
+
+**Translate X:**
+`translate-x-0`, `translate-x-px`, `translate-x-0.5`, `translate-x-1`, `translate-x-1.5`, `translate-x-2`, `translate-x-2.5`, `translate-x-3`, `translate-x-4`, `translate-x-5`, `translate-x-6`, `translate-x-8`, `translate-x-10`, `translate-x-12`, `translate-x-16`, `translate-x-20`, `translate-x-24`, `translate-x-32`
+`translate-x-1/2`, `translate-x-1/3`, `translate-x-2/3`, `translate-x-1/4`, `translate-x-3/4`, `translate-x-full`
+`-translate-x-px`, `-translate-x-0.5`, `-translate-x-1`, `-translate-x-1.5`, `-translate-x-2`, `-translate-x-2.5`, `-translate-x-3`, `-translate-x-4`, `-translate-x-1/2`, `-translate-x-full`
+
+**Translate Y:**
+`translate-y-0`, `translate-y-px`, `translate-y-0.5`, `translate-y-1`, `translate-y-1.5`, `translate-y-2`, `translate-y-2.5`, `translate-y-3`, `translate-y-4`, `translate-y-5`, `translate-y-6`, `translate-y-8`, `translate-y-10`, `translate-y-12`, `translate-y-16`, `translate-y-20`, `translate-y-24`, `translate-y-32`
+`translate-y-1/2`, `translate-y-full`
+`-translate-y-px`, `-translate-y-0.5`, `-translate-y-1`, `-translate-y-2`, `-translate-y-4`, `-translate-y-1/2`, `-translate-y-full`
+
+**Skew:**
+`skew-x-0`, `skew-x-1`, `skew-x-2`, `skew-x-3`, `skew-x-6`, `skew-x-12`
+`-skew-x-1`, `-skew-x-2`, `-skew-x-3`, `-skew-x-6`, `-skew-x-12`
+`skew-y-0`, `skew-y-1`, `skew-y-2`, `skew-y-3`, `skew-y-6`, `skew-y-12`
+`-skew-y-1`, `-skew-y-2`, `-skew-y-3`, `-skew-y-6`, `-skew-y-12`
+
+**Arbitrary values** (`translate-x-[value]`, `rotate-[value]`, `scale-[value]`, `skew-x-[value]`, etc.) are also supported.
 
 ### **Transitions**
 
@@ -156,6 +185,11 @@ Custom Elements Runtime provides a high-performance, zero-dependency JIT CSS eng
 
 **Duration:**
 `duration-75`, `duration-100`, `duration-150`, `duration-200`, `duration-300`, `duration-500`, `duration-700`, `duration-1000`
+
+**Delay:**
+`delay-0`, `delay-75`, `delay-100`, `delay-150`, `delay-200`, `delay-300`, `delay-500`, `delay-700`, `delay-1000`
+
+Arbitrary values are also supported: `duration-[500ms]`, `delay-[300ms]`.
 
 ### **Aspect Ratio**
 
@@ -185,6 +219,44 @@ Custom Elements Runtime provides a high-performance, zero-dependency JIT CSS eng
 
 Examples: `from-primary-500`, `to-secondary-600`, `via-neutral-300`
 
+### **Background**
+
+**Size:** `bg-cover`, `bg-contain`, `bg-auto`
+
+**Position:** `bg-center`, `bg-top`, `bg-bottom`, `bg-left`, `bg-right`, `bg-left-top`, `bg-left-bottom`, `bg-right-top`, `bg-right-bottom`
+
+**Repeat:** `bg-no-repeat`, `bg-repeat`, `bg-repeat-x`, `bg-repeat-y`, `bg-repeat-round`, `bg-repeat-space`
+
+**Attachment:** `bg-fixed`, `bg-local`, `bg-scroll`
+
+**Origin:** `bg-origin-border`, `bg-origin-padding`, `bg-origin-content`
+
+**Clip:** `bg-clip-border`, `bg-clip-padding`, `bg-clip-content`, `bg-clip-text`
+
+```html
+<!-- Gradient text -->
+<span
+  class="bg-linear-to-r from-primary-500 to-secondary-500 bg-clip-text text-transparent"
+>
+  Gradient text
+</span>
+```
+
+### **Outline**
+
+`outline`, `outline-0`, `outline-1`, `outline-2`, `outline-4`, `outline-6`, `outline-8`
+`outline-offset-0`, `outline-offset-1`, `outline-offset-2`, `outline-offset-4`, `outline-offset-6`, `outline-offset-8`
+`outline-solid`, `outline-dashed`, `outline-dotted`, `outline-double`, `outline-none`, `outline-hidden`
+`outline-{color}` (e.g., `outline-primary-500`, `outline-error-300`)
+
+```html
+<button
+  class="focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500 focus-visible:outline-offset-2"
+>
+  Accessible button
+</button>
+```
+
 ### **Container Queries**
 
 `@container` - Sets `container-type: inline-size`
@@ -196,6 +268,141 @@ Examples: `from-primary-500`, `to-secondary-600`, `via-neutral-300`
 For a complete list, see the `utilityMap` in [`src/lib/runtime/style.ts`](../src/lib/runtime/style.ts).
 
 **Note:** Some utilities are parsed at runtime rather than enumerated as literal keys in `utilityMap`. Color utilities (e.g. `bg-<color>-<shade>`), opacity modifiers (`/50`), arbitrary values (`prop-[value]`) and spacing shorthands (`m`, `mx`, `p`, `px`, `gap`, etc.) are handled by the runtime helpers `parseColorClass`, `parseOpacityModifier`, `parseArbitrary`, and `parseSpacing` respectively (see `src/lib/runtime/style.ts`).
+
+### **Divide / Sibling Borders**
+
+Apply borders between direct children. Pair with `divide-{color}` to set the border color.
+
+`divide-x`, `divide-x-0`, `divide-x-2`, `divide-x-4`, `divide-x-8`
+`divide-y`, `divide-y-0`, `divide-y-2`, `divide-y-4`, `divide-y-8`
+`divide-solid`, `divide-dashed`, `divide-dotted`, `divide-double`, `divide-none`
+`divide-{color}` (e.g., `divide-neutral-200`, `divide-primary-500`)
+
+```html
+<ul class="divide-y divide-neutral-200">
+  <li class="py-2">Item one</li>
+  <li class="py-2">Item two</li>
+</ul>
+```
+
+### **Ring Focus Utilities**
+
+CSS-variable–based focus rings rendered via `box-shadow`. Stack with `ring-{color}` to customize ring color.
+
+`ring`, `ring-0`, `ring-1`, `ring-2`, `ring-4`, `ring-8`, `ring-inset`
+`ring-offset-0`, `ring-offset-1`, `ring-offset-2`, `ring-offset-4`, `ring-offset-8`
+`ring-{color}` (e.g., `ring-primary-500`, `ring-error-300`)
+
+```html
+<input class="focus:ring-2 focus:ring-primary-500 rounded" />
+<button class="focus:ring-4 focus:ring-primary-200 focus:ring-offset-2">
+  Save
+</button>
+```
+
+### **CSS Filters**
+
+All filter utilities compose via CSS custom properties — stacking multiple filter utilities on the same element works correctly.
+
+**Blur:** `blur-none`, `blur-sm`, `blur`, `blur-md`, `blur-lg`, `blur-xl`, `blur-2xl`, `blur-3xl`
+
+**Brightness:** `brightness-0`, `brightness-50`, `brightness-75`, `brightness-90`, `brightness-95`, `brightness-100`, `brightness-105`, `brightness-110`, `brightness-125`, `brightness-150`, `brightness-200`
+
+**Contrast:** `contrast-0`, `contrast-50`, `contrast-75`, `contrast-100`, `contrast-125`, `contrast-150`, `contrast-200`
+
+**Grayscale:** `grayscale-0`, `grayscale`
+
+**Hue Rotate:** `hue-rotate-0`, `hue-rotate-15`, `hue-rotate-30`, `hue-rotate-60`, `hue-rotate-90`, `hue-rotate-180` (and negative `-hue-rotate-*` variants)
+
+**Invert:** `invert-0`, `invert`
+
+**Saturate:** `saturate-0`, `saturate-50`, `saturate-100`, `saturate-150`, `saturate-200`
+
+**Sepia:** `sepia-0`, `sepia`
+
+**Drop Shadow (filter-based):** `drop-shadow-none`, `drop-shadow-sm`, `drop-shadow`, `drop-shadow-md`, `drop-shadow-lg`, `drop-shadow-xl`, `drop-shadow-2xl`
+
+```html
+<!-- Multiple filters compose correctly — all three apply at once -->
+<img class="blur-sm grayscale brightness-75" src="photo.jpg" />
+```
+
+### **Backdrop Filters**
+
+Apply filter effects to the area **behind** an element (e.g., frosted glass). Use with a semi-transparent background.
+
+`backdrop-blur-none`, `backdrop-blur-sm`, `backdrop-blur`, `backdrop-blur-md`, `backdrop-blur-lg`, `backdrop-blur-xl`, `backdrop-blur-2xl`, `backdrop-blur-3xl`
+
+```html
+<div class="backdrop-blur bg-white/30 rounded-lg p-4">Frosted glass panel</div>
+```
+
+### **Text Decoration**
+
+**Style:** `decoration-solid`, `decoration-dashed`, `decoration-dotted`, `decoration-double`, `decoration-wavy`
+
+**Thickness:** `decoration-auto`, `decoration-from-font`, `decoration-1`, `decoration-2`, `decoration-4`, `decoration-8`
+
+**Color:** `decoration-{color}` (e.g., `decoration-primary-500`, `decoration-error-600`)
+
+**Underline Offset:** `underline-offset-auto`, `underline-offset-1`, `underline-offset-2`, `underline-offset-4`, `underline-offset-8`
+
+```html
+<span
+  class="underline decoration-wavy decoration-2 decoration-primary-500 underline-offset-4"
+>
+  Styled underline
+</span>
+```
+
+### **List Style**
+
+`list-none`, `list-disc`, `list-decimal`
+`list-inside`, `list-outside`
+
+```html
+<ul class="list-disc list-inside">
+  <li>Item one</li>
+  <li>Item two</li>
+</ul>
+```
+
+### **Scroll & Snap**
+
+**Scroll Behavior:** `scroll-smooth`, `scroll-auto`
+
+**Scroll Margin / Padding:** `scroll-m-0`, `scroll-p-0`
+
+**Snap Type:** `snap-none`, `snap-x`, `snap-y`, `snap-both`, `snap-mandatory`, `snap-proximity`
+
+**Snap Align:** `snap-start`, `snap-end`, `snap-center`, `snap-align-none`
+
+**Snap Stop:** `snap-normal`, `snap-always`
+
+```html
+<div class="snap-x snap-mandatory overflow-x-scroll flex">
+  <div class="snap-start shrink-0 w-full">Slide 1</div>
+  <div class="snap-start shrink-0 w-full">Slide 2</div>
+</div>
+```
+
+### **Multi-Column Layout**
+
+`columns-auto`, `columns-1` through `columns-12`
+
+```html
+<div class="columns-3 gap-4">
+  <p>Column text automatically flows across columns.</p>
+</div>
+```
+
+### **Miscellaneous Utilities**
+
+**Will Change:** `will-change-auto`, `will-change-scroll`, `will-change-contents`, `will-change-transform`, `will-change-opacity`
+
+**Touch Action:** `touch-auto`, `touch-none`, `touch-pan-x`, `touch-pan-left`, `touch-pan-right`, `touch-pan-y`, `touch-pan-up`, `touch-pan-down`, `touch-pinch-zoom`, `touch-manipulation`
+
+**Z-Index:** See the Z-Index section in Built-in Utilities above (`z-0` through `z-50`, plus `z-auto` and negative `-z-10` through `-z-50`)
 
 ## 🧑‍💻 Variants
 
@@ -214,6 +421,12 @@ For a complete list, see the `utilityMap` in [`src/lib/runtime/style.ts`](../src
 **Dark Mode (Prefers-color-scheme):** `dark:`
 
 **Dark Mode (Class-based, e.g.; `.dark` on host element):** `dark-class:`
+
+**Motion:** `motion-reduce:`, `motion-safe:` (map to `prefers-reduced-motion`)
+
+**Text Direction:** `rtl:`, `ltr:` (require a `dir="rtl"` or `dir="ltr"` ancestor)
+
+**Print:** `print:` (applies inside a `@media print` context)
 
 **Example:**
 
@@ -360,6 +573,25 @@ JIT CSS provides a rich set of built-in color palettes, all accessible via utili
 - `black` (DEFAULT)
 - `transparent` (DEFAULT)
 - `current` (DEFAULT, maps to `currentColor`)
+
+**Extended Color Palette (opt-in):**
+
+For a full Tailwind-compatible color palette (`gray`, `slate`, `zinc`, `red`, `orange`, `amber`, `yellow`, `lime`, `green`, `teal`, `cyan`, `sky`, `blue`, `indigo`, `violet`, `purple`, `fuchsia`, `pink`, `rose`), import the opt-in module:
+
+```ts
+import { extendedColors } from '@jasonshimmy/custom-elements-runtime/css/colors';
+
+// Use in a component
+useStyle(
+  () => css`
+    :host {
+      --accent: ${extendedColors.violet['500']};
+    }
+  `,
+);
+```
+
+See the [Extended Color Palette section](#-extended-color-palette-typescript) in the API reference for full details.
 
 **Opacity Modifiers:**
 

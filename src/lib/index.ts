@@ -34,13 +34,18 @@ export { css } from './runtime/style';
 export { unsafeHTML, decodeEntities } from './runtime/helpers';
 
 // Logger utilities
-export { setDevMode } from './runtime/logger';
+export { setDevMode, devLog } from './runtime/logger';
 
 // Testing utilities
 export { flushDOMUpdates, nextTick } from './runtime/scheduler';
 
 // Health monitoring
+export type {
+  HealthMonitorInstance,
+  HealthReport,
+} from './runtime/monitoring/health-monitor';
 export {
+  createHealthMonitor,
   getHealthMonitor,
   getHealthStatus,
   updateHealthMetric,

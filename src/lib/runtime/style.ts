@@ -136,6 +136,34 @@ export const baseReset = css`
     background: transparent;
     color: inherit;
     -webkit-tap-highlight-color: transparent;
+    /* Transform composition variables (reset per-element for composability) */
+    --cer-translate-x: 0px;
+    --cer-translate-y: 0px;
+    --cer-rotate: 0deg;
+    --cer-skew-x: 0deg;
+    --cer-skew-y: 0deg;
+    --cer-scale-x: 1;
+    --cer-scale-y: 1;
+    /* Ring variables */
+    --cer-ring-color: rgb(59 130 246 / 0.5);
+    /* Filter composition variables (empty = no-op in filter chain) */
+    --cer-blur: ;
+    --cer-brightness: ;
+    --cer-contrast: ;
+    --cer-grayscale: ;
+    --cer-hue-rotate: ;
+    --cer-invert: ;
+    --cer-saturate: ;
+    --cer-sepia: ;
+    --cer-drop-shadow: ;
+    --cer-backdrop-blur: ;
+    --cer-backdrop-brightness: ;
+    --cer-backdrop-contrast: ;
+    --cer-backdrop-grayscale: ;
+    --cer-backdrop-hue-rotate: ;
+    --cer-backdrop-invert: ;
+    --cer-backdrop-saturate: ;
+    --cer-backdrop-sepia: ;
   }
   :host {
     display: contents;
@@ -745,6 +773,159 @@ const generateUtilities = (): CSSMap => {
     'overflow-y-scroll': 'overflow-y:scroll;',
   });
 
+  // Background utilities (position, size, repeat, attachment, clip)
+  Object.assign(utils, {
+    'bg-cover': 'background-size:cover;',
+    'bg-contain': 'background-size:contain;',
+    'bg-auto': 'background-size:auto;',
+    'bg-center': 'background-position:center;',
+    'bg-top': 'background-position:top;',
+    'bg-bottom': 'background-position:bottom;',
+    'bg-left': 'background-position:left;',
+    'bg-right': 'background-position:right;',
+    'bg-left-top': 'background-position:left top;',
+    'bg-left-bottom': 'background-position:left bottom;',
+    'bg-right-top': 'background-position:right top;',
+    'bg-right-bottom': 'background-position:right bottom;',
+    'bg-no-repeat': 'background-repeat:no-repeat;',
+    'bg-repeat': 'background-repeat:repeat;',
+    'bg-repeat-x': 'background-repeat:repeat-x;',
+    'bg-repeat-y': 'background-repeat:repeat-y;',
+    'bg-repeat-round': 'background-repeat:round;',
+    'bg-repeat-space': 'background-repeat:space;',
+    'bg-fixed': 'background-attachment:fixed;',
+    'bg-local': 'background-attachment:local;',
+    'bg-scroll': 'background-attachment:scroll;',
+    'bg-origin-border': 'background-origin:border-box;',
+    'bg-origin-padding': 'background-origin:padding-box;',
+    'bg-origin-content': 'background-origin:content-box;',
+    'bg-clip-border': 'background-clip:border-box;',
+    'bg-clip-padding': 'background-clip:padding-box;',
+    'bg-clip-content': 'background-clip:content-box;',
+    'bg-clip-text': 'background-clip:text;-webkit-background-clip:text;',
+  });
+
+  // Text decoration style and thickness utilities
+  Object.assign(utils, {
+    'decoration-solid': 'text-decoration-style:solid;',
+    'decoration-dashed': 'text-decoration-style:dashed;',
+    'decoration-dotted': 'text-decoration-style:dotted;',
+    'decoration-double': 'text-decoration-style:double;',
+    'decoration-wavy': 'text-decoration-style:wavy;',
+    'decoration-from-font': 'text-decoration-thickness:from-font;',
+    'decoration-auto': 'text-decoration-thickness:auto;',
+    'decoration-1': 'text-decoration-thickness:1px;',
+    'decoration-2': 'text-decoration-thickness:2px;',
+    'decoration-4': 'text-decoration-thickness:4px;',
+    'decoration-8': 'text-decoration-thickness:8px;',
+    'underline-offset-auto': 'text-underline-offset:auto;',
+    'underline-offset-1': 'text-underline-offset:1px;',
+    'underline-offset-2': 'text-underline-offset:2px;',
+    'underline-offset-4': 'text-underline-offset:4px;',
+    'underline-offset-8': 'text-underline-offset:8px;',
+  });
+
+  // List utilities
+  Object.assign(utils, {
+    'list-none': 'list-style-type:none;',
+    'list-disc': 'list-style-type:disc;',
+    'list-decimal': 'list-style-type:decimal;',
+    'list-inside': 'list-style-position:inside;',
+    'list-outside': 'list-style-position:outside;',
+  });
+
+  // Scroll utilities
+  Object.assign(utils, {
+    'scroll-smooth': 'scroll-behavior:smooth;',
+    'scroll-auto': 'scroll-behavior:auto;',
+    'scroll-m-0': 'scroll-margin:0;',
+    'scroll-p-0': 'scroll-padding:0;',
+    'snap-none': 'scroll-snap-type:none;',
+    'snap-x': 'scroll-snap-type:x var(--cer-scroll-snap-strictness,mandatory);',
+    'snap-y': 'scroll-snap-type:y var(--cer-scroll-snap-strictness,mandatory);',
+    'snap-both':
+      'scroll-snap-type:both var(--cer-scroll-snap-strictness,mandatory);',
+    'snap-mandatory': '--cer-scroll-snap-strictness:mandatory;',
+    'snap-proximity': '--cer-scroll-snap-strictness:proximity;',
+    'snap-start': 'scroll-snap-align:start;',
+    'snap-end': 'scroll-snap-align:end;',
+    'snap-center': 'scroll-snap-align:center;',
+    'snap-align-none': 'scroll-snap-align:none;',
+    'snap-normal': 'scroll-snap-stop:normal;',
+    'snap-always': 'scroll-snap-stop:always;',
+  });
+
+  // Will-change utilities
+  Object.assign(utils, {
+    'will-change-auto': 'will-change:auto;',
+    'will-change-scroll': 'will-change:scroll-position;',
+    'will-change-contents': 'will-change:contents;',
+    'will-change-transform': 'will-change:transform;',
+    'will-change-opacity': 'will-change:opacity;',
+  });
+
+  // Touch action utilities
+  Object.assign(utils, {
+    'touch-auto': 'touch-action:auto;',
+    'touch-none': 'touch-action:none;',
+    'touch-pan-x': 'touch-action:pan-x;',
+    'touch-pan-left': 'touch-action:pan-left;',
+    'touch-pan-right': 'touch-action:pan-right;',
+    'touch-pan-y': 'touch-action:pan-y;',
+    'touch-pan-up': 'touch-action:pan-up;',
+    'touch-pan-down': 'touch-action:pan-down;',
+    'touch-pinch-zoom': 'touch-action:pinch-zoom;',
+    'touch-manipulation': 'touch-action:manipulation;',
+  });
+
+  // Columns utilities
+  Object.assign(utils, {
+    'columns-auto': 'columns:auto;',
+    'columns-1': 'columns:1;',
+    'columns-2': 'columns:2;',
+    'columns-3': 'columns:3;',
+    'columns-4': 'columns:4;',
+    'columns-5': 'columns:5;',
+    'columns-6': 'columns:6;',
+    'columns-7': 'columns:7;',
+    'columns-8': 'columns:8;',
+    'columns-9': 'columns:9;',
+    'columns-10': 'columns:10;',
+    'columns-11': 'columns:11;',
+    'columns-12': 'columns:12;',
+    'columns-3xs': `columns:${0.25 * 64}rem;`,
+    'columns-2xs': `columns:${0.25 * 80}rem;`,
+    'columns-xs': `columns:${0.25 * 96}rem;`,
+    'columns-sm': `columns:${0.25 * 112}rem;`,
+    'columns-md': `columns:${0.25 * 128}rem;`,
+    'columns-lg': `columns:${0.25 * 160}rem;`,
+    'columns-xl': `columns:${0.25 * 192}rem;`,
+    'columns-2xl': `columns:${0.25 * 224}rem;`,
+    'columns-3xl': `columns:${0.25 * 256}rem;`,
+    'columns-4xl': `columns:${0.25 * 280}rem;`,
+    'columns-5xl': `columns:${0.25 * 320}rem;`,
+  });
+
+  // Divide utilities (sibling selectors using special marker for post-processing)
+  // These use > * + * selectors which need special handling in generateRule()
+  Object.assign(utils, {
+    'divide-x': 'border-left-width:1px;',
+    'divide-x-0': 'border-left-width:0px;',
+    'divide-x-2': 'border-left-width:2px;',
+    'divide-x-4': 'border-left-width:4px;',
+    'divide-x-8': 'border-left-width:8px;',
+    'divide-y': 'border-top-width:1px;',
+    'divide-y-0': 'border-top-width:0px;',
+    'divide-y-2': 'border-top-width:2px;',
+    'divide-y-4': 'border-top-width:4px;',
+    'divide-y-8': 'border-top-width:8px;',
+    'divide-solid': 'border-style:solid;',
+    'divide-dashed': 'border-style:dashed;',
+    'divide-dotted': 'border-style:dotted;',
+    'divide-double': 'border-style:double;',
+    'divide-none': 'border-style:none;',
+  });
+
   // Accessibility, pointer events, visibility, cursors, z-index
   const cursors = [
     'auto',
@@ -759,7 +940,14 @@ const generateUtilities = (): CSSMap => {
     'grabbing',
   ];
   for (const c of cursors) utils[`cursor-${c}`] = `cursor:${c};`;
-  for (const z of [0, 10, 20, 30, 40, 50]) utils[`z-${z}`] = `z-index:${z};`;
+  for (const z of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 30, 40, 50])
+    utils[`z-${z}`] = `z-index:${z};`;
+  utils['z-auto'] = 'z-index:auto;';
+  utils['-z-10'] = 'z-index:-10;';
+  utils['-z-20'] = 'z-index:-20;';
+  utils['-z-30'] = 'z-index:-30;';
+  utils['-z-40'] = 'z-index:-40;';
+  utils['-z-50'] = 'z-index:-50;';
   Object.assign(utils, {
     'sr-only':
       'position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border-width:0;',
@@ -835,35 +1023,262 @@ const generateUtilities = (): CSSMap => {
     'duration-1000': 'transition-duration:1000ms;',
   });
 
-  // Transform utilities
+  // Transition delay utilities
   Object.assign(utils, {
-    'scale-0': 'transform:scale(0);',
-    'scale-50': 'transform:scale(0.5);',
-    'scale-75': 'transform:scale(0.75);',
-    'scale-90': 'transform:scale(0.9);',
-    'scale-95': 'transform:scale(0.95);',
-    'scale-100': 'transform:scale(1);',
-    'scale-105': 'transform:scale(1.05);',
-    'scale-110': 'transform:scale(1.1);',
-    'scale-125': 'transform:scale(1.25);',
-    'scale-150': 'transform:scale(1.5);',
-    'rotate-0': 'transform:rotate(0deg);',
-    'rotate-1': 'transform:rotate(1deg);',
-    'rotate-2': 'transform:rotate(2deg);',
-    'rotate-3': 'transform:rotate(3deg);',
-    'rotate-6': 'transform:rotate(6deg);',
-    'rotate-12': 'transform:rotate(12deg);',
-    'rotate-45': 'transform:rotate(45deg);',
-    'rotate-90': 'transform:rotate(90deg);',
-    'rotate-180': 'transform:rotate(180deg);',
-    '-rotate-1': 'transform:rotate(-1deg);',
-    '-rotate-2': 'transform:rotate(-2deg);',
-    '-rotate-3': 'transform:rotate(-3deg);',
-    '-rotate-6': 'transform:rotate(-6deg);',
-    '-rotate-12': 'transform:rotate(-12deg);',
-    '-rotate-45': 'transform:rotate(-45deg);',
-    '-rotate-90': 'transform:rotate(-90deg);',
-    '-rotate-180': 'transform:rotate(-180deg);',
+    'delay-0': 'transition-delay:0ms;',
+    'delay-75': 'transition-delay:75ms;',
+    'delay-100': 'transition-delay:100ms;',
+    'delay-150': 'transition-delay:150ms;',
+    'delay-200': 'transition-delay:200ms;',
+    'delay-300': 'transition-delay:300ms;',
+    'delay-500': 'transition-delay:500ms;',
+    'delay-700': 'transition-delay:700ms;',
+    'delay-1000': 'transition-delay:1000ms;',
+  });
+
+  // Transform utilities — CSS-variable–composed so multiple transforms compose
+  const TRANSFORM_COMPOSE =
+    'translateX(var(--cer-translate-x)) translateY(var(--cer-translate-y)) rotate(var(--cer-rotate)) skewX(var(--cer-skew-x)) skewY(var(--cer-skew-y)) scaleX(var(--cer-scale-x)) scaleY(var(--cer-scale-y))';
+  const tx = (v: string) =>
+    `--cer-translate-x:${v};transform:${TRANSFORM_COMPOSE};`;
+  const ty = (v: string) =>
+    `--cer-translate-y:${v};transform:${TRANSFORM_COMPOSE};`;
+  Object.assign(utils, {
+    // Scale (uniform)
+    'scale-0': `--cer-scale-x:0;--cer-scale-y:0;transform:${TRANSFORM_COMPOSE};`,
+    'scale-50': `--cer-scale-x:.5;--cer-scale-y:.5;transform:${TRANSFORM_COMPOSE};`,
+    'scale-75': `--cer-scale-x:.75;--cer-scale-y:.75;transform:${TRANSFORM_COMPOSE};`,
+    'scale-90': `--cer-scale-x:.9;--cer-scale-y:.9;transform:${TRANSFORM_COMPOSE};`,
+    'scale-95': `--cer-scale-x:.95;--cer-scale-y:.95;transform:${TRANSFORM_COMPOSE};`,
+    'scale-100': `--cer-scale-x:1;--cer-scale-y:1;transform:${TRANSFORM_COMPOSE};`,
+    'scale-105': `--cer-scale-x:1.05;--cer-scale-y:1.05;transform:${TRANSFORM_COMPOSE};`,
+    'scale-110': `--cer-scale-x:1.1;--cer-scale-y:1.1;transform:${TRANSFORM_COMPOSE};`,
+    'scale-125': `--cer-scale-x:1.25;--cer-scale-y:1.25;transform:${TRANSFORM_COMPOSE};`,
+    'scale-150': `--cer-scale-x:1.5;--cer-scale-y:1.5;transform:${TRANSFORM_COMPOSE};`,
+    // Scale X axis only
+    'scale-x-0': `--cer-scale-x:0;transform:${TRANSFORM_COMPOSE};`,
+    'scale-x-50': `--cer-scale-x:.5;transform:${TRANSFORM_COMPOSE};`,
+    'scale-x-75': `--cer-scale-x:.75;transform:${TRANSFORM_COMPOSE};`,
+    'scale-x-90': `--cer-scale-x:.9;transform:${TRANSFORM_COMPOSE};`,
+    'scale-x-95': `--cer-scale-x:.95;transform:${TRANSFORM_COMPOSE};`,
+    'scale-x-100': `--cer-scale-x:1;transform:${TRANSFORM_COMPOSE};`,
+    'scale-x-105': `--cer-scale-x:1.05;transform:${TRANSFORM_COMPOSE};`,
+    'scale-x-110': `--cer-scale-x:1.1;transform:${TRANSFORM_COMPOSE};`,
+    'scale-x-125': `--cer-scale-x:1.25;transform:${TRANSFORM_COMPOSE};`,
+    'scale-x-150': `--cer-scale-x:1.5;transform:${TRANSFORM_COMPOSE};`,
+    // Scale Y axis only
+    'scale-y-0': `--cer-scale-y:0;transform:${TRANSFORM_COMPOSE};`,
+    'scale-y-50': `--cer-scale-y:.5;transform:${TRANSFORM_COMPOSE};`,
+    'scale-y-75': `--cer-scale-y:.75;transform:${TRANSFORM_COMPOSE};`,
+    'scale-y-90': `--cer-scale-y:.9;transform:${TRANSFORM_COMPOSE};`,
+    'scale-y-95': `--cer-scale-y:.95;transform:${TRANSFORM_COMPOSE};`,
+    'scale-y-100': `--cer-scale-y:1;transform:${TRANSFORM_COMPOSE};`,
+    'scale-y-105': `--cer-scale-y:1.05;transform:${TRANSFORM_COMPOSE};`,
+    'scale-y-110': `--cer-scale-y:1.1;transform:${TRANSFORM_COMPOSE};`,
+    'scale-y-125': `--cer-scale-y:1.25;transform:${TRANSFORM_COMPOSE};`,
+    'scale-y-150': `--cer-scale-y:1.5;transform:${TRANSFORM_COMPOSE};`,
+    // Rotate
+    'rotate-0': `--cer-rotate:0deg;transform:${TRANSFORM_COMPOSE};`,
+    'rotate-1': `--cer-rotate:1deg;transform:${TRANSFORM_COMPOSE};`,
+    'rotate-2': `--cer-rotate:2deg;transform:${TRANSFORM_COMPOSE};`,
+    'rotate-3': `--cer-rotate:3deg;transform:${TRANSFORM_COMPOSE};`,
+    'rotate-6': `--cer-rotate:6deg;transform:${TRANSFORM_COMPOSE};`,
+    'rotate-12': `--cer-rotate:12deg;transform:${TRANSFORM_COMPOSE};`,
+    'rotate-45': `--cer-rotate:45deg;transform:${TRANSFORM_COMPOSE};`,
+    'rotate-90': `--cer-rotate:90deg;transform:${TRANSFORM_COMPOSE};`,
+    'rotate-180': `--cer-rotate:180deg;transform:${TRANSFORM_COMPOSE};`,
+    '-rotate-1': `--cer-rotate:-1deg;transform:${TRANSFORM_COMPOSE};`,
+    '-rotate-2': `--cer-rotate:-2deg;transform:${TRANSFORM_COMPOSE};`,
+    '-rotate-3': `--cer-rotate:-3deg;transform:${TRANSFORM_COMPOSE};`,
+    '-rotate-6': `--cer-rotate:-6deg;transform:${TRANSFORM_COMPOSE};`,
+    '-rotate-12': `--cer-rotate:-12deg;transform:${TRANSFORM_COMPOSE};`,
+    '-rotate-45': `--cer-rotate:-45deg;transform:${TRANSFORM_COMPOSE};`,
+    '-rotate-90': `--cer-rotate:-90deg;transform:${TRANSFORM_COMPOSE};`,
+    '-rotate-180': `--cer-rotate:-180deg;transform:${TRANSFORM_COMPOSE};`,
+    // Translate X
+    'translate-x-0': tx('0px'),
+    'translate-x-px': tx('1px'),
+    'translate-x-0.5': tx('0.125rem'),
+    'translate-x-1': tx('0.25rem'),
+    'translate-x-1.5': tx('0.375rem'),
+    'translate-x-2': tx('0.5rem'),
+    'translate-x-2.5': tx('0.625rem'),
+    'translate-x-3': tx('0.75rem'),
+    'translate-x-4': tx('1rem'),
+    'translate-x-5': tx('1.25rem'),
+    'translate-x-6': tx('1.5rem'),
+    'translate-x-8': tx('2rem'),
+    'translate-x-10': tx('2.5rem'),
+    'translate-x-12': tx('3rem'),
+    'translate-x-16': tx('4rem'),
+    'translate-x-20': tx('5rem'),
+    'translate-x-24': tx('6rem'),
+    'translate-x-32': tx('8rem'),
+    'translate-x-1/2': tx('50%'),
+    'translate-x-1/3': tx('33.333333%'),
+    'translate-x-2/3': tx('66.666667%'),
+    'translate-x-1/4': tx('25%'),
+    'translate-x-3/4': tx('75%'),
+    'translate-x-full': tx('100%'),
+    '-translate-x-px': tx('-1px'),
+    '-translate-x-0.5': tx('-0.125rem'),
+    '-translate-x-1': tx('-0.25rem'),
+    '-translate-x-1.5': tx('-0.375rem'),
+    '-translate-x-2': tx('-0.5rem'),
+    '-translate-x-2.5': tx('-0.625rem'),
+    '-translate-x-3': tx('-0.75rem'),
+    '-translate-x-4': tx('-1rem'),
+    '-translate-x-1/2': tx('-50%'),
+    '-translate-x-full': tx('-100%'),
+    // Translate Y
+    'translate-y-0': ty('0px'),
+    'translate-y-px': ty('1px'),
+    'translate-y-0.5': ty('0.125rem'),
+    'translate-y-1': ty('0.25rem'),
+    'translate-y-1.5': ty('0.375rem'),
+    'translate-y-2': ty('0.5rem'),
+    'translate-y-2.5': ty('0.625rem'),
+    'translate-y-3': ty('0.75rem'),
+    'translate-y-4': ty('1rem'),
+    'translate-y-5': ty('1.25rem'),
+    'translate-y-6': ty('1.5rem'),
+    'translate-y-8': ty('2rem'),
+    'translate-y-10': ty('2.5rem'),
+    'translate-y-12': ty('3rem'),
+    'translate-y-16': ty('4rem'),
+    'translate-y-20': ty('5rem'),
+    'translate-y-24': ty('6rem'),
+    'translate-y-32': ty('8rem'),
+    'translate-y-1/2': ty('50%'),
+    'translate-y-full': ty('100%'),
+    '-translate-y-px': ty('-1px'),
+    '-translate-y-0.5': ty('-0.125rem'),
+    '-translate-y-1': ty('-0.25rem'),
+    '-translate-y-2': ty('-0.5rem'),
+    '-translate-y-4': ty('-1rem'),
+    '-translate-y-1/2': ty('-50%'),
+    '-translate-y-full': ty('-100%'),
+    // Skew X
+    'skew-x-0': `--cer-skew-x:0deg;transform:${TRANSFORM_COMPOSE};`,
+    'skew-x-1': `--cer-skew-x:1deg;transform:${TRANSFORM_COMPOSE};`,
+    'skew-x-2': `--cer-skew-x:2deg;transform:${TRANSFORM_COMPOSE};`,
+    'skew-x-3': `--cer-skew-x:3deg;transform:${TRANSFORM_COMPOSE};`,
+    'skew-x-6': `--cer-skew-x:6deg;transform:${TRANSFORM_COMPOSE};`,
+    'skew-x-12': `--cer-skew-x:12deg;transform:${TRANSFORM_COMPOSE};`,
+    '-skew-x-1': `--cer-skew-x:-1deg;transform:${TRANSFORM_COMPOSE};`,
+    '-skew-x-2': `--cer-skew-x:-2deg;transform:${TRANSFORM_COMPOSE};`,
+    '-skew-x-3': `--cer-skew-x:-3deg;transform:${TRANSFORM_COMPOSE};`,
+    '-skew-x-6': `--cer-skew-x:-6deg;transform:${TRANSFORM_COMPOSE};`,
+    '-skew-x-12': `--cer-skew-x:-12deg;transform:${TRANSFORM_COMPOSE};`,
+    // Skew Y
+    'skew-y-0': `--cer-skew-y:0deg;transform:${TRANSFORM_COMPOSE};`,
+    'skew-y-1': `--cer-skew-y:1deg;transform:${TRANSFORM_COMPOSE};`,
+    'skew-y-2': `--cer-skew-y:2deg;transform:${TRANSFORM_COMPOSE};`,
+    'skew-y-3': `--cer-skew-y:3deg;transform:${TRANSFORM_COMPOSE};`,
+    'skew-y-6': `--cer-skew-y:6deg;transform:${TRANSFORM_COMPOSE};`,
+    'skew-y-12': `--cer-skew-y:12deg;transform:${TRANSFORM_COMPOSE};`,
+    '-skew-y-1': `--cer-skew-y:-1deg;transform:${TRANSFORM_COMPOSE};`,
+    '-skew-y-2': `--cer-skew-y:-2deg;transform:${TRANSFORM_COMPOSE};`,
+    '-skew-y-3': `--cer-skew-y:-3deg;transform:${TRANSFORM_COMPOSE};`,
+    '-skew-y-6': `--cer-skew-y:-6deg;transform:${TRANSFORM_COMPOSE};`,
+    '-skew-y-12': `--cer-skew-y:-12deg;transform:${TRANSFORM_COMPOSE};`,
+  });
+
+  // Ring utilities — drawn via box-shadow, color set via --cer-ring-color
+  Object.assign(utils, {
+    ring: `box-shadow:0 0 0 3px var(--cer-ring-color,rgb(59 130 246/0.5));`,
+    'ring-0': `box-shadow:0 0 0 0px var(--cer-ring-color,rgb(59 130 246/0.5));`,
+    'ring-1': `box-shadow:0 0 0 1px var(--cer-ring-color,rgb(59 130 246/0.5));`,
+    'ring-2': `box-shadow:0 0 0 2px var(--cer-ring-color,rgb(59 130 246/0.5));`,
+    'ring-4': `box-shadow:0 0 0 4px var(--cer-ring-color,rgb(59 130 246/0.5));`,
+    'ring-8': `box-shadow:0 0 0 8px var(--cer-ring-color,rgb(59 130 246/0.5));`,
+    'ring-inset': `box-shadow:inset 0 0 0 3px var(--cer-ring-color,rgb(59 130 246/0.5));`,
+    'ring-offset-0': `--cer-ring-offset-width:0px;box-shadow:0 0 0 0px var(--cer-ring-offset-color,#fff),0 0 0 3px var(--cer-ring-color,rgb(59 130 246/0.5));`,
+    'ring-offset-1': `--cer-ring-offset-width:1px;box-shadow:0 0 0 1px var(--cer-ring-offset-color,#fff),0 0 0 calc(3px + 1px) var(--cer-ring-color,rgb(59 130 246/0.5));`,
+    'ring-offset-2': `--cer-ring-offset-width:2px;box-shadow:0 0 0 2px var(--cer-ring-offset-color,#fff),0 0 0 calc(3px + 2px) var(--cer-ring-color,rgb(59 130 246/0.5));`,
+    'ring-offset-4': `--cer-ring-offset-width:4px;box-shadow:0 0 0 4px var(--cer-ring-offset-color,#fff),0 0 0 calc(3px + 4px) var(--cer-ring-color,rgb(59 130 246/0.5));`,
+    'ring-offset-8': `--cer-ring-offset-width:8px;box-shadow:0 0 0 8px var(--cer-ring-offset-color,#fff),0 0 0 calc(3px + 8px) var(--cer-ring-color,rgb(59 130 246/0.5));`,
+  });
+
+  // Filter utilities — CSS-variable–composed
+  const FILTER_COMPOSE =
+    'var(--cer-blur) var(--cer-brightness) var(--cer-contrast) var(--cer-grayscale) var(--cer-hue-rotate) var(--cer-invert) var(--cer-saturate) var(--cer-sepia) var(--cer-drop-shadow)';
+  const BACKDROP_FILTER_COMPOSE =
+    'var(--cer-backdrop-blur) var(--cer-backdrop-brightness) var(--cer-backdrop-contrast) var(--cer-backdrop-grayscale) var(--cer-backdrop-hue-rotate) var(--cer-backdrop-invert) var(--cer-backdrop-saturate) var(--cer-backdrop-sepia)';
+  Object.assign(utils, {
+    // Blur
+    'blur-none': `--cer-blur:;filter:${FILTER_COMPOSE};`,
+    'blur-sm': `--cer-blur:blur(4px);filter:${FILTER_COMPOSE};`,
+    blur: `--cer-blur:blur(8px);filter:${FILTER_COMPOSE};`,
+    'blur-md': `--cer-blur:blur(12px);filter:${FILTER_COMPOSE};`,
+    'blur-lg': `--cer-blur:blur(16px);filter:${FILTER_COMPOSE};`,
+    'blur-xl': `--cer-blur:blur(24px);filter:${FILTER_COMPOSE};`,
+    'blur-2xl': `--cer-blur:blur(40px);filter:${FILTER_COMPOSE};`,
+    'blur-3xl': `--cer-blur:blur(64px);filter:${FILTER_COMPOSE};`,
+    // Brightness
+    'brightness-0': `--cer-brightness:brightness(0);filter:${FILTER_COMPOSE};`,
+    'brightness-50': `--cer-brightness:brightness(.5);filter:${FILTER_COMPOSE};`,
+    'brightness-75': `--cer-brightness:brightness(.75);filter:${FILTER_COMPOSE};`,
+    'brightness-90': `--cer-brightness:brightness(.9);filter:${FILTER_COMPOSE};`,
+    'brightness-95': `--cer-brightness:brightness(.95);filter:${FILTER_COMPOSE};`,
+    'brightness-100': `--cer-brightness:brightness(1);filter:${FILTER_COMPOSE};`,
+    'brightness-105': `--cer-brightness:brightness(1.05);filter:${FILTER_COMPOSE};`,
+    'brightness-110': `--cer-brightness:brightness(1.1);filter:${FILTER_COMPOSE};`,
+    'brightness-125': `--cer-brightness:brightness(1.25);filter:${FILTER_COMPOSE};`,
+    'brightness-150': `--cer-brightness:brightness(1.5);filter:${FILTER_COMPOSE};`,
+    'brightness-200': `--cer-brightness:brightness(2);filter:${FILTER_COMPOSE};`,
+    // Contrast
+    'contrast-0': `--cer-contrast:contrast(0);filter:${FILTER_COMPOSE};`,
+    'contrast-50': `--cer-contrast:contrast(.5);filter:${FILTER_COMPOSE};`,
+    'contrast-75': `--cer-contrast:contrast(.75);filter:${FILTER_COMPOSE};`,
+    'contrast-100': `--cer-contrast:contrast(1);filter:${FILTER_COMPOSE};`,
+    'contrast-125': `--cer-contrast:contrast(1.25);filter:${FILTER_COMPOSE};`,
+    'contrast-150': `--cer-contrast:contrast(1.5);filter:${FILTER_COMPOSE};`,
+    'contrast-200': `--cer-contrast:contrast(2);filter:${FILTER_COMPOSE};`,
+    // Grayscale
+    grayscale: `--cer-grayscale:grayscale(100%);filter:${FILTER_COMPOSE};`,
+    'grayscale-0': `--cer-grayscale:grayscale(0);filter:${FILTER_COMPOSE};`,
+    // Hue rotate
+    'hue-rotate-0': `--cer-hue-rotate:hue-rotate(0deg);filter:${FILTER_COMPOSE};`,
+    'hue-rotate-15': `--cer-hue-rotate:hue-rotate(15deg);filter:${FILTER_COMPOSE};`,
+    'hue-rotate-30': `--cer-hue-rotate:hue-rotate(30deg);filter:${FILTER_COMPOSE};`,
+    'hue-rotate-60': `--cer-hue-rotate:hue-rotate(60deg);filter:${FILTER_COMPOSE};`,
+    'hue-rotate-90': `--cer-hue-rotate:hue-rotate(90deg);filter:${FILTER_COMPOSE};`,
+    'hue-rotate-180': `--cer-hue-rotate:hue-rotate(180deg);filter:${FILTER_COMPOSE};`,
+    '-hue-rotate-180': `--cer-hue-rotate:hue-rotate(-180deg);filter:${FILTER_COMPOSE};`,
+    '-hue-rotate-90': `--cer-hue-rotate:hue-rotate(-90deg);filter:${FILTER_COMPOSE};`,
+    '-hue-rotate-60': `--cer-hue-rotate:hue-rotate(-60deg);filter:${FILTER_COMPOSE};`,
+    '-hue-rotate-30': `--cer-hue-rotate:hue-rotate(-30deg);filter:${FILTER_COMPOSE};`,
+    '-hue-rotate-15': `--cer-hue-rotate:hue-rotate(-15deg);filter:${FILTER_COMPOSE};`,
+    // Invert
+    invert: `--cer-invert:invert(100%);filter:${FILTER_COMPOSE};`,
+    'invert-0': `--cer-invert:invert(0);filter:${FILTER_COMPOSE};`,
+    // Saturate
+    'saturate-0': `--cer-saturate:saturate(0);filter:${FILTER_COMPOSE};`,
+    'saturate-50': `--cer-saturate:saturate(.5);filter:${FILTER_COMPOSE};`,
+    'saturate-100': `--cer-saturate:saturate(1);filter:${FILTER_COMPOSE};`,
+    'saturate-150': `--cer-saturate:saturate(1.5);filter:${FILTER_COMPOSE};`,
+    'saturate-200': `--cer-saturate:saturate(2);filter:${FILTER_COMPOSE};`,
+    // Sepia
+    sepia: `--cer-sepia:sepia(100%);filter:${FILTER_COMPOSE};`,
+    'sepia-0': `--cer-sepia:sepia(0);filter:${FILTER_COMPOSE};`,
+    // Drop shadow (filter, not box-shadow)
+    'drop-shadow-sm': `--cer-drop-shadow:drop-shadow(0 1px 1px rgb(0 0 0/.05));filter:${FILTER_COMPOSE};`,
+    'drop-shadow': `--cer-drop-shadow:drop-shadow(0 1px 2px rgb(0 0 0/.1)) drop-shadow(0 1px 1px rgb(0 0 0/.06));filter:${FILTER_COMPOSE};`,
+    'drop-shadow-md': `--cer-drop-shadow:drop-shadow(0 4px 3px rgb(0 0 0/.07)) drop-shadow(0 2px 2px rgb(0 0 0/.06));filter:${FILTER_COMPOSE};`,
+    'drop-shadow-lg': `--cer-drop-shadow:drop-shadow(0 10px 8px rgb(0 0 0/.04)) drop-shadow(0 4px 3px rgb(0 0 0/.1));filter:${FILTER_COMPOSE};`,
+    'drop-shadow-xl': `--cer-drop-shadow:drop-shadow(0 20px 13px rgb(0 0 0/.03)) drop-shadow(0 8px 5px rgb(0 0 0/.08));filter:${FILTER_COMPOSE};`,
+    'drop-shadow-2xl': `--cer-drop-shadow:drop-shadow(0 25px 25px rgb(0 0 0/.15));filter:${FILTER_COMPOSE};`,
+    'drop-shadow-none': `--cer-drop-shadow:drop-shadow(0 0 #0000);filter:${FILTER_COMPOSE};`,
+    // Backdrop blur
+    'backdrop-blur-none': `--cer-backdrop-blur:;backdrop-filter:${BACKDROP_FILTER_COMPOSE};-webkit-backdrop-filter:${BACKDROP_FILTER_COMPOSE};`,
+    'backdrop-blur-sm': `--cer-backdrop-blur:blur(4px);backdrop-filter:${BACKDROP_FILTER_COMPOSE};-webkit-backdrop-filter:${BACKDROP_FILTER_COMPOSE};`,
+    'backdrop-blur': `--cer-backdrop-blur:blur(8px);backdrop-filter:${BACKDROP_FILTER_COMPOSE};-webkit-backdrop-filter:${BACKDROP_FILTER_COMPOSE};`,
+    'backdrop-blur-md': `--cer-backdrop-blur:blur(12px);backdrop-filter:${BACKDROP_FILTER_COMPOSE};-webkit-backdrop-filter:${BACKDROP_FILTER_COMPOSE};`,
+    'backdrop-blur-lg': `--cer-backdrop-blur:blur(16px);backdrop-filter:${BACKDROP_FILTER_COMPOSE};-webkit-backdrop-filter:${BACKDROP_FILTER_COMPOSE};`,
+    'backdrop-blur-xl': `--cer-backdrop-blur:blur(24px);backdrop-filter:${BACKDROP_FILTER_COMPOSE};-webkit-backdrop-filter:${BACKDROP_FILTER_COMPOSE};`,
+    'backdrop-blur-2xl': `--cer-backdrop-blur:blur(40px);backdrop-filter:${BACKDROP_FILTER_COMPOSE};-webkit-backdrop-filter:${BACKDROP_FILTER_COMPOSE};`,
+    'backdrop-blur-3xl': `--cer-backdrop-blur:blur(64px);backdrop-filter:${BACKDROP_FILTER_COMPOSE};-webkit-backdrop-filter:${BACKDROP_FILTER_COMPOSE};`,
   });
 
   // Aspect ratio utilities
@@ -1167,6 +1582,8 @@ export const selectorVariants: SelectorVariantMap = {
   'peer-checked': (sel, body) => `.peer:checked ~ ${sel}{${body}}`,
   'peer-disabled': (sel, body) => `.peer:disabled ~ ${sel}{${body}}`,
   'dark-class': (sel, body) => `:host(.dark) ${sel}{${body}}`,
+  rtl: (sel, body) => `[dir=rtl] ${sel}{${body}}`,
+  ltr: (sel, body) => `[dir=ltr] ${sel}{${body}}`,
 };
 
 export const mediaVariants: MediaVariantMap = {
@@ -1176,6 +1593,9 @@ export const mediaVariants: MediaVariantMap = {
   xl: '(min-width:1280px)',
   '2xl': '(min-width:1536px)',
   dark: '(prefers-color-scheme: dark)',
+  'motion-reduce': '(prefers-reduced-motion: reduce)',
+  'motion-safe': '(prefers-reduced-motion: no-preference)',
+  print: 'print',
 };
 
 export const containerVariants: MediaVariantMap = {
@@ -1192,7 +1612,16 @@ export const containerVariants: MediaVariantMap = {
   '7xl': '(min-width:80rem)',
 };
 
-export const responsiveOrder = ['sm', 'md', 'lg', 'xl', '2xl'];
+export const responsiveOrder = [
+  'sm',
+  'md',
+  'lg',
+  'xl',
+  '2xl',
+  'motion-reduce',
+  'motion-safe',
+  'print',
+];
 export const containerOrder = [
   'xs',
   'sm',
@@ -1315,7 +1744,7 @@ export function hexToRgb(hex: string): string {
 
 // Optimized color parsing with lookup tables
 const colorRegex =
-  /^(bg|text|border|decoration|shadow|outline|caret|accent|fill|stroke)-([a-z]+)-?(\d{2,3}|DEFAULT)?$/;
+  /^(bg|text|border|decoration|shadow|outline|caret|accent|fill|stroke|ring|divide)-([a-z]+)-?(\d{2,3}|DEFAULT)?$/;
 const propMap: Record<string, string> = {
   bg: 'background-color',
   decoration: 'text-decoration-color',
@@ -1337,6 +1766,8 @@ export function parseColorClass(className: string): string | null {
   if (!colorValue) return null;
 
   if (type === 'shadow') return `--cer-shadow-color:${colorValue};`;
+  if (type === 'ring') return `--cer-ring-color:${colorValue};`;
+  if (type === 'divide') return `border-color:${colorValue};`;
   const prop = propMap[type];
   return prop ? `${prop}:${colorValue};` : null;
 }

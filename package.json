@@ -59,6 +59,7 @@
     "dist",
     "dist/index.d.ts",
     "dist/*.d.ts",
+    "dist/css/*.d.ts",
     "entities.json"
   ],
   "sideEffects": [
@@ -109,7 +110,12 @@
     "./css": "./dist/style.css",
     "./css/style.css": "./dist/style.css",
     "./css/reset.css": "./dist/reset.css",
-    "./css/variables.css": "./dist/variables.css"
+    "./css/variables.css": "./dist/variables.css",
+    "./css/colors": {
+      "types": "./dist/css/colors.d.ts",
+      "import": "./dist/custom-elements-runtime.colors.es.js",
+      "require": "./dist/custom-elements-runtime.colors.cjs.js"
+    }
   },
   "publishConfig": {
     "access": "public"

@@ -275,13 +275,15 @@ describe('🔧 Container Queries', () => {
 
   describe('🧩 Container Queries with Complex Utilities', () => {
     it('should handle container queries with transform utilities', () => {
+      const TC =
+        'translateX(var(--cer-translate-x)) translateY(var(--cer-translate-y)) rotate(var(--cer-rotate)) skewX(var(--cer-skew-x)) skewY(var(--cer-skew-y)) scaleX(var(--cer-scale-x)) scaleY(var(--cer-scale-y))';
       const html = '<div class="@md:scale-110 @lg:rotate-45"></div>';
       const css = jitCSS(html);
       expect(css).toContain(
-        '@container (min-width:28rem){.\\@md\\:scale-110{transform:scale(1.1);}}',
+        `@container (min-width:28rem){.\\@md\\:scale-110{--cer-scale-x:1.1;--cer-scale-y:1.1;transform:${TC};}}`,
       );
       expect(css).toContain(
-        '@container (min-width:32rem){.\\@lg\\:rotate-45{transform:rotate(45deg);}}',
+        `@container (min-width:32rem){.\\@lg\\:rotate-45{--cer-rotate:45deg;transform:${TC};}}`,
       );
     });
 

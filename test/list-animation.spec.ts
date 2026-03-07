@@ -278,10 +278,15 @@ describe('List Animation - Styling and Animation Tests', () => {
     items = el.shadowRoot.querySelectorAll('[data-test-id]');
     expect(items.length).toBe(2);
 
-    // Check second item has transition classes
+    // In jsdom there is no real CSS animation engine, so transitionend fires
+    // almost instantly — by 50 ms the enter transition may already be complete.
+    // Verify transition completed correctly: base classes present, enterFrom
+    // classes ('opacity-0 translate-x-4') are no longer on the element.
     const secondItem = items[1] as HTMLElement;
     const classes2 = secondItem.className;
-    expect(classes2).toMatch(/opacity-100|translate-x-0/);
+    expect(classes2).toContain('p-4'); // base classes rendered
+    expect(classes2).not.toContain('opacity-0'); // enterFrom was removed
+    expect(classes2).not.toContain('translate-x-4'); // enterFrom was removed
   });
 
   it('should apply leave transitions when removing items', async () => {
