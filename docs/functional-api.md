@@ -100,6 +100,8 @@ All hooks must be called during component render and provide perfect TypeScript 
 - **`useOnDisconnected(callback)`**: Set up lifecycle hook for when component disconnects from DOM
 - **`useOnAttributeChanged(callback)`**: Set up lifecycle hook for when attributes change
 - **`useOnError(callback)`**: Set up lifecycle hook for error handling
+- **`useExpose(api)`**: Publish methods and properties onto the host element as an imperative public API. See [useExpose()](./use-expose.md).
+- **`useSlots()`**: Inspect which named slots have been filled by the consumer. See [useSlots()](./use-slots.md).
 
 ## 🔒 Props and Type Safety
 
@@ -1916,3 +1918,27 @@ See the [Teleport guide](./teleport.md) for full documentation.
 [`registerKeepAlive()`](./keep-alive.md) registers `<ce-keep-alive>`, a wrapper element that preserves component JavaScript state across DOM removals and re-insertions.
 
 See the [Keep-Alive guide](./keep-alive.md) for full documentation.
+
+### 🎯 useExpose() — Imperative Handles
+
+[`useExpose(api)`](./use-expose.md) publishes methods and properties directly onto the host element so parent components or plain JavaScript can call them by reference — similar to `defineExpose()` in Vue 3 or `useImperativeHandle()` in React.
+
+See the [useExpose() guide](./use-expose.md) for full documentation.
+
+### 🧩 useSlots() — Slot Inspection
+
+[`useSlots()`](./use-slots.md) returns helpers (`has()`, `getNodes()`, `names()`) to inspect which named slots have content at render time. Use it to conditionally render wrapper elements only when a slot has been filled.
+
+See the [useSlots() guide](./use-slots.md) for full documentation.
+
+### 🧱 Built-in Components
+
+[`registerBuiltinComponents()`](./builtin-components.md) registers `<ce-suspense>` and `<ce-error-boundary>` — opt-in utility components for loading states and graceful error recovery.
+
+See the [Built-in Components guide](./builtin-components.md) for full documentation.
+
+### ⚡ Concurrent Rendering & Update Priority
+
+[`scheduleWithPriority(update, priority?, componentId?)`](./concurrent-rendering.md) provides explicit control over when updates run: `'immediate'` (synchronous), `'normal'` (microtask-batched with deduplication), or `'idle'` (deferred via `requestIdleCallback` — time-sliced and non-blocking).
+
+See the [Concurrent Rendering guide](./concurrent-rendering.md) for full documentation.

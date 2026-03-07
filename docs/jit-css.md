@@ -25,6 +25,20 @@ Custom Elements Runtime provides a high-performance, zero-dependency JIT CSS eng
 `w-full`, `w-screen`, `w-auto`, `w-fit`, `w-min`, `w-max`, `h-full`, `h-screen`, `h-auto`, `h-fit`, `h-min`, `h-max`
 `max-w-full`, `max-w-screen`, `max-h-full`, `max-h-screen`, `min-w-0`, `min-h-0`, `min-w-full`, `min-h-full`, `min-w-screen`, `min-h-screen`
 
+**Size Shorthand (width + height simultaneously):**
+`size-full`, `size-screen`, `size-auto`, `size-fit`, `size-min`, `size-max`
+`size-4`, `size-8`, `size-16`, `size-1/2`, etc. (all numeric, fraction, and named spacing tokens are supported as with `w-*` / `h-*`)
+
+The `size-*` shorthand sets both `width` and `height` in a single utility — ideal for icons, avatars, and any square UI element.
+
+```html
+<!-- 40px × 40px icon -->
+<img class="size-10 rounded-full" src="avatar.png" />
+
+<!-- Full-screen overlay -->
+<div class="size-full absolute inset-0"></div>
+```
+
 **Semantic Sizes:**
 `w-3xs` to `w-7xl`, `h-3xs` to `h-7xl`, `max-w-3xs` to `max-w-7xl`, `max-h-3xs` to `max-h-7xl`, `min-w-3xs` to `min-w-7xl`, `min-h-3xs` to `min-h-7xl`
 
@@ -110,6 +124,18 @@ Custom Elements Runtime provides a high-performance, zero-dependency JIT CSS eng
 `truncate`
 `whitespace-normal`, `whitespace-nowrap`, `whitespace-pre`, `whitespace-pre-line`, `whitespace-pre-wrap`
 `break-normal`, `break-words`, `break-all`
+
+**Text Wrap:**
+`text-wrap` — `text-wrap: wrap` (default browser behaviour, explicit)
+`text-nowrap` — `text-wrap: nowrap` (prevent line breaks)
+`text-balance` — `text-wrap: balance` (evenly distributed lines, great for headings)
+`text-pretty` — `text-wrap: pretty` (avoids orphaned last words, great for body text)
+
+```html
+<h1 class="text-2xl font-bold text-balance">Perfectly Balanced Heading</h1>
+<p class="text-pretty">Long paragraph text without orphaned last words.</p>
+<span class="text-nowrap">Never&nbsp;wraps</span>
+```
 
 **Line Clamp:**
 `line-clamp-1`, `line-clamp-2`, `line-clamp-3`, `line-clamp-4`, `line-clamp-5`, `line-clamp-6`, `line-clamp-none`
@@ -404,9 +430,61 @@ Apply filter effects to the area **behind** an element (e.g., frosted glass). Us
 
 **Z-Index:** See the Z-Index section in Built-in Utilities above (`z-0` through `z-50`, plus `z-auto` and negative `-z-10` through `-z-50`)
 
+### **Pseudo-Element Content**
+
+`content-none` — `content: none`
+`content-empty` — `content: ''` (empty string, makes a pseudo-element visible without text)
+`content-['text']` — arbitrary content string via the `content-[value]` pattern
+
+Used exclusively with the `before:` and `after:` variants to add decorative content.
+
+```html
+<!-- Decorative leading dash -->
+<li class="before:content-['-_'] before:text-neutral-400">List item</li>
+
+<!-- Clear pseudo-element content -->
+<div class="before:content-none">No decoration</div>
+
+<!-- Custom badge via ::before -->
+<span
+  class="relative before:content-['NEW'] before:absolute before:-top-3 before:text-xs before:bg-primary-500 before:text-white before:px-1 before:rounded"
+>
+  Feature
+</span>
+```
+
 ## 🧑‍💻 Variants
 
 **State:** `hover:`, `focus:`, `active:`, `disabled:`, `visited:`, `checked:`, `first:`, `last:`, `odd:`, `even:`, `before:`, `after:`, `focus-within:`, `focus-visible:`
+
+**Pseudo-Element:** `placeholder:`, `file:`, `marker:`, `selection:`, `open:`
+
+| Variant        | CSS Selector Applied         | Use Case                                                |
+| -------------- | ---------------------------- | ------------------------------------------------------- |
+| `placeholder:` | `::placeholder`              | Style `<input>` and `<textarea>` placeholder text       |
+| `file:`        | `::file-selector-button`     | Style the button inside `<input type="file">`           |
+| `marker:`      | `::marker`                   | Style list item bullet points and numbers               |
+| `selection:`   | `::selection`                | Style highlighted / selected text                       |
+| `open:`        | `:is([open], :popover-open)` | Style open `<details>`, `<dialog>`, or popover elements |
+
+```html
+<input
+  class="placeholder:text-neutral-400 placeholder:italic"
+  placeholder="Search…"
+/>
+<input
+  type="file"
+  class="file:rounded file:border-0 file:bg-primary-500 file:text-white file:px-3 file:py-1 file:cursor-pointer"
+/>
+<ul class="list-disc marker:text-primary-500">
+  <li>Colored bullet</li>
+</ul>
+<p class="selection:bg-primary-200">Select this text to see the highlight.</p>
+<details class="open:bg-neutral-50 border rounded p-2">
+  <summary>Toggle</summary>
+  <p>Content shown when open.</p>
+</details>
+```
 
 **Group:** `group-hover:`, `group-focus:`, `group-active:`, `group-disabled:`
 
@@ -427,6 +505,59 @@ Apply filter effects to the area **behind** an element (e.g., frosted glass). Us
 **Text Direction:** `rtl:`, `ltr:` (require a `dir="rtl"` or `dir="ltr"` ancestor)
 
 **Print:** `print:` (applies inside a `@media print` context)
+
+**Accessibility:** `forced-colors:` (applies inside `@media (forced-colors: active)` — targets Windows High Contrast mode and other accessibility color-forcing displays)
+
+```html
+<!-- Hide decorative elements in high contrast mode -->
+<div class="bg-primary-500 forced-colors:bg-transparent">Important content</div>
+```
+
+**Dynamic (Relational) Variants:**
+
+| Variant                             | CSS Output                                   | Use Case                                                           |
+| ----------------------------------- | -------------------------------------------- | ------------------------------------------------------------------ |
+| `data-[attr]:` / `data-[attr=val]:` | `[data-attr]` / `[data-attr="val"]` selector | Style based on `data-*` attribute state (headless UI, Radix, etc.) |
+| `has-[selector]:`                   | `:has(selector)` on the element              | Parent-conditional styling when a descendant matches               |
+| `not-[selector]:`                   | `:not(selector)` on the element              | Style when the element does NOT match the selector                 |
+| `in-[selector]:`                    | Ancestor `selector` scope                    | Style when inside an ancestor matching the selector                |
+| `starting:`                         | `@starting-style` wrapper                    | CSS entry transitions when an element first appears in DOM         |
+| `supports-[feat]:`                  | `@supports (feat)` wrapper                   | Progressive enhancement based on CSS feature support               |
+
+```html
+<!-- data-[*]: — commonly used with headless UI libraries -->
+<button
+  data-state="active"
+  class="data-[state=active]:bg-primary-500 data-[state=active]:text-white"
+>
+  Active Tab
+</button>
+
+<!-- has-[*]: — style a container based on its contents -->
+<label class="has-[input:checked]:font-bold">
+  <input type="checkbox" /> Check me
+</label>
+
+<!-- not-[*]: — style when element does NOT match -->
+<button class="not-[.primary]:border not-[.primary]:border-neutral-300">
+  Secondary
+</button>
+
+<!-- in-[*]: — style inside a specific ancestor context -->
+<span class="in-[.sidebar]:text-sm">Smaller in sidebar</span>
+
+<!-- starting: — fade in when element is first inserted -->
+<div class="opacity-100 transition-opacity duration-300 starting:opacity-0">
+  Fades in on mount
+</div>
+
+<!-- supports-[*]: — progressively enhance with grid -->
+<div
+  class="flex supports-[display:grid]:grid supports-[display:grid]:grid-cols-3"
+>
+  Flex, or grid when supported
+</div>
+```
 
 **Example:**
 
@@ -468,7 +599,9 @@ Based on the enhanced property mappings in the implementation:
 - `p-[value]`, `px-[value]`, `py-[value]` → padding variants
 - `m-[value]`, `mx-[value]`, `my-[value]` → margin variants
 - `w-[value]`, `h-[value]` → width, height
+- `size-[value]` → width **and** height simultaneously (e.g. `size-[40px]`)
 - `min-w-[value]`, `max-w-[value]`, `min-h-[value]`, `max-h-[value]` → size constraints
+- `content-[value]` → CSS `content` property for `::before`/`::after` pseudo-elements (e.g. `before:content-['→']`)
 - `border-t-[value]`, `border-r-[value]`, `border-b-[value]`, `border-l-[value]` → directional borders
 - `border-x-[value]`, `border-y-[value]` → axis borders
 - `grid-cols-[value]`, `grid-rows-[value]` → grid templates

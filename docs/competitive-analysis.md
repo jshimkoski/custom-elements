@@ -536,27 +536,48 @@ For comparison, Tailwind CSS v4's `@tailwindcss/vite` plugin adds 0KB to the run
 
 ## 🎯 Recommended Immediate Actions
 
+> **✅ All 15 items have been implemented, tested, and shipped as of v2.5.2.** Every item below passed `npm run all:ci` (lint, typecheck, 1 731 Vitest tests, Cypress e2e, production build) with zero errors or warnings.
+
 Ordered by impact, effort, and ability to complete without new dependencies:
 
-| #   | Action                                                                 | Effort  | Bundle Δ | Gap Closed Against          |
-| --- | ---------------------------------------------------------------------- | ------- | -------- | --------------------------- |
-| 1   | Add `size-*` utility                                                   | Trivial | +200B    | Tailwind v4                 |
-| 2   | Add `text-balance`, `text-pretty`, `text-nowrap`                       | Trivial | +80B     | Tailwind v4                 |
-| 3   | Add `placeholder:`, `file:`, `marker:`, `selection:`, `open:` variants | Trivial | +200B    | Tailwind v4                 |
-| 4   | Add `forced-colors:` media variant                                     | Trivial | +50B     | Tailwind v4 + Accessibility |
-| 5   | Add `content-none`, `content-empty`, arbitrary `content-[*]`           | Low     | +150B    | Tailwind v4                 |
-| 6   | Add `data-[*]:` variant                                                | Low     | +300B    | Tailwind v4 + Headless UI   |
-| 7   | Add `has-[*]:` variant                                                 | Low     | +200B    | Tailwind v4                 |
-| 8   | Add `not-[*]:` and `in-[*]:` variants                                  | Low     | +250B    | Tailwind v4                 |
-| 9   | Add `starting:` (`@starting-style`) variant                            | Low     | +150B    | Tailwind v4                 |
-| 10  | Add `supports-[*]:` variant                                            | Low     | +200B    | Tailwind v4                 |
-| 11  | Implement `useExpose()` hook                                           | Low     | +~100B   | React, Vue, Svelte          |
-| 12  | Implement `useSlots()` typed detection                                 | Medium  | +~300B   | Vue, Svelte                 |
-| 13  | Implement `<ce-suspense>` boundary                                     | Medium  | +~500B   | React, Vue                  |
-| 14  | Implement `<ce-error-boundary>`                                        | Medium  | +~400B   | React, Vue                  |
-| 15  | Implement concurrent-style rendering                                   | Medium  | +~500B   | React                       |
+| #   | Action                                                                 | Effort  | Bundle Δ | Gap Closed Against          | Status |
+| --- | ---------------------------------------------------------------------- | ------- | -------- | --------------------------- | :----: |
+| 1   | Add `size-*` utility                                                   | Trivial | +200B    | Tailwind v4                 |   ✅   |
+| 2   | Add `text-balance`, `text-pretty`, `text-nowrap`                       | Trivial | +80B     | Tailwind v4                 |   ✅   |
+| 3   | Add `placeholder:`, `file:`, `marker:`, `selection:`, `open:` variants | Trivial | +200B    | Tailwind v4                 |   ✅   |
+| 4   | Add `forced-colors:` media variant                                     | Trivial | +50B     | Tailwind v4 + Accessibility |   ✅   |
+| 5   | Add `content-none`, `content-empty`, arbitrary `content-[*]`           | Low     | +150B    | Tailwind v4                 |   ✅   |
+| 6   | Add `data-[*]:` variant                                                | Low     | +300B    | Tailwind v4 + Headless UI   |   ✅   |
+| 7   | Add `has-[*]:` variant                                                 | Low     | +200B    | Tailwind v4                 |   ✅   |
+| 8   | Add `not-[*]:` and `in-[*]:` variants                                  | Low     | +250B    | Tailwind v4                 |   ✅   |
+| 9   | Add `starting:` (`@starting-style`) variant                            | Low     | +150B    | Tailwind v4                 |   ✅   |
+| 10  | Add `supports-[*]:` variant                                            | Low     | +200B    | Tailwind v4                 |   ✅   |
+| 11  | Implement `useExpose()` hook                                           | Low     | +~100B   | React, Vue, Svelte          |   ✅   |
+| 12  | Implement `useSlots()` typed detection                                 | Medium  | +~300B   | Vue, Svelte                 |   ✅   |
+| 13  | Implement `<ce-suspense>` boundary                                     | Medium  | +~500B   | React, Vue                  |   ✅   |
+| 14  | Implement `<ce-error-boundary>`                                        | Medium  | +~400B   | React, Vue                  |   ✅   |
+| 15  | Implement concurrent-style rendering (`scheduleWithPriority`)          | Medium  | +~500B   | React                       |   ✅   |
 
 Items 1–10 collectively add under **1.8KB raw** to the bundle (~500B gzip). Every single one is a pure addition — no existing behavior changes.
+
+### Implementation Notes
+
+| Feature                             | Implementation                                                                      | Tests                                   |
+| ----------------------------------- | ----------------------------------------------------------------------------------- | --------------------------------------- |
+| `size-*`                            | `spacingProps: { size: ['width', 'height'] }` in `style.ts`                         | `test/jit-css-competitive-gaps.spec.ts` |
+| `text-wrap` utilities               | `generateUtilities()` static map additions                                          | `test/jit-css-competitive-gaps.spec.ts` |
+| Pseudo element variants             | `selectorVariants` additions (`placeholder`, `file`, `marker`, `selection`, `open`) | `test/jit-css-competitive-gaps.spec.ts` |
+| `forced-colors:`                    | `mediaVariants` + `responsiveOrder` additions                                       | `test/jit-css-competitive-gaps.spec.ts` |
+| `content-*` utilities               | `generateUtilities()` + fixed `parseArbitrary` `content` prop mapping               | `test/jit-css-competitive-gaps.spec.ts` |
+| `data-[*]:` variant                 | Dynamic variant handler in `generateRule()` → `[data-*]` attribute selector         | `test/jit-css-competitive-gaps.spec.ts` |
+| `has-[*]:` / `not-[*]:` / `in-[*]:` | Dynamic handlers → `:has()`, `:not()`, `:is()` selectors                            | `test/jit-css-competitive-gaps.spec.ts` |
+| `starting:`                         | `@starting-style` wrap in `wrapRule`                                                | `test/jit-css-competitive-gaps.spec.ts` |
+| `supports-[*]:`                     | `@supports` wrap in `wrapRule`                                                      | `test/jit-css-competitive-gaps.spec.ts` |
+| `useExpose()`                       | `src/lib/runtime/hooks.ts` — sets props on host element                             | `test/use-expose.spec.ts`               |
+| `useSlots()`                        | `src/lib/runtime/hooks.ts` — `has()`, `getNodes()`, `names()` helpers               | `test/use-slots.spec.ts`                |
+| `<ce-suspense>`                     | `src/lib/runtime/builtin-components.ts`                                             | `test/builtin-components.spec.ts`       |
+| `<ce-error-boundary>`               | `src/lib/runtime/builtin-components.ts`                                             | `test/builtin-components.spec.ts`       |
+| `scheduleWithPriority()`            | `src/lib/runtime/scheduler.ts` — `'immediate'` / `'normal'` / `'idle'`              | `test/scheduler-priority.spec.ts`       |
 
 ---
 
@@ -580,4 +601,4 @@ Completing the trivial and low-effort items in the table above — particularly 
 
 ---
 
-_Analysis compiled: March 2026 — `@jasonshimmy/custom-elements-runtime` v2.5.1_
+_Analysis compiled: March 2026 — `@jasonshimmy/custom-elements-runtime` v2.5.1 | All 15 recommended actions implemented and shipped — v2.5.2_

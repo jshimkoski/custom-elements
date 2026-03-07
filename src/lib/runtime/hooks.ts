@@ -31,6 +31,7 @@ interface InternalHookCallbacks {
   onError?: Array<(err: unknown) => void>;
   props?: Record<string, unknown>;
   style?: () => string;
+  expose?: Record<string, unknown>;
 }
 
 type InternalComponentContext = Record<string, unknown> & {
@@ -786,5 +787,122 @@ export function createComposable<T>(
         clearCurrentComponentContext();
       }
     }
+  };
+}
+
+/**
+ * Expose a public interface from the current component so that parent
+ * components holding a template ref to this element can call its methods
+ * or read its properties. Must be called during component render.
+ *
+ * @example
+ * ```ts
+ * component('my-counter', () => {
+ *   const count = ref(0);
+ *   useExpose({ increment: () => count.value++, get count() { return count.value; } });
+ *   return html`<div>${count.value}</div>`;
+ * });
+ *
+ * // Parent: counterRef.value.increment()
+ * ```
+ */
+export function useExpose<T extends Record<string, unknown>>(exposed: T): void {
+  if (!currentComponentContext) {
+    throw new Error('useExpose must be called during component render');
+  }
+
+  // During discovery render, skip — no real host to expose properties on
+  if (_isDiscoveryRenderFn()) return;
+
+  ensureHookCallbacks(currentComponentContext);
+  const hooks = currentComponentContext._hookCallbacks as InternalHookCallbacks;
+  hooks.expose = { ...(hooks.expose ?? {}), ...exposed };
+
+  // Apply exposed properties onto the host element immediately if available
+  const host = (currentComponentContext as { _host?: HTMLElement })._host;
+  if (host) {
+    for (const [key, value] of Object.entries(exposed)) {
+      try {
+        (host as unknown as Record<string, unknown>)[key] = value;
+      } catch {
+        // ignore non-writable properties
+      }
+    }
+  }
+}
+
+/**
+ * Access named slots provided to the current component. Returns helpers to
+ * check slot presence and retrieve slotted elements. Must be called during
+ * component render.
+ *
+ * @example
+ * ```ts
+ * component('my-card', () => {
+ *   const slots = useSlots();
+ *   return html`
+ *     <div class="card">
+ *       <slot></slot>
+ *       ${slots.has('footer') ? html`<footer><slot name="footer"></slot></footer>` : ''}
+ *     </div>
+ *   `;
+ * });
+ * ```
+ */
+export function useSlots(): {
+  has(name?: string): boolean;
+  getNodes(name?: string): Element[];
+  names(): string[];
+} {
+  if (!currentComponentContext) {
+    throw new Error('useSlots must be called during component render');
+  }
+
+  // During discovery render, return empty no-op slot object
+  if (_isDiscoveryRenderFn()) {
+    return { has: () => false, getNodes: () => [], names: () => [] };
+  }
+
+  const host = (currentComponentContext as { _host?: HTMLElement })._host;
+
+  return {
+    /**
+     * Returns true if the named slot (or the default slot when name is
+     * omitted) has at least one slotted child element.
+     */
+    has(name?: string): boolean {
+      if (!host) return false;
+      if (!name || name === 'default') {
+        return Array.from(host.children).some((el) => !el.hasAttribute('slot'));
+      }
+      return Array.from(host.children).some(
+        (el) => el.getAttribute('slot') === name,
+      );
+    },
+    /**
+     * Returns all child elements assigned to the named slot (or the default
+     * slot when name is omitted).
+     */
+    getNodes(name?: string): Element[] {
+      if (!host) return [];
+      if (!name || name === 'default') {
+        return Array.from(host.children).filter(
+          (el) => !el.hasAttribute('slot'),
+        );
+      }
+      return Array.from(host.children).filter(
+        (el) => el.getAttribute('slot') === name,
+      );
+    },
+    /** Returns the names of all slots that have content, including 'default'. */
+    names(): string[] {
+      if (!host) return [];
+      const slotNames = new Set<string>();
+      for (const child of Array.from(host.children)) {
+        const slotAttr = child.getAttribute('slot');
+        slotNames.add(slotAttr ?? 'default');
+      }
+      return Array.from(slotNames);
+    },
   };
 }

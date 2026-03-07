@@ -88,7 +88,7 @@ Convenience function that updates a named metric on the global singleton monitor
 ```ts
 // Typically called from your render cycle
 updateHealthMetric('averageRenderTime', renderDurationMs);
-updateHealthMetric('componentCount', registeredComponentCount);
+updateHealthMetric('activeComponents', registeredComponentCount);
 ```
 
 ---
@@ -131,9 +131,12 @@ interface HealthReport {
 }
 
 interface HealthMetric {
+  name: string;
   value: number;
-  status: 'healthy' | 'warning' | 'critical';
   threshold: number;
+  status: 'healthy' | 'warning' | 'critical';
+  lastUpdated: number;
+  history: number[];
 }
 ```
 
@@ -143,15 +146,21 @@ interface HealthMetric {
 
 The monitor evaluates the following metrics against thresholds to determine status:
 
-| Metric name         | Threshold | Status logic                         |
-| ------------------- | --------- | ------------------------------------ |
-| `averageRenderTime` | 16 ms     | > 16ms = warning, > 32ms = critical  |
-| `memoryUsage`       | 50 MB     | > 50MB = warning, > 100MB = critical |
-| `componentCount`    | 100       | > 100 = warning, > 200 = critical    |
-| `updateQueueDepth`  | 10        | > 10 = warning, > 20 = critical      |
-| `jitCacheHitRate`   | 0.8 (80%) | < 80% = warning, < 40% = critical    |
+| Metric name            | Threshold      | Status logic                                 |
+| ---------------------- | -------------- | -------------------------------------------- |
+| `activeComponents`     | 1000           | > 1000 = warning, > 2000 = critical          |
+| `componentCreateRate`  | 50 / sec       | > 50 = warning, > 100 = critical             |
+| `componentErrorRate`   | 0.1 (10%)      | > 10% = warning, > 25% = critical            |
+| `memoryUsage`          | 50 MB (bytes)  | > 50 MB = warning, > 100 MB = critical       |
+| `memoryGrowthRate`     | 1 MB / sample  | > 1 MB = warning, > 2 MB = critical          |
+| `averageRenderTime`    | 16 ms          | > 16ms = warning, > 32ms = critical          |
+| `slowRenderCount`      | 10             | > 10 = warning, > 20 = critical              |
+| `jitCacheHitRate`      | 80 (0–100 int) | < 80 = warning, < 40 = critical _(inverted)_ |
+| `activeReactiveStates` | 5000           | > 5000 = warning, > 10000 = critical         |
+| `dependencyUpdates`    | 100            | > 100 = warning, > 200 = critical            |
+| `memoryLeakIndicator`  | 0.1            | > 0.1 = warning, > 0.5 = critical            |
 
-> **Inverted threshold:** `jitCacheHitRate` uses a _lower-is-worse_ scale. All other metrics use a _higher-is-worse_ scale.
+> **Inverted threshold:** `jitCacheHitRate` uses a _lower-is-worse_ scale (integer 0–100). All other metrics use a _higher-is-worse_ scale.
 
 ---
 
@@ -186,7 +195,7 @@ component('perf-hud', () => {
             ms
           </p>
           <p>
-            Components: ${report.value!.metrics.componentCount?.value ?? '—'}
+            Components: ${report.value!.metrics.activeComponents?.value ?? '—'}
           </p>
         </div>
       `,
@@ -226,9 +235,8 @@ component('expensive-list', () => {
     () => {
       const t0 = performance.now();
       // ... rendering happens synchronously then...
-      nextTick(() => {
-        updateHealthMetric('averageRenderTime', performance.now() - t0);
-      });
+      await nextTick();
+      updateHealthMetric('averageRenderTime', performance.now() - t0);
     },
   );
 

@@ -103,14 +103,29 @@ This allows multiple instances of the same component to be cached independently 
 ## Limitations
 
 - Only the **first element per cache key** is stored. If you need multiple instances of the same component in the same `<ce-keep-alive>`, give each a unique `id`.
-- The cache lives for the lifetime of the `<ce-keep-alive>` element. It is cleared when the keep-alive element itself is removed from the DOM.
+- The cache lives for the lifetime of the `<ce-keep-alive>` element. It is **not** automatically cleared when the keep-alive element is removed from the DOM — call `clearCache()` to evict entries manually.
 - Only components registered as custom elements (i.e. `component()` calls) benefit from keep-alive caching. Plain DOM elements are not cached.
 
 ---
 
 ## Clearing the Cache
 
-The cache is automatically cleared when `<ce-keep-alive>` is disconnected from the document. There is no public API to selectively evict individual entries.
+The cache is **not** automatically cleared when `<ce-keep-alive>` is disconnected from the document (only the `slotchange` listener is removed). Use the `clearCache()` method to evict entries manually:
+
+```ts
+import { registerKeepAlive } from '@jasonshimmy/custom-elements-runtime';
+
+registerKeepAlive();
+
+const keepAliveEl = document.querySelector('ce-keep-alive') as any;
+
+// Evict a specific cache entry by key (tag name, optionally with id)
+keepAliveEl.clearCache('my-component');
+keepAliveEl.clearCache('my-component#sidebar');
+
+// Evict all cached entries
+keepAliveEl.clearCache();
+```
 
 ---
 

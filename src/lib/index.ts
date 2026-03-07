@@ -15,6 +15,10 @@ export {
   inject,
   // Composable hooks outside render (Priority 2)
   createComposable,
+  // Expose component API to parent template refs (Priority 1)
+  useExpose,
+  // Access named slots in the component (Priority 1)
+  useSlots,
   // Internal: for advanced consumers and library authors
   getCurrentComponentContext,
 } from './runtime/hooks';
@@ -37,7 +41,12 @@ export { unsafeHTML, decodeEntities } from './runtime/helpers';
 export { setDevMode, devLog } from './runtime/logger';
 
 // Testing utilities
-export { flushDOMUpdates, nextTick } from './runtime/scheduler';
+export {
+  flushDOMUpdates,
+  nextTick,
+  scheduleWithPriority,
+} from './runtime/scheduler';
+export type { UpdatePriority } from './runtime/scheduler';
 
 // Health monitoring
 export type {
@@ -53,6 +62,13 @@ export {
 
 // Teleport (Priority 3)
 export type { TeleportHandle } from './teleport';
+
+// Built-in components: <ce-suspense> and <ce-error-boundary>
+export {
+  registerCeSuspense,
+  registerCeErrorBoundary,
+  registerBuiltinComponents,
+} from './runtime/builtin-components';
 export { useTeleport } from './teleport';
 
 // KeepAlive (Priority 3)

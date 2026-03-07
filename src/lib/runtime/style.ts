@@ -446,6 +446,8 @@ export const spacingProps: Record<string, string[]> = {
   gap: ['gap'],
   'gap-x': ['column-gap'],
   'gap-y': ['row-gap'],
+  // size-* sets both width and height simultaneously (Tailwind v3+)
+  size: ['width', 'height'],
 };
 
 // Utility generators for reduced code bloat
@@ -585,6 +587,11 @@ const generateUtilities = (): CSSMap => {
     'break-normal': 'overflow-wrap:normal;word-break:normal;',
     'break-words': 'overflow-wrap:break-word;',
     'break-all': 'word-break:break-all;',
+    // Text-wrap utilities (Tailwind v3.3+)
+    'text-wrap': 'text-wrap:wrap;',
+    'text-nowrap': 'text-wrap:nowrap;',
+    'text-balance': 'text-wrap:balance;',
+    'text-pretty': 'text-wrap:pretty;',
   });
 
   // Font sizes with proper line heights
@@ -832,6 +839,13 @@ const generateUtilities = (): CSSMap => {
     'list-decimal': 'list-style-type:decimal;',
     'list-inside': 'list-style-position:inside;',
     'list-outside': 'list-style-position:outside;',
+  });
+
+  // Content utilities for pseudo-elements
+  Object.assign(utils, {
+    'content-none': 'content:none;',
+    'content-normal': 'content:normal;',
+    'content-empty': "content:'';",
   });
 
   // Scroll utilities
@@ -1584,6 +1598,14 @@ export const selectorVariants: SelectorVariantMap = {
   'dark-class': (sel, body) => `:host(.dark) ${sel}{${body}}`,
   rtl: (sel, body) => `[dir=rtl] ${sel}{${body}}`,
   ltr: (sel, body) => `[dir=ltr] ${sel}{${body}}`,
+  // Pseudo-element variants
+  placeholder: (sel, body) => `${sel}::placeholder{${body}}`,
+  file: (sel, body) => `${sel}::file-selector-button{${body}}`,
+  marker: (sel, body) => `${sel}::marker{${body}}`,
+  selection: (sel, body) => `${sel}::selection{${body}}`,
+  // State variants
+  open: (sel, body) =>
+    `${insertPseudoBeforeCombinator(sel, '[open]')}{${body}}`,
 };
 
 export const mediaVariants: MediaVariantMap = {
@@ -1596,6 +1618,7 @@ export const mediaVariants: MediaVariantMap = {
   'motion-reduce': '(prefers-reduced-motion: reduce)',
   'motion-safe': '(prefers-reduced-motion: no-preference)',
   print: 'print',
+  'forced-colors': '(forced-colors: active)',
 };
 
 export const containerVariants: MediaVariantMap = {
@@ -1621,6 +1644,7 @@ export const responsiveOrder = [
   'motion-reduce',
   'motion-safe',
   'print',
+  'forced-colors',
 ];
 export const containerOrder = [
   'xs',
@@ -1987,7 +2011,7 @@ export function parseArbitrary(className: string): string | null {
     flex: 'flex-direction',
     items: 'align-items',
     justify: 'justify-content',
-    content: 'align-content',
+    content: 'content',
     self: 'align-self',
     basis: 'flex-basis',
     tracking: 'letter-spacing',
@@ -2241,6 +2265,20 @@ export function jitCSS(html: string): string {
         checkPart = checkPart.slice(0, -1);
       }
 
+      // Skip tokens that are dynamic variant prefixes — they are NOT base
+      // utilities and must not be consumed by parseArbitrary() (which otherwise
+      // treats e.g. `data-[key]` as the CSS rule `data:key;`).
+      if (
+        (checkPart.startsWith('data-[') && checkPart.endsWith(']')) ||
+        (checkPart.startsWith('has-[') && checkPart.endsWith(']')) ||
+        (checkPart.startsWith('not-[') && checkPart.endsWith(']')) ||
+        (checkPart.startsWith('in-[') && checkPart.endsWith(']')) ||
+        (checkPart.startsWith('supports-[') && checkPart.endsWith(']')) ||
+        checkPart === 'starting'
+      ) {
+        continue;
+      }
+
       if (
         utilityMap[checkPart] ||
         parseSpacing(checkPart) ||
@@ -2303,6 +2341,8 @@ export function jitCSS(html: string): string {
     const subjectPseudos: string[] = [];
     const innerPseudos: string[] = [];
     let wrapperVariant: string | null = null;
+    let hasStartingStyle = false;
+    const supportsTokens: string[] = [];
 
     for (const token of variants) {
       if (
@@ -2312,6 +2352,49 @@ export function jitCSS(html: string): string {
           (containerOrder.includes(token.slice(1)) || token.match(/^@\[.+\]$/)))
       )
         continue;
+
+      // Handle data-[*]: attribute variant → [data-key] or [data-key="value"]
+      if (token.startsWith('data-[') && token.endsWith(']')) {
+        const inner = token.slice(6, -1);
+        const attrSel = inner.includes('=')
+          ? '[data-' + inner.replace(/^([^=]+)=(.+)$/, '$1="$2"') + ']'
+          : '[data-' + inner + ']';
+        subjectPseudos.push(attrSel);
+        continue;
+      }
+
+      // Handle has-[*]: pseudo-class variant → :has(...)
+      if (token.startsWith('has-[') && token.endsWith(']')) {
+        const inner = token.slice(5, -1).replace(/_/g, ' ');
+        subjectPseudos.push(`:has(${inner})`);
+        continue;
+      }
+
+      // Handle not-[*]: pseudo-class variant → :not(...)
+      if (token.startsWith('not-[') && token.endsWith(']')) {
+        const inner = token.slice(5, -1).replace(/_/g, ' ');
+        subjectPseudos.push(`:not(${inner})`);
+        continue;
+      }
+
+      // Handle in-[*]: ancestor variant → :is(selector) .element
+      if (token.startsWith('in-[') && token.endsWith(']')) {
+        const inner = token.slice(4, -1).replace(/_/g, ' ');
+        selector = ':is(' + inner + ') ' + selector;
+        continue;
+      }
+
+      // Handle starting: → @starting-style{} wrapper
+      if (token === 'starting') {
+        hasStartingStyle = true;
+        continue;
+      }
+
+      // Handle supports-[*]: → @supports(...){} wrapper
+      if (token.startsWith('supports-[') && token.endsWith(']')) {
+        supportsTokens.push(token);
+        continue;
+      }
 
       const variantSelector = parseArbitraryVariant(token);
       if (variantSelector) {
@@ -2493,16 +2576,33 @@ export function jitCSS(html: string): string {
       }
     }
 
+    // Build @supports query from supportsTokens
+    let supportsQuery = '';
+    if (supportsTokens.length > 0) {
+      const lastSupports = supportsTokens[supportsTokens.length - 1];
+      const supportsValue = lastSupports.slice(10, -1).replace(/_/g, ' ');
+      supportsQuery = `@supports ${
+        supportsValue.startsWith('not(') ||
+        supportsValue.startsWith('selector(') ||
+        supportsValue.startsWith('(')
+          ? supportsValue
+          : `(${supportsValue})`
+      }`;
+    }
+
     // Combine queries by wrapping each generated rule separately. If we
     // produced multiple rules (rulesArray), wrap each one and concatenate
     // them so tests can match the expected single-declaration block while
     // we still emit a second, overriding block for color-mix.
     const wrapRule = (r: string): string => {
+      let rule = r;
+      if (hasStartingStyle) rule = `@starting-style{${rule}}`;
+      if (supportsQuery) rule = `${supportsQuery}{${rule}}`;
       if (mediaQuery && containerQuery)
-        return `${mediaQuery}${containerQuery}{${r}}`;
-      if (mediaQuery) return `${mediaQuery}{${r}}`;
-      if (containerQuery) return `${containerQuery}{${r}}`;
-      return r;
+        return `${mediaQuery}${containerQuery}{${rule}}`;
+      if (mediaQuery) return `${mediaQuery}{${rule}}`;
+      if (containerQuery) return `${containerQuery}{${rule}}`;
+      return rule;
     };
 
     return rulesArray.map(wrapRule).join('');
