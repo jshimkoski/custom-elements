@@ -29,7 +29,6 @@ A guide to diagnosing and resolving common issues in the custom elements runtime
 ## 🔗 Event & Binding Problems
 
 - **Events not firing:**
-- **Events not firing:**
 - Check that the handler is correctly bound and accessible in the component scope (no accidental shadowing or missing closure capture).
 - Ensure the element is mounted before wiring listeners when using imperative `addEventListener`.
 - Use `@event` syntax in templates (e.g., `@click`) or attach listeners via refs + `addEventListener` for cross-framework compatibility.

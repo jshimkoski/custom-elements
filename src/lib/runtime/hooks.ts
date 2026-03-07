@@ -3,17 +3,32 @@
  * Provides React-like hooks with perfect TypeScript inference
  */
 
+import { isReactiveState } from './reactive';
+import { toKebab } from './helpers';
+import { devWarn } from './logger';
+import { isDiscoveryRender as _isDiscoveryRenderFn } from './discovery-state';
+
+// Re-export discovery helpers so consumers continue to use the same import path.
+export { beginDiscoveryRender, endDiscoveryRender } from './discovery-state';
+
+/**
+ * Returns true while a discovery render is in progress.
+ * Used by `html` and other primitives to short-circuit side effects.
+ * @internal
+ */
+export function isDiscoveryRender(): boolean {
+  return _isDiscoveryRenderFn();
+}
+
 // Global state to track current component context during render
 // Narrowed internal type for currentComponentContext to expose _hookCallbacks
 interface InternalHookCallbacks {
-  onConnected?: () => void;
-  onDisconnected?: () => void;
-  onAttributeChanged?: (
-    name: string,
-    oldValue: string | null,
-    newValue: string | null,
-  ) => void;
-  onError?: (err: unknown) => void;
+  onConnected?: Array<(context?: unknown) => void>;
+  onDisconnected?: Array<(context?: unknown) => void>;
+  onAttributeChanged?: Array<
+    (name: string, oldValue: string | null, newValue: string | null) => void
+  >;
+  onError?: Array<(err: unknown) => void>;
   props?: Record<string, unknown>;
   style?: () => string;
 }
@@ -24,9 +39,6 @@ type InternalComponentContext = Record<string, unknown> & {
 };
 
 let currentComponentContext: InternalComponentContext | null = null;
-import { isReactiveState } from './reactive';
-import { toKebab } from './helpers';
-import { devWarn } from './logger';
 
 /**
  * Set the current component context (called internally during render)
@@ -44,6 +56,21 @@ export function setCurrentComponentContext(
  */
 export function clearCurrentComponentContext(): void {
   currentComponentContext = null;
+}
+
+// ---------- Discovery render probe ----------
+// The actual state and helpers live in discovery-state.ts to avoid
+// circular dependencies with reactive.ts. The re-exports above forward
+// beginDiscoveryRender / endDiscoveryRender / isDiscoveryRender from that
+// module so all existing import sites remain unchanged.
+
+/**
+ * Get the current component context. Useful for advanced composable patterns
+ * that need to access or pass the context explicitly.
+ * @internal
+ */
+export function getCurrentComponentContext(): Record<string, unknown> | null {
+  return currentComponentContext;
 }
 
 /**
@@ -71,6 +98,11 @@ export function useEmit(): (
 ) => boolean {
   if (!currentComponentContext) {
     throw new Error('useEmit must be called during component render');
+  }
+
+  // During discovery render, return a no-op function — no real host exists.
+  if (_isDiscoveryRenderFn()) {
+    return () => false;
   }
 
   // Capture and validate the emit function from the current context
@@ -125,11 +157,14 @@ export function useOnConnected(callback: () => void): void {
     throw new Error('useOnConnected must be called during component render');
   }
 
+  // During discovery render, skip registering lifecycle callbacks — the
+  // discoveryContext is ephemeral and its hooks are never invoked.
+  if (_isDiscoveryRenderFn()) return;
+
   ensureHookCallbacks(currentComponentContext as InternalComponentContext);
-  // currentComponentContext._hookCallbacks is typed via ensureHookCallbacks
-  (
-    currentComponentContext._hookCallbacks as InternalHookCallbacks
-  ).onConnected = callback;
+  const hooks = currentComponentContext._hookCallbacks as InternalHookCallbacks;
+  if (!hooks.onConnected) hooks.onConnected = [];
+  hooks.onConnected.push(callback);
 }
 
 /**
@@ -151,10 +186,13 @@ export function useOnDisconnected(callback: () => void): void {
     throw new Error('useOnDisconnected must be called during component render');
   }
 
+  // During discovery render, skip registering lifecycle callbacks.
+  if (_isDiscoveryRenderFn()) return;
+
   ensureHookCallbacks(currentComponentContext as InternalComponentContext);
-  (
-    currentComponentContext._hookCallbacks as InternalHookCallbacks
-  ).onDisconnected = callback;
+  const hooks = currentComponentContext._hookCallbacks as InternalHookCallbacks;
+  if (!hooks.onDisconnected) hooks.onDisconnected = [];
+  hooks.onDisconnected.push(callback);
 }
 
 /**
@@ -184,10 +222,13 @@ export function useOnAttributeChanged(
     );
   }
 
+  // During discovery render, skip registering lifecycle callbacks.
+  if (_isDiscoveryRenderFn()) return;
+
   ensureHookCallbacks(currentComponentContext as InternalComponentContext);
-  (
-    currentComponentContext._hookCallbacks as InternalHookCallbacks
-  ).onAttributeChanged = callback;
+  const hooks = currentComponentContext._hookCallbacks as InternalHookCallbacks;
+  if (!hooks.onAttributeChanged) hooks.onAttributeChanged = [];
+  hooks.onAttributeChanged.push(callback);
 }
 
 /**
@@ -209,18 +250,21 @@ export function useOnError(callback: (error: Error) => void): void {
     throw new Error('useOnError must be called during component render');
   }
 
+  // During discovery render, skip registering lifecycle callbacks.
+  if (_isDiscoveryRenderFn()) return;
+
   ensureHookCallbacks(currentComponentContext as InternalComponentContext);
-  // Accept unknown error types from runtime and forward to user-provided Error handler when possible
-  (currentComponentContext._hookCallbacks as InternalHookCallbacks).onError = (
-    err: unknown,
-  ) => {
+  const hooks = currentComponentContext._hookCallbacks as InternalHookCallbacks;
+  if (!hooks.onError) hooks.onError = [];
+  // Wrap to normalize to Error and swallow re-throws.
+  hooks.onError.push((err: unknown) => {
     try {
       if (err instanceof Error) callback(err);
       else callback(new Error(String(err)));
     } catch {
       /* swallow */
     }
-  };
+  });
 }
 
 /**
@@ -555,6 +599,9 @@ export function useStyle(callback: () => string): void {
     throw new Error('useStyle must be called during component render');
   }
 
+  // During discovery render, skip style computation — no real DOM to style.
+  if (_isDiscoveryRenderFn()) return;
+
   ensureHookCallbacks(currentComponentContext);
 
   // Execute the callback immediately during render to capture the current style
@@ -578,4 +625,166 @@ export function useStyle(callback: () => string): void {
       configurable: true,
     });
   }
+}
+
+// ---------- provide / inject ----------
+
+const PROVIDES_KEY = Symbol.for('@cer/provides');
+
+/**
+ * Store a value under a key so that descendant components can retrieve it
+ * with `inject()`. Must be called during component render.
+ *
+ * @example
+ * ```ts
+ * component('theme-provider', () => {
+ *   provide('theme', 'dark');
+ *   return html`<slot></slot>`;
+ * });
+ * ```
+ */
+export function provide<T>(key: string | symbol, value: T): void {
+  if (!currentComponentContext) {
+    throw new Error('provide must be called during component render');
+  }
+
+  // During discovery render, skip provide — the ephemeral context is discarded.
+  if (_isDiscoveryRenderFn()) return;
+
+  const ctx = currentComponentContext as Record<string | symbol, unknown>;
+  if (!ctx[PROVIDES_KEY]) {
+    Object.defineProperty(ctx, PROVIDES_KEY, {
+      value: new Map<string | symbol, unknown>(),
+      writable: false,
+      enumerable: false,
+      configurable: true,
+    });
+  }
+  (ctx[PROVIDES_KEY] as Map<string | symbol, unknown>).set(key, value);
+}
+
+/**
+ * Retrieve a value provided by an ancestor component. Traverses the shadow
+ * DOM tree upward through ShadowRoot host elements looking for the nearest
+ * `provide()` call with the matching key. Returns `defaultValue` (or
+ * `undefined`) when no provider is found. Must be called during render.
+ *
+ * @example
+ * ```ts
+ * component('themed-button', () => {
+ *   const theme = inject<string>('theme', 'light');
+ *   return html`<button class="btn-${theme}">Click</button>`;
+ * });
+ * ```
+ */
+export function inject<T>(
+  key: string | symbol,
+  defaultValue?: T,
+): T | undefined {
+  if (!currentComponentContext) {
+    throw new Error('inject must be called during component render');
+  }
+
+  // During discovery render, the host tree is not yet mounted — return the
+  // default value to allow prop detection to continue without DOM traversal.
+  if (_isDiscoveryRenderFn()) return defaultValue;
+
+  try {
+    const host = (currentComponentContext as { _host?: HTMLElement })._host;
+    if (host) {
+      let node: Node | null = host.parentNode as Node | null;
+      if (!node) node = host.getRootNode() as Node | null;
+
+      while (node) {
+        if (node instanceof ShadowRoot) {
+          const shadowHost = node.host;
+          const hostCtx = (
+            shadowHost as unknown as {
+              context?: Record<string | symbol, unknown>;
+            }
+          ).context;
+          if (hostCtx) {
+            const provides = hostCtx[PROVIDES_KEY] as
+              | Map<string | symbol, unknown>
+              | undefined;
+            if (provides?.has(key)) {
+              return provides.get(key) as T;
+            }
+          }
+          const next: Node | null = shadowHost.parentNode as Node | null;
+          node = next ?? (shadowHost.getRootNode() as Node | null);
+          if (node === document || node === shadowHost) break;
+        } else {
+          const next: Node | null = (node as Node).parentNode as Node | null;
+          node = next ?? ((node as Node).getRootNode?.() as Node | null);
+          if (node === document) break;
+        }
+      }
+    }
+  } catch {
+    // ignore traversal errors - fall through to default
+  }
+
+  return defaultValue;
+}
+
+// ---------- createComposable ----------
+
+/**
+ * Execute a function that calls hooks (useOnConnected, useOnDisconnected, etc.)
+ * using an explicit component context rather than requiring the call to happen
+ * directly inside a render function. This enables composable utility functions
+ * that register lifecycle callbacks from outside the render body.
+ *
+ * @example
+ * ```ts
+ * function useLogger(label: string) {
+ *   return createComposable(() => {
+ *     useOnConnected(() => console.log(`${label} connected`));
+ *     useOnDisconnected(() => console.log(`${label} disconnected`));
+ *   });
+ * }
+ *
+ * component('my-comp', () => {
+ *   const stopLogger = useLogger('my-comp');
+ *   stopLogger(context); // pass the component context explicitly
+ *   return html`<div>Hello</div>`;
+ * });
+ * ```
+ *
+ * More commonly, use it as a direct wrapper inside render:
+ * ```ts
+ * component('my-comp', () => {
+ *   // Accepts context automatically from getCurrentComponentContext()
+ *   createComposable(() => {
+ *     useOnConnected(() => console.log('connected from composable'));
+ *   })();
+ *   return html`<div>Hello</div>`;
+ * });
+ * ```
+ */
+export function createComposable<T>(
+  fn: () => T,
+): (ctx?: Record<string, unknown>) => T {
+  return (ctx?: Record<string, unknown>) => {
+    const targetCtx = ctx ?? currentComponentContext;
+    if (!targetCtx) {
+      throw new Error(
+        'createComposable: no component context available. Pass a context explicitly or call inside a render function.',
+      );
+    }
+
+    const prev = currentComponentContext;
+    setCurrentComponentContext(targetCtx);
+    try {
+      return fn();
+    } finally {
+      // Restore the previous context (supports nested composables)
+      if (prev) {
+        setCurrentComponentContext(prev);
+      } else {
+        clearCurrentComponentContext();
+      }
+    }
+  };
 }

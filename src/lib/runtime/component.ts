@@ -25,6 +25,8 @@ import { scheduleDOMUpdate } from './scheduler';
 import {
   setCurrentComponentContext,
   clearCurrentComponentContext,
+  beginDiscoveryRender,
+  endDiscoveryRender,
 } from './hooks';
 import { devError, devWarn } from './logger';
 
@@ -70,7 +72,7 @@ function initGlobalRegistryIfNeeded(): void {
       const g = globalThis as Record<string | symbol, unknown>;
       if (!g[GLOBAL_REG_KEY]) {
         // Use a unique registry per realm to avoid cross-contamination
-        const realmId = Math.random().toString(36).substr(2, 9);
+        const realmId = crypto.randomUUID();
         g[GLOBAL_REG_KEY] = new Map([...registry.entries()]);
         // Store realm identifier for debugging
         (
@@ -85,44 +87,44 @@ function initGlobalRegistryIfNeeded(): void {
 }
 
 // --- Hot Module Replacement (HMR) ---
-if (
-  typeof import.meta !== 'undefined' &&
-  (
-    import.meta as {
-      hot?: { accept: (fn: (newModule?: unknown) => void) => void };
-    }
-  ).hot &&
-  import.meta &&
-  import.meta.hot
-) {
-  import.meta.hot.accept((newModule) => {
-    // Update registry with new configs from the hot module (SSR-safe)
-    if (newModule && newModule.registry) {
-      for (const [tag, newConfig] of newModule.registry.entries()) {
-        registry.set(tag, newConfig);
-        // Update all instances to use new config (browser only)
-        if (typeof document !== 'undefined' && document.querySelectorAll) {
-          try {
-            document.querySelectorAll(tag).forEach((el) => {
-              const customEl = el as CustomElement;
-              if (typeof customEl._cfg !== 'undefined') {
-                customEl._cfg = newConfig;
-              }
-              // HMR: Preserve existing state by keeping the context object intact.
-              // Instead of re-executing the component function (which would create new refs),
-              // we just update the config and re-render with the existing context.
-              // This ensures refs and other reactive state are preserved across HMR updates.
-              if (typeof customEl._render === 'function') {
-                customEl._render(newConfig);
-              }
-            });
-          } catch (error) {
-            devWarn('HMR update failed:', error);
+{
+  type HMRImportMeta = {
+    hot?: { accept: (fn: (newModule?: unknown) => void) => void };
+  };
+  const hmrHot = (import.meta as HMRImportMeta).hot;
+  if (hmrHot) {
+    hmrHot.accept((newModule: unknown) => {
+      // Update registry with new configs from the hot module (SSR-safe)
+      const mod = newModule as
+        | { registry?: Map<string, ComponentConfig<object, object, object>> }
+        | undefined;
+      if (mod && mod.registry) {
+        for (const [tag, newConfig] of mod.registry.entries()) {
+          registry.set(tag, newConfig);
+          // Update all instances to use new config (browser only)
+          if (typeof document !== 'undefined' && document.querySelectorAll) {
+            try {
+              document.querySelectorAll(tag).forEach((el) => {
+                const customEl = el as CustomElement;
+                if (typeof customEl._cfg !== 'undefined') {
+                  customEl._cfg = newConfig;
+                }
+                // HMR: Preserve existing state by keeping the context object intact.
+                // Instead of re-executing the component function (which would create new refs),
+                // we just update the config and re-render with the existing context.
+                // This ensures refs and other reactive state are preserved across HMR updates.
+                if (typeof customEl._render === 'function') {
+                  customEl._render(newConfig);
+                }
+              });
+            } catch (error) {
+              devWarn('HMR update failed:', error);
+            }
           }
         }
       }
-    }
-  });
+    });
+  }
 }
 
 export function createElementClass<
@@ -196,7 +198,7 @@ export function createElementClass<
       this._cfg = (registry.get(tag) as ComponentConfig<S, C, P, T>) || config;
 
       // Generate unique component ID for render deduplication
-      this._componentId = `${tag}-${Math.random().toString(36).substr(2, 9)}`;
+      this._componentId = `${tag}-${crypto.randomUUID()}`;
 
       const reactiveContext = this._initContext(config);
 
@@ -826,14 +828,16 @@ export function component(
       type InternalContext = Record<string, unknown> & {
         _componentId?: string;
         _hookCallbacks?: Record<string, unknown> & {
-          onConnected?: () => void;
-          onDisconnected?: () => void;
-          onAttributeChanged?: (
-            name: string,
-            oldValue: string | null,
-            newValue: string | null,
-          ) => void;
-          onError?: (err: unknown) => void;
+          onConnected?: Array<() => void>;
+          onDisconnected?: Array<() => void>;
+          onAttributeChanged?: Array<
+            (
+              name: string,
+              oldValue: string | null,
+              newValue: string | null,
+            ) => void
+          >;
+          onError?: Array<(err: unknown) => void>;
           style?: (el: HTMLElement) => void;
           props?: Record<string, unknown>;
         };
@@ -841,8 +845,7 @@ export function component(
 
       const ictx = context as InternalContext;
       const componentId =
-        ictx._componentId ||
-        `${normalizedTag}-${Math.random().toString(36).substr(2, 9)}`;
+        ictx._componentId || `${normalizedTag}-${crypto.randomUUID()}`;
 
       reactiveSystem.setCurrentComponent(componentId, () => {
         if (context.requestRender) {
@@ -851,6 +854,21 @@ export function component(
       });
 
       try {
+        // Reset hook callbacks before each render so registrations from a previous
+        // render don't accumulate. The context is re-used across re-renders so
+        // any callbacks pushed in the last render must be cleared before the next
+        // renderFn() call to keep the "call useOnConnected once per render" contract.
+        //
+        // IMPORTANT: Use Object.defineProperty (not a direct assignment) so that
+        // this write bypasses the reactive Proxy set-trap that wraps `context`.
+        // A plain `context._hookCallbacks = {}` assignment would travel through the
+        // proxy, call scheduleDOMUpdate, and trigger an infinite re-render loop.
+        Object.defineProperty(context, '_hookCallbacks', {
+          value: {},
+          writable: true,
+          enumerable: false,
+          configurable: true,
+        });
         // Set current component context for hooks
         setCurrentComponentContext(context);
 
@@ -864,9 +882,18 @@ export function component(
         } catch (err) {
           try {
             const hookCallbacks = ictx._hookCallbacks;
-            if (hookCallbacks && typeof hookCallbacks.onError === 'function') {
+            const errorCbs = hookCallbacks?.onError;
+            if (Array.isArray(errorCbs)) {
+              for (const cb of errorCbs) {
+                try {
+                  (cb as (e: unknown) => void)(err);
+                } catch {
+                  /* swallow */
+                }
+              }
+            } else if (typeof errorCbs === 'function') {
               try {
-                (hookCallbacks.onError as (e: unknown) => void)(err);
+                (errorCbs as (e: unknown) => void)(err);
               } catch {
                 /* swallow */
               }
@@ -877,27 +904,73 @@ export function component(
           throw err;
         }
 
-        // Process hook callbacks that were set during render
+        // Process hook callbacks that were set during render.
+        // Callbacks are stored as arrays to allow multiple registrations (composable pattern).
         if (ictx._hookCallbacks) {
           const hookCallbacks = ictx._hookCallbacks;
           if (hookCallbacks.onConnected) {
-            lifecycleHooks.onConnected = hookCallbacks.onConnected;
+            const cbs = hookCallbacks.onConnected as Array<
+              (context?: unknown) => void
+            >;
+            lifecycleHooks.onConnected = (context?: unknown) => {
+              for (const cb of cbs) {
+                try {
+                  cb(context);
+                } catch {
+                  /* swallow */
+                }
+              }
+            };
           }
           if (hookCallbacks.onDisconnected) {
-            lifecycleHooks.onDisconnected = hookCallbacks.onDisconnected;
+            const cbs = hookCallbacks.onDisconnected as Array<
+              (context?: unknown) => void
+            >;
+            lifecycleHooks.onDisconnected = (context?: unknown) => {
+              for (const cb of cbs) {
+                try {
+                  cb(context);
+                } catch {
+                  /* swallow */
+                }
+              }
+            };
           }
           if (hookCallbacks.onAttributeChanged) {
-            lifecycleHooks.onAttributeChanged =
-              hookCallbacks.onAttributeChanged as (
+            const cbs = hookCallbacks.onAttributeChanged as Array<
+              (
                 name: string,
                 oldValue: string | null,
                 newValue: string | null,
-              ) => void;
+                context?: unknown,
+              ) => void
+            >;
+            lifecycleHooks.onAttributeChanged = (
+              name: string,
+              oldValue: string | null,
+              newValue: string | null,
+              context?: unknown,
+            ) => {
+              for (const cb of cbs) {
+                try {
+                  cb(name, oldValue, newValue, context);
+                } catch {
+                  /* swallow */
+                }
+              }
+            };
           }
           if (hookCallbacks.onError) {
-            lifecycleHooks.onError = hookCallbacks.onError as (
-              err: Error,
-            ) => void;
+            const cbs = hookCallbacks.onError as Array<(err: Error) => void>;
+            lifecycleHooks.onError = (err: Error) => {
+              for (const cb of cbs) {
+                try {
+                  cb(err);
+                } catch {
+                  /* swallow */
+                }
+              }
+            };
           }
           // Note: `useStyle()` stores a computed style string directly on
           // the current context as `_computedStyle`. The runtime reads
@@ -944,12 +1017,19 @@ export function component(
   // Store in registry
   registry.set(normalizedTag, config);
 
-  // CRITICAL: Perform a "discovery render" to detect props from useProps()
-  // This must happen BEFORE defining the custom element, so observedAttributes
-  // includes all props declared via useProps()
+  // CRITICAL: Perform a "discovery render" to detect props from useProps().
+  // This must happen BEFORE defining the custom element so observedAttributes
+  // includes all props declared via useProps().
+  //
+  // The discovery render uses a lightweight probe context combined with the
+  // beginDiscoveryRender() flag. When that flag is set, the html tagged
+  // template and other side-effectful primitives (reactive subscriptions,
+  // template parsing, etc.) short-circuit immediately. Only useProps() and
+  // other metadata-registration hooks actually execute. This eliminates the
+  // double-execution of side effects (API calls, console.logs, watchers)
+  // that occurred in the previous implementation which ran the full render.
   if (typeof window !== 'undefined') {
     try {
-      // Create a minimal mock context for discovery
       const discoveryContext: {
         _hookCallbacks: Record<string, unknown>;
         requestRender: () => void;
@@ -957,34 +1037,41 @@ export function component(
       } = {
         _hookCallbacks: {},
         requestRender: () => {},
-        // Provide a noop emit during discovery render so hooks like useEmit()
-        // can be called safely when the component author invokes them at
-        // module-evaluation time to declare handlers. The real element
-        // instances will have a proper emit implementation.
         emit: () => true,
       };
       setCurrentComponentContext(discoveryContext);
+      beginDiscoveryRender();
       try {
-        // Execute once to trigger useProps() calls. If this throws we want to
-        // surface the error to any useOnError hook that the component may have
-        // registered during discovery and emit DEV diagnostics so authors see
-        // what's going wrong (best-effort).
+        // Run with discovery flag active. The html`` tag and side-effectful
+        // primitives will no-op; only useProps() actually registers metadata.
         renderFn();
       } catch (err) {
         try {
           const hookCallbacks = (
             discoveryContext as {
-              _hookCallbacks?: { onError?: (err: unknown) => void };
+              _hookCallbacks?: {
+                onError?:
+                  | Array<(err: unknown) => void>
+                  | ((err: unknown) => void);
+              };
             }
           )?._hookCallbacks;
-          if (hookCallbacks && typeof hookCallbacks.onError === 'function') {
+          const errorCbs = hookCallbacks?.onError;
+          if (Array.isArray(errorCbs)) {
+            for (const cb of errorCbs) {
+              try {
+                cb(err);
+              } catch {
+                /* swallow */
+              }
+            }
+          } else if (typeof errorCbs === 'function') {
             try {
-              hookCallbacks.onError(err);
+              (errorCbs as (e: unknown) => void)(err);
             } catch {
               /* swallow */
             }
           }
-          // DEV diagnostics for discovery-time failures
           devError(
             `Error during component discovery render <${normalizedTag}>:`,
             err,
@@ -995,12 +1082,13 @@ export function component(
         } catch {
           /* best-effort */
         }
+        endDiscoveryRender();
         clearCurrentComponentContext();
         throw err;
       }
+      endDiscoveryRender();
       clearCurrentComponentContext();
 
-      // If useProps() was called during discovery, update config.props
       if (discoveryContext._hookCallbacks?.props) {
         const propsDefaults = discoveryContext._hookCallbacks.props;
         config.props = Object.fromEntries(
@@ -1019,11 +1107,10 @@ export function component(
             ];
           }),
         );
-        // Update registry with discovered props
         registry.set(normalizedTag, config);
       }
     } catch {
-      // Discovery render failed - this is OK, props will be discovered on first real render
+      // Discovery render failed - props will be discovered on first real render
     }
 
     if (!customElements.get(normalizedTag)) {

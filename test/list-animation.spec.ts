@@ -340,7 +340,6 @@ describe('List Animation - Styling and Animation Tests', () => {
 
     // Check item is still in DOM during transition
     await new Promise((resolve) => setTimeout(resolve, 50));
-    items = el.shadowRoot.querySelectorAll('[data-test-id]');
 
     // After transition, item should be removed
     await new Promise((resolve) => setTimeout(resolve, 250));

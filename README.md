@@ -80,23 +80,31 @@ Below is the **complete list of public symbols** exported by the runtime and its
 
 **Package:** `@jasonshimmy/custom-elements-runtime`
 
-| Export                  | Description                                                            |
-| ----------------------- | ---------------------------------------------------------------------- |
-| `component`             | Define a custom element with the functional component API.             |
-| `html`                  | Template tag function producing runtime VNodes from template literals. |
-| `css`                   | Define component-scoped/JIT styles or register stylesheets.            |
-| `ref`                   | Create a reactive reference object with a `.value` property.           |
-| `computed`              | Create a derived, read-only reactive value from other reactives.       |
-| `watch`                 | Register watchers reacting to changes in reactive values.              |
-| `useProps`              | Hook to declare/consume typed component props with defaults.           |
-| `useEmit`               | Hook returning an emit function for dispatching custom events.         |
-| `useOnConnected`        | Hook that runs a callback when the component connects.                 |
-| `useOnDisconnected`     | Hook that runs a callback when the component disconnects.              |
-| `useOnAttributeChanged` | Hook observing host attribute changes.                                 |
-| `useOnError`            | Hook to register a component-level error handler.                      |
-| `useStyle`              | Hook to register or compute component styles at runtime.               |
-| `unsafeHTML`            | Insert raw HTML into a template (**unsafe; use carefully**).           |
-| `decodeEntities`        | Utility to decode HTML entities in strings.                            |
+| Export                       | Description                                                                      |
+| ---------------------------- | -------------------------------------------------------------------------------- |
+| `component`                  | Define a custom element with the functional component API.                       |
+| `html`                       | Template tag function producing runtime VNodes from template literals.           |
+| `css`                        | Define component-scoped/JIT styles or register stylesheets.                      |
+| `ref`                        | Create a reactive reference object with a `.value` property.                     |
+| `computed`                   | Create a memoized, derived read-only value from other reactive sources.          |
+| `watch`                      | Register watchers reacting to changes in reactive values.                        |
+| `watchEffect`                | Auto-track reactive reads and re-run a side-effect whenever dependencies change. |
+| `nextTick`                   | Returns a Promise resolving after all pending DOM updates are flushed.           |
+| `provide`                    | Store a value on the current component for descendant injection.                 |
+| `inject`                     | Retrieve a value provided by an ancestor component.                              |
+| `createComposable`           | Package reusable stateful logic (hooks, reactive state) into a composable.       |
+| `getCurrentComponentContext` | Access the active component context from within a composable or render function. |
+| `useProps`                   | Hook to declare/consume typed component props with defaults.                     |
+| `useEmit`                    | Hook returning an emit function for dispatching custom events.                   |
+| `useOnConnected`             | Hook that runs a callback when the component connects.                           |
+| `useOnDisconnected`          | Hook that runs a callback when the component disconnects.                        |
+| `useOnAttributeChanged`      | Hook observing host attribute changes.                                           |
+| `useOnError`                 | Hook to register a component-level error handler.                                |
+| `useStyle`                   | Hook to register or compute component styles at runtime.                         |
+| `useTeleport`                | Render virtual DOM content into any DOM node outside the shadow root.            |
+| `registerKeepAlive`          | Register `<ce-keep-alive>` to preserve component state across DOM removals.      |
+| `unsafeHTML`                 | Insert raw HTML into a template (**unsafe; use carefully**).                     |
+| `decodeEntities`             | Utility to decode HTML entities in strings.                                      |
 
 ---
 
@@ -258,6 +266,8 @@ Explore the complete documentation for every runtime feature:
 ### 🎨 **Styling**
 
 - [🎨 JIT CSS](./docs/jit-css.md) - On-demand utility-first styling system
+- [� JIT CSS Competitive Audit](./docs/jit-css-audit.md) - Gap analysis and improvement roadmap for the JIT CSS engine
+- [�📏 Space Utilities](./docs/space-utilities.md) - Tailwind-style `space-x-*` and `space-y-*` spacing utilities
 - [📝 Prose Typography](./docs/prose.md) - Beautiful typography for long-form content
 
 ### 🔗 **Communication & State**
@@ -269,6 +279,11 @@ Explore the complete documentation for every runtime feature:
 
 ### ⚡ **Advanced Features**
 
+- [⚡ Reactive API](./docs/reactive-api.md) - `computed()` memoization, `watchEffect()` auto-tracking, and `nextTick()`
+- [🏝️ Provide / Inject](./docs/provide-inject.md) - Ancestor-to-descendant dependency injection without prop-drilling
+- [🧩 Composables](./docs/composable.md) - Reusable stateful logic with `createComposable()`
+- [🚀 Teleport](./docs/teleport.md) - Render content outside the shadow root with `useTeleport()`
+- [♻️ Keep-Alive](./docs/keep-alive.md) - Preserve component state across DOM removals with `<ce-keep-alive>`
 - [🔮 Virtual DOM](./docs/virtual-dom.md) - VDOM implementation and performance details
 - [🌐 SSR](./docs/ssr.md) - Server-side rendering support
 - [♻️ HMR](./docs/hmr.md) - Hot module replacement
@@ -282,9 +297,10 @@ Explore the complete documentation for every runtime feature:
 - [🅰️ Angular Integration](./docs/angular-integration.md) - Using components in Angular apps
 - [🔥 Svelte Integration](./docs/svelte-integration.md) - Using components in Svelte apps
 
-### 🛠️ **Troubleshooting**
+### 🛠️ **Troubleshooting & Roadmap**
 
 - [🔧 Troubleshooting](./docs/troubleshooting.md) - Common issues and solutions
+- [🗺️ Improvement Roadmap](./docs/improvement-roadmap.md) - Remaining work to surpass React, Vue, and Svelte
 
 For examples and implementation details, explore the source code in `src/lib/`.
 

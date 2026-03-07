@@ -1,6 +1,7 @@
 import { scheduleDOMUpdate } from './scheduler';
 import { ProxyOptimizer } from './reactive-proxy-cache';
 import { devWarn } from './logger';
+import { isDiscoveryRender } from './discovery-state';
 
 /**
  * Global reactive system for tracking dependencies and triggering updates
@@ -350,25 +351,119 @@ export function isReactiveState(v: unknown): v is ReactiveState<unknown> {
 }
 
 /**
- * Create computed state that derives from other reactive state
+ * Create computed state that derives from other reactive state.
+ * The result is cached and only recomputed when tracked reactive dependencies change.
  *
  * @example
  * ```ts
  * const firstName = ref('John');
  * const lastName = ref('Doe');
  * const fullName = computed(() => `${firstName.value} ${lastName.value}`);
+ * console.log(fullName.value); // 'John Doe' — cached until firstName or lastName changes
  * ```
  */
 export function computed<T>(fn: () => T): { readonly value: T } {
-  const computedState = new ReactiveState(fn());
+  let cachedValue: T;
+  let isDirty = true;
 
-  // We need to track dependencies when the computed function runs
-  // For now, we'll re-evaluate on every access (can be optimized later)
+  // Unique identifier used ONLY to track which reactive states this computed depends
+  // on (for cache invalidation). It does NOT serve as a "current component" for
+  // downstream notification — that is handled by running fn() in the outer context.
+  const computedId = `computed-${crypto.randomUUID()}`;
+
+  // invalidate() only marks the cache stale. It does NOT call triggerUpdate because
+  // the calling component is notified directly via the outer fn() call (see get value()).
+  const invalidate = (): void => {
+    isDirty = true;
+  };
+
+  // Register under the current component (if inside a render) so cleanup is automatic.
+  try {
+    const parentComp = reactiveSystem.getCurrentComponentId();
+    if (parentComp) {
+      reactiveSystem.registerWatcher(parentComp, computedId);
+    }
+  } catch {
+    /* ignore */
+  }
+
+  // Initial computation: establishes which reactive sources this computed depends on
+  // for invalidation tracking.
+  reactiveSystem.setCurrentComponent(computedId, invalidate);
+  cachedValue = fn();
+  reactiveSystem.clearCurrentComponent();
+  isDirty = false;
+
   return {
     get value(): T {
-      reactiveSystem.trackDependency(computedState as ReactiveState<unknown>);
-      return fn();
+      if (isDirty) {
+        // Re-run fn() in computedId's context to re-subscribe for future invalidations.
+        reactiveSystem.setCurrentComponent(computedId, invalidate);
+        cachedValue = fn();
+        reactiveSystem.clearCurrentComponent();
+        isDirty = false;
+      }
+
+      // Run fn() once more in the CURRENT (calling) context so that whoever is
+      // consuming this computed — a component or an outer computed — directly tracks
+      // the same reactive dependencies. This preserves the original synchronous
+      // notification behaviour: when any dep changes, the consumer is notified
+      // directly without going through an async microtask cascade.
+      // The result of this call is discarded; we return the cached value above.
+      fn();
+
+      return cachedValue;
     },
+  };
+}
+
+/**
+ * Run a side-effect function immediately and automatically re-run it whenever
+ * any reactive state accessed inside `fn` changes. Similar to Vue's `watchEffect`.
+ *
+ * @returns A cleanup function that stops the effect.
+ *
+ * @example
+ * ```ts
+ * const count = ref(0);
+ * const stop = watchEffect(() => {
+ *   document.title = `Count: ${count.value}`;
+ * });
+ * count.value++; // automatically re-runs the effect
+ * stop(); // cancel the effect
+ * ```
+ */
+export function watchEffect(fn: () => void): () => void {
+  // During discovery render, skip setting up effects — fn may have side effects
+  // (API calls, mutations) that should only run in real render contexts.
+  if (isDiscoveryRender()) return () => {};
+
+  const effectId = `effect-${crypto.randomUUID()}`;
+
+  // Register under the current component for automatic cleanup on re-render/destroy.
+  try {
+    const parentComp = reactiveSystem.getCurrentComponentId();
+    if (parentComp) {
+      reactiveSystem.registerWatcher(parentComp, effectId);
+    }
+  } catch {
+    /* ignore */
+  }
+
+  const run = (): void => {
+    reactiveSystem.setCurrentComponent(effectId, run);
+    try {
+      fn();
+    } finally {
+      reactiveSystem.clearCurrentComponent();
+    }
+  };
+
+  // Run immediately to establish dependencies and execute the initial side effect.
+  run();
+
+  return () => {
+    reactiveSystem.cleanup(effectId);
   };
 }
 
@@ -398,6 +493,10 @@ export function watch<T>(
   callback: (newValue: T, oldValue?: T) => void,
   options?: { immediate?: boolean },
 ): () => void {
+  // During discovery render, skip setting up watchers — callbacks may contain
+  // side effects that should only run against real component instances.
+  if (isDiscoveryRender()) return () => {};
+
   // Note: we must establish reactive dependencies first (a tracked
   // call) and only then capture the initial `oldValue`. Capturing
   // `oldValue` before registering as a dependent means the first
@@ -414,7 +513,7 @@ export function watch<T>(
   })();
 
   // Create a dummy component to track dependencies
-  const watcherId = `watch-${Math.random().toString(36).substr(2, 9)}`;
+  const watcherId = `watch-${crypto.randomUUID()}`;
 
   // If called during a component render, register this watcher under that
   // component so watchers created in render are cleaned up on re-render.

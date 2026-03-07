@@ -65,10 +65,10 @@ Use the built-in store for global or shared state.
   ```typescript
   import { component, html } from '@jasonshimmy/custom-elements-runtime';
 
-  component('theme-toggle', (props, { emit }) => {
+  component('theme-toggle', () => {
     const toggleTheme = () => {
       const currentTheme = store.getState().theme;
-      store.getState().theme = currentTheme === 'light' ? 'dark' : 'light';
+      store.setState({ theme: currentTheme === 'light' ? 'dark' : 'light' });
     };
 
     return html`

@@ -164,7 +164,7 @@ component('event-example', () => {
 
 ```typescript
 component('safe-state', () => {
-  const items = state<string[]>([]);
+  const items = ref<string[]>([]);
   const filter = ref('');
 
   // ✅ Pure computed - no side effects

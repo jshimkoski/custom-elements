@@ -14,6 +14,7 @@
 - [🎨 Styling](#-styling)
 - [🔗 Component Communication](#-component-communication)
 - [⚙️ Advanced Configuration](#-advanced-configuration)
+- [🚀 Advanced APIs](#-advanced-apis)
 - [⏳ Async Components](#-async-components)
 - [🧪 Testing Components](#-testing-components)
 - [🎯 Best Practices](#-best-practices)
@@ -659,15 +660,14 @@ component('multi-select', () => {
     options: [] as { label: string; value: string }[],
     selectedValues: [] as string[],
   });
-  const selectedItems = ref<string[]>([]);
-  const multiple = ref(true);
 
   const isSelected = (value: string) => props.selectedValues.includes(value);
   const toggleSelection = (value: string) => {
     const newSelection = isSelected(value)
-      ? props.selectedValues.filter((item) => item !== value)
+      ? props.selectedValues.filter((item: string) => item !== value)
       : [...props.selectedValues, value];
-    props.selectedValues = newSelection;
+    // Emit update event so parent can update selectedValues via :model or binding
+    emit('update:selectedValues', newSelection);
     emit('selection-changed', newSelection);
   };
 
@@ -1223,8 +1223,8 @@ component('interactive-button', () => {
   useStyle(
     () => css`
       :host {
-        --button-color: ${buttonState.color};
-        --opacity: ${buttonState.hovered ? '0.8' : '1'};
+        --button-color: ${buttonState.value.color};
+        --opacity: ${buttonState.value.hovered ? '0.8' : '1'};
       }
 
       .button {
@@ -1243,10 +1243,15 @@ component('interactive-button', () => {
   return html`
     <button
       class="button"
-      @mouseenter="${() => (buttonState.hovered = true)}"
-      @mouseleave="${() => (buttonState.hovered = false)}"
+      @mouseenter="${() =>
+        (buttonState.value = { ...buttonState.value, hovered: true })}"
+      @mouseleave="${() =>
+        (buttonState.value = { ...buttonState.value, hovered: false })}"
       @click="${() =>
-        (buttonState.color = buttonState.color === 'blue' ? 'green' : 'blue')}"
+        (buttonState.value = {
+          ...buttonState.value,
+          color: buttonState.value.color === 'blue' ? 'green' : 'blue',
+        })}"
     >
       Toggle Color
     </button>
@@ -1274,7 +1279,7 @@ component('adaptive-card', () => {
       :host {
         display: block;
         transition: all 0.3s ease;
-        transform: ${cardState.expanded ? 'scale(1.02)' : 'scale(1)'};
+        transform: ${cardState.value.expanded ? 'scale(1.02)' : 'scale(1)'};
       }
 
       .card {
@@ -1301,7 +1306,11 @@ component('adaptive-card', () => {
   return html`
     <div
       class="card"
-      @click="${() => (cardState.expanded = !cardState.expanded)}"
+      @click="${() =>
+        (cardState.value = {
+          ...cardState.value,
+          expanded: !cardState.value.expanded,
+        })}"
     >
       <slot></slot>
     </div>
@@ -1517,6 +1526,9 @@ component('user-avatar', () => {
           />
           <span>${appState.value.user.name}</span>
         `,
+      )}
+      ${when(
+        !appState.value.user,
         html`
           <button @click="${() => emit('login-requested')}">Login</button>
         `,
@@ -1864,3 +1876,43 @@ The streamlined functional component API provides:
 - **🔄 Full Feature Support** - All directives, bindings, and state management
 
 This API eliminates the complexity of the previous system while maintaining all the power and flexibility you need to build modern, reactive custom elements.
+
+---
+
+## 🚀 Advanced APIs
+
+The runtime ships several advanced utilities beyond the core functional API documented above.
+
+### ⚡ Reactive Utilities
+
+[`computed()`](./reactive-api.md#computed) — Memoized derived state with automatic cache invalidation.
+
+[`watchEffect(fn)`](./reactive-api.md#watcheffect) — Run a side-effect automatically whenever any reactive dependency changes.
+
+[`nextTick()`](./reactive-api.md#nexttick) — Defer work until after all pending DOM updates have been flushed.
+
+See the full [Reactive API guide](./reactive-api.md) for usage examples.
+
+### 🏝️ Provide / Inject
+
+[`provide(key, value)`](./provide-inject.md) and [`inject(key, defaultValue?)`](./provide-inject.md) implement ancestor → descendant dependency injection without prop-drilling.
+
+See the [Provide / Inject guide](./provide-inject.md) for full documentation.
+
+### 🧩 Composables
+
+[`createComposable(fn)`](./composable.md) extracts reusable stateful logic — including lifecycle hooks — into shareable factory functions.
+
+See the [Composables guide](./composable.md) for usage patterns.
+
+### 🚀 Teleport
+
+[`useTeleport(target)`](./teleport.md) renders virtual DOM content into an arbitrary DOM node outside the current shadow root — ideal for modals, tooltips, and popovers.
+
+See the [Teleport guide](./teleport.md) for full documentation.
+
+### ♻️ Keep-Alive
+
+[`registerKeepAlive()`](./keep-alive.md) registers `<ce-keep-alive>`, a wrapper element that preserves component JavaScript state across DOM removals and re-insertions.
+
+See the [Keep-Alive guide](./keep-alive.md) for full documentation.

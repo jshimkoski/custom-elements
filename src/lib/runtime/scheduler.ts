@@ -5,6 +5,14 @@
 import { devWarn, devError } from './logger';
 
 /**
+ * A scheduled update function to be executed in the next flush cycle.
+ * Keys in `pendingUpdates` map to these functions; using the function reference
+ * (or an explicit componentId string) as the key deduplicates multiple render
+ * requests for the same component within a single microtask batch.
+ */
+type ScheduledUpdate = () => void;
+
+/**
  * Environment detection utilities
  */
 interface TestEnvironment {
@@ -56,7 +64,7 @@ function detectTestEnvironment(): TestEnvironment {
 }
 
 class UpdateScheduler {
-  private pendingUpdates = new Map<string | (() => void), () => void>();
+  private pendingUpdates = new Map<string | (() => void), ScheduledUpdate>();
   private isFlushScheduled = false;
   private isFlushing = false;
   private readonly testEnv: TestEnvironment;
@@ -108,7 +116,8 @@ class UpdateScheduler {
   }
 
   /**
-   * Execute all pending updates
+   * Execute all pending updates with priority ordering
+   * Execute all pending updates with priority ordering
    */
   private flush(): void {
     // Prevent reentrant flushes
@@ -232,7 +241,8 @@ class UpdateScheduler {
 export const updateScheduler = new UpdateScheduler();
 
 /**
- * Schedule a DOM update to be batched with optional component identity
+ * Schedule a DOM update to be batched with optional component identity and priority
+ * Schedule a DOM update to be batched with optional component identity and priority
  */
 export function scheduleDOMUpdate(
   update: () => void,
@@ -250,4 +260,28 @@ export function scheduleDOMUpdate(
  */
 export function flushDOMUpdates(): void {
   updateScheduler.flushImmediately();
+}
+
+/**
+ * Returns a Promise that resolves after the next DOM update cycle completes.
+ * Equivalent to Vue's `nextTick()` — useful when you need to observe DOM
+ * state that reflects the latest reactive changes.
+ *
+ * @example
+ * ```ts
+ * count.value++;
+ * await nextTick();
+ * console.log(element.shadowRoot.querySelector('span').textContent); // updated
+ * ```
+ */
+export function nextTick(): Promise<void> {
+  // If there are pending updates, flush them and wait for the microtask queue to drain.
+  // Otherwise, just wait one microtask so callers always get post-render timing.
+  return new Promise<void>((resolve) => {
+    if (updateScheduler.hasPendingUpdates) {
+      updateScheduler.flushImmediately();
+    }
+    // Queue resolution after any pending microtasks (including the scheduler's queueMicrotask flush)
+    queueMicrotask(resolve);
+  });
 }

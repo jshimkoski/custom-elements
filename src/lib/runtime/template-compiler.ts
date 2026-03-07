@@ -13,6 +13,7 @@ import {
 } from './helpers';
 import { isReactiveState } from './reactive';
 import { devWarn } from './logger';
+import { isDiscoveryRender } from './discovery-state';
 
 // Strict LRU cache helper for fully static templates (no interpolations, no context)
 class LRUCache<K, V> {
@@ -1395,6 +1396,11 @@ export function html(
   strings: TemplateStringsArray,
   ...values: unknown[]
 ): VNode | VNode[] {
+  // Short-circuit during discovery renders to avoid template parsing side effects.
+  // useProps() and other hook registrations still run because they happen before
+  // the html`` call in the render function body.
+  if (isDiscoveryRender()) return [];
+
   // If last value is a context object, use it
   const last = values[values.length - 1];
   const context =

@@ -105,6 +105,9 @@ All documentation written in the docs directory should be:
 - Keep code developer friendly and easy to use.
 - Keep code easy to read and understand.
 - Keep code maintainable and scalable.
+- Always write tests for your code.
+- Always follow best practices in coding, security, and performance.
+- A change can only be considered complete when it meets all the above criteria and has been thoroughly tested and reviewed and the command `npm run all:ci` runs without errors or warnings. THIS IS NON-NEGOTIABLE.
 
 ## Methodology
 
