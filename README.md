@@ -4,7 +4,7 @@
 
 > **The Complete Web Components Framework**
 
-Build modern components with strict TypeScript, zero dependencies, and a clean functional API. Designed for speed, standards compliance, and productivity.
+Build modern components with strict TypeScript, zero dependencies, and a clean functional API. Designed for ease of use, speed, standards compliance, and productivity.
 
 🕹️ Try it on [Codepen.io](https://codepen.io/jshimkoski/pen/JoYmpxm).
 
