@@ -1,6 +1,29 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v2.5.3] - 2026-03-08
+
+- remove erroneous testing file, update package-lock (ad90108)
+- update package-lock (67e6752)
+- enhance documentation for built-in components by adding <cer-keep-alive> to the registration details (f09aa55)
+- improve tests for built-in components, add new tests for composables, enhance teleport functionality, and update transition timing (b1e0dee)
+- improve transition and error boundary handling, enhance teleport functionality, and update tests for stability and error propagation (d26725f)
+- improve docs (48f34c8)
+- improve built-in components and their consistency (9576b4d)
+- improve docs (d6d6148)
+- add deep watching, improve exports, documentation (37287fd)
+- improve documentation (b4525a7)
+- improve documentation (ba0d823)
+- remove audit files (fef34e0)
+- add more jit css classes, useSlot, useExpose, keep alive, scheduling, error boundary, suspense (9dd836c)
+- additional improvements (66a1044)
+- watchEffect, vdom split, nextTick, keep alive, teleport, more (a5bfc7b)
+- fix: update vitest dependency (946bb29)
+- feat(router-link): Enhance active state reliability and synchronization (1ddc269)
+- fix: improve router implementation (187c894)
+- improve router (d601dcc)
+
+
 ## [v2.5.2] - 2025-11-23
 
 - fix: update vitest dependency (946bb29)
