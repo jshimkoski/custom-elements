@@ -1,13 +1,14 @@
 # 🧱 Built-in Components
 
-The runtime ships two opt-in utility components — `<ce-suspense>` and `<ce-error-boundary>` — that cover the two most common async UI patterns: loading states and graceful error recovery. Both are zero-dependency, Shadow DOM native, and tree-shakeable.
+The runtime ships three opt-in utility components — `<cer-suspense>`, `<cer-error-boundary>`, and `<cer-keep-alive>` — that cover the most common async UI patterns: loading states, graceful error recovery, and state preservation. All three are zero-dependency, Shadow DOM native, and tree-shakeable.
 
 ## 📦 Import
 
 ```ts
 import {
-  registerCeSuspense,
-  registerCeErrorBoundary,
+  registerSuspense,
+  registerErrorBoundary,
+  registerKeepAlive,
   registerBuiltinComponents,
 } from '@jasonshimmy/custom-elements-runtime';
 ```
@@ -16,7 +17,7 @@ Registration is **idempotent** — calling any register function multiple times 
 
 ## 🔁 `registerBuiltinComponents()`
 
-Registers both built-in components in one call. Call this once at your application entry point:
+Registers all three built-in components in one call. Call this once at your application entry point:
 
 ```ts
 import { registerBuiltinComponents } from '@jasonshimmy/custom-elements-runtime';
@@ -26,15 +27,15 @@ registerBuiltinComponents();
 
 ---
 
-## ⏳ `<ce-suspense>`
+## ⏳ `<cer-suspense>`
 
 Shows a **fallback** slot while async work is pending, then swaps to the **default** slot when work completes. Controlled by the `pending` attribute/property.
 
 ### Registration
 
 ```ts
-import { registerCeSuspense } from '@jasonshimmy/custom-elements-runtime';
-registerCeSuspense();
+import { registerSuspense } from '@jasonshimmy/custom-elements-runtime';
+registerSuspense();
 ```
 
 ### Props / Attributes
@@ -53,13 +54,13 @@ registerCeSuspense();
 ### Basic HTML Usage
 
 ```html
-<ce-suspense pending>
+<cer-suspense pending>
   <!-- Shown when pending is false (resolved state) -->
   <my-async-content></my-async-content>
 
   <!-- Shown while pending is true -->
   <div slot="fallback">Loading…</div>
-</ce-suspense>
+</cer-suspense>
 ```
 
 ### Programmatic Usage inside a Component
@@ -71,9 +72,9 @@ import {
   ref,
   useOnConnected,
 } from '@jasonshimmy/custom-elements-runtime';
-import { registerCeSuspense } from '@jasonshimmy/custom-elements-runtime';
+import { registerSuspense } from '@jasonshimmy/custom-elements-runtime';
 
-registerCeSuspense();
+registerSuspense();
 
 component('user-profile', () => {
   const pending = ref(true);
@@ -85,7 +86,7 @@ component('user-profile', () => {
   });
 
   return html`
-    <ce-suspense pending="${pending.value}">
+    <cer-suspense pending="${pending.value}">
       <div class="profile">
         <h2>${user.value?.name ?? ''}</h2>
       </div>
@@ -94,38 +95,38 @@ component('user-profile', () => {
         <div class="skeleton-avatar"></div>
         <div class="skeleton-text"></div>
       </div>
-    </ce-suspense>
+    </cer-suspense>
   `;
 });
 ```
 
 ### Nested Suspense
 
-Multiple `<ce-suspense>` boundaries can be nested independently — each one manages its own `pending` state:
+Multiple `<cer-suspense>` boundaries can be nested independently — each one manages its own `pending` state:
 
 ```html
-<ce-suspense pending="${headerPending.value}">
+<cer-suspense pending="${headerPending.value}">
   <page-header></page-header>
   <div slot="fallback">Loading header…</div>
-</ce-suspense>
+</cer-suspense>
 
-<ce-suspense pending="${contentPending.value}">
+<cer-suspense pending="${contentPending.value}">
   <page-content></page-content>
   <div slot="fallback">Loading content…</div>
-</ce-suspense>
+</cer-suspense>
 ```
 
 ---
 
-## 🛡️ `<ce-error-boundary>`
+## 🛡️ `<cer-error-boundary>`
 
 Catches errors thrown inside child component renders and displays a **fallback** UI instead of crashing the rest of the page. Provides a `reset()` method to clear the error and retry.
 
 ### Registration
 
 ```ts
-import { registerCeErrorBoundary } from '@jasonshimmy/custom-elements-runtime';
-registerCeErrorBoundary();
+import { registerErrorBoundary } from '@jasonshimmy/custom-elements-runtime';
+registerErrorBoundary();
 ```
 
 ### Slots
@@ -144,27 +145,27 @@ registerCeErrorBoundary();
 ### Basic HTML Usage
 
 ```html
-<ce-error-boundary>
+<cer-error-boundary>
   <my-risky-component></my-risky-component>
 
   <div slot="fallback">
     <p>Something went wrong.</p>
-    <button onclick="this.closest('ce-error-boundary').reset()">Retry</button>
+    <button onclick="this.closest('cer-error-boundary').reset()">Retry</button>
   </div>
-</ce-error-boundary>
+</cer-error-boundary>
 ```
 
 ### Programmatic Usage inside a Component
 
 ```ts
 import { component, html } from '@jasonshimmy/custom-elements-runtime';
-import { registerCeErrorBoundary } from '@jasonshimmy/custom-elements-runtime';
+import { registerErrorBoundary } from '@jasonshimmy/custom-elements-runtime';
 
-registerCeErrorBoundary();
+registerErrorBoundary();
 
 component('app-root', () => {
   return html`
-    <ce-error-boundary>
+    <cer-error-boundary>
       <feature-module></feature-module>
       <analytics-tracker></analytics-tracker>
 
@@ -173,13 +174,13 @@ component('app-root', () => {
         <p>We've been notified and are working on it.</p>
         <button
           @click="${(e: Event) => {
-            (e.target as HTMLElement).closest('ce-error-boundary')?.reset();
+            (e.target as HTMLElement).closest('cer-error-boundary')?.reset();
           }}"
         >
           Try again
         </button>
       </div>
-    </ce-error-boundary>
+    </cer-error-boundary>
   `;
 });
 ```
@@ -189,37 +190,38 @@ component('app-root', () => {
 Wrap async loading content in both boundaries for full async UI coverage:
 
 ```html
-<ce-error-boundary>
-  <ce-suspense pending="${pending.value}">
+<cer-error-boundary>
+  <cer-suspense pending="${pending.value}">
     <async-data-view></async-data-view>
     <div slot="fallback">Loading…</div>
-  </ce-suspense>
+  </cer-suspense>
 
   <div slot="fallback">
     <p>
       Failed to load.
-      <button onclick="this.closest('ce-error-boundary').reset()">Retry</button>
+      <button onclick="this.closest('cer-error-boundary').reset()">
+        Retry
+      </button>
     </p>
   </div>
-</ce-error-boundary>
+</cer-error-boundary>
 ```
 
 ---
 
 ## 🌲 Tree-Shaking
 
-Both components are opt-in and only bundled when you import them. If your application does not use `<ce-error-boundary>`, do not call `registerCeErrorBoundary()` and it will be removed from your bundle at build time.
-
-Use individual register functions when you only need one component:
+All three components are opt-in and only bundled when you import them. Use individual register functions when you only need a subset:
 
 ```ts
-// Only pulls in ce-suspense — ce-error-boundary is not bundled
-import { registerCeSuspense } from '@jasonshimmy/custom-elements-runtime';
-registerCeSuspense();
+// Only pulls in cer-suspense — the other two are not bundled
+import { registerSuspense } from '@jasonshimmy/custom-elements-runtime';
+registerSuspense();
 ```
 
 ## 🔗 Related
 
+- [Keep-Alive](./keep-alive.md) — preserve component state across DOM removal/re-insertion
 - [Functional API](./functional-api.md) — component lifecycle hooks
 - [useExpose()](./use-expose.md) — expose imperative methods from a component (e.g., `reset()`)
 - [Provide / Inject](./provide-inject.md) — cross-component state sharing

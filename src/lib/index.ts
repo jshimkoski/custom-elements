@@ -69,10 +69,10 @@ export {
 // Teleport (Priority 3)
 export type { TeleportHandle } from './teleport';
 
-// Built-in components: <ce-suspense> and <ce-error-boundary>
+// Built-in components: <cer-suspense> and <cer-error-boundary>
 export {
-  registerCeSuspense,
-  registerCeErrorBoundary,
+  registerSuspense,
+  registerErrorBoundary,
   registerBuiltinComponents,
 } from './runtime/builtin-components';
 export { useTeleport } from './teleport';

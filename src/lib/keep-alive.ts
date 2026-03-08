@@ -3,28 +3,28 @@
  *
  * Preserves component state when a component is removed from and later
  * re-inserted into the DOM. By default, custom elements lose all JavaScript
- * state when `disconnectedCallback` fires. `ce-keep-alive` intercepts
+ * state when `disconnectedCallback` fires. `cer-keep-alive` intercepts
  * that lifecycle and keeps the child element alive in memory, re-attaching
  * it when a matching component is re-inserted.
  *
  * ## Usage
  *
- * Wrap any custom element with `<ce-keep-alive>`:
+ * Wrap any custom element with `<cer-keep-alive>`:
  * ```html
- * <ce-keep-alive>
+ * <cer-keep-alive>
  *   <my-counter></my-counter>
- * </ce-keep-alive>
+ * </cer-keep-alive>
  * ```
  *
  * Or register it programmatically:
  * ```ts
  * import { registerKeepAlive } from '@jasonshimmy/custom-elements-runtime';
- * registerKeepAlive(); // registers <ce-keep-alive> globally
+ * registerKeepAlive(); // registers <cer-keep-alive> globally
  * ```
  *
  * ## How it works
  *
- * `ce-keep-alive` uses a slotted layout. When a slotted child component is
+ * `cer-keep-alive` uses a slotted layout. When a slotted child component is
  * about to leave the DOM (via a re-render of a parent), KeepAlive intercepts
  * `slotchange` events and preserves the detached child element in an internal
  * cache keyed by tag name. When the same tag re-appears in the slot, the
@@ -42,7 +42,7 @@
 type CacheKey = string;
 
 /**
- * Register the `<ce-keep-alive>` custom element.
+ * Register the `<cer-keep-alive>` custom element.
  * Safe to call multiple times — subsequent calls are no-ops.
  *
  * @example
@@ -55,16 +55,16 @@ export function registerKeepAlive(): void {
   if (
     typeof window === 'undefined' ||
     typeof customElements === 'undefined' ||
-    customElements.get('ce-keep-alive')
+    customElements.get('cer-keep-alive')
   ) {
     return;
   }
 
-  customElements.define('ce-keep-alive', createKeepAliveClass());
+  customElements.define('cer-keep-alive', createKeepAliveClass());
 }
 
 function createKeepAliveClass(): CustomElementConstructor {
-  return class CeKeepAlive extends HTMLElement {
+  return class CerKeepAlive extends HTMLElement {
     /** Preserved component instances keyed by tag[:id]. */
     private _cache = new Map<CacheKey, Element>();
     private _slot: HTMLSlotElement | null = null;

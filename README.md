@@ -106,10 +106,10 @@ Below is the **complete list of public symbols** exported by the runtime and its
 | `useExpose`                  | Publish methods and properties onto the host element as an imperative public API.                     |
 | `useSlots`                   | Inspect which named slots have been filled by the component consumer.                                 |
 | `useTeleport`                | Render virtual DOM content into any DOM node outside the shadow root.                                 |
-| `registerKeepAlive`          | Register `<ce-keep-alive>` to preserve component state across DOM removals.                           |
-| `registerCeSuspense`         | Register the `<ce-suspense>` built-in component.                                                      |
-| `registerCeErrorBoundary`    | Register the `<ce-error-boundary>` built-in component.                                                |
-| `registerBuiltinComponents`  | Register both `<ce-suspense>` and `<ce-error-boundary>` in one call.                                  |
+| `registerKeepAlive`          | Register `<cer-keep-alive>` to preserve component state across DOM removals.                          |
+| `registerSuspense`           | Register the `<cer-suspense>` built-in component.                                                     |
+| `registerErrorBoundary`      | Register the `<cer-error-boundary>` built-in component.                                               |
+| `registerBuiltinComponents`  | Register both `<cer-suspense>` and `<cer-error-boundary>` in one call.                                |
 | `unsafeHTML`                 | Insert raw HTML into a template (**unsafe; use carefully**).                                          |
 | `decodeEntities`             | Utility to decode HTML entities in strings.                                                           |
 | `setDevMode`                 | Toggle dev-mode logging on or off at runtime.                                                         |
@@ -342,7 +342,7 @@ Explore the complete documentation for every runtime feature:
 - [🏝️ Provide / Inject](./docs/provide-inject.md) - Ancestor-to-descendant dependency injection without prop-drilling
 - [🧩 Composables](./docs/composable.md) - Reusable stateful logic with `createComposable()`
 - [🚀 Teleport](./docs/teleport.md) - Render content outside the shadow root with `useTeleport()`
-- [♻️ Keep-Alive](./docs/keep-alive.md) - Preserve component state across DOM removals with `<ce-keep-alive>`
+- [♻️ Keep-Alive](./docs/keep-alive.md) - Preserve component state across DOM removals with `<cer-keep-alive>`
 - [🩺 Health Monitor](./docs/health-monitor.md) - Track runtime metrics and receive periodic health reports with `createHealthMonitor()`
 - [🔮 Virtual DOM](./docs/virtual-dom.md) - VDOM implementation and performance details
 - [🌐 SSR](./docs/ssr.md) - Server-side rendering support

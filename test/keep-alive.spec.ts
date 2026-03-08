@@ -15,9 +15,9 @@ afterEach(() => {
 });
 
 describe('♻️ registerKeepAlive()', () => {
-  it('registers the <ce-keep-alive> custom element', () => {
+  it('registers the <cer-keep-alive> custom element', () => {
     registerKeepAlive();
-    expect(customElements.get('ce-keep-alive')).toBeTruthy();
+    expect(customElements.get('cer-keep-alive')).toBeTruthy();
   });
 
   it('is idempotent — calling it multiple times does not throw', () => {
@@ -28,17 +28,17 @@ describe('♻️ registerKeepAlive()', () => {
     }).not.toThrow();
   });
 
-  it('<ce-keep-alive> can be added to the DOM without errors', async () => {
+  it('<cer-keep-alive> can be added to the DOM without errors', async () => {
     registerKeepAlive();
 
-    container.innerHTML = '<ce-keep-alive></ce-keep-alive>';
+    container.innerHTML = '<cer-keep-alive></cer-keep-alive>';
     await new Promise((r) => setTimeout(r, 50));
 
-    const el = container.querySelector('ce-keep-alive');
+    const el = container.querySelector('cer-keep-alive');
     expect(el).toBeTruthy();
   });
 
-  it('ce-keep-alive renders slotted children', async () => {
+  it('cer-keep-alive renders slotted children', async () => {
     registerKeepAlive();
 
     component(
@@ -47,14 +47,14 @@ describe('♻️ registerKeepAlive()', () => {
     );
 
     container.innerHTML = `
-      <ce-keep-alive>
+      <cer-keep-alive>
         <ka-child></ka-child>
-      </ce-keep-alive>
+      </cer-keep-alive>
     `;
 
     await new Promise((r) => setTimeout(r, 100));
 
-    const kaEl = container.querySelector('ce-keep-alive');
+    const kaEl = container.querySelector('cer-keep-alive');
     expect(kaEl).toBeTruthy();
 
     const child = kaEl?.querySelector('ka-child');
@@ -70,9 +70,9 @@ describe('♻️ registerKeepAlive()', () => {
     );
 
     container.innerHTML = `
-      <ce-keep-alive id="ka-host">
+      <cer-keep-alive id="ka-host">
         <ka-stateful id="ka-inst"></ka-stateful>
-      </ce-keep-alive>
+      </cer-keep-alive>
     `;
 
     await new Promise((r) => setTimeout(r, 100));

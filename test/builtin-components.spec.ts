@@ -1,5 +1,5 @@
 /**
- * Tests for built-in components: <ce-suspense> and <ce-error-boundary>.
+ * Tests for built-in components: <cer-suspense> and <cer-error-boundary>.
  *
  * These components must be registered before use via the exported register
  * functions. Each test suite registers its component before the tests run.
@@ -7,9 +7,10 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
-  registerCeSuspense,
-  registerCeErrorBoundary,
+  registerSuspense,
+  registerErrorBoundary,
   registerBuiltinComponents,
+  registerKeepAlive,
 } from '../src/lib';
 
 let container: HTMLElement;
@@ -32,23 +33,23 @@ function wait(ms = 80): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// ── ce-suspense ──────────────────────────────────────────────────────────────
+// ── cer-suspense ──────────────────────────────────────────────────────────────
 
-describe('<ce-suspense>', () => {
+describe('<cer-suspense>', () => {
   it('is registered in the custom elements registry', () => {
-    expect(customElements.get('ce-suspense')).toBeDefined();
+    expect(customElements.get('cer-suspense')).toBeDefined();
   });
 
   it('renders default slot when pending is false', async () => {
     container.innerHTML = `
-      <ce-suspense>
+      <cer-suspense>
         <span id="content">Content</span>
         <span slot="fallback" id="fallback">Loading…</span>
-      </ce-suspense>
+      </cer-suspense>
     `;
     await wait();
 
-    const el = container.querySelector('ce-suspense') as HTMLElement;
+    const el = container.querySelector('cer-suspense') as HTMLElement;
     const shadow = el.shadowRoot;
     // Shadow should contain a slot (not the fallback slot) when pending=false
     if (shadow) {
@@ -62,14 +63,14 @@ describe('<ce-suspense>', () => {
 
   it('renders fallback slot when pending=true', async () => {
     container.innerHTML = `
-      <ce-suspense pending>
+      <cer-suspense pending>
         <span id="content">Content</span>
         <span slot="fallback" id="fallback">Loading…</span>
-      </ce-suspense>
+      </cer-suspense>
     `;
     await wait();
 
-    const el = container.querySelector('ce-suspense') as HTMLElement;
+    const el = container.querySelector('cer-suspense') as HTMLElement;
     const shadow = el.shadowRoot;
     if (shadow) {
       const slots = shadow.querySelectorAll('slot');
@@ -82,14 +83,14 @@ describe('<ce-suspense>', () => {
     // Verify the resolved state (pending=false) renders the default slot.
     // Attribute-change transitions are integration-level concerns covered by e2e tests.
     container.innerHTML = `
-      <ce-suspense>
+      <cer-suspense>
         <span slot="fallback">Loading…</span>
         <span id="content">Content</span>
-      </ce-suspense>
+      </cer-suspense>
     `;
     await wait();
 
-    const el = container.querySelector('ce-suspense') as HTMLElement;
+    const el = container.querySelector('cer-suspense') as HTMLElement;
     const shadow = el.shadowRoot;
     if (shadow) {
       const slots = shadow.querySelectorAll('slot');
@@ -100,36 +101,36 @@ describe('<ce-suspense>', () => {
     }
   });
 
-  it('registerCeSuspense is safe to call multiple times', () => {
+  it('registerSuspense is safe to call multiple times', () => {
     expect(() => {
-      registerCeSuspense();
-      registerCeSuspense();
+      registerSuspense();
+      registerSuspense();
     }).not.toThrow();
   });
 
   it('is exported from the main package entry', () => {
     // Verified by the successful top-level import at the top of this file
-    expect(typeof registerCeSuspense).toBe('function');
+    expect(typeof registerSuspense).toBe('function');
   });
 });
 
-// ── ce-error-boundary ────────────────────────────────────────────────────────
+// ── cer-error-boundary ────────────────────────────────────────────────────────
 
-describe('<ce-error-boundary>', () => {
+describe('<cer-error-boundary>', () => {
   it('is registered in the custom elements registry', () => {
-    expect(customElements.get('ce-error-boundary')).toBeDefined();
+    expect(customElements.get('cer-error-boundary')).toBeDefined();
   });
 
   it('renders default slot when there is no error', async () => {
     container.innerHTML = `
-      <ce-error-boundary>
+      <cer-error-boundary>
         <span id="content">Safe content</span>
         <div slot="fallback">Error occurred</div>
-      </ce-error-boundary>
+      </cer-error-boundary>
     `;
     await wait();
 
-    const el = container.querySelector('ce-error-boundary') as HTMLElement;
+    const el = container.querySelector('cer-error-boundary') as HTMLElement;
     const shadow = el.shadowRoot;
     if (shadow) {
       const slots = shadow.querySelectorAll('slot');
@@ -140,21 +141,29 @@ describe('<ce-error-boundary>', () => {
     }
   });
 
-  it('registerCeErrorBoundary is safe to call multiple times', () => {
+  it('registerErrorBoundary is safe to call multiple times', () => {
     expect(() => {
-      registerCeErrorBoundary();
-      registerCeErrorBoundary();
+      registerErrorBoundary();
+      registerErrorBoundary();
     }).not.toThrow();
   });
 
   it('is exported from the main package entry', () => {
     // Verified by the successful top-level import at the top of this file
-    expect(typeof registerCeErrorBoundary).toBe('function');
+    expect(typeof registerErrorBoundary).toBe('function');
   });
 
-  it('registerBuiltinComponents registers both components', () => {
+  it('registerBuiltinComponents registers all three components', () => {
     expect(typeof registerBuiltinComponents).toBe('function');
-    expect(customElements.get('ce-suspense')).toBeDefined();
-    expect(customElements.get('ce-error-boundary')).toBeDefined();
+    expect(customElements.get('cer-suspense')).toBeDefined();
+    expect(customElements.get('cer-error-boundary')).toBeDefined();
+    expect(customElements.get('cer-keep-alive')).toBeDefined();
+  });
+
+  it('registerKeepAlive is safe to call multiple times', () => {
+    expect(() => {
+      registerKeepAlive();
+      registerKeepAlive();
+    }).not.toThrow();
   });
 });

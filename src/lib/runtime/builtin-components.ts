@@ -5,16 +5,18 @@
  * They are designed to be minimal, tree-shakeable, and zero-dependency.
  *
  * Included components:
- * - `<ce-suspense>` — Shows a fallback while async work is pending
- * - `<ce-error-boundary>` — Catches render errors and shows a fallback UI
+ * - `<cer-suspense>` — Shows a fallback while async work is pending
+ * - `<cer-error-boundary>` — Catches render errors and shows a fallback UI
+ * - `<cer-keep-alive>` — Preserves component state across DOM removal/re-insertion
  */
 
 import { component } from './component';
 import { html } from './template-compiler';
 import { ref } from './reactive';
 import { useProps, useOnError } from './hooks';
+import { registerKeepAlive } from '../keep-alive';
 
-// ── ce-suspense ──────────────────────────────────────────────────────────────
+// ── cer-suspense ──────────────────────────────────────────────────────────────
 
 /**
  * A built-in component that conditionally renders either the default slot
@@ -26,13 +28,13 @@ import { useProps, useOnError } from './hooks';
  *
  * @example
  * ```html
- * <ce-suspense pending>
+ * <cer-suspense pending>
  *   <!-- shown when pending=false -->
  *   <my-async-content></my-async-content>
  *
  *   <!-- shown while pending=true -->
  *   <div slot="fallback">Loading…</div>
- * </ce-suspense>
+ * </cer-suspense>
  * ```
  *
  * @example Programmatic usage
@@ -44,18 +46,18 @@ import { useProps, useOnError } from './hooks';
  *     pending.value = false;
  *   });
  *   return html`
- *     <ce-suspense pending="${pending.value}">
+ *     <cer-suspense pending="${pending.value}">
  *       <my-data-view></my-data-view>
  *       <div slot="fallback">Loading data…</div>
- *     </ce-suspense>
+ *     </cer-suspense>
  *   `;
  * });
  * ```
  */
-export function registerCeSuspense(): void {
-  if (customElements.get('ce-suspense')) return;
+export function registerSuspense(): void {
+  if (customElements.get('cer-suspense')) return;
 
-  component('ce-suspense', () => {
+  component('cer-suspense', () => {
     const { pending } = useProps({ pending: false });
 
     return pending
@@ -64,7 +66,7 @@ export function registerCeSuspense(): void {
   });
 }
 
-// ── ce-error-boundary ────────────────────────────────────────────────────────
+// ── cer-error-boundary ────────────────────────────────────────────────────────
 
 /**
  * A built-in component that catches errors thrown during child component
@@ -79,19 +81,19 @@ export function registerCeSuspense(): void {
  *
  * @example
  * ```html
- * <ce-error-boundary>
+ * <cer-error-boundary>
  *   <my-risky-component></my-risky-component>
  *
  *   <div slot="fallback">
- *     <p>Something went wrong. <button onclick="this.closest('ce-error-boundary').reset()">Retry</button></p>
+ *     <p>Something went wrong. <button onclick="this.closest('cer-error-boundary').reset()">Retry</button></p>
  *   </div>
- * </ce-error-boundary>
+ * </cer-error-boundary>
  * ```
  */
-export function registerCeErrorBoundary(): void {
-  if (customElements.get('ce-error-boundary')) return;
+export function registerErrorBoundary(): void {
+  if (customElements.get('cer-error-boundary')) return;
 
-  component('ce-error-boundary', () => {
+  component('cer-error-boundary', () => {
     const hasError = ref(false);
     const errorMessage = ref('');
 
@@ -111,14 +113,16 @@ export function registerCeErrorBoundary(): void {
   });
 }
 
-// ── Auto-register both components ────────────────────────────────────────────
+// ── Auto-register all components ─────────────────────────────────────────────
 
 /**
- * Register all built-in components (`ce-suspense`, `ce-error-boundary`).
+ * Register all built-in components (`cer-suspense`, `cer-error-boundary`,
+ * `cer-keep-alive`).
  * Safe to call multiple times — each registration is guarded by a
  * `customElements.get()` check.
  */
 export function registerBuiltinComponents(): void {
-  registerCeSuspense();
-  registerCeErrorBoundary();
+  registerSuspense();
+  registerErrorBoundary();
+  registerKeepAlive();
 }

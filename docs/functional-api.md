@@ -1916,7 +1916,7 @@ See the [Teleport guide](./teleport.md) for full documentation.
 
 ### ♻️ Keep-Alive
 
-[`registerKeepAlive()`](./keep-alive.md) registers `<ce-keep-alive>`, a wrapper element that preserves component JavaScript state across DOM removals and re-insertions.
+[`registerKeepAlive()`](./keep-alive.md) registers `<cer-keep-alive>`, a wrapper element that preserves component JavaScript state across DOM removals and re-insertions.
 
 See the [Keep-Alive guide](./keep-alive.md) for full documentation.
 
@@ -1934,7 +1934,7 @@ See the [useSlots() guide](./use-slots.md) for full documentation.
 
 ### 🧱 Built-in Components
 
-[`registerBuiltinComponents()`](./builtin-components.md) registers `<ce-suspense>` and `<ce-error-boundary>` — opt-in utility components for loading states and graceful error recovery.
+[`registerBuiltinComponents()`](./builtin-components.md) registers `<cer-suspense>` and `<cer-error-boundary>` — opt-in utility components for loading states and graceful error recovery.
 
 See the [Built-in Components guide](./builtin-components.md) for full documentation.
 

@@ -1,8 +1,8 @@
-# ♻️ Keep-Alive: `registerKeepAlive` and `<ce-keep-alive>`
+# ♻️ Keep-Alive: `registerKeepAlive` and `<cer-keep-alive>`
 
-`registerKeepAlive()` registers the `<ce-keep-alive>` custom element. Wrap child components inside it to **preserve their JavaScript state** when they are temporarily removed from the DOM.
+`registerKeepAlive()` registers the `<cer-keep-alive>` custom element. Wrap child components inside it to **preserve their JavaScript state** when they are temporarily removed from the DOM.
 
-By default, custom elements lose all JavaScript state (reactive refs, timers, DOM refs) when `disconnectedCallback` fires. `<ce-keep-alive>` intercepts this lifecycle through `slotchange` events and keeps detached elements alive in memory, re-attaching the original instance when the same tag is re-inserted.
+By default, custom elements lose all JavaScript state (reactive refs, timers, DOM refs) when `disconnectedCallback` fires. `<cer-keep-alive>` intercepts this lifecycle through `slotchange` events and keeps detached elements alive in memory, re-attaching the original instance when the same tag is re-inserted.
 
 ---
 
@@ -16,18 +16,26 @@ import { registerKeepAlive } from '@jasonshimmy/custom-elements-runtime';
 registerKeepAlive();
 ```
 
-This registers the `<ce-keep-alive>` custom element globally. Safe to call multiple times — subsequent calls are no-ops.
+Alternatively, `registerBuiltinComponents()` registers `<cer-keep-alive>` alongside `<cer-suspense>` and `<cer-error-boundary>` in a single call:
+
+```typescript
+import { registerBuiltinComponents } from '@jasonshimmy/custom-elements-runtime';
+
+registerBuiltinComponents();
+```
+
+Both approaches are safe to call multiple times — subsequent calls are no-ops.
 
 ---
 
 ## Basic Usage
 
-Wrap any custom element with `<ce-keep-alive>`:
+Wrap any custom element with `<cer-keep-alive>`:
 
 ```html
-<ce-keep-alive>
+<cer-keep-alive>
   <my-counter></my-counter>
-</ce-keep-alive>
+</cer-keep-alive>
 ```
 
 Or in a component render function:
@@ -43,9 +51,9 @@ registerKeepAlive();
 
 component('app-root', () => {
   return html`
-    <ce-keep-alive>
+    <cer-keep-alive>
       <expensive-chart></expensive-chart>
-    </ce-keep-alive>
+    </cer-keep-alive>
   `;
 });
 ```
@@ -66,10 +74,10 @@ component('tab-panel', () => {
       <button @click="${() => (active.value = 'tab-b')}">Tab B</button>
     </nav>
 
-    <ce-keep-alive>
+    <cer-keep-alive>
       ${when(active.value === 'tab-a', html`<tab-content-a></tab-content-a>`)}
       ${when(active.value === 'tab-b', html`<tab-content-b></tab-content-b>`)}
-    </ce-keep-alive>
+    </cer-keep-alive>
   `;
 });
 ```
@@ -94,30 +102,30 @@ This allows multiple instances of the same component to be cached independently 
 
 ## How It Works
 
-1. `<ce-keep-alive>` attaches a `slotchange` listener to its default slot.
+1. `<cer-keep-alive>` attaches a `slotchange` listener to its default slot.
 2. When a slotted child leaves the DOM (e.g. during a parent re-render), the element is moved into an internal cache Map keyed by tag name (and `id`).
-3. When a new element with the same tag is slotted in, `<ce-keep-alive>` replaces it with the cached instance — restoring all JavaScript state.
+3. When a new element with the same tag is slotted in, `<cer-keep-alive>` replaces it with the cached instance — restoring all JavaScript state.
 
 ---
 
 ## Limitations
 
-- Only the **first element per cache key** is stored. If you need multiple instances of the same component in the same `<ce-keep-alive>`, give each a unique `id`.
-- The cache lives for the lifetime of the `<ce-keep-alive>` element. It is **not** automatically cleared when the keep-alive element is removed from the DOM — call `clearCache()` to evict entries manually.
+- Only the **first element per cache key** is stored. If you need multiple instances of the same component in the same `<cer-keep-alive>`, give each a unique `id`.
+- The cache lives for the lifetime of the `<cer-keep-alive>` element. It is **not** automatically cleared when the keep-alive element is removed from the DOM — call `clearCache()` to evict entries manually.
 - Only components registered as custom elements (i.e. `component()` calls) benefit from keep-alive caching. Plain DOM elements are not cached.
 
 ---
 
 ## Clearing the Cache
 
-The cache is **not** automatically cleared when `<ce-keep-alive>` is disconnected from the document (only the `slotchange` listener is removed). Use the `clearCache()` method to evict entries manually:
+The cache is **not** automatically cleared when `<cer-keep-alive>` is disconnected from the document (only the `slotchange` listener is removed). Use the `clearCache()` method to evict entries manually:
 
 ```ts
 import { registerKeepAlive } from '@jasonshimmy/custom-elements-runtime';
 
 registerKeepAlive();
 
-const keepAliveEl = document.querySelector('ce-keep-alive') as any;
+const keepAliveEl = document.querySelector('cer-keep-alive') as any;
 
 // Evict a specific cache entry by key (tag name, optionally with id)
 keepAliveEl.clearCache('my-component');
