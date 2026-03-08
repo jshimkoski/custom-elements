@@ -449,6 +449,35 @@ export function createElementClass<
         if (cfg.onError) {
           cfg.onError(error as Error | null, this.context);
         }
+
+        // Propagate to the nearest ancestor <cer-error-boundary> so that
+        // slotted child components' errors are surfaced to the boundary even
+        // when the child has no useOnError handler of its own.
+        // Skip when this element IS the error boundary to avoid double-handling.
+        if (this.tagName.toLowerCase() !== 'cer-error-boundary') {
+          let node: Element | null = this.parentElement;
+          if (!node) {
+            const root = this.getRootNode();
+            if (root instanceof ShadowRoot) node = root.host.parentElement;
+          }
+          while (node) {
+            if (node.tagName.toLowerCase() === 'cer-error-boundary') {
+              type ErrorBoundaryElement = {
+                _cerHandleChildError?: (err: unknown) => void;
+              };
+              (node as unknown as ErrorBoundaryElement)._cerHandleChildError?.(
+                error,
+              );
+              break;
+            }
+            let next: Element | null = node.parentElement;
+            if (!next) {
+              const root = node.getRootNode();
+              if (root instanceof ShadowRoot) next = root.host.parentElement;
+            }
+            node = next;
+          }
+        }
       }
     }
 
@@ -587,13 +616,7 @@ export function createElementClass<
 
     private _applyProps(cfg: ComponentConfig<S, C, P, T>): void {
       this._runLogicWithinErrorBoundary(cfg, () => {
-        try {
-          applyProps(this, cfg, this.context);
-        } catch (error) {
-          this._hasError = true;
-          if (cfg.onError) cfg.onError(error as Error | null, this.context);
-          // Note: errorFallback was removed as it's handled by the functional API directly
-        }
+        applyProps(this, cfg, this.context);
       });
     }
   };

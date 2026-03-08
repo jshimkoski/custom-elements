@@ -12,12 +12,7 @@
  */
 
 import type { VNode, VDomRefs, AnchorBlockVNode } from './types';
-import {
-  toCamel,
-  safe,
-  safeSerializeAttr,
-  isClassLikeAttr,
-} from './helpers';
+import { toCamel, safe, safeSerializeAttr, isClassLikeAttr } from './helpers';
 import {
   setAttributeSmart,
   removeAttributeSmart,
@@ -239,14 +234,18 @@ export function patchProps(
     newPropsAttrsCopy,
   );
 
-  // Merge processed directive results with existing props/attrs
+  // Merge processed directive results with existing props/attrs.
+  // NOTE: Do NOT include oldProps.attrs in mergedAttrs — it is the "new"
+  // side of the diff and must only carry the incoming new attrs plus any
+  // directive-generated overrides. Including old attrs here would prevent
+  // previously-set attributes from ever being removed (e.g. name="fallback"
+  // on a <slot> after an error-boundary resets to its clean state).
   const mergedProps: PropsMap = {
     ...((oldProps.props as PropsMap) || {}),
     ...((newProps.props as PropsMap) || {}),
     ...(processedDirectives.props || {}),
   };
   const mergedAttrs: PropsMap = {
-    ...((oldProps.attrs as PropsMap) || {}),
     ...(newPropsAttrsCopy || {}),
     ...(processedDirectives.attrs || {}),
   };
@@ -2441,7 +2440,28 @@ export function vdomRenderer(
   }
   nodesToRemove.forEach((node) => root.removeChild(node));
 
-  // Update tracked VNode and DOM node
-  (root as unknown as Record<string, unknown>)._prevVNode = newVNode as unknown;
+  // Update tracked VNode and DOM node.
+  // Store a copy of newVNode with its own props/attrs objects so that
+  // subsequent writebackAttr calls (inside patchProps) do not mutate the
+  // LRU-cached VNode that the template compiler returns on every render.
+  // Shallow-copying props + deep-copying attrs/props sub-objects is
+  // enough because writebackAttr only writes one level deep into attrs.
+  const prevVNodeToStore: VNode =
+    newVNode && typeof newVNode === 'object' && newVNode.props
+      ? ({
+          ...newVNode,
+          props: {
+            ...newVNode.props,
+            attrs: newVNode.props.attrs
+              ? { ...newVNode.props.attrs }
+              : undefined,
+            props: newVNode.props.props
+              ? { ...newVNode.props.props }
+              : undefined,
+          },
+        } as VNode)
+      : newVNode;
+  (root as unknown as Record<string, unknown>)._prevVNode =
+    prevVNodeToStore as unknown;
   (root as unknown as Record<string, unknown>)._prevDom = newDom as unknown;
 }

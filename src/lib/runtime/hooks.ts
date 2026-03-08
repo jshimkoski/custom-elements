@@ -716,6 +716,23 @@ export function inject<T>(
           node = next ?? (shadowHost.getRootNode() as Node | null);
           if (node === document || node === shadowHost) break;
         } else {
+          // Also check light-DOM ancestor elements that may be custom components
+          // with provides (e.g. a consumer that is a slotted child of a provider).
+          if (node instanceof Element) {
+            const elCtx = (
+              node as unknown as {
+                context?: Record<string | symbol, unknown>;
+              }
+            ).context;
+            if (elCtx) {
+              const provides = elCtx[PROVIDES_KEY] as
+                | Map<string | symbol, unknown>
+                | undefined;
+              if (provides?.has(key)) {
+                return provides.get(key) as T;
+              }
+            }
+          }
           const next: Node | null = (node as Node).parentNode as Node | null;
           node = next ?? ((node as Node).getRootNode?.() as Node | null);
           if (node === document) break;

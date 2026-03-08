@@ -274,6 +274,28 @@ export class ReactiveState<T> {
     reactiveSystem.triggerUpdate(this);
   }
 
+  /**
+   * Read the current value without registering a reactive dependency.
+   * Useful for internal infrastructure (e.g. stable hook slots) that must
+   * inspect the stored value without re-triggering the containing component.
+   * @internal
+   */
+  peek(): T {
+    return this._value;
+  }
+
+  /**
+   * Set the initial value without triggering any reactive updates or warnings.
+   * Only intended for internal/infrastructure use (e.g. storing a stable hook
+   * handle in a reactive slot without causing a spurious re-render).
+   * The value is stored as-is without reactive proxy wrapping so that opaque
+   * objects (e.g. TeleportHandle) are not accidentally instrumented.
+   * @internal
+   */
+  initSilent(value: T): void {
+    this._value = value;
+  }
+
   addDependent(componentId: string): void {
     this.dependents.add(componentId);
   }

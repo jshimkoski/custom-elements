@@ -210,6 +210,37 @@ export function component(
           } catch {
             /* best-effort */
           }
+
+          // Propagate to the nearest ancestor <cer-error-boundary> when the
+          // host element is already connected to the DOM (parentElement set).
+          // This enables the error boundary to catch child component errors.
+          try {
+            const host = (ictx as { _host?: Element })._host;
+            if (host?.parentElement) {
+              let node: Element | null = host.parentElement;
+              while (node) {
+                if (node.tagName.toLowerCase() === 'cer-error-boundary') {
+                  type ErrorBoundaryEl = {
+                    _cerHandleChildError?: (err: unknown) => void;
+                  };
+                  (node as unknown as ErrorBoundaryEl)._cerHandleChildError?.(
+                    err,
+                  );
+                  break;
+                }
+                let next: Element | null = node.parentElement;
+                if (!next) {
+                  const root = node.getRootNode();
+                  if (root instanceof ShadowRoot)
+                    next = root.host.parentElement;
+                }
+                node = next;
+              }
+            }
+          } catch {
+            /* best-effort */
+          }
+
           throw err;
         }
 

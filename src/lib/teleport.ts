@@ -35,6 +35,8 @@
 
 import type { VNode, VDomRefs } from './runtime/types';
 import { vdomRenderer } from './runtime/vdom';
+import { reactiveSystem } from './runtime/reactive';
+import { getCurrentComponentContext, isDiscoveryRender } from './runtime/hooks';
 
 /** Handle returned by {@link useTeleport} for managing a portal. */
 export interface TeleportHandle {
@@ -76,6 +78,47 @@ export function useTeleport(target: string | Element): TeleportHandle {
     return { portal: () => {}, destroy: () => {} };
   }
 
+  // During discovery render the component is not yet mounted — return a no-op
+  // handle so the library can detect props/hooks without side-effects.
+  if (isDiscoveryRender()) {
+    return { portal: () => {}, destroy: () => {} };
+  }
+
+  // If called inside a component render, use the reactive state-index slot
+  // mechanism to ensure the same handle is returned on every re-render of the
+  // same component instance.  Without this, each re-render would create a new
+  // <cer-teleport> container in the target, leaking all but the last one.
+  const ctx = getCurrentComponentContext();
+  if (ctx) {
+    // getOrCreateState uses an incrementing stateIndex that is reset to 0 at
+    // the start of each render, so the same call site always gets the same slot.
+    const slot = reactiveSystem.getOrCreateState<TeleportHandle | null>(null);
+    const existing = slot.peek();
+    if (existing !== null) {
+      return existing;
+    }
+    // First render: create the handle and store it without triggering a
+    // reactive update (initSilent bypasses triggerUpdate).
+    // Pass a slot-invalidation callback so that destroy() clears the slot,
+    // allowing a reconnected component to create a fresh container.
+    const handle = _createTeleportHandle(target, () => slot.initSilent(null));
+    slot.initSilent(handle);
+    return handle;
+  }
+
+  // Outside a component context (e.g. called directly in tests or scripts):
+  // fall through to a non-cached, non-stable handle.
+  return _createTeleportHandle(target);
+}
+
+/** Internal: create a fresh teleport handle pointing at `target`.
+ * @param onDestroy - Optional callback invoked after cleanup in destroy(), used
+ *   to invalidate a cached slot so the next render creates a fresh handle.
+ */
+function _createTeleportHandle(
+  target: string | Element,
+  onDestroy?: () => void,
+): TeleportHandle {
   const targetEl =
     typeof target === 'string'
       ? (document.querySelector(target) as Element | null)
@@ -97,7 +140,7 @@ export function useTeleport(target: string | Element): TeleportHandle {
   // Shared refs bag — passed consistently so ref directives work across updates.
   const refs: VDomRefs = {};
 
-  return {
+  const handle: TeleportHandle = {
     portal(content: VNode | VNode[] | null | undefined): void {
       const nodes: VNode[] =
         content == null ? [] : Array.isArray(content) ? content : [content];
@@ -117,6 +160,12 @@ export function useTeleport(target: string | Element): TeleportHandle {
       if (container.parentNode) {
         container.parentNode.removeChild(container);
       }
+      // Invalidate the cached slot so that if the component reconnects and
+      // re-renders, useTeleport() creates a fresh container rather than
+      // reusing this destroyed one.
+      onDestroy?.();
     },
   };
+
+  return handle;
 }

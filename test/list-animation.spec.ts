@@ -30,7 +30,7 @@ describe('List Animation - Styling and Animation Tests', () => {
               (item: any) => html`
                 <div
                   key="${item.id}"
-                  class="flex-shrink-0 p-4 bg-blue-100"
+                  class="shrink-0 p-4 bg-blue-100"
                   data-test-id="${item.id}"
                 >
                   ${item.text}
@@ -601,7 +601,7 @@ describe('List Animation - Styling and Animation Tests', () => {
               (item: any) => html`
                 <div
                   key="${item.id}"
-                  class="p-4 mb-2 bg-gradient-to-r from-purple-100 to-pink-100 rounded-lg shadow-md
+                  class="p-4 mb-2 bg-linear-to-r from-purple-100 to-pink-100 rounded-lg shadow-md
                      hover:shadow-lg hover:scale-105 transition-all duration-200"
                   data-test-id="${item.id}"
                 >

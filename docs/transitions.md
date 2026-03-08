@@ -213,7 +213,7 @@ ${TransitionGroup({
   class: 'flex gap-4 flex-wrap',
   tag: 'div'
 }, each(items.value, (item) => html`
-  <div key="${item.id}" class="flex-shrink-0 p-4 bg-blue-100 rounded">
+  <div key="${item.id}" class="shrink-0 p-4 bg-blue-100 rounded">
     ${item.text}
   </div>
 `))}

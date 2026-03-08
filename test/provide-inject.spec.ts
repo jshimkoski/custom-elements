@@ -114,4 +114,53 @@ describe('🏝️ provide() / inject()', () => {
 
     expect(received).toBe(99);
   });
+
+  it('inject() finds provided value through light-DOM ancestor chain', async () => {
+    // Provider is a light-DOM parent of consumer (slotted pattern).
+    // inject() must traverse up through regular element ancestors, not just
+    // ShadowRoot boundaries, to find the provided value.
+    let received: string | undefined = 'not-set';
+
+    component('pi-provider-ld', () => {
+      provide('ld-theme', 'dark');
+      return html`<slot></slot>`;
+    });
+
+    component('pi-consumer-ld', () => {
+      received = inject<string>('ld-theme', 'light');
+      return html`<div class="result">${received}</div>`;
+    });
+
+    container.innerHTML = `
+      <pi-provider-ld>
+        <pi-consumer-ld></pi-consumer-ld>
+      </pi-provider-ld>
+    `;
+    await new Promise((r) => setTimeout(r, 80));
+
+    expect(received).toBe('dark');
+  });
+
+  it('inject() returns default when provider exists but key is different', async () => {
+    let received: string | undefined = 'not-set';
+
+    component('pi-provider-other-key', () => {
+      provide('ld-other-key', 'something');
+      return html`<slot></slot>`;
+    });
+
+    component('pi-consumer-wrong-key', () => {
+      received = inject<string>('ld-different-key', 'fallback');
+      return html`<div>${received}</div>`;
+    });
+
+    container.innerHTML = `
+      <pi-provider-other-key>
+        <pi-consumer-wrong-key></pi-consumer-wrong-key>
+      </pi-provider-other-key>
+    `;
+    await new Promise((r) => setTimeout(r, 80));
+
+    expect(received).toBe('fallback');
+  });
 });

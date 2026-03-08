@@ -11,6 +11,8 @@ import {
   registerErrorBoundary,
   registerBuiltinComponents,
   registerKeepAlive,
+  component,
+  nextTick,
 } from '../src/lib';
 
 let container: HTMLElement;
@@ -165,5 +167,96 @@ describe('<cer-error-boundary>', () => {
       registerKeepAlive();
       registerKeepAlive();
     }).not.toThrow();
+  });
+
+  it('<cer-error-boundary> exposes a reset() method that clears error state', async () => {
+    // The error boundary must expose a `reset()` method so parent templates can
+    // call `errorBoundaryRef.value.reset()` to recover from an error.
+    container.innerHTML = `
+      <cer-error-boundary id="eb-reset-test">
+        <span id="safe-content">Safe</span>
+        <div slot="fallback">Oops</div>
+      </cer-error-boundary>
+    `;
+    await wait();
+
+    const el = container.querySelector<HTMLElement & { reset?: () => void }>(
+      '#eb-reset-test',
+    )!;
+    expect(typeof el.reset).toBe('function');
+
+    // reset() should be callable without throwing
+    expect(() => el.reset?.()).not.toThrow();
+  });
+
+  it('exposes _cerHandleChildError for internal error propagation', async () => {
+    container.innerHTML = `<cer-error-boundary id="eb-handler-test"></cer-error-boundary>`;
+    await wait();
+
+    const el = container.querySelector('#eb-handler-test') as HTMLElement & {
+      _cerHandleChildError?: (err: unknown) => void;
+    };
+    expect(typeof el._cerHandleChildError).toBe('function');
+  });
+
+  it('catches errors from slotted child components via propagation', async () => {
+    // Register a child component that always throws during render.
+    // Use a unique tag to avoid conflicts across test runs.
+    const tag = `cer-throwing-child-${crypto.randomUUID().slice(0, 8)}`;
+    component(tag, () => {
+      throw new Error('Child render error propagation test');
+    });
+
+    container.innerHTML = `
+      <cer-error-boundary id="eb-propagation-test">
+        <${tag}></${tag}>
+        <div slot="fallback" id="propagation-fallback">Child error caught</div>
+      </cer-error-boundary>
+    `;
+    await wait();
+
+    const el = container.querySelector('#eb-propagation-test') as HTMLElement;
+    const shadow = el.shadowRoot!;
+
+    // After child error propagation the boundary re-renders showing the fallback slot
+    const fallbackSlot = shadow.querySelector('slot[name="fallback"]');
+    expect(fallbackSlot).not.toBeNull();
+
+    // The default (non-fallback) slot should NOT be present in the error state
+    const defaultSlot = shadow.querySelector('slot:not([name])');
+    expect(defaultSlot).toBeNull();
+  });
+
+  it('reset() clears state after a child error is propagated', async () => {
+    container.innerHTML = `
+      <cer-error-boundary id="eb-reset-after-child">
+        <span id="safe-child">Safe content</span>
+        <div slot="fallback">Error fallback</div>
+      </cer-error-boundary>
+    `;
+    await wait();
+    const el = container.querySelector(
+      '#eb-reset-after-child',
+    ) as HTMLElement & {
+      _cerHandleChildError?: (err: unknown) => void;
+      reset?: () => void;
+    };
+
+    // Directly simulate a child error via the internal handler
+    el._cerHandleChildError?.(new Error('Simulated child error'));
+    await wait();
+
+    // Boundary should now be in error state
+    expect(
+      el.shadowRoot!.querySelector('slot[name="fallback"]'),
+    ).not.toBeNull();
+
+    // Reset the boundary
+    el.reset?.();
+    await nextTick();
+    await nextTick(); // drain any second-level microtasks
+
+    // Boundary should recover and show the default slot
+    expect(el.shadowRoot!.querySelector('slot:not([name])')).not.toBeNull();
   });
 });

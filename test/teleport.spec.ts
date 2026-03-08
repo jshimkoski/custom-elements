@@ -1,6 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { useTeleport } from '../src/lib';
-import { html } from '../src/lib';
+import {
+  useTeleport,
+  component,
+  html,
+  ref,
+  useOnDisconnected,
+} from '../src/lib';
 
 let container: HTMLElement;
 
@@ -108,6 +113,77 @@ describe('🚀 useTeleport()', () => {
     expect(typeof handle.destroy).toBe('function');
 
     handle.destroy();
+    document.body.removeChild(target);
+  });
+
+  it('useTeleport inside a component creates only one container across re-renders', async () => {
+    // Regression test: previously each re-render created a fresh <cer-teleport>
+    // container, leaking all previous ones. The fix stores the handle in a
+    // stable reactive slot so re-renders return the same handle.
+    const target = document.createElement('div');
+    target.id = 'tp-stability-target';
+    document.body.appendChild(target);
+
+    component('tp-stable-test', () => {
+      const count = ref(0);
+      const { portal, destroy } = useTeleport('#tp-stability-target');
+      useOnDisconnected(destroy);
+      portal(html`<span id="tp-portal-count">${count.value}</span>`);
+      return html`<button id="tp-inc" @click="${() => count.value++}">
+        +
+      </button>`;
+    });
+
+    container.innerHTML = '<tp-stable-test></tp-stable-test>';
+    await new Promise((r) => setTimeout(r, 80));
+
+    // Trigger two re-renders via reactive state changes
+    const btn = container.querySelector<HTMLElement>('#tp-inc');
+    btn?.click();
+    await new Promise((r) => setTimeout(r, 80));
+
+    btn?.click();
+    await new Promise((r) => setTimeout(r, 80));
+
+    // There must be exactly ONE cer-teleport container in the target, not one per render.
+    const containers = target.querySelectorAll('cer-teleport');
+    expect(containers.length).toBe(1);
+
+    document.body.removeChild(target);
+  });
+
+  it('useTeleport recreates container after destroy() and reconnect', async () => {
+    // After destroy() is called (e.g. useOnDisconnected) and the component
+    // reconnects, useTeleport() must create a fresh container rather than
+    // reusing the dead one removed from the DOM.
+    const target = document.createElement('div');
+    target.id = 'tp-reconnect-target';
+    document.body.appendChild(target);
+
+    component('tp-reconnect-test', () => {
+      const { portal, destroy } = useTeleport('#tp-reconnect-target');
+      useOnDisconnected(destroy);
+      portal(html`<span class="tp-rc-content">hello</span>`);
+      return html`<div></div>`;
+    });
+
+    // First mount
+    container.innerHTML = '<tp-reconnect-test></tp-reconnect-test>';
+    await new Promise((r) => setTimeout(r, 80));
+    expect(target.querySelector('.tp-rc-content')).toBeTruthy();
+
+    // Disconnect — destroy() clears the container AND the cached slot
+    container.innerHTML = '';
+    await new Promise((r) => setTimeout(r, 80));
+    expect(target.querySelector('cer-teleport')).toBeFalsy();
+
+    // Reconnect — must create a new container
+    container.innerHTML = '<tp-reconnect-test></tp-reconnect-test>';
+    await new Promise((r) => setTimeout(r, 80));
+    const containers = target.querySelectorAll('cer-teleport');
+    expect(containers.length).toBe(1);
+    expect(target.querySelector('.tp-rc-content')).toBeTruthy();
+
     document.body.removeChild(target);
   });
 });

@@ -13,7 +13,7 @@
 import { component } from './component';
 import { html } from './template-compiler';
 import { ref } from './reactive';
-import { useProps, useOnError } from './hooks';
+import { useProps, useOnError, useExpose } from './hooks';
 import { registerKeepAlive } from '../keep-alive';
 
 // ── cer-suspense ──────────────────────────────────────────────────────────────
@@ -100,6 +100,28 @@ export function registerErrorBoundary(): void {
     useOnError((err: Error) => {
       hasError.value = true;
       errorMessage.value = err.message;
+    });
+
+    // Expose a reset() method so parent templates can call
+    // `errorBoundaryRef.value.reset()` to clear the error and retry.
+    // Also expose an internal `_cerHandleChildError` receiver so that the
+    // component runtime can propagate uncaught errors from slotted child
+    // components up to the nearest ancestor <cer-error-boundary>.
+    useExpose({
+      _cerHandleChildError: (err: unknown) => {
+        // Use peek() to read the current value without registering a reactive
+        // dependency — the child component's render context may be active when
+        // this handler runs, and we must not accidentally subscribe the child
+        // to this boundary's internal state.
+        if (!hasError.peek()) {
+          hasError.value = true;
+          errorMessage.value = err instanceof Error ? err.message : String(err);
+        }
+      },
+      reset: () => {
+        hasError.value = false;
+        errorMessage.value = '';
+      },
     });
 
     return hasError.value
