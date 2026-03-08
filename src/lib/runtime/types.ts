@@ -50,6 +50,16 @@ export type LifecycleKeys =
 
 export interface WatchOptions {
   immediate?: boolean;
+  /**
+   * When `true`, the watcher tracks nested object/array property mutations.
+   * The callback receives deep-cloned snapshots of the new and old values so
+   * before/after state can be compared.
+   *
+   * Note: because deep watching bypasses reference equality, the callback fires
+   * on every nested mutation even if the resulting plain-object value is
+   * structurally identical. Use a shallow watcher (default) when you only need
+   * to detect `.value` reassignment.
+   */
   deep?: boolean;
 }
 

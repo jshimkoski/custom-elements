@@ -35,20 +35,21 @@
     "cy:open": "cypress open"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@testing-library/jest-dom": "^6.9.1",
-    "@types/jsdom": "^27.0.0",
+    "@types/jsdom": "^28.0.0",
     "@typescript-eslint/eslint-plugin": "^8.46.2",
     "@typescript-eslint/parser": "^8.46.2",
-    "@vitest/coverage-v8": "^4.0.13",
-    "cypress": "^15.7.0",
-    "eslint": "^9.39.1",
+    "@vitest/coverage-v8": "^4.0.18",
+    "cypress": "^15.11.0",
+    "eslint": "^10.0.2",
     "eslint-config-prettier": "^10.1.8",
-    "eslint-plugin-prettier": "^5.5.4",
-    "jsdom": "^27.2.0",
-    "prettier": "^3.6.2",
+    "eslint-plugin-prettier": "^5.5.5",
+    "jsdom": "^28.1.0",
+    "prettier": "^3.8.1",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.47.0",
-    "vite": "^7.2.4",
+    "typescript-eslint": "^8.56.1",
+    "vite": "^7.3.1",
     "vitest": "^4.0.12"
   },
   "main": "dist/custom-elements-runtime.cjs.js",
@@ -58,6 +59,7 @@
     "dist",
     "dist/index.d.ts",
     "dist/*.d.ts",
+    "dist/css/*.d.ts",
     "entities.json"
   ],
   "sideEffects": [
@@ -108,7 +110,12 @@
     "./css": "./dist/style.css",
     "./css/style.css": "./dist/style.css",
     "./css/reset.css": "./dist/reset.css",
-    "./css/variables.css": "./dist/variables.css"
+    "./css/variables.css": "./dist/variables.css",
+    "./css/colors": {
+      "types": "./dist/css/colors.d.ts",
+      "import": "./dist/custom-elements-runtime.colors.es.js",
+      "require": "./dist/custom-elements-runtime.colors.cjs.js"
+    }
   },
   "publishConfig": {
     "access": "public"

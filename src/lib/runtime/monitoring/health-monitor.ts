@@ -20,319 +20,241 @@ interface HealthReport {
   timestamp: number;
   recommendations: string[];
 }
+export type { HealthReport };
 
-export class HealthMonitor {
-  private metrics = new Map<string, HealthMetric>();
-  private readonly maxHistorySize = 100;
-  private readonly checkInterval = 30000; // 30 seconds
-  private intervalId: number | null = null;
-  private listeners = new Set<(report: HealthReport) => void>();
+/**
+ * Public interface for a health monitor instance.
+ * All state is managed internally via closures — no class syntax.
+ */
+export interface HealthMonitorInstance {
+  /** Update a specific health metric value */
+  updateMetric(name: string, value: number): void;
+  /** Get the current health report */
+  getHealthReport(): HealthReport;
+  /** Add a listener to be notified when a health check runs */
+  addListener(listener: (report: HealthReport) => void): void;
+  /** Remove a previously registered listener */
+  removeListener(listener: (report: HealthReport) => void): void;
+  /** Stop the periodic health monitoring timer */
+  stop(): void;
+  /** Get historical values for a specific metric */
+  getMetricHistory(name: string): number[];
+  /** Clear all metric history */
+  clearHistory(): void;
+}
 
-  constructor() {
-    this.initializeMetrics();
-    this.startMonitoring();
+const MAX_HISTORY_SIZE = 100;
+const CHECK_INTERVAL = 30_000; // 30 seconds
+
+function calcStatus(
+  value: number,
+  threshold: number,
+  metricName: string,
+): 'healthy' | 'warning' | 'critical' {
+  if (metricName === 'jitCacheHitRate') {
+    if (value < threshold * 0.5) return 'critical';
+    if (value < threshold) return 'warning';
+    return 'healthy';
   }
+  if (value > threshold * 2) return 'critical';
+  if (value > threshold) return 'warning';
+  return 'healthy';
+}
 
-  /**
-   * Initialize default health metrics
-   */
-  private initializeMetrics(): void {
-    // Component metrics
-    this.addMetric('activeComponents', 0, 1000, []);
-    this.addMetric('componentCreateRate', 0, 50, []); // Components per second
-    this.addMetric('componentErrorRate', 0, 0.1, []); // Error rate percentage
+function buildRecommendations(metrics: Record<string, HealthMetric>): string[] {
+  const out: string[] = [];
+  if (metrics.memoryUsage?.status !== 'healthy')
+    out.push(
+      'Consider reducing component complexity or implementing better memory cleanup',
+    );
+  if (metrics.averageRenderTime?.status !== 'healthy')
+    out.push(
+      'Optimize component render functions - consider lazy loading or virtualization',
+    );
+  if (metrics.jitCacheHitRate?.status !== 'healthy')
+    out.push(
+      'JIT CSS cache performance is poor - review CSS patterns for optimization',
+    );
+  if (metrics.componentErrorRate?.status !== 'healthy')
+    out.push(
+      'High component error rate detected - review error handling and component logic',
+    );
+  if (metrics.activeReactiveStates?.status !== 'healthy')
+    out.push(
+      'High number of reactive states - consider state consolidation or cleanup',
+    );
+  if (metrics.memoryLeakIndicator?.status !== 'healthy')
+    out.push(
+      'Potential memory leak detected - review component cleanup and event listener management',
+    );
+  return out;
+}
 
-    // Memory metrics
-    this.addMetric('memoryUsage', 0, 50 * 1024 * 1024, []); // 50MB threshold
-    this.addMetric('memoryGrowthRate', 0, 1024 * 1024, []); // 1MB/check threshold
+/**
+ * Create a new health monitor instance.
+ * All mutable state lives in closures — no `class` or `this`.
+ */
+export function createHealthMonitor(): HealthMonitorInstance {
+  const metricsMap = new Map<string, HealthMetric>();
+  const listeners = new Set<(report: HealthReport) => void>();
+  let intervalId: ReturnType<typeof setInterval> | null = null;
 
-    // Performance metrics
-    this.addMetric('averageRenderTime', 0, 16, []); // 16ms for 60fps
-    this.addMetric('slowRenderCount', 0, 10, []); // Renders >16ms per check
-    this.addMetric('jitCacheHitRate', 100, 80, []); // Cache hit rate percentage
-
-    // Reactive system metrics
-    this.addMetric('activeReactiveStates', 0, 5000, []);
-    this.addMetric('dependencyUpdates', 0, 100, []); // Updates per check
-    this.addMetric('memoryLeakIndicator', 0, 0.1, []); // Growth without cleanup
-  }
-
-  /**
-   * Add a new health metric
-   */
-  private addMetric(
-    name: string,
-    value: number,
-    threshold: number,
-    history: number[],
-  ): void {
-    this.metrics.set(name, {
+  function addMetric(name: string, value: number, threshold: number): void {
+    metricsMap.set(name, {
       name,
       value,
       threshold,
       status: 'healthy',
       lastUpdated: Date.now(),
-      history: [...history],
+      history: [],
     });
   }
 
-  /**
-   * Update a specific health metric
-   */
-  updateMetric(name: string, value: number): void {
-    const metric = this.metrics.get(name);
-    if (!metric) return;
+  function initializeMetrics(): void {
+    addMetric('activeComponents', 0, 1000);
+    addMetric('componentCreateRate', 0, 50);
+    addMetric('componentErrorRate', 0, 0.1);
+    addMetric('memoryUsage', 0, 50 * 1024 * 1024);
+    addMetric('memoryGrowthRate', 0, 1024 * 1024);
+    addMetric('averageRenderTime', 0, 16);
+    addMetric('slowRenderCount', 0, 10);
+    addMetric('jitCacheHitRate', 100, 80);
+    addMetric('activeReactiveStates', 0, 5000);
+    addMetric('dependencyUpdates', 0, 100);
+    addMetric('memoryLeakIndicator', 0, 0.1);
+  }
 
+  function updateMetric(name: string, value: number): void {
+    const metric = metricsMap.get(name);
+    if (!metric) return;
     metric.value = value;
     metric.lastUpdated = Date.now();
-
-    // Update history
     metric.history.push(value);
-    if (metric.history.length > this.maxHistorySize) {
-      metric.history.shift();
-    }
-
-    // Update status based on threshold
-    metric.status = this.calculateStatus(value, metric.threshold, name);
+    if (metric.history.length > MAX_HISTORY_SIZE) metric.history.shift();
+    metric.status = calcStatus(value, metric.threshold, name);
   }
 
-  /**
-   * Calculate health status based on value and threshold
-   */
-  private calculateStatus(
-    value: number,
-    threshold: number,
-    metricName: string,
-  ): 'healthy' | 'warning' | 'critical' {
-    // Special handling for different metric types
-    if (metricName === 'jitCacheHitRate') {
-      // Lower is worse for cache hit rate
-      if (value < threshold * 0.5) return 'critical';
-      if (value < threshold) return 'warning';
-      return 'healthy';
+  function getHealthReport(): HealthReport {
+    const snapshot: Record<string, HealthMetric> = {};
+    let overall: 'healthy' | 'warning' | 'critical' = 'healthy';
+    for (const [name, metric] of metricsMap) {
+      snapshot[name] = { ...metric };
+      if (metric.status === 'critical') overall = 'critical';
+      else if (metric.status === 'warning' && overall === 'healthy')
+        overall = 'warning';
     }
-
-    // Default: higher is worse
-    if (value > threshold * 2) return 'critical';
-    if (value > threshold) return 'warning';
-    return 'healthy';
-  }
-
-  /**
-   * Get current health report
-   */
-  getHealthReport(): HealthReport {
-    const metrics: Record<string, HealthMetric> = {};
-    let overallStatus: 'healthy' | 'warning' | 'critical' = 'healthy';
-
-    // Collect all metrics
-    for (const [name, metric] of this.metrics) {
-      metrics[name] = { ...metric };
-
-      // Determine overall status (worst metric wins)
-      if (metric.status === 'critical') {
-        overallStatus = 'critical';
-      } else if (metric.status === 'warning' && overallStatus === 'healthy') {
-        overallStatus = 'warning';
-      }
-    }
-
-    const recommendations = this.generateRecommendations(metrics);
-
     return {
-      overall: overallStatus,
-      metrics,
+      overall,
+      metrics: snapshot,
       timestamp: Date.now(),
-      recommendations,
+      recommendations: buildRecommendations(snapshot),
     };
   }
 
-  /**
-   * Generate actionable recommendations based on metrics
-   */
-  private generateRecommendations(
-    metrics: Record<string, HealthMetric>,
-  ): string[] {
-    const recommendations: string[] = [];
-
-    if (metrics.memoryUsage?.status !== 'healthy') {
-      recommendations.push(
-        'Consider reducing component complexity or implementing better memory cleanup',
-      );
-    }
-
-    if (metrics.averageRenderTime?.status !== 'healthy') {
-      recommendations.push(
-        'Optimize component render functions - consider lazy loading or virtualization',
-      );
-    }
-
-    if (metrics.jitCacheHitRate?.status !== 'healthy') {
-      recommendations.push(
-        'JIT CSS cache performance is poor - review CSS patterns for optimization',
-      );
-    }
-
-    if (metrics.componentErrorRate?.status !== 'healthy') {
-      recommendations.push(
-        'High component error rate detected - review error handling and component logic',
-      );
-    }
-
-    if (metrics.activeReactiveStates?.status !== 'healthy') {
-      recommendations.push(
-        'High number of reactive states - consider state consolidation or cleanup',
-      );
-    }
-
-    if (metrics.memoryLeakIndicator?.status !== 'healthy') {
-      recommendations.push(
-        'Potential memory leak detected - review component cleanup and event listener management',
-      );
-    }
-
-    return recommendations;
-  }
-
-  /**
-   * Start periodic health monitoring
-   */
-  private startMonitoring(): void {
-    if (typeof window === 'undefined') return; // Skip in SSR
-
-    this.intervalId = window.setInterval(() => {
-      this.performHealthCheck();
-    }, this.checkInterval);
-  }
-
-  /**
-   * Perform comprehensive health check
-   */
-  private performHealthCheck(): void {
-    // Update memory metrics
-    this.updateMemoryMetrics();
-
-    // Generate and emit health report
-    const report = this.getHealthReport();
-    this.notifyListeners(report);
-
-    // Log critical issues
-    if (report.overall === 'critical') {
-      devError(
-        '🚨 Runtime Health: Critical issues detected',
-        report.recommendations,
-      );
-    } else if (report.overall === 'warning') {
-      devWarn(
-        '⚠️ Runtime Health: Performance warnings',
-        report.recommendations,
-      );
-    }
-  }
-
-  /**
-   * Update memory-related metrics
-   */
-  private updateMemoryMetrics(): void {
+  function updateMemoryMetrics(): void {
     if (
       'memory' in performance &&
       (performance as Record<string, unknown>).memory
     ) {
-      const memory = (performance as Record<string, unknown>).memory as {
+      const mem = (performance as Record<string, unknown>).memory as {
         usedJSHeapSize: number;
-        totalJSHeapSize: number;
-        jsHeapSizeLimit: number;
       };
-      this.updateMetric('memoryUsage', memory.usedJSHeapSize);
-
-      // Calculate memory growth rate
-      const memoryMetric = this.metrics.get('memoryUsage');
-      if (memoryMetric && memoryMetric.history.length > 1) {
-        const previous = memoryMetric.history[memoryMetric.history.length - 2];
-        const current = memoryMetric.history[memoryMetric.history.length - 1];
-        const growthRate = current - previous;
-        this.updateMetric('memoryGrowthRate', Math.max(0, growthRate));
+      updateMetric('memoryUsage', mem.usedJSHeapSize);
+      const m = metricsMap.get('memoryUsage');
+      if (m && m.history.length > 1) {
+        const prev = m.history[m.history.length - 2];
+        const curr = m.history[m.history.length - 1];
+        updateMetric('memoryGrowthRate', Math.max(0, curr - prev));
       }
     }
   }
 
-  /**
-   * Add health report listener
-   */
-  addListener(listener: (report: HealthReport) => void): void {
-    this.listeners.add(listener);
-  }
-
-  /**
-   * Remove health report listener
-   */
-  removeListener(listener: (report: HealthReport) => void): void {
-    this.listeners.delete(listener);
-  }
-
-  /**
-   * Notify all listeners of health report
-   */
-  private notifyListeners(report: HealthReport): void {
-    for (const listener of this.listeners) {
+  function notifyListeners(report: HealthReport): void {
+    for (const listener of listeners) {
       try {
         listener(report);
-      } catch (error) {
-        devError('Error in health monitor listener:', error);
+      } catch (e) {
+        devError('Error in health monitor listener:', e);
       }
     }
   }
 
-  /**
-   * Stop health monitoring
-   */
-  stop(): void {
-    if (this.intervalId !== null) {
-      clearInterval(this.intervalId);
-      this.intervalId = null;
+  function performHealthCheck(): void {
+    updateMemoryMetrics();
+    const report = getHealthReport();
+    notifyListeners(report);
+    if (report.overall === 'critical')
+      devError(
+        '🚨 Runtime Health: Critical issues detected',
+        report.recommendations,
+      );
+    else if (report.overall === 'warning')
+      devWarn(
+        '⚠️ Runtime Health: Performance warnings',
+        report.recommendations,
+      );
+  }
+
+  function startMonitoring(): void {
+    if (typeof window === 'undefined') return;
+    intervalId = setInterval(performHealthCheck, CHECK_INTERVAL);
+  }
+
+  function stop(): void {
+    if (intervalId !== null) {
+      clearInterval(intervalId);
+      intervalId = null;
     }
   }
 
-  /**
-   * Get specific metric history for analysis
-   */
-  getMetricHistory(name: string): number[] {
-    const metric = this.metrics.get(name);
-    return metric ? [...metric.history] : [];
+  function addListener(listener: (report: HealthReport) => void): void {
+    listeners.add(listener);
+  }
+  function removeListener(listener: (report: HealthReport) => void): void {
+    listeners.delete(listener);
+  }
+  function getMetricHistory(name: string): number[] {
+    const m = metricsMap.get(name);
+    return m ? [...m.history] : [];
+  }
+  function clearHistory(): void {
+    for (const m of metricsMap.values()) m.history = [];
   }
 
-  /**
-   * Clear all metrics history
-   */
-  clearHistory(): void {
-    for (const metric of this.metrics.values()) {
-      metric.history = [];
-    }
-  }
+  initializeMetrics();
+  startMonitoring();
+
+  return {
+    updateMetric,
+    getHealthReport,
+    addListener,
+    removeListener,
+    stop,
+    getMetricHistory,
+    clearHistory,
+  };
 }
 
-// Global health monitor instance
-let healthMonitor: HealthMonitor | null = null;
+// Global singleton
+let _monitor: HealthMonitorInstance | null = null;
 
 /**
- * Get the global health monitor instance
+ * Get the global health monitor singleton instance.
  */
-export function getHealthMonitor(): HealthMonitor {
-  if (!healthMonitor) {
-    healthMonitor = new HealthMonitor();
-  }
-  return healthMonitor;
+export function getHealthMonitor(): HealthMonitorInstance {
+  if (!_monitor) _monitor = createHealthMonitor();
+  return _monitor;
 }
 
 /**
- * Update a health metric from anywhere in the framework
+ * Update a health metric from anywhere in the framework.
  */
 export function updateHealthMetric(name: string, value: number): void {
   getHealthMonitor().updateMetric(name, value);
 }
 
 /**
- * Get current health status
+ * Get the current health status report.
  */
 export function getHealthStatus(): HealthReport {
   return getHealthMonitor().getHealthReport();

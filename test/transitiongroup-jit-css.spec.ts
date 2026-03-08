@@ -160,7 +160,7 @@ describe('TransitionGroup class prop with JIT CSS', () => {
             {
               preset: 'fade',
               class:
-                'flex flex-wrap gap-6 p-6 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl shadow-2xl hover:shadow-3xl transition-all duration-300',
+                'flex flex-wrap gap-6 p-6 bg-linear-to-r from-blue-500 to-purple-500 rounded-xl shadow-2xl hover:shadow-3xl transition-all duration-300',
               tag: 'div',
             },
             each(

@@ -111,12 +111,26 @@ describe('Optimized JIT CSS Tests', () => {
     });
 
     it('should have transform utilities', () => {
-      expect(utilityMap['scale-50']).toBe('transform:scale(0.5);');
-      expect(utilityMap['scale-100']).toBe('transform:scale(1);');
-      expect(utilityMap['scale-125']).toBe('transform:scale(1.25);');
-      expect(utilityMap['rotate-45']).toBe('transform:rotate(45deg);');
-      expect(utilityMap['rotate-90']).toBe('transform:rotate(90deg);');
-      expect(utilityMap['-rotate-45']).toBe('transform:rotate(-45deg);');
+      const TC =
+        'translateX(var(--cer-translate-x)) translateY(var(--cer-translate-y)) rotate(var(--cer-rotate)) skewX(var(--cer-skew-x)) skewY(var(--cer-skew-y)) scaleX(var(--cer-scale-x)) scaleY(var(--cer-scale-y))';
+      expect(utilityMap['scale-50']).toBe(
+        `--cer-scale-x:.5;--cer-scale-y:.5;transform:${TC};`,
+      );
+      expect(utilityMap['scale-100']).toBe(
+        `--cer-scale-x:1;--cer-scale-y:1;transform:${TC};`,
+      );
+      expect(utilityMap['scale-125']).toBe(
+        `--cer-scale-x:1.25;--cer-scale-y:1.25;transform:${TC};`,
+      );
+      expect(utilityMap['rotate-45']).toBe(
+        `--cer-rotate:45deg;transform:${TC};`,
+      );
+      expect(utilityMap['rotate-90']).toBe(
+        `--cer-rotate:90deg;transform:${TC};`,
+      );
+      expect(utilityMap['-rotate-45']).toBe(
+        `--cer-rotate:-45deg;transform:${TC};`,
+      );
     });
 
     it('should have aspect ratio utilities', () => {
@@ -276,10 +290,14 @@ describe('Optimized JIT CSS Tests', () => {
     });
 
     it('should generate CSS for transform utilities', () => {
+      const TC =
+        'translateX(var(--cer-translate-x)) translateY(var(--cer-translate-y)) rotate(var(--cer-rotate)) skewX(var(--cer-skew-x)) skewY(var(--cer-skew-y)) scaleX(var(--cer-scale-x)) scaleY(var(--cer-scale-y))';
       const html = '<div class="scale-110 rotate-45">Content</div>';
       const css = jitCSS(html);
-      expect(css).toContain('.scale-110{transform:scale(1.1);}');
-      expect(css).toContain('.rotate-45{transform:rotate(45deg);}');
+      expect(css).toContain(
+        `.scale-110{--cer-scale-x:1.1;--cer-scale-y:1.1;transform:${TC};}`,
+      );
+      expect(css).toContain(`.rotate-45{--cer-rotate:45deg;transform:${TC};}`);
     });
 
     it('should generate CSS for aspect ratio utilities', () => {

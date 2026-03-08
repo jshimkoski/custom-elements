@@ -139,6 +139,31 @@ component('directive-demo', () => {
 });
 ```
 
+## 🔲 anchorBlock — Stable VNode Fragment Primitive
+
+`anchorBlock` is a lower-level utility exported from `./directives` that wraps VNode content in a keyed fragment with stable start/end boundaries. All higher-level directives (`when`, `each`, `match`) use it internally.
+
+You can import and use it directly when building custom directive-like helpers that need stable keys for the virtual DOM differ:
+
+```typescript
+import { anchorBlock } from '@jasonshimmy/custom-elements-runtime/directives';
+import type { VNode } from '@jasonshimmy/custom-elements-runtime';
+
+function myCustomDirective(cond: boolean, content: VNode | VNode[]): VNode {
+  return anchorBlock(cond ? content : [], 'my-directive-key');
+}
+```
+
+**Parameters:**
+
+- `children` — `VNode | VNode[] | null | undefined` — Content to render inside the anchor.
+- `anchorKey` — `string` — A stable string key that uniquely identifies this anchor block in its sibling list.
+
+**Notes:**
+
+- `null` and `undefined` children are filtered out; meaningful falsy values (`0`, `false`, `''`) are preserved.
+- The `anchorKey` is used by the VDOM differ to efficiently track which anchor block moved, grew, or shrank.
+
 ## 🧠 How Directives Work Internally
 
 - Directives are pure functions that return VNode(s) for the virtual DOM.

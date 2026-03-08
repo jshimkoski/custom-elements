@@ -57,24 +57,38 @@ unsubscribe();
 
 ## 🔄 One-time Listeners
 
-Use `eventBus.once(eventName, handler)` to listen for an event only once. Returns a Promise that resolves with the event data.
+`once` has two separate overloads — choose the one that fits your style. **Do not mix them.**
+
+**Callback form** — pass a handler, returns `void`:
 
 ```ts
-// With handler callback
+// Handler is called exactly once, then automatically removed
 eventBus.once('user:login', (user) => {
   alert(`Welcome, ${user.name}!`);
 });
 
-// Or use as Promise
-const user = await eventBus.once('user:login', (user) => {
-  console.log('Handler called first');
+// Shorthand equivalent
+once('user:login', (user) => {
+  alert(`Welcome, ${user.name}!`);
 });
-console.log('Promise resolved with:', user);
 ```
+
+**Promise form** — no handler argument, returns `Promise<T>`:
+
+```ts
+// Await the next emission of the event
+const user = await eventBus.once<User>('user:login');
+console.log('Logged in:', user.name);
+
+// Shorthand equivalent
+const user = await once<User>('user:login');
+```
+
+> **Note:** These are strict overloads. Passing a handler returns `void` (no Promise). Omitting the handler returns a Promise. The old dual-output form (handler + Promise together) is no longer supported.
 
 ## 🧹 Removing Listeners
 
-You can remove listeners by calling the unsubscribe function returned by `.on()` or `.once()`.
+You can remove listeners by calling the unsubscribe function returned by `.on()`. The `once` callback form self-removes after the first invocation — no manual cleanup needed.
 
 ## 🧩 Example: Component Communication
 
@@ -119,6 +133,40 @@ component('notification-receiver', () => {
   `;
 });
 ```
+
+## 🧰 Utility Methods
+
+The `GlobalEventBus` class (accessed via `eventBus`) exposes several utility methods for cleanup and debugging:
+
+```ts
+import {
+  eventBus,
+  GlobalEventBus,
+} from '@jasonshimmy/custom-elements-runtime/event-bus';
+
+// Remove all handlers for a specific event
+eventBus.offAll('cart:add');
+
+// List all event names that have at least one registered handler
+const activeEvents: string[] = eventBus.getActiveEvents();
+
+// Remove every registered handler (useful in tests or for full teardown)
+eventBus.clear();
+
+// Count how many handlers are currently registered for an event
+const count: number = eventBus.getHandlerCount('cart:add');
+
+// Get per-event emission counts and handler counts (for debugging)
+const stats = eventBus.getEventStats();
+// { 'cart:add': { count: 5, handlersCount: 2 }, ... }
+
+// Reset emission counters (useful in tests or after resolving event storms)
+eventBus.resetEventCounters();
+```
+
+### Event Storm Protection
+
+The bus automatically throttles events that fire more than 50 times per second per event name (silent slowdown above 50, silent drop above 100). Use `resetEventCounters()` to clear these counters during testing or after a burst.
 
 ## 💡 Tips
 

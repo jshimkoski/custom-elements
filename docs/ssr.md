@@ -72,7 +72,7 @@ import { renderToString } from '@jasonshimmy/custom-elements-runtime/ssr';
 import { renderHello } from './components/hello';
 
 const vnode = renderHello({ name: 'Alice' });
-const html = renderToString(vnode);
+const renderedHtml = renderToString(vnode);
 ```
 
 Async renders
@@ -81,7 +81,7 @@ If `render` returns a Promise, await it before stringifying:
 
 ```ts
 const vnode = await maybeAsyncRender(ctx);
-const html = renderToString(vnode);
+const renderedHtml = renderToString(vnode);
 ```
 
 Minimal server example
@@ -242,15 +242,18 @@ When performing server-side rendering you may want full HTML5 named-entity decod
 ### API
 
 - `registerEntityMap(map: Record<string,string>, options?: { overwrite?: boolean })` — register the full map before rendering. First registration wins by default.
+- `loadEntityMap(): Promise<Record<string,string>>` — dynamically load the full HTML5 named-entity map (useful in SSR pipelines that need complete entity support). Returns a promise that resolves to the map — the runtime tries the published package's `entities.json` first and falls back to a minimal inline map when the JSON cannot be loaded.
 - `clearRegisteredEntityMap()` — clear the registration (useful in tests).
+
+All three are importable from `@jasonshimmy/custom-elements-runtime/ssr`.
 
 ### Example (Express)
 
 ```js
 // server.js
 import express from 'express';
-import { registerEntityMap } from 'your-lib';
-import entities from './entities.json'; // generated or copied by the server team
+import { registerEntityMap } from '@jasonshimmy/custom-elements-runtime/ssr';
+import entities from '@jasonshimmy/custom-elements-runtime/entities.json' assert { type: 'json' };
 
 registerEntityMap(entities);
 
@@ -266,8 +269,8 @@ Place `registerEntityMap` call in your server start file (before handling reques
 
 ```js
 // next-server.js (or similar startup entry)
-import { registerEntityMap } from 'your-lib';
-import entities from './entities.json';
+import { registerEntityMap } from '@jasonshimmy/custom-elements-runtime/ssr';
+import entities from '@jasonshimmy/custom-elements-runtime/entities.json' assert { type: 'json' };
 
 // register synchronously at startup — do this before handling any incoming requests
 registerEntityMap(entities);

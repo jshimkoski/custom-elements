@@ -57,13 +57,13 @@ describe('Transitions - Comprehensive Tests', () => {
       '[data-test="add"]',
     ) as HTMLButtonElement;
 
-    // Add 3 items with transitions
+    // Add 3 items with transitions — wait > transition duration (200ms) per step
     addBtn.click();
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, 300));
     addBtn.click();
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, 300));
     addBtn.click();
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, 300));
 
     // Check that all items exist
     const items = el.shadowRoot?.querySelectorAll('[data-test-id]');

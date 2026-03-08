@@ -5,6 +5,21 @@
 import { devWarn, devError } from './logger';
 
 /**
+ * A scheduled update function to be executed in the next flush cycle.
+ */
+type ScheduledUpdate = () => void;
+
+/**
+ * Scheduling priority for update tasks.
+ *
+ * - `'immediate'` — Run synchronously before returning (use sparingly).
+ * - `'normal'`    — Batch via microtask (default).
+ * - `'idle'`      — Defer to browser idle time via `requestIdleCallback`
+ *                    (time-sliced, non-blocking rendering for low-priority work).
+ */
+export type UpdatePriority = 'immediate' | 'normal' | 'idle';
+
+/**
  * Environment detection utilities
  */
 interface TestEnvironment {
@@ -56,13 +71,20 @@ function detectTestEnvironment(): TestEnvironment {
 }
 
 class UpdateScheduler {
-  private pendingUpdates = new Map<string | (() => void), () => void>();
+  private pendingUpdates = new Map<string | (() => void), ScheduledUpdate>();
   private isFlushScheduled = false;
   private isFlushing = false;
   private readonly testEnv: TestEnvironment;
   private lastCleanup = 0;
   private readonly CLEANUP_INTERVAL = 5 * 60 * 1000; // 5 minutes
   private readonly MAX_PENDING_SIZE = 10000; // Prevent memory bloat
+
+  // Idle / time-sliced priority support
+  private pendingIdleUpdates = new Map<
+    string | (() => void),
+    ScheduledUpdate
+  >();
+  private idleCallbackHandle: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
     // Cache environment detection result to avoid repeated checks
@@ -108,7 +130,8 @@ class UpdateScheduler {
   }
 
   /**
-   * Execute all pending updates
+   * Execute all pending updates with priority ordering
+   * Execute all pending updates with priority ordering
    */
   private flush(): void {
     // Prevent reentrant flushes
@@ -226,19 +249,167 @@ class UpdateScheduler {
       this.pendingUpdates.delete(entries[i][0]);
     }
   }
+
+  /**
+   * Schedule an update with an explicit priority level.
+   *
+   * - `'immediate'` — Runs synchronously before returning.
+   * - `'normal'`    — Default microtask batching (same as `schedule()`).
+   * - `'idle'`      — Deferred to browser idle time via `requestIdleCallback`
+   *                    with time-slicing to avoid blocking the main thread.
+   *                    Falls back to a 5 ms `setTimeout` when
+   *                    `requestIdleCallback` is unavailable (e.g. Safari < 16).
+   *
+   * @example Defer a low-priority analytics flush
+   * ```ts
+   * scheduleWithPriority(() => flushAnalytics(), 'idle');
+   * ```
+   */
+  scheduleWithPriority(
+    update: () => void,
+    priority: UpdatePriority = 'normal',
+    componentId?: string,
+  ): void {
+    if (priority === 'immediate') {
+      try {
+        update();
+      } catch (error) {
+        devError('Error in immediate update:', error);
+      }
+      return;
+    }
+
+    if (priority === 'idle') {
+      const key = componentId ?? update;
+      if (this.pendingIdleUpdates.size >= this.MAX_PENDING_SIZE) {
+        this.performEmergencyCleanup();
+      }
+      this.pendingIdleUpdates.set(key, update);
+      this.scheduleIdleFlush();
+      return;
+    }
+
+    // 'normal' → microtask-batched path, always via queueMicrotask so that
+    // multiple synchronous calls with the same componentId are deduped before
+    // the flush fires (even in test environments where schedule() auto-flushes
+    // synchronously to simplify timing).
+    const key = componentId ?? update;
+    if (this.pendingUpdates.size >= this.MAX_PENDING_SIZE) {
+      this.performEmergencyCleanup();
+    }
+    this.pendingUpdates.set(key, update);
+    if (!this.isFlushScheduled) {
+      this.isFlushScheduled = true;
+      queueMicrotask(() => this.flush());
+    }
+  }
+
+  /**
+   * Schedule a flush of idle-priority updates.
+   * Uses `requestIdleCallback` when available; falls back to a short `setTimeout`.
+   */
+  private scheduleIdleFlush(): void {
+    if (this.idleCallbackHandle !== null) return;
+
+    if (this.testEnv.isTest) {
+      // In tests, run after current call stack via microtask so updates are
+      // observable synchronously in the same tick.
+      this.idleCallbackHandle = setTimeout(() => {
+        this.idleCallbackHandle = null;
+        this.flushIdleUpdates(null);
+      }, 0);
+      return;
+    }
+
+    // Use requestIdleCallback when the browser supports it (Chrome/Firefox/Edge)
+    if (typeof requestIdleCallback !== 'undefined') {
+      const handle = requestIdleCallback(
+        (deadline) => {
+          this.idleCallbackHandle = null;
+          this.flushIdleUpdates(deadline);
+        },
+        { timeout: 2000 },
+      ) as unknown as ReturnType<typeof setTimeout>;
+      this.idleCallbackHandle = handle;
+    } else {
+      // Polyfill: simulate a ~50 ms idle deadline via setTimeout
+      this.idleCallbackHandle = setTimeout(() => {
+        this.idleCallbackHandle = null;
+        const start = Date.now();
+        this.flushIdleUpdates({
+          timeRemaining: () => Math.max(0, 50 - (Date.now() - start)),
+          didTimeout: false,
+        });
+      }, 5);
+    }
+  }
+
+  /**
+   * Process pending idle-priority updates in a time-sliced manner.
+   * Yields back to the browser when the deadline's `timeRemaining()` reaches
+   * zero and reschedules any unprocessed work.
+   */
+  private flushIdleUpdates(
+    deadline: { timeRemaining: () => number; didTimeout: boolean } | null,
+  ): void {
+    // Snapshot and clear current idle queue
+    const updates = Array.from(this.pendingIdleUpdates.entries());
+    this.pendingIdleUpdates = new Map();
+
+    for (let i = 0; i < updates.length; i++) {
+      // Yield if we've used our idle time (unless the callback timed out,
+      // in which case we must finish to avoid indefinite deferral)
+      if (deadline && !deadline.didTimeout && deadline.timeRemaining() <= 0) {
+        // Re-queue remaining work for the next idle window
+        for (let j = i; j < updates.length; j++) {
+          this.pendingIdleUpdates.set(updates[j][0], updates[j][1]);
+        }
+        this.scheduleIdleFlush();
+        return;
+      }
+
+      try {
+        updates[i][1]();
+      } catch (error) {
+        devError('Error in idle update:', error);
+      }
+    }
+  }
 }
 
 // Global scheduler instance
 export const updateScheduler = new UpdateScheduler();
 
 /**
- * Schedule a DOM update to be batched with optional component identity
+ * Schedule a DOM update to be batched with optional component identity and priority
+ * Schedule a DOM update to be batched with optional component identity and priority
  */
 export function scheduleDOMUpdate(
   update: () => void,
   componentId?: string,
 ): void {
   updateScheduler.schedule(update, componentId);
+}
+
+/**
+ * Schedule an update with explicit priority.
+ * See `UpdateScheduler.scheduleWithPriority` for full documentation.
+ *
+ * @example
+ * ```ts
+ * // Defer low-priority work to browser idle time (time-sliced, non-blocking)
+ * scheduleWithPriority(() => updateAnalyticsDashboard(), 'idle');
+ *
+ * // Run a critical update before any async code resumes
+ * scheduleWithPriority(() => updateCriticalUI(), 'immediate');
+ * ```
+ */
+export function scheduleWithPriority(
+  update: () => void,
+  priority: UpdatePriority = 'normal',
+  componentId?: string,
+): void {
+  updateScheduler.scheduleWithPriority(update, priority, componentId);
 }
 
 /**
@@ -250,4 +421,28 @@ export function scheduleDOMUpdate(
  */
 export function flushDOMUpdates(): void {
   updateScheduler.flushImmediately();
+}
+
+/**
+ * Returns a Promise that resolves after the next DOM update cycle completes.
+ * Equivalent to Vue's `nextTick()` — useful when you need to observe DOM
+ * state that reflects the latest reactive changes.
+ *
+ * @example
+ * ```ts
+ * count.value++;
+ * await nextTick();
+ * console.log(element.shadowRoot.querySelector('span').textContent); // updated
+ * ```
+ */
+export function nextTick(): Promise<void> {
+  // If there are pending updates, flush them and wait for the microtask queue to drain.
+  // Otherwise, just wait one microtask so callers always get post-render timing.
+  return new Promise<void>((resolve) => {
+    if (updateScheduler.hasPendingUpdates) {
+      updateScheduler.flushImmediately();
+    }
+    // Queue resolution after any pending microtasks (including the scheduler's queueMicrotask flush)
+    queueMicrotask(resolve);
+  });
 }

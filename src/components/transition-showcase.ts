@@ -231,7 +231,7 @@ component('complex-animation-demo', () => {
         },
         html`
           <div
-            class="p-8 bg-gradient-to-br from-primary-500 to-secondary-500 text-white rounded-xl shadow-2xl"
+            class="p-8 bg-linear-to-br from-primary-500 to-secondary-500 text-white rounded-xl shadow-2xl"
           >
             <h2 class="text-2xl font-bold mb-2">Complex Animation</h2>
             <p>Multiple transforms combined with opacity and timing!</p>
@@ -451,7 +451,7 @@ component('layout-demo', () => {
               Using
               <code class="bg-neutral-100 px-2 py-1 rounded text-sm"
                 >class="flex gap-4 items-center justify-around p-6
-                bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl"</code
+                bg-linear-to-r from-blue-50 to-purple-50 rounded-xl"</code
               >
             </p>
 
@@ -484,7 +484,7 @@ component('layout-demo', () => {
               {
                 preset: 'scale',
                 class:
-                  'flex gap-4 items-center justify-around p-6 bg-gradient-to-r from-primary-50 to-secondary-50 rounded-xl min-h-[120px]',
+                  'flex gap-4 items-center justify-around p-6 bg-linear-to-r from-primary-50 to-secondary-50 rounded-xl min-h-[120px]',
                 tag: 'div',
                 moveClass: 'transition-all duration-500 ease-out',
                 appear: true,

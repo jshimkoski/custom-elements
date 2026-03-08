@@ -70,6 +70,16 @@ component('my-counter', () => {
 
 Store is shallowly reactive: `setState()` performs a shallow merge and replaces the internal state object, then notifies subscribers. Use `subscribe(listener)` to react to state changes; the listener is invoked immediately with the current state when you subscribe and `subscribe` returns an unsubscribe function.
 
+`setState` accepts **either** a partial state object or an updater function that receives the previous state. The updater form is preferred when the new value depends on the current state:
+
+```ts
+// Object form — shallow merge
+store.setState({ theme: 'dark' });
+
+// Updater function form — preferred for derived updates
+store.setState((prev) => ({ count: prev.count + 1 }));
+```
+
 ```ts
 const unsubscribe = store.subscribe((state) => {
   console.log('State changed:', state);

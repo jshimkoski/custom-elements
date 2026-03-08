@@ -96,4 +96,4 @@ A: Yes, HMR works with state, props, computed, style, render, and more.
 
 HMR in the custom elements runtime enables fast, stateful, and reliable development. By updating configs and live instances instantly, you get immediate feedback and a smooth developer experience.
 
-For more details, see the HMR logic in `src/lib/index.ts` and try editing components in development mode to see HMR in action.
+For more details, see the HMR logic in `src/lib/runtime/component/` and try editing components in development mode to see HMR in action.

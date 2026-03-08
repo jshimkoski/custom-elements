@@ -14,6 +14,7 @@
 - [🎨 Styling](#-styling)
 - [🔗 Component Communication](#-component-communication)
 - [⚙️ Advanced Configuration](#-advanced-configuration)
+- [🚀 Advanced APIs](#-advanced-apis)
 - [⏳ Async Components](#-async-components)
 - [🧪 Testing Components](#-testing-components)
 - [🎯 Best Practices](#-best-practices)
@@ -99,6 +100,9 @@ All hooks must be called during component render and provide perfect TypeScript 
 - **`useOnDisconnected(callback)`**: Set up lifecycle hook for when component disconnects from DOM
 - **`useOnAttributeChanged(callback)`**: Set up lifecycle hook for when attributes change
 - **`useOnError(callback)`**: Set up lifecycle hook for error handling
+- **`useStyle(fn: () => string): void`**: Provide a reactive CSS string applied as the component's scoped stylesheet. The `fn` callback runs during render; any reactive reads inside are tracked so styles update when dependencies change. See [jit-css.md](./jit-css.md) for usage with the `css` template helper.
+- **`useExpose(api)`**: Publish methods and properties onto the host element as an imperative public API. See [useExpose()](./use-expose.md).
+- **`useSlots()`**: Inspect which named slots have been filled by the consumer. See [useSlots()](./use-slots.md).
 
 ## 🔒 Props and Type Safety
 
@@ -659,15 +663,14 @@ component('multi-select', () => {
     options: [] as { label: string; value: string }[],
     selectedValues: [] as string[],
   });
-  const selectedItems = ref<string[]>([]);
-  const multiple = ref(true);
 
   const isSelected = (value: string) => props.selectedValues.includes(value);
   const toggleSelection = (value: string) => {
     const newSelection = isSelected(value)
-      ? props.selectedValues.filter((item) => item !== value)
+      ? props.selectedValues.filter((item: string) => item !== value)
       : [...props.selectedValues, value];
-    props.selectedValues = newSelection;
+    // Emit update event so parent can update selectedValues via :model or binding
+    emit('update:selectedValues', newSelection);
     emit('selection-changed', newSelection);
   };
 
@@ -1223,8 +1226,8 @@ component('interactive-button', () => {
   useStyle(
     () => css`
       :host {
-        --button-color: ${buttonState.color};
-        --opacity: ${buttonState.hovered ? '0.8' : '1'};
+        --button-color: ${buttonState.value.color};
+        --opacity: ${buttonState.value.hovered ? '0.8' : '1'};
       }
 
       .button {
@@ -1243,10 +1246,15 @@ component('interactive-button', () => {
   return html`
     <button
       class="button"
-      @mouseenter="${() => (buttonState.hovered = true)}"
-      @mouseleave="${() => (buttonState.hovered = false)}"
+      @mouseenter="${() =>
+        (buttonState.value = { ...buttonState.value, hovered: true })}"
+      @mouseleave="${() =>
+        (buttonState.value = { ...buttonState.value, hovered: false })}"
       @click="${() =>
-        (buttonState.color = buttonState.color === 'blue' ? 'green' : 'blue')}"
+        (buttonState.value = {
+          ...buttonState.value,
+          color: buttonState.value.color === 'blue' ? 'green' : 'blue',
+        })}"
     >
       Toggle Color
     </button>
@@ -1274,7 +1282,7 @@ component('adaptive-card', () => {
       :host {
         display: block;
         transition: all 0.3s ease;
-        transform: ${cardState.expanded ? 'scale(1.02)' : 'scale(1)'};
+        transform: ${cardState.value.expanded ? 'scale(1.02)' : 'scale(1)'};
       }
 
       .card {
@@ -1301,7 +1309,11 @@ component('adaptive-card', () => {
   return html`
     <div
       class="card"
-      @click="${() => (cardState.expanded = !cardState.expanded)}"
+      @click="${() =>
+        (cardState.value = {
+          ...cardState.value,
+          expanded: !cardState.value.expanded,
+        })}"
     >
       <slot></slot>
     </div>
@@ -1517,6 +1529,9 @@ component('user-avatar', () => {
           />
           <span>${appState.value.user.name}</span>
         `,
+      )}
+      ${when(
+        !appState.value.user,
         html`
           <button @click="${() => emit('login-requested')}">Login</button>
         `,
@@ -1864,3 +1879,99 @@ The streamlined functional component API provides:
 - **🔄 Full Feature Support** - All directives, bindings, and state management
 
 This API eliminates the complexity of the previous system while maintaining all the power and flexibility you need to build modern, reactive custom elements.
+
+---
+
+## 🚀 Advanced APIs
+
+The runtime ships several advanced utilities beyond the core functional API documented above.
+
+### ⚡ Reactive Utilities
+
+[`computed()`](./reactive-api.md#computed) — Memoized derived state with automatic cache invalidation.
+
+[`watchEffect(fn)`](./reactive-api.md#watcheffect) — Run a side-effect automatically whenever any reactive dependency changes.
+
+[`nextTick()`](./reactive-api.md#nexttick) — Defer work until after all pending DOM updates have been flushed.
+
+See the full [Reactive API guide](./reactive-api.md) for usage examples.
+
+### 🏝️ Provide / Inject
+
+[`provide(key, value)`](./provide-inject.md) and [`inject(key, defaultValue?)`](./provide-inject.md) implement ancestor → descendant dependency injection without prop-drilling.
+
+See the [Provide / Inject guide](./provide-inject.md) for full documentation.
+
+### 🧩 Composables
+
+[`createComposable(fn)`](./composable.md) extracts reusable stateful logic — including lifecycle hooks — into shareable factory functions.
+
+See the [Composables guide](./composable.md) for usage patterns.
+
+### 🚀 Teleport
+
+[`useTeleport(target)`](./teleport.md) renders virtual DOM content into an arbitrary DOM node outside the current shadow root — ideal for modals, tooltips, and popovers.
+
+See the [Teleport guide](./teleport.md) for full documentation.
+
+### ♻️ Keep-Alive
+
+[`registerKeepAlive()`](./keep-alive.md) registers `<cer-keep-alive>`, a wrapper element that preserves component JavaScript state across DOM removals and re-insertions.
+
+See the [Keep-Alive guide](./keep-alive.md) for full documentation.
+
+### 🎯 useExpose() — Imperative Handles
+
+[`useExpose(api)`](./use-expose.md) publishes methods and properties directly onto the host element so parent components or plain JavaScript can call them by reference — similar to `defineExpose()` in Vue 3 or `useImperativeHandle()` in React.
+
+See the [useExpose() guide](./use-expose.md) for full documentation.
+
+### 🧩 useSlots() — Slot Inspection
+
+[`useSlots()`](./use-slots.md) returns helpers (`has()`, `getNodes()`, `names()`) to inspect which named slots have content at render time. Use it to conditionally render wrapper elements only when a slot has been filled.
+
+See the [useSlots() guide](./use-slots.md) for full documentation.
+
+### 🧱 Built-in Components
+
+[`registerBuiltinComponents()`](./builtin-components.md) registers `<cer-suspense>`, `<cer-error-boundary>`, and `<cer-keep-alive>` — opt-in utility components for loading states, graceful error recovery, and state preservation.
+
+See the [Built-in Components guide](./builtin-components.md) for full documentation.
+
+### ⚡ Concurrent Rendering & Update Priority
+
+[`scheduleWithPriority(update, priority?, componentId?)`](./concurrent-rendering.md) provides explicit control over when updates run: `'immediate'` (synchronous), `'normal'` (microtask-batched with deduplication), or `'idle'` (deferred via `requestIdleCallback` — time-sliced and non-blocking).
+
+See the [Concurrent Rendering guide](./concurrent-rendering.md) for full documentation.
+
+### 🔧 Development & Logging Utilities
+
+The runtime exports two helpers for development-time diagnostics:
+
+#### `setDevMode(v: boolean)`
+
+Programmatically enable or disable dev-mode console logging at runtime. This is useful when you want verbose logs during a session without changing build configuration.
+
+```ts
+import { setDevMode } from '@jasonshimmy/custom-elements-runtime';
+
+setDevMode(true); // enable dev logs
+setDevMode(false); // silence them
+```
+
+Alternatively, set `globalThis.__CE_RUNTIME_DEV__ = true` before the library is imported to enable logging as early as possible.
+
+> **Note:** This flag is process-wide. In Node/SSR environments it affects all requests in the same process.
+
+#### `devLog(message: string, ...args: unknown[])`
+
+Log an informational message to the console only when dev mode is enabled. No-op in production builds or when dev mode is disabled.
+
+```ts
+import { devLog } from '@jasonshimmy/custom-elements-runtime';
+
+component('my-widget', () => {
+  devLog('[my-widget] render()', { props }); // silent in production
+  // ...
+});
+```

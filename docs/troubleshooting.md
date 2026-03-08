@@ -29,7 +29,6 @@ A guide to diagnosing and resolving common issues in the custom elements runtime
 ## 🔗 Event & Binding Problems
 
 - **Events not firing:**
-- **Events not firing:**
 - Check that the handler is correctly bound and accessible in the component scope (no accidental shadowing or missing closure capture).
 - Ensure the element is mounted before wiring listeners when using imperative `addEventListener`.
 - Use `@event` syntax in templates (e.g., `@click`) or attach listeners via refs + `addEventListener` for cross-framework compatibility.
@@ -44,7 +43,9 @@ A guide to diagnosing and resolving common issues in the custom elements runtime
 - **Lifecycle hooks not called:**
   - Use correct hook names (`onConnected`, `onDisconnected`, etc.) from the hooks object.
   - For the functional `watch()` helper, provide the correct source function (e.g., `() => user.profile.age`) to observe nested values.
-  - The lightweight `watch()` exported by the runtime does not support a `{ deep: true }` option; instead watch the specific nested path or create separate watchers for nested properties.
+  - Use `watch(source, cb, { deep: true })` to observe nested object/array mutations. The callback will fire whenever any property at any depth changes, with deep-cloned before/after snapshots provided to the callback.
+  - Use `watchEffect/watch` for side effects, never mutate state directly during render.
+  - Use `watch(source, cb, { deep: true })` to observe nested object/array mutations. The callback receives deep-cloned before/after snapshots. Without `deep: true`, only top-level `.value` reassignment is detected.
   - Ensure hooks are properly destructured from the second parameter.
 - **Watchers not triggering:**
   - Use correct path for nested state (e.g., `user.profile.age`).
@@ -57,7 +58,7 @@ A guide to diagnosing and resolving common issues in the custom elements runtime
 - Use supported directives (`when`, `each`, `match`).
 - Handle loading and error state in your component (for example using `ref` or `switchOnPromise`), and log errors in async code.
 - **Template errors:**
-  - Use error boundaries (`errorTemplate`, `errorFallback`) for robust handling.
+  - Use error boundaries with a `slot="fallback"` attribute for robust handling.
 
 ## 🔥 HMR & SSR
 
@@ -96,4 +97,4 @@ A: Log errors in async code.
 
 Troubleshooting is easier with clear configs, error boundaries, and dev tools. Use this guide to quickly resolve issues and build robust custom elements.
 
-For more help, see the documentation for each feature and inspect the source code in `src/lib/index.ts`.
+For more help, see the documentation for each feature and inspect the source code in `src/lib/runtime/`.

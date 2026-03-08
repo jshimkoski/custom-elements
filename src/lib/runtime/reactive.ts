@@ -1,6 +1,8 @@
 import { scheduleDOMUpdate } from './scheduler';
 import { ProxyOptimizer } from './reactive-proxy-cache';
 import { devWarn } from './logger';
+import { isDiscoveryRender } from './discovery-state';
+import type { WatchOptions } from './types';
 
 /**
  * Global reactive system for tracking dependencies and triggering updates
@@ -261,7 +263,7 @@ export class ReactiveState<T> {
         devWarn(
           '🚨 State modification detected during render! This can cause infinite loops.\n' +
             '  • Move state updates to event handlers\n' +
-            '  • Use useEffect/watch for side effects\n' +
+            '  • Use watchEffect/watch for side effects\n' +
             "  • Ensure computed properties don't modify state",
         );
       }
@@ -270,6 +272,28 @@ export class ReactiveState<T> {
     this._value = this.makeReactive(newValue);
     // Trigger updates for all dependent components
     reactiveSystem.triggerUpdate(this);
+  }
+
+  /**
+   * Read the current value without registering a reactive dependency.
+   * Useful for internal infrastructure (e.g. stable hook slots) that must
+   * inspect the stored value without re-triggering the containing component.
+   * @internal
+   */
+  peek(): T {
+    return this._value;
+  }
+
+  /**
+   * Set the initial value without triggering any reactive updates or warnings.
+   * Only intended for internal/infrastructure use (e.g. storing a stable hook
+   * handle in a reactive slot without causing a spurious re-render).
+   * The value is stored as-is without reactive proxy wrapping so that opaque
+   * objects (e.g. TeleportHandle) are not accidentally instrumented.
+   * @internal
+   */
+  initSilent(value: T): void {
+    this._value = value;
   }
 
   addDependent(componentId: string): void {
@@ -350,26 +374,163 @@ export function isReactiveState(v: unknown): v is ReactiveState<unknown> {
 }
 
 /**
- * Create computed state that derives from other reactive state
+ * Create computed state that derives from other reactive state.
+ * The result is cached and only recomputed when tracked reactive dependencies change.
  *
  * @example
  * ```ts
  * const firstName = ref('John');
  * const lastName = ref('Doe');
  * const fullName = computed(() => `${firstName.value} ${lastName.value}`);
+ * console.log(fullName.value); // 'John Doe' — cached until firstName or lastName changes
  * ```
  */
 export function computed<T>(fn: () => T): { readonly value: T } {
-  const computedState = new ReactiveState(fn());
+  let cachedValue: T;
+  let isDirty = true;
 
-  // We need to track dependencies when the computed function runs
-  // For now, we'll re-evaluate on every access (can be optimized later)
+  // Unique identifier used ONLY to track which reactive states this computed depends
+  // on (for cache invalidation). It does NOT serve as a "current component" for
+  // downstream notification — that is handled by running fn() in the outer context.
+  const computedId = `computed-${crypto.randomUUID()}`;
+
+  // invalidate() only marks the cache stale. It does NOT call triggerUpdate because
+  // the calling component is notified directly via the outer fn() call (see get value()).
+  const invalidate = (): void => {
+    isDirty = true;
+  };
+
+  // Register under the current component (if inside a render) so cleanup is automatic.
+  try {
+    const parentComp = reactiveSystem.getCurrentComponentId();
+    if (parentComp) {
+      reactiveSystem.registerWatcher(parentComp, computedId);
+    }
+  } catch {
+    /* ignore */
+  }
+
+  // Initial computation: establishes which reactive sources this computed depends on
+  // for invalidation tracking.
+  reactiveSystem.setCurrentComponent(computedId, invalidate);
+  cachedValue = fn();
+  reactiveSystem.clearCurrentComponent();
+  isDirty = false;
+
   return {
     get value(): T {
-      reactiveSystem.trackDependency(computedState as ReactiveState<unknown>);
-      return fn();
+      if (isDirty) {
+        // Re-run fn() in computedId's context to re-subscribe for future invalidations.
+        reactiveSystem.setCurrentComponent(computedId, invalidate);
+        cachedValue = fn();
+        reactiveSystem.clearCurrentComponent();
+        isDirty = false;
+      }
+
+      // Run fn() once more in the CURRENT (calling) context so that whoever is
+      // consuming this computed — a component or an outer computed — directly tracks
+      // the same reactive dependencies. This preserves the original synchronous
+      // notification behaviour: when any dep changes, the consumer is notified
+      // directly without going through an async microtask cascade.
+      // The result of this call is discarded; we return the cached value above.
+      fn();
+
+      return cachedValue;
     },
   };
+}
+
+/**
+ * Run a side-effect function immediately and automatically re-run it whenever
+ * any reactive state accessed inside `fn` changes. Similar to Vue's `watchEffect`.
+ *
+ * @returns A cleanup function that stops the effect.
+ *
+ * @example
+ * ```ts
+ * const count = ref(0);
+ * const stop = watchEffect(() => {
+ *   document.title = `Count: ${count.value}`;
+ * });
+ * count.value++; // automatically re-runs the effect
+ * stop(); // cancel the effect
+ * ```
+ */
+export function watchEffect(fn: () => void): () => void {
+  // During discovery render, skip setting up effects — fn may have side effects
+  // (API calls, mutations) that should only run in real render contexts.
+  if (isDiscoveryRender()) return () => {};
+
+  const effectId = `effect-${crypto.randomUUID()}`;
+
+  // Register under the current component for automatic cleanup on re-render/destroy.
+  try {
+    const parentComp = reactiveSystem.getCurrentComponentId();
+    if (parentComp) {
+      reactiveSystem.registerWatcher(parentComp, effectId);
+    }
+  } catch {
+    /* ignore */
+  }
+
+  const run = (): void => {
+    reactiveSystem.setCurrentComponent(effectId, run);
+    try {
+      fn();
+    } finally {
+      reactiveSystem.clearCurrentComponent();
+    }
+  };
+
+  // Run immediately to establish dependencies and execute the initial side effect.
+  run();
+
+  return () => {
+    reactiveSystem.cleanup(effectId);
+  };
+}
+
+/**
+ * Recursively deep-clone a value into a plain (non-reactive) snapshot.
+ *
+ * Rules:
+ *  - Primitives and functions are returned as-is.
+ *  - `Date` instances are cloned.
+ *  - Arrays are cloned element-by-element (works through Proxy).
+ *  - Plain objects are cloned key-by-key (works through Proxy `get` traps).
+ *  - DOM nodes are returned as-is (cloning nodes is out of scope).
+ *  - Circular references are handled via a `WeakMap` seen-set.
+ *
+ * @internal — used by deep watchers to capture before/after state snapshots.
+ */
+function deepClone<T>(value: T, seen = new WeakMap<object, unknown>()): T {
+  if (value === null || typeof value !== 'object') return value;
+  const obj = value as object;
+  if (seen.has(obj)) return seen.get(obj) as T;
+  // Do not attempt to clone DOM nodes
+  if (typeof Node !== 'undefined' && obj instanceof Node) return value;
+  // Clone Date
+  if (obj instanceof Date) return new Date(obj.getTime()) as unknown as T;
+  // Clone Array (Array.isArray is Proxy-transparent)
+  if (Array.isArray(obj)) {
+    const arr: unknown[] = [];
+    seen.set(obj, arr);
+    for (let i = 0; i < (obj as unknown[]).length; i++) {
+      arr.push(deepClone((obj as unknown[])[i], seen));
+    }
+    return arr as unknown as T;
+  }
+  // Clone plain object (Object.keys + Reflect.get work through Proxy)
+  const copy: Record<string, unknown> = {};
+  seen.set(obj, copy);
+  for (const key of Object.keys(obj)) {
+    try {
+      copy[key] = deepClone((obj as Record<string, unknown>)[key], seen);
+    } catch {
+      // skip inaccessible or throwing properties
+    }
+  }
+  return copy as unknown as T;
 }
 
 /**
@@ -386,18 +547,22 @@ export function computed<T>(fn: () => T): { readonly value: T } {
 export function watch<T>(
   source: ReactiveState<T>,
   callback: (newValue: T, oldValue?: T) => void,
-  options?: { immediate?: boolean },
+  options?: WatchOptions,
 ): () => void;
 export function watch<T>(
   source: () => T,
   callback: (newValue: T, oldValue?: T) => void,
-  options?: { immediate?: boolean },
+  options?: WatchOptions,
 ): () => void;
 export function watch<T>(
   source: ReactiveState<T> | (() => T),
   callback: (newValue: T, oldValue?: T) => void,
-  options?: { immediate?: boolean },
+  options?: WatchOptions,
 ): () => void {
+  // During discovery render, skip setting up watchers — callbacks may contain
+  // side effects that should only run against real component instances.
+  if (isDiscoveryRender()) return () => {};
+
   // Note: we must establish reactive dependencies first (a tracked
   // call) and only then capture the initial `oldValue`. Capturing
   // `oldValue` before registering as a dependent means the first
@@ -414,7 +579,7 @@ export function watch<T>(
   })();
 
   // Create a dummy component to track dependencies
-  const watcherId = `watch-${Math.random().toString(36).substr(2, 9)}`;
+  const watcherId = `watch-${crypto.randomUUID()}`;
 
   // If called during a component render, register this watcher under that
   // component so watchers created in render are cleaned up on re-render.
@@ -432,7 +597,17 @@ export function watch<T>(
     const newValue = getter();
     reactiveSystem.clearCurrentComponent();
 
-    if (newValue !== oldValue) {
+    if (options?.deep) {
+      // Deep watchers: nested mutations keep the same proxy reference, so
+      // reference equality is not a reliable change signal. Always fire
+      // the callback and provide independent deep-cloned snapshots so
+      // callers receive distinct before/after plain-object values.
+      const newSnapshot = reactiveSystem.withoutTracking(() =>
+        deepClone(newValue),
+      ) as T;
+      callback(newSnapshot, oldValue);
+      oldValue = newSnapshot;
+    } else if (newValue !== oldValue) {
       callback(newValue, oldValue);
       oldValue = newValue;
     }
@@ -443,6 +618,12 @@ export function watch<T>(
   // Capture the tracked initial value as the baseline
   oldValue = getter();
   reactiveSystem.clearCurrentComponent();
+
+  // For deep watchers, snapshot the initial value so that oldValue is a
+  // stable plain-object clone that won't be mutated in-place by the user.
+  if (options?.deep) {
+    oldValue = reactiveSystem.withoutTracking(() => deepClone(oldValue)) as T;
+  }
 
   // If immediate is requested, invoke the callback once with the
   // current value as `newValue` and `undefined` as the previous value

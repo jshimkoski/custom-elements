@@ -40,7 +40,12 @@ describe('ReactiveProxyCache & ProxyOptimizer', () => {
   it('object handler set/delete triggers update and wraps values', () => {
     const obj: any = { a: 1 };
     const onUpdate = vi.fn();
-    const makeReactive = vi.fn((v: any) => ({ v }));
+    // Mimic real makeReactive: only wrap primitives, pass objects through
+    // (the real implementation is idempotent — returning the same proxy
+    // when called a second time on an already-reactive value).
+    const makeReactive = vi.fn((v: any) =>
+      typeof v === 'object' && v !== null ? v : { v },
+    );
 
     const proxy = ProxyOptimizer.createReactiveProxy(
       obj,

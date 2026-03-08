@@ -79,8 +79,10 @@ export interface TransitionOptions extends TransitionClasses, TransitionHooks {
 /**
  * Options for TransitionGroup component
  */
-export interface TransitionGroupOptions
-  extends Omit<TransitionOptions, 'show'> {
+export interface TransitionGroupOptions extends Omit<
+  TransitionOptions,
+  'show'
+> {
   /** HTML tag for the wrapper element */
   tag?: string;
   /** Class applied during move transitions (when items reorder) */
@@ -329,7 +331,7 @@ export function Transition(
  *   preset: 'fade',
  *   class: 'flex gap-4 flex-wrap'
  * }, each(items.value, (item) => html`
- *   <div key="${item.id}" class="flex-shrink-0">${item.text}</div>
+ *   <div key="${item.id}" class="shrink-0">${item.text}</div>
  * `))}
  *
  * // With grid layout

@@ -194,7 +194,6 @@ describe('Transitions - Minimal Tests', () => {
 
     // Item should still be in DOM during transition
     await new Promise((resolve) => setTimeout(resolve, 50));
-    items = el.shadowRoot?.querySelectorAll('[data-test-id]');
 
     // After transition completes, should have 1 item
     await new Promise((resolve) => setTimeout(resolve, 250));

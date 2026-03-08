@@ -195,7 +195,7 @@ component('form-example', () => {
 
 ### Custom Elements with `:model`
 
-For custom elements, `:model` follows Vue.js conventions. For detailed information about custom element `:model` binding, see the [Enhanced Model Binding](./enhanced-model-binding.md) documentation.
+For custom elements, `:model` follows Vue.js conventions. The runtime maps the bound ref's value to the element's `value` property and listens for the corresponding `update:modelValue` or `input` event to write back changes.
 
 ## 🪝 Ref Binding (`:ref`)
 
@@ -252,7 +252,12 @@ Toggle element visibility using `display: none` based on a boolean condition.
 ### Example
 
 ```typescript
-import { component, html, ref } from '@jasonshimmy/custom-elements-runtime';
+import {
+  component,
+  html,
+  ref,
+  useProps,
+} from '@jasonshimmy/custom-elements-runtime';
 
 component('toggle-content', () => {
   const props = useProps({ showDetails: false });
@@ -322,19 +327,26 @@ ${when(isVisible, html`<div>Content</div>`)}
 ### Example
 
 ```typescript
-import { component, html, ref } from '@jasonshimmy/custom-elements-runtime';
+import {
+  component,
+  html,
+  ref,
+  useProps,
+  useEmit,
+} from '@jasonshimmy/custom-elements-runtime';
 
 component('conditional-message', () => {
   const props = useProps({ loggedIn: false });
+  const emit = useEmit();
   const messageCount = ref(0);
 
   return html`
     <div>
-      <div :when="${loggedIn}">
+      <div :when="${props.loggedIn}">
         <h2>Welcome back!</h2>
         <p>You have ${messageCount.value} new messages.</p>
       </div>
-      <div :when="${!loggedIn}">
+      <div :when="${!props.loggedIn}">
         <h2>Please log in</h2>
         <button @click="${() => emit('login-requested')}">Log In</button>
       </div>
@@ -412,7 +424,6 @@ component('binding-demo', () => {
 ## 📚 Learn More
 
 - [Directives Guide](./directives.md)
-- [Enhanced Model Binding](./enhanced-model-binding.md)
 - [Template Guide](./template.md)
 
 ## 🏁 Summary

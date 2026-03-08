@@ -22,6 +22,8 @@ export default defineConfig({
         style: 'src/lib/css/style.css',
         reset: 'src/lib/css/reset.css',
         variables: 'src/lib/css/variables.css',
+        // Extended color palette (opt-in)
+        colors: resolve(__dirname, 'src/lib/css/colors.ts'),
       },
       name: 'CustomElementsRuntime',
       fileName: (format, entryName) =>

@@ -37,7 +37,7 @@ export function createStore<T extends object>(initial: T): Store<T> {
   }
 
   function notify() {
-    listeners.forEach((fn) => fn(state));
+    for (const fn of listeners) fn(state);
   }
 
   return { subscribe, getState, setState };
