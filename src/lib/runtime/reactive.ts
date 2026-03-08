@@ -2,6 +2,7 @@ import { scheduleDOMUpdate } from './scheduler';
 import { ProxyOptimizer } from './reactive-proxy-cache';
 import { devWarn } from './logger';
 import { isDiscoveryRender } from './discovery-state';
+import type { WatchOptions } from './types';
 
 /**
  * Global reactive system for tracking dependencies and triggering updates
@@ -262,7 +263,7 @@ export class ReactiveState<T> {
         devWarn(
           '🚨 State modification detected during render! This can cause infinite loops.\n' +
             '  • Move state updates to event handlers\n' +
-            '  • Use useEffect/watch for side effects\n' +
+            '  • Use watchEffect/watch for side effects\n' +
             "  • Ensure computed properties don't modify state",
         );
       }
@@ -481,17 +482,17 @@ export function watchEffect(fn: () => void): () => void {
 export function watch<T>(
   source: ReactiveState<T>,
   callback: (newValue: T, oldValue?: T) => void,
-  options?: { immediate?: boolean },
+  options?: WatchOptions,
 ): () => void;
 export function watch<T>(
   source: () => T,
   callback: (newValue: T, oldValue?: T) => void,
-  options?: { immediate?: boolean },
+  options?: WatchOptions,
 ): () => void;
 export function watch<T>(
   source: ReactiveState<T> | (() => T),
   callback: (newValue: T, oldValue?: T) => void,
-  options?: { immediate?: boolean },
+  options?: WatchOptions,
 ): () => void {
   // During discovery render, skip setting up watchers — callbacks may contain
   // side effects that should only run against real component instances.

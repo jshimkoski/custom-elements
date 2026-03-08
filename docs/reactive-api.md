@@ -1,11 +1,60 @@
-# ⚡ Reactive API: `watch`, `computed`, `watchEffect`, and `nextTick`
+# ⚡ Reactive API: `ref`, `watch`, `computed`, `watchEffect`, and `nextTick`
 
 This document covers the core reactive utilities provided by the runtime:
 
+- [`ref()`](#ref) — create a reactive state container
 - [`watch()`](#watch) — explicit reactive watcher with old/new value callbacks
 - [`computed()`](#computed) — memoized derived state
 - [`watchEffect()`](#watcheffect) — automatic side-effect tracking
 - [`nextTick()`](#nexttick) — defer work until after DOM updates
+
+---
+
+## `ref()`
+
+Creates a reactive state container. Reading or writing `.value` inside a component render function, `computed()`, or `watchEffect()` automatically tracks and triggers reactive updates.
+
+### Signature
+
+```typescript
+// No argument → ReactiveState<null>
+function ref(): ReactiveState<null>;
+
+// With initial value
+function ref<T>(initialValue: T): ReactiveState<T>;
+```
+
+The returned `ReactiveState<T>` object has a single `.value` property with both a getter and a setter. Writing to `.value` schedules a DOM update for every component that read `.value` during its last render.
+
+### Usage
+
+```typescript
+import { component, html, ref } from '@jasonshimmy/custom-elements-runtime';
+
+component('click-counter', () => {
+  const count = ref(0);
+
+  return html`
+    <button @click="${() => count.value++}">
+      Clicked ${count.value} times
+    </button>
+  `;
+});
+```
+
+**Nullable ref (no argument)**
+
+```typescript
+const user = ref<{ name: string } | null>(); // ReactiveState<null>
+user.value = { name: 'Alice' }; // later assign a value
+```
+
+### Notes
+
+- `ref` works with any value: primitives, objects, arrays, or `null`.
+- For objects and arrays, `ref` wraps the value in a shallow reactive Proxy so property mutations on the value also trigger updates.
+- **Do not destructure** `ref.value` into a plain variable — the plain variable won't be reactive. Instead, always read `.value` inside the render function or a `computed`.
+- `ref` called outside a component's render return is still reactive and can be shared across components (like a micro-store).
 
 ---
 
@@ -16,18 +65,24 @@ Registers a watcher that runs a callback whenever a reactive source changes. Unl
 ### Signature
 
 ```typescript
+interface WatchOptions {
+  immediate?: boolean;
+  /** Accepted for API compatibility but currently ignored — watch a specific getter instead. */
+  deep?: boolean;
+}
+
 // Watch a ReactiveState (ref)
 function watch<T>(
   source: ReactiveState<T>,
   callback: (newValue: T, oldValue?: T) => void,
-  options?: { immediate?: boolean },
+  options?: WatchOptions,
 ): () => void;
 
 // Watch a getter function
 function watch<T>(
   source: () => T,
   callback: (newValue: T, oldValue?: T) => void,
-  options?: { immediate?: boolean },
+  options?: WatchOptions,
 ): () => void;
 ```
 
@@ -77,9 +132,10 @@ component('search-box', () => {
 
 ### Options
 
-| Option      | Type      | Default | Description                                                                                     |
-| ----------- | --------- | ------- | ----------------------------------------------------------------------------------------------- |
-| `immediate` | `boolean` | `false` | When `true`, invoke the callback immediately with the current value (old value is `undefined`). |
+| Option      | Type      | Default | Description                                                                                                                                 |
+| ----------- | --------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `immediate` | `boolean` | `false` | When `true`, invoke the callback immediately with the current value (old value is `undefined`).                                             |
+| `deep`      | `boolean` | `false` | **Not currently implemented — silently ignored at runtime.** To watch a nested property, use a getter: `watch(() => obj.nested.value, cb)`. |
 
 ### Comparison with `watchEffect()`
 

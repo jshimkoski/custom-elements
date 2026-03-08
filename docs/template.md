@@ -119,7 +119,7 @@ html`
 - TypeScript infers types for template variables.
 - Works seamlessly with state, props, computed, store, and event bus.
 
-For more, see the [API Reference](../src/lib/template-compiler.ts) and [examples](../src/components/examples/).
+For more, see the [Bindings Reference](./bindings.md) and [Directives Reference](./directives.md).
 
 ## 🧾 Raw HTML and Entities
 

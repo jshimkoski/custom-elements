@@ -467,6 +467,46 @@ Behavior notes:
 
 - SSR `initialUrl`: for server-side or static rendering, pass `initialUrl` into `initRouter`/`useRouter` so the router can derive the initial `path` and `query` server-side. If you explicitly pass `initialUrl` the runtime will honor it and initialize from that URL even when a `window` object exists (useful for SSR hydration and deterministic tests). If you omit `initialUrl` the router operates in normal browser mode and derives its initial state from `window.location`.
 
+## 🛠️ Router Utility Functions
+
+The `/router` subpath exports several standalone utility functions useful for custom tooling, SSR pipelines, and library authors:
+
+```ts
+import {
+  parseQuery,
+  serializeQuery,
+  normalizePathForRoute,
+  DEFAULT_SCROLL_CONFIG,
+  isDangerousScheme,
+  isAbsoluteUrl,
+  safeDecode,
+  canonicalizeBase,
+  matchRoute,
+  matchRouteSSR,
+  findMatchedRoute,
+  resolveRouteComponent,
+  clearComponentCache,
+  activeRouterProxy,
+} from '@jasonshimmy/custom-elements-runtime/router';
+```
+
+| Function                | Signature                                     | Description                                                                                                                                                          |
+| ----------------------- | --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `parseQuery`            | `(search: string) => Record<string, string>`  | Parse a URL query string (with or without leading `?`) into a key/value map.                                                                                         |
+| `serializeQuery`        | `(params: Record<string, string>) => string`  | Serialize a key/value map to a canonical `?key=value` query string.                                                                                                  |
+| `normalizePathForRoute` | `(path: string, base?: string) => string`     | Strip the base from a path and normalize it for route matching.                                                                                                      |
+| `DEFAULT_SCROLL_CONFIG` | `object`                                      | Default scroll-to-fragment configuration (`{ enabled: true, offset: 0, timeoutMs: 2000 }`).                                                                          |
+| `isDangerousScheme`     | `(url: string) => boolean`                    | Returns `true` for unsafe URL schemes (`javascript:`, `data:`, `vbscript:`).                                                                                         |
+| `isAbsoluteUrl`         | `(url: string) => boolean`                    | Returns `true` for absolute URLs with a scheme (e.g. `https://`).                                                                                                    |
+| `safeDecode`            | `(str: string) => string`                     | `decodeURIComponent` with a fallback that returns the raw string on error.                                                                                           |
+| `canonicalizeBase`      | `(base?: string) => string`                   | Normalize a router base path (ensure leading slash, strip trailing slash).                                                                                           |
+| `matchRoute`            | `(routes, path) => { route, params }`         | Match a path against a route array and return the matched route and extracted params.                                                                                |
+| `matchRouteSSR`         | `(routes, path) => { route, params }`         | Same as `matchRoute` but named for SSR contexts.                                                                                                                     |
+| `findMatchedRoute`      | `(routes, path) => { route, params } \| null` | Find the first matching route (returns `null` if none match).                                                                                                        |
+| `resolveRouteComponent` | `(route: Route) => Promise<RouteComponent>`   | Load and cache a route's component. Throws a descriptive error if `load()` fails or no component is defined.                                                         |
+| `clearComponentCache`   | `() => void`                                  | Clear the resolved route component cache (useful in tests or HMR).                                                                                                   |
+| `activeRouterProxy`     | `Router`                                      | A stable proxy object that always delegates to the currently active router instance. Useful in modules that must reference the router before `initRouter` is called. |
+
 ## 🧾 TypeScript types (exports)
 
 The package now exports a small set of types that are useful for TypeScript/npm consumers. The most important is the `Router` interface which
@@ -485,6 +525,8 @@ Key exported types you can import from the package:
 - `Router` — the runtime instance returned by `initRouter()` (includes `push`, `replace`, `back`, `getCurrent`, `subscribe`, `matchRoute`, `resolveRouteComponent`, `base`, and `scrollToFragment`).
 - `RouterConfig` — the configuration object accepted by `initRouter()` (includes `routes`, optional `base`, and `scrollToFragment` options).
 - `Route`, `RouteState`, `RouteComponent` — route definitions and runtime state shapes.
+- `RouterLinkProps` — the props accepted by the `<router-link>` custom element (`to`, `tag`, `replace`, `external`, `disabled`, `exact`, `activeClass`, `exactActiveClass`, `ariaCurrentValue`, `class`, `style`).
+- `RouterLinkComputed` — the derived state object computed by `<router-link>` on each render; useful when building custom link components or testing router-link behavior. Fields: `current` (route state), `isExactActive`, `isActive`, `className`, `ariaCurrent`, `isButton`, `disabledAttr`, `externalAttr`.
 - `parseQuery`, `matchRoute`, `matchRouteSSR`, `resolveRouteComponent`, `normalizePathForRoute` — small utility exports that can be useful in server rendering or custom tooling.
 
 These types are lightweight and intended to make it easier to integrate the router into TypeScript projects and server-side code (for example

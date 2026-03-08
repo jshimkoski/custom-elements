@@ -134,6 +134,40 @@ component('notification-receiver', () => {
 });
 ```
 
+## 🧰 Utility Methods
+
+The `GlobalEventBus` class (accessed via `eventBus`) exposes several utility methods for cleanup and debugging:
+
+```ts
+import {
+  eventBus,
+  GlobalEventBus,
+} from '@jasonshimmy/custom-elements-runtime/event-bus';
+
+// Remove all handlers for a specific event
+eventBus.offAll('cart:add');
+
+// List all event names that have at least one registered handler
+const activeEvents: string[] = eventBus.getActiveEvents();
+
+// Remove every registered handler (useful in tests or for full teardown)
+eventBus.clear();
+
+// Count how many handlers are currently registered for an event
+const count: number = eventBus.getHandlerCount('cart:add');
+
+// Get per-event emission counts and handler counts (for debugging)
+const stats = eventBus.getEventStats();
+// { 'cart:add': { count: 5, handlersCount: 2 }, ... }
+
+// Reset emission counters (useful in tests or after resolving event storms)
+eventBus.resetEventCounters();
+```
+
+### Event Storm Protection
+
+The bus automatically throttles events that fire more than 50 times per second per event name (silent slowdown above 50, silent drop above 100). Use `resetEventCounters()` to clear these counters during testing or after a burst.
+
 ## 💡 Tips
 
 - Use event namespacing (e.g., `user:login`) for clarity.

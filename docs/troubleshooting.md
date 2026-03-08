@@ -44,6 +44,7 @@ A guide to diagnosing and resolving common issues in the custom elements runtime
   - Use correct hook names (`onConnected`, `onDisconnected`, etc.) from the hooks object.
   - For the functional `watch()` helper, provide the correct source function (e.g., `() => user.profile.age`) to observe nested values.
   - The lightweight `watch()` exported by the runtime does not support a `{ deep: true }` option; instead watch the specific nested path or create separate watchers for nested properties.
+  - Use `watchEffect/watch` for side effects, never mutate state directly during render.
   - Ensure hooks are properly destructured from the second parameter.
 - **Watchers not triggering:**
   - Use correct path for nested state (e.g., `user.profile.age`).
@@ -56,7 +57,7 @@ A guide to diagnosing and resolving common issues in the custom elements runtime
 - Use supported directives (`when`, `each`, `match`).
 - Handle loading and error state in your component (for example using `ref` or `switchOnPromise`), and log errors in async code.
 - **Template errors:**
-  - Use error boundaries (`errorTemplate`, `errorFallback`) for robust handling.
+  - Use error boundaries with a `slot="fallback"` attribute for robust handling.
 
 ## 🔥 HMR & SSR
 
@@ -95,4 +96,4 @@ A: Log errors in async code.
 
 Troubleshooting is easier with clear configs, error boundaries, and dev tools. Use this guide to quickly resolve issues and build robust custom elements.
 
-For more help, see the documentation for each feature and inspect the source code in `src/lib/index.ts`.
+For more help, see the documentation for each feature and inspect the source code in `src/lib/runtime/`.

@@ -72,7 +72,7 @@ import { renderToString } from '@jasonshimmy/custom-elements-runtime/ssr';
 import { renderHello } from './components/hello';
 
 const vnode = renderHello({ name: 'Alice' });
-const html = renderToString(vnode);
+const renderedHtml = renderToString(vnode);
 ```
 
 Async renders
@@ -81,7 +81,7 @@ If `render` returns a Promise, await it before stringifying:
 
 ```ts
 const vnode = await maybeAsyncRender(ctx);
-const html = renderToString(vnode);
+const renderedHtml = renderToString(vnode);
 ```
 
 Minimal server example

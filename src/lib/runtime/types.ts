@@ -50,6 +50,11 @@ export type LifecycleKeys =
 
 export interface WatchOptions {
   immediate?: boolean;
+  /**
+   * Deep watching is not currently implemented. This option is accepted for
+   * API compatibility but is silently ignored at runtime. To observe a nested
+   * property, pass a getter function: `watch(() => obj.nested.value, cb)`.
+   */
   deep?: boolean;
 }
 

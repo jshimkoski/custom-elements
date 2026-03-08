@@ -100,6 +100,7 @@ All hooks must be called during component render and provide perfect TypeScript 
 - **`useOnDisconnected(callback)`**: Set up lifecycle hook for when component disconnects from DOM
 - **`useOnAttributeChanged(callback)`**: Set up lifecycle hook for when attributes change
 - **`useOnError(callback)`**: Set up lifecycle hook for error handling
+- **`useStyle(fn: () => string): void`**: Provide a reactive CSS string applied as the component's scoped stylesheet. The `fn` callback runs during render; any reactive reads inside are tracked so styles update when dependencies change. See [jit-css.md](./jit-css.md) for usage with the `css` template helper.
 - **`useExpose(api)`**: Publish methods and properties onto the host element as an imperative public API. See [useExpose()](./use-expose.md).
 - **`useSlots()`**: Inspect which named slots have been filled by the consumer. See [useSlots()](./use-slots.md).
 

@@ -323,6 +323,7 @@ Explore the complete documentation for every runtime feature:
 - [🎨 JIT CSS](./docs/jit-css.md) - On-demand utility-first styling system
 - [📏 Space Utilities](./docs/space-utilities.md) - Tailwind-style `space-x-*` and `space-y-*` spacing utilities
 - [📝 Prose Typography](./docs/prose.md) - Beautiful typography for long-form content
+- [🎨 Colors](./docs/colors.md) - Extended Tailwind-compatible color palette (`/css/colors` subpath)
 
 ### 🔗 **Communication & State**
 
