@@ -233,14 +233,14 @@ Below is the **complete list of public symbols** exported by the runtime and its
 
 **Package:** `@jasonshimmy/custom-elements-runtime/ssr`
 
-| Export                     | Description                                                                   |
-| -------------------------- | ----------------------------------------------------------------------------- |
-| `renderToString`           | Render a VNode tree to HTML for server-side rendering.                        |
-| `registerEntityMap`        | Register a custom named-entity map for SSR `decodeEntities`.                  |
-| `loadEntityMap`            | Async loader that fetches and registers the full HTML5 entity map from a URL. |
-| `clearRegisteredEntityMap` | Reset the registered entity map back to the built-in minimal set.             |
-| `VNode` (type)             | The runtime VNode shape used by renderers and SSR.                            |
-| `RenderOptions` (type)     | Options for `renderToString` (`injectSvgNamespace`, `injectKnownNamespaces`). |
+| Export                     | Description                                                                                                            |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `renderToString`           | Render a VNode tree to HTML for server-side rendering.                                                                 |
+| `registerEntityMap`        | Register a custom named-entity map for SSR `decodeEntities`.                                                           |
+| `loadEntityMap`            | Async loader that dynamically imports the full HTML5 named-entity map; returns the map to pass to `registerEntityMap`. |
+| `clearRegisteredEntityMap` | Reset the registered entity map back to the built-in minimal set.                                                      |
+| `VNode` (type)             | The runtime VNode shape used by renderers and SSR.                                                                     |
+| `RenderOptions` (type)     | Options for `renderToString` (`injectSvgNamespace`, `injectKnownNamespaces`).                                          |
 
 ### Global Styles (CSS)
 
