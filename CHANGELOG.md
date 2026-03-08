@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v2.5.5] - 2026-03-08
+
+- feat: update readme (e1f4cd0)
+- feat: update readme (0af8106)
+
+
 ## [v2.5.4] - 2026-03-08
 
 - feat: update readme (0af8106)
