@@ -7,8 +7,7 @@
  *
  * @example
  * ```ts
- * import { component, html, ref, useOnDisconnected } from '@lib/index';
- * import { useTeleport } from '@lib/teleport';
+ * import { component, html, ref, useOnDisconnected, useTeleport } from '@jasonshimmy/custom-elements-runtime';
  *
  * component('modal-trigger', () => {
  *   const isOpen = ref(false);
@@ -60,6 +59,8 @@ export interface TeleportHandle {
  *
  * @example
  * ```ts
+ * import { component, html, useOnDisconnected, useTeleport } from '@jasonshimmy/custom-elements-runtime';
+ *
  * component('my-tooltip', () => {
  *   const { portal, destroy } = useTeleport('body');
  *   useOnDisconnected(destroy);

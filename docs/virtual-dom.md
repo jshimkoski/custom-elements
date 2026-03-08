@@ -40,9 +40,13 @@ const vnode = {
 
 ## 📦 VNode Type Export
 
-The `VNode` type is exported for TypeScript users who need type-safe virtual DOM manipulation:
+The `VNode` type is exported for TypeScript users who need type-safe virtual DOM manipulation. It is available from both the main entry and the SSR entry:
 
 ```typescript
+// Preferred: import from main entry
+import type { VNode } from '@jasonshimmy/custom-elements-runtime';
+
+// Also available from the SSR entry
 import type { VNode } from '@jasonshimmy/custom-elements-runtime/ssr';
 
 // VNode interface structure
@@ -83,7 +87,7 @@ interface VNode {
 **Example: Type-safe VNode factory**
 
 ```typescript
-import type { VNode } from '@jasonshimmy/custom-elements-runtime/ssr';
+import type { VNode } from '@jasonshimmy/custom-elements-runtime';
 
 function createCard(title: string, content: string): VNode {
   return {

@@ -18,7 +18,7 @@
  *
  * Or register it programmatically:
  * ```ts
- * import { registerKeepAlive } from '@lib/keep-alive';
+ * import { registerKeepAlive } from '@jasonshimmy/custom-elements-runtime';
  * registerKeepAlive(); // registers <ce-keep-alive> globally
  * ```
  *
@@ -47,7 +47,7 @@ type CacheKey = string;
  *
  * @example
  * ```ts
- * import { registerKeepAlive } from '@lib/keep-alive';
+ * import { registerKeepAlive } from '@jasonshimmy/custom-elements-runtime';
  * registerKeepAlive();
  * ```
  */

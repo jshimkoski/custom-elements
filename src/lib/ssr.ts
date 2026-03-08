@@ -16,7 +16,7 @@
  * Examples
  *
  *   // Default (injects xmlns for <svg> if missing)
- *   import { renderToString } from '@custom-elements/ssr';
+ *   import { renderToString } from '@jasonshimmy/custom-elements-runtime/ssr';
  *   const html = renderToString(vnodeTree);
  *
  *   // Opt-out
@@ -25,3 +25,12 @@
 export { renderToString } from './runtime/vdom-ssr';
 export type { VNode } from './runtime/types';
 export type { RenderOptions } from './runtime/vdom-ssr';
+
+// Entity map utilities for SSR — register the full HTML5 named-entity map at
+// server startup so decodeEntities uses the complete mapping. Kept out of the
+// main client bundle to reduce client-side payload.
+export {
+  registerEntityMap,
+  loadEntityMap,
+  clearRegisteredEntityMap,
+} from './runtime/helpers';

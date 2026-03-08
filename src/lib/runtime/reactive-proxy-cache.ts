@@ -96,6 +96,13 @@ class ReactiveProxyCache {
             }
           }
 
+          if (
+            value !== null &&
+            typeof value === 'object' &&
+            typeof prop === 'string'
+          ) {
+            return reactiveState.makeReactiveValue(value);
+          }
           return value;
         },
         set: (target, prop, value) => {
@@ -128,7 +135,15 @@ class ReactiveProxyCache {
     if (!this.objectHandlerCache.has(reactiveState)) {
       const handler: ProxyHandler<Record<string | symbol, unknown>> = {
         get: (target, prop, receiver) => {
-          return Reflect.get(target, prop, receiver);
+          const value = Reflect.get(target, prop, receiver);
+          if (
+            value !== null &&
+            typeof value === 'object' &&
+            typeof prop === 'string'
+          ) {
+            return reactiveState.makeReactiveValue(value);
+          }
+          return value;
         },
         set: (target, prop, value) => {
           (target as Record<string | symbol, unknown>)[prop] =

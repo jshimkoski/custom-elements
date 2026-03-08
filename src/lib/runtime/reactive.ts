@@ -469,6 +469,49 @@ export function watchEffect(fn: () => void): () => void {
 }
 
 /**
+ * Recursively deep-clone a value into a plain (non-reactive) snapshot.
+ *
+ * Rules:
+ *  - Primitives and functions are returned as-is.
+ *  - `Date` instances are cloned.
+ *  - Arrays are cloned element-by-element (works through Proxy).
+ *  - Plain objects are cloned key-by-key (works through Proxy `get` traps).
+ *  - DOM nodes are returned as-is (cloning nodes is out of scope).
+ *  - Circular references are handled via a `WeakMap` seen-set.
+ *
+ * @internal — used by deep watchers to capture before/after state snapshots.
+ */
+function deepClone<T>(value: T, seen = new WeakMap<object, unknown>()): T {
+  if (value === null || typeof value !== 'object') return value;
+  const obj = value as object;
+  if (seen.has(obj)) return seen.get(obj) as T;
+  // Do not attempt to clone DOM nodes
+  if (typeof Node !== 'undefined' && obj instanceof Node) return value;
+  // Clone Date
+  if (obj instanceof Date) return new Date(obj.getTime()) as unknown as T;
+  // Clone Array (Array.isArray is Proxy-transparent)
+  if (Array.isArray(obj)) {
+    const arr: unknown[] = [];
+    seen.set(obj, arr);
+    for (let i = 0; i < (obj as unknown[]).length; i++) {
+      arr.push(deepClone((obj as unknown[])[i], seen));
+    }
+    return arr as unknown as T;
+  }
+  // Clone plain object (Object.keys + Reflect.get work through Proxy)
+  const copy: Record<string, unknown> = {};
+  seen.set(obj, copy);
+  for (const key of Object.keys(obj)) {
+    try {
+      copy[key] = deepClone((obj as Record<string, unknown>)[key], seen);
+    } catch {
+      // skip inaccessible or throwing properties
+    }
+  }
+  return copy as unknown as T;
+}
+
+/**
  * Create a watcher that runs when dependencies change
  *
  * @example
@@ -532,7 +575,17 @@ export function watch<T>(
     const newValue = getter();
     reactiveSystem.clearCurrentComponent();
 
-    if (newValue !== oldValue) {
+    if (options?.deep) {
+      // Deep watchers: nested mutations keep the same proxy reference, so
+      // reference equality is not a reliable change signal. Always fire
+      // the callback and provide independent deep-cloned snapshots so
+      // callers receive distinct before/after plain-object values.
+      const newSnapshot = reactiveSystem.withoutTracking(() =>
+        deepClone(newValue),
+      ) as T;
+      callback(newSnapshot, oldValue);
+      oldValue = newSnapshot;
+    } else if (newValue !== oldValue) {
       callback(newValue, oldValue);
       oldValue = newValue;
     }
@@ -543,6 +596,12 @@ export function watch<T>(
   // Capture the tracked initial value as the baseline
   oldValue = getter();
   reactiveSystem.clearCurrentComponent();
+
+  // For deep watchers, snapshot the initial value so that oldValue is a
+  // stable plain-object clone that won't be mutated in-place by the user.
+  if (options?.deep) {
+    oldValue = reactiveSystem.withoutTracking(() => deepClone(oldValue)) as T;
+  }
 
   // If immediate is requested, invoke the callback once with the
   // current value as `newValue` and `undefined` as the previous value

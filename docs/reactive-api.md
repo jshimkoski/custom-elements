@@ -1,4 +1,4 @@
-# ⚡ Reactive API: `ref`, `watch`, `computed`, `watchEffect`, and `nextTick`
+# ⚡ Reactive API: `ref`, `watch`, `computed`, `watchEffect`, `nextTick`, and `isReactiveState`
 
 This document covers the core reactive utilities provided by the runtime:
 
@@ -7,6 +7,7 @@ This document covers the core reactive utilities provided by the runtime:
 - [`computed()`](#computed) — memoized derived state
 - [`watchEffect()`](#watcheffect) — automatic side-effect tracking
 - [`nextTick()`](#nexttick) — defer work until after DOM updates
+- [`isReactiveState()`](#isreactivestate) — type-guard to detect `ref()` objects
 
 ---
 
@@ -67,7 +68,7 @@ Registers a watcher that runs a callback whenever a reactive source changes. Unl
 ```typescript
 interface WatchOptions {
   immediate?: boolean;
-  /** Accepted for API compatibility but currently ignored — watch a specific getter instead. */
+  /** When true, track nested object/array mutations (deep-cloned snapshots provided). */
   deep?: boolean;
 }
 
@@ -132,10 +133,48 @@ component('search-box', () => {
 
 ### Options
 
-| Option      | Type      | Default | Description                                                                                                                                 |
-| ----------- | --------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `immediate` | `boolean` | `false` | When `true`, invoke the callback immediately with the current value (old value is `undefined`).                                             |
-| `deep`      | `boolean` | `false` | **Not currently implemented — silently ignored at runtime.** To watch a nested property, use a getter: `watch(() => obj.nested.value, cb)`. |
+| Option      | Type      | Default | Description                                                                                                                                                                   |
+| ----------- | --------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `immediate` | `boolean` | `false` | When `true`, invoke the callback immediately with the current value (old value is `undefined`).                                                                               |
+| `deep`      | `boolean` | `false` | When `true`, track nested object/array mutations. The callback receives deep-cloned before/after snapshots. Fires on every nested mutation regardless of structural equality. |
+
+### Deep Watching
+
+Use `{ deep: true }` to observe mutations to properties nested inside a reactive object or array. The callback receives independent deep-cloned snapshots so you can safely compare old and new state.
+
+```typescript
+import { ref, watch } from '@jasonshimmy/custom-elements-runtime';
+
+const user = ref({ name: 'Alice', address: { city: 'NYC' } });
+
+const stop = watch(
+  user,
+  (newVal, oldVal) => {
+    console.log('Before:', oldVal); // { name: 'Alice', address: { city: 'NYC' } }
+    console.log('After: ', newVal); // { name: 'Alice', address: { city: 'LA'  } }
+  },
+  { deep: true },
+);
+
+user.value.address.city = 'LA'; // → callback fires
+
+stop(); // cancel deep watcher
+```
+
+Combine `deep` and `immediate`:
+
+```typescript
+watch(
+  user,
+  (newVal, oldVal) => {
+    // oldVal is undefined on the first (immediate) call
+    console.log('user state:', newVal);
+  },
+  { deep: true, immediate: true },
+);
+```
+
+> **Note:** Because deep watching bypasses reference equality the callback fires on every nested mutation even if the resulting plain-object value is structurally identical to the previous snapshot. When you only need to detect top-level `.value` reassignment, use a shallow watcher (the default).
 
 ### Comparison with `watchEffect()`
 
@@ -311,3 +350,50 @@ it('DOM reflects reactive change', async () => {
 
 - If no DOM updates are pending, `nextTick()` still resolves (via `queueMicrotask`).
 - Multiple `await nextTick()` calls in sequence are safe.
+
+---
+
+## `isReactiveState()`
+
+A type-guard that returns `true` when passed a `ReactiveState` object (i.e. a value created by `ref()`). Useful when building composables or utility functions that accept either a plain value or a reactive state.
+
+### Signature
+
+```typescript
+function isReactiveState(v: unknown): v is ReactiveState<unknown>;
+```
+
+### Usage
+
+```typescript
+import { ref, isReactiveState } from '@jasonshimmy/custom-elements-runtime';
+
+const count = ref(0);
+
+isReactiveState(count); // true
+isReactiveState(0); // false
+isReactiveState('hello'); // false
+isReactiveState(null); // false
+```
+
+**Building a composable that accepts both forms:**
+
+```typescript
+import {
+  ref,
+  isReactiveState,
+  ReactiveState,
+} from '@jasonshimmy/custom-elements-runtime';
+
+function useDoubled(
+  input: number | ReactiveState<number>,
+): ReactiveState<number> {
+  const source = isReactiveState(input) ? input : ref(input);
+  return ref(source.value * 2);
+}
+```
+
+### Notes
+
+- This function is a TypeScript type-guard — the compiler narrows the type to `ReactiveState<unknown>` inside the `if` branch.
+- Detection uses a global symbol (`Symbol.for('@cer/ReactiveState')`) that is resilient across multiple bundle copies, minifiers, and different JS realms.

@@ -39,6 +39,14 @@ let runtimeFlag: boolean | undefined;
  * Programmatically toggle dev-mode logging at runtime.
  * Prefer setting `globalThis.__CE_RUNTIME_DEV__ = true` before importing
  * the runtime so logs are enabled as early as possible.
+ *
+ * @param v - `true` to enable dev logging, `false` to disable it.
+ *
+ * @example
+ * ```ts
+ * import { setDevMode } from '@jasonshimmy/custom-elements-runtime';
+ * setDevMode(true); // enable verbose dev logs
+ * ```
  */
 export function setDevMode(v: boolean): void {
   runtimeFlag = !!v;
@@ -81,7 +89,17 @@ export function devWarn(message: string, ...args: unknown[]): void {
 }
 
 /**
- * Log info only in development mode
+ * Log an informational message only in development mode.
+ * No-ops in production builds or when dev mode is disabled.
+ *
+ * @param message - Message to log.
+ * @param args - Additional values to pass to `console.log`.
+ *
+ * @example
+ * ```ts
+ * import { devLog } from '@jasonshimmy/custom-elements-runtime';
+ * devLog('[my-component] mounted', { props });
+ * ```
  */
 export function devLog(message: string, ...args: unknown[]): void {
   if (runtimeDevEnabled()) {

@@ -24,9 +24,11 @@ router.back();
 
 ## 🗺️ API Reference
 
-### `initRouter(config: RouterConfig)`
+### `initRouter(config: RouterConfig)` — **recommended**
 
 - Registers `<router-view>` (renders matched route) and `<router-link>` (navigation link/button).
+- Sets the global active router instance used by `activeRouterProxy`.
+- Clears the route component cache so stale lazy components don't persist across hot-reloads / test re-runs.
 - Returns router instance:
   - `push(path: string)`: Navigate to path (in browser mode this updates history and the URL)
   - `replace(path: string)`: Replace current path (in browser mode this updates history and the URL)
@@ -40,11 +42,28 @@ router.back();
   - `scrollToFragment(frag?: string)`: Programmatically request scrolling to a fragment/anchor on the current page. Returns `Promise<boolean>` which resolves `true` when the scroll was performed or `false` on timeout/cancellation.
   - `store`: Low-level store object (exposes `getState()` and `subscribe()`) — primarily useful for tests or advanced integration.
 
-Note: The runtime now exports a small TypeScript surface that is handy for npm consumers (see "TypeScript types" below). In particular the
-value returned from `initRouter(...)` conforms to an exported `Router` interface which includes the `base` property and the methods
-listed above.
+### `useRouter(config: RouterConfig)` — low-level
 
-Note: query parsing is performed for the initial browser location, for popstate (back/forward) events, and for programmatic navigations such as `router.push('/path?x=1')` and `router.replace('/path?x=1')`. Programmatic navigations now parse and store query parameters on the current route state and include the serialized query string in the browser history entry. The runtime exports a small `serializeQuery` helper that is used internally to produce the canonical `?a=b` portion of pushed URLs.
+`useRouter` is the underlying factory function that creates and returns the router object. **Prefer `initRouter` in almost all cases.**
+
+`initRouter` is a thin wrapper around `useRouter` that additionally:
+
+1. Clears the resolved route-component cache (avoiding stale lazy imports across re-initializations).
+2. Sets the active router instance on the global proxy (`activeRouterProxy`) so all component references are updated atomically.
+3. Registers the `<router-view>` and `<router-link>` custom elements.
+
+`useRouter` is useful when you need the router object alone without registering custom elements — for example in unit tests, SSR utilities, or library code that wraps the router:
+
+```ts
+import { useRouter } from '@jasonshimmy/custom-elements-runtime/router';
+
+// Create a router without registering custom elements.
+// Useful in server environments or isolated tests.
+const router = useRouter({ routes, initialUrl: '/about' });
+const { route, params } = router.matchRoute('/about');
+```
+
+Both functions accept the same `RouterConfig` parameter and return the same `Router` interface.
 
 Also: `push()` and `replace()` only update the browser URL/history when the router is running in browser mode (i.e. when `initialUrl` is not provided). When `initialUrl` is supplied (SSR/static rendering), navigation occurs via the server-side code path and may reject if a route or guard fails — server-side navigation does not mutate the client's history.
 

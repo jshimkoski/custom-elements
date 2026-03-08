@@ -80,45 +80,46 @@ Below is the **complete list of public symbols** exported by the runtime and its
 
 **Package:** `@jasonshimmy/custom-elements-runtime`
 
-| Export                       | Description                                                                                |
-| ---------------------------- | ------------------------------------------------------------------------------------------ |
-| `component`                  | Define a custom element with the functional component API.                                 |
-| `html`                       | Template tag function producing runtime VNodes from template literals.                     |
-| `css`                        | Define component-scoped/JIT styles or register stylesheets.                                |
-| `ref`                        | Create a reactive reference object with a `.value` property.                               |
-| `computed`                   | Create a memoized, derived read-only value from other reactive sources.                    |
-| `watch`                      | Register watchers reacting to changes in reactive values.                                  |
-| `watchEffect`                | Auto-track reactive reads and re-run a side-effect whenever dependencies change.           |
-| `nextTick`                   | Returns a Promise resolving after all pending DOM updates are flushed.                     |
-| `flushDOMUpdates`            | Synchronously flush all pending DOM update tasks (useful in tests).                        |
-| `scheduleWithPriority`       | Schedule a callback at a given `UpdatePriority` level.                                     |
-| `provide`                    | Store a value on the current component for descendant injection.                           |
-| `inject`                     | Retrieve a value provided by an ancestor component.                                        |
-| `createComposable`           | Package reusable stateful logic (hooks, reactive state) into a composable.                 |
-| `getCurrentComponentContext` | Access the active component context from within a composable or render function.           |
-| `useProps`                   | Hook to declare/consume typed component props with defaults.                               |
-| `useEmit`                    | Hook returning an emit function for dispatching custom events.                             |
-| `useOnConnected`             | Hook that runs a callback when the component connects.                                     |
-| `useOnDisconnected`          | Hook that runs a callback when the component disconnects.                                  |
-| `useOnAttributeChanged`      | Hook observing host attribute changes.                                                     |
-| `useOnError`                 | Hook to register a component-level error handler.                                          |
-| `useStyle`                   | Hook to register or compute component styles at runtime.                                   |
-| `useExpose`                  | Publish methods and properties onto the host element as an imperative public API.          |
-| `useSlots`                   | Inspect which named slots have been filled by the component consumer.                      |
-| `useTeleport`                | Render virtual DOM content into any DOM node outside the shadow root.                      |
-| `registerKeepAlive`          | Register `<ce-keep-alive>` to preserve component state across DOM removals.                |
-| `registerCeSuspense`         | Register the `<ce-suspense>` built-in component.                                           |
-| `registerCeErrorBoundary`    | Register the `<ce-error-boundary>` built-in component.                                     |
-| `registerBuiltinComponents`  | Register both `<ce-suspense>` and `<ce-error-boundary>` in one call.                       |
-| `unsafeHTML`                 | Insert raw HTML into a template (**unsafe; use carefully**).                               |
-| `decodeEntities`             | Utility to decode HTML entities in strings.                                                |
-| `setDevMode`                 | Toggle dev-mode logging on or off at runtime.                                              |
-| `devLog`                     | Log a message to the console in dev mode only (no-op in production).                       |
-| `createHealthMonitor`        | Create a new health monitor instance (factory; each call returns an independent instance). |
-| `getHealthMonitor`           | Return the global singleton health monitor instance (lazily created).                      |
-| `updateHealthMetric`         | Update a named metric on the global singleton health monitor.                              |
-| `getHealthStatus`            | Return the current `HealthReport` from the global singleton health monitor.                |
-| **Types**                    | `HealthMonitorInstance`, `HealthReport`, `UpdatePriority`, `TeleportHandle`                |
+| Export                       | Description                                                                                           |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `component`                  | Define a custom element with the functional component API.                                            |
+| `html`                       | Template tag function producing runtime VNodes from template literals.                                |
+| `css`                        | Define component-scoped/JIT styles or register stylesheets.                                           |
+| `ref`                        | Create a reactive reference object with a `.value` property.                                          |
+| `computed`                   | Create a memoized, derived read-only value from other reactive sources.                               |
+| `watch`                      | Register watchers reacting to changes in reactive values.                                             |
+| `watchEffect`                | Auto-track reactive reads and re-run a side-effect whenever dependencies change.                      |
+| `nextTick`                   | Returns a Promise resolving after all pending DOM updates are flushed.                                |
+| `flushDOMUpdates`            | Synchronously flush all pending DOM update tasks (useful in tests).                                   |
+| `scheduleWithPriority`       | Schedule a callback at a given `UpdatePriority` level.                                                |
+| `provide`                    | Store a value on the current component for descendant injection.                                      |
+| `inject`                     | Retrieve a value provided by an ancestor component.                                                   |
+| `createComposable`           | Package reusable stateful logic (hooks, reactive state) into a composable.                            |
+| `getCurrentComponentContext` | Access the active component context from within a composable or render function.                      |
+| `useProps`                   | Hook to declare/consume typed component props with defaults.                                          |
+| `useEmit`                    | Hook returning an emit function for dispatching custom events.                                        |
+| `useOnConnected`             | Hook that runs a callback when the component connects.                                                |
+| `useOnDisconnected`          | Hook that runs a callback when the component disconnects.                                             |
+| `useOnAttributeChanged`      | Hook observing host attribute changes.                                                                |
+| `useOnError`                 | Hook to register a component-level error handler.                                                     |
+| `useStyle`                   | Hook to register or compute component styles at runtime.                                              |
+| `useExpose`                  | Publish methods and properties onto the host element as an imperative public API.                     |
+| `useSlots`                   | Inspect which named slots have been filled by the component consumer.                                 |
+| `useTeleport`                | Render virtual DOM content into any DOM node outside the shadow root.                                 |
+| `registerKeepAlive`          | Register `<ce-keep-alive>` to preserve component state across DOM removals.                           |
+| `registerCeSuspense`         | Register the `<ce-suspense>` built-in component.                                                      |
+| `registerCeErrorBoundary`    | Register the `<ce-error-boundary>` built-in component.                                                |
+| `registerBuiltinComponents`  | Register both `<ce-suspense>` and `<ce-error-boundary>` in one call.                                  |
+| `unsafeHTML`                 | Insert raw HTML into a template (**unsafe; use carefully**).                                          |
+| `decodeEntities`             | Utility to decode HTML entities in strings.                                                           |
+| `setDevMode`                 | Toggle dev-mode logging on or off at runtime.                                                         |
+| `devLog`                     | Log a message to the console in dev mode only (no-op in production).                                  |
+| `isReactiveState`            | Type-guard returning `true` when a value is a `ReactiveState` instance.                               |
+| `createHealthMonitor`        | Create a new health monitor instance (factory; each call returns an independent instance).            |
+| `getHealthMonitor`           | Return the global singleton health monitor instance (lazily created).                                 |
+| `updateHealthMetric`         | Update a named metric on the global singleton health monitor.                                         |
+| `getHealthStatus`            | Return the current `HealthReport` from the global singleton health monitor.                           |
+| **Types**                    | `HealthMonitorInstance`, `HealthReport`, `UpdatePriority`, `TeleportHandle`, `ReactiveState`, `VNode` |
 
 ---
 
@@ -232,11 +233,14 @@ Below is the **complete list of public symbols** exported by the runtime and its
 
 **Package:** `@jasonshimmy/custom-elements-runtime/ssr`
 
-| Export                 | Description                                                                   |
-| ---------------------- | ----------------------------------------------------------------------------- |
-| `renderToString`       | Render a VNode tree to HTML for server-side rendering.                        |
-| `VNode` (type)         | The runtime VNode shape used by renderers and SSR.                            |
-| `RenderOptions` (type) | Options for `renderToString` (`injectSvgNamespace`, `injectKnownNamespaces`). |
+| Export                     | Description                                                                   |
+| -------------------------- | ----------------------------------------------------------------------------- |
+| `renderToString`           | Render a VNode tree to HTML for server-side rendering.                        |
+| `registerEntityMap`        | Register a custom named-entity map for SSR `decodeEntities`.                  |
+| `loadEntityMap`            | Async loader that fetches and registers the full HTML5 entity map from a URL. |
+| `clearRegisteredEntityMap` | Reset the registered entity map back to the built-in minimal set.             |
+| `VNode` (type)             | The runtime VNode shape used by renderers and SSR.                            |
+| `RenderOptions` (type)     | Options for `renderToString` (`injectSvgNamespace`, `injectKnownNamespaces`). |
 
 ### Global Styles (CSS)
 

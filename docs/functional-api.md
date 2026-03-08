@@ -1943,3 +1943,35 @@ See the [Built-in Components guide](./builtin-components.md) for full documentat
 [`scheduleWithPriority(update, priority?, componentId?)`](./concurrent-rendering.md) provides explicit control over when updates run: `'immediate'` (synchronous), `'normal'` (microtask-batched with deduplication), or `'idle'` (deferred via `requestIdleCallback` — time-sliced and non-blocking).
 
 See the [Concurrent Rendering guide](./concurrent-rendering.md) for full documentation.
+
+### 🔧 Development & Logging Utilities
+
+The runtime exports two helpers for development-time diagnostics:
+
+#### `setDevMode(v: boolean)`
+
+Programmatically enable or disable dev-mode console logging at runtime. This is useful when you want verbose logs during a session without changing build configuration.
+
+```ts
+import { setDevMode } from '@jasonshimmy/custom-elements-runtime';
+
+setDevMode(true); // enable dev logs
+setDevMode(false); // silence them
+```
+
+Alternatively, set `globalThis.__CE_RUNTIME_DEV__ = true` before the library is imported to enable logging as early as possible.
+
+> **Note:** This flag is process-wide. In Node/SSR environments it affects all requests in the same process.
+
+#### `devLog(message: string, ...args: unknown[])`
+
+Log an informational message to the console only when dev mode is enabled. No-op in production builds or when dev mode is disabled.
+
+```ts
+import { devLog } from '@jasonshimmy/custom-elements-runtime';
+
+component('my-widget', () => {
+  devLog('[my-widget] render()', { props }); // silent in production
+  // ...
+});
+```

@@ -43,8 +43,9 @@ A guide to diagnosing and resolving common issues in the custom elements runtime
 - **Lifecycle hooks not called:**
   - Use correct hook names (`onConnected`, `onDisconnected`, etc.) from the hooks object.
   - For the functional `watch()` helper, provide the correct source function (e.g., `() => user.profile.age`) to observe nested values.
-  - The lightweight `watch()` exported by the runtime does not support a `{ deep: true }` option; instead watch the specific nested path or create separate watchers for nested properties.
+  - Use `watch(source, cb, { deep: true })` to observe nested object/array mutations. The callback will fire whenever any property at any depth changes, with deep-cloned before/after snapshots provided to the callback.
   - Use `watchEffect/watch` for side effects, never mutate state directly during render.
+  - Use `watch(source, cb, { deep: true })` to observe nested object/array mutations. The callback receives deep-cloned before/after snapshots. Without `deep: true`, only top-level `.value` reassignment is detected.
   - Ensure hooks are properly destructured from the second parameter.
 - **Watchers not triggering:**
   - Use correct path for nested state (e.g., `user.profile.age`).

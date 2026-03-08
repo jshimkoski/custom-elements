@@ -14,6 +14,7 @@ import {
   computed,
   useProps,
 } from '@jasonshimmy/custom-elements-runtime';
+import type { VNode } from '@jasonshimmy/custom-elements-runtime';
 import {
   unless,
   whenEmpty,
@@ -28,6 +29,9 @@ import {
   whenVariants,
   responsiveSwitch,
   switchOn,
+  // Low-level responsive constants (for advanced/custom use)
+  mediaVariants,
+  responsiveOrder,
 } from '@jasonshimmy/custom-elements-runtime/directive-enhancements';
 ```
 
@@ -568,18 +572,31 @@ component('order-status-flow', () => {
 
 ## 📐 Breakpoint Values
 
-The responsive directives use these breakpoint values (matching the style system):
+The responsive directives use these breakpoint values (matching the style system). Both `mediaVariants` and `responsiveOrder` are exported constants you can import for advanced or custom responsive logic.
 
 ```typescript
-const mediaVariants = {
-  sm: '(min-width:640px)',
-  md: '(min-width:768px)',
-  lg: '(min-width:1024px)',
-  xl: '(min-width:1280px)',
-  '2xl': '(min-width:1536px)',
-  dark: '(prefers-color-scheme: dark)',
-};
+import {
+  mediaVariants,
+  responsiveOrder,
+} from '@jasonshimmy/custom-elements-runtime/directive-enhancements';
+
+// mediaVariants: media query strings keyed by name
+console.log(mediaVariants);
+// {
+//   sm: '(min-width:640px)',
+//   md: '(min-width:768px)',
+//   lg: '(min-width:1024px)',
+//   xl: '(min-width:1280px)',
+//   '2xl': '(min-width:1536px)',
+//   dark: '(prefers-color-scheme: dark)',
+// }
+
+// responsiveOrder: ordered tuple of responsive breakpoint names
+console.log(responsiveOrder);
+// ['sm', 'md', 'lg', 'xl', '2xl']
 ```
+
+These are useful when building custom responsive helpers that need to stay aligned with the style system's breakpoints — for example, iterating over breakpoints in order or looking up the media query string for a given variant name.
 
 ## 🔑 Key Features
 

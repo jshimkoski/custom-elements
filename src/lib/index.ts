@@ -30,12 +30,18 @@ export {
   watch,
   // watchEffect: auto-tracks reactive reads and re-runs on change (Priority 2)
   watchEffect,
+  // Type guard: check if a value is a reactive state object
+  isReactiveState,
 } from './runtime/reactive';
+export { ReactiveState } from './runtime/reactive';
 
 // Template and styling
 export { html } from './runtime/template-compiler';
 export { css } from './runtime/style';
 export { unsafeHTML, decodeEntities } from './runtime/helpers';
+
+// Virtual DOM types
+export type { VNode } from './runtime/types';
 
 // Logger utilities
 export { setDevMode, devLog } from './runtime/logger';
