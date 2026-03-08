@@ -1934,7 +1934,7 @@ See the [useSlots() guide](./use-slots.md) for full documentation.
 
 ### 🧱 Built-in Components
 
-[`registerBuiltinComponents()`](./builtin-components.md) registers `<cer-suspense>` and `<cer-error-boundary>` — opt-in utility components for loading states and graceful error recovery.
+[`registerBuiltinComponents()`](./builtin-components.md) registers `<cer-suspense>`, `<cer-error-boundary>`, and `<cer-keep-alive>` — opt-in utility components for loading states, graceful error recovery, and state preservation.
 
 See the [Built-in Components guide](./builtin-components.md) for full documentation.
 
