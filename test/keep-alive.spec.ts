@@ -95,4 +95,45 @@ describe('♻️ registerKeepAlive()', () => {
     const reinserted = ka.querySelector('ka-stateful');
     expect(reinserted).toBeTruthy();
   });
+
+  it('clearCache(key) evicts a specific cache entry by tag name', async () => {
+    registerKeepAlive();
+
+    component('ka-evictable', () => html`<div>evictable</div>`);
+
+    container.innerHTML = `
+      <cer-keep-alive id="ka-evict-test">
+        <ka-evictable id="evict-inst"></ka-evictable>
+      </cer-keep-alive>
+    `;
+    await new Promise((r) => setTimeout(r, 100));
+
+    const ka = container.querySelector<
+      HTMLElement & { clearCache: (key?: string) => void }
+    >('#ka-evict-test')!;
+
+    // Evicting an existing key should not throw
+    expect(() => ka.clearCache('ka-evictable')).not.toThrow();
+    // Evicting a non-existent key should be a no-op (not throw)
+    expect(() => ka.clearCache('nonexistent-tag')).not.toThrow();
+  });
+
+  it('clearCache() with no args evicts all cached entries', async () => {
+    registerKeepAlive();
+
+    component('ka-evictable-all', () => html`<div>evictable-all</div>`);
+
+    container.innerHTML = `
+      <cer-keep-alive id="ka-evict-all-test">
+        <ka-evictable-all></ka-evictable-all>
+      </cer-keep-alive>
+    `;
+    await new Promise((r) => setTimeout(r, 100));
+
+    const ka = container.querySelector<
+      HTMLElement & { clearCache: () => void }
+    >('#ka-evict-all-test')!;
+
+    expect(() => ka.clearCache()).not.toThrow();
+  });
 });

@@ -174,4 +174,51 @@ describe('🧩 createComposable()', () => {
     const el = document.querySelector('composable-throws');
     expect(el).toBeTruthy();
   });
+
+  it('composable factory can be called with an explicit context argument', async () => {
+    let contextFromComposable: Record<string, unknown> | null = null;
+
+    const useInspector = createComposable(() => {
+      contextFromComposable = getCurrentComponentContext();
+      return {};
+    });
+
+    component('composable-explicit-ctx', () => {
+      const ctx = getCurrentComponentContext()!;
+      useInspector(ctx); // explicit context passed
+      return html`<div>explicit ctx</div>`;
+    });
+
+    container.innerHTML = '<composable-explicit-ctx></composable-explicit-ctx>';
+    await new Promise((r) => setTimeout(r, 50));
+
+    // The composable ran inside the provided context
+    expect(contextFromComposable).not.toBeNull();
+  });
+
+  it('composables are nestable — a composable can call another composable', async () => {
+    const events: string[] = [];
+
+    const useInnerComposable = createComposable(() => {
+      useOnConnected(() => events.push('inner-connected'));
+      return { from: 'inner' };
+    });
+
+    const useOuterComposable = createComposable(() => {
+      const inner = useInnerComposable(); // nest a composable inside a composable
+      useOnConnected(() => events.push('outer-connected'));
+      return { from: 'outer', inner };
+    });
+
+    component('composable-nested-test', () => {
+      const result = useOuterComposable();
+      return html`<div>${result.from}-${result.inner.from}</div>`;
+    });
+
+    container.innerHTML = '<composable-nested-test></composable-nested-test>';
+    await new Promise((r) => setTimeout(r, 50));
+
+    expect(events).toContain('inner-connected');
+    expect(events).toContain('outer-connected');
+  });
 });

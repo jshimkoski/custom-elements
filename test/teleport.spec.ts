@@ -186,4 +186,29 @@ describe('🚀 useTeleport()', () => {
 
     document.body.removeChild(target);
   });
+
+  it('portal(null) clears rendered content without destroying the container', async () => {
+    const target = document.createElement('div');
+    target.id = 'tp-null-clear';
+    document.body.appendChild(target);
+
+    const handle = useTeleport('#tp-null-clear');
+    handle.portal(html`<p id="tp-to-clear">content</p>`);
+    await new Promise((r) => setTimeout(r, 50));
+
+    expect(target.querySelector('#tp-to-clear')).toBeTruthy();
+    // Container must still be present
+    expect(target.querySelector('cer-teleport')).toBeTruthy();
+
+    // Pass null to clear content — the container itself must survive
+    handle.portal(null);
+    await new Promise((r) => setTimeout(r, 50));
+
+    expect(target.querySelector('#tp-to-clear')).toBeFalsy();
+    // Container must still exist after portal(null)
+    expect(target.querySelector('cer-teleport')).toBeTruthy();
+
+    handle.destroy();
+    document.body.removeChild(target);
+  });
 });

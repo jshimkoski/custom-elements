@@ -163,4 +163,56 @@ describe('🏝️ provide() / inject()', () => {
 
     expect(received).toBe('fallback');
   });
+
+  it('inject() finds value provided by a shadow-DOM parent component', async () => {
+    // The consumer is rendered inside the provider's shadow DOM (component hierarchy).
+    // inject() must cross the ShadowRoot boundary to find the provider's context.
+    let received: string | undefined = 'not-set';
+
+    component('pi-shadow-dom-provider', () => {
+      provide('pi-sd-theme', 'dark');
+      return html`<pi-shadow-dom-consumer></pi-shadow-dom-consumer>`;
+    });
+
+    component('pi-shadow-dom-consumer', () => {
+      received = inject<string>('pi-sd-theme', 'light');
+      return html`<div>${received}</div>`;
+    });
+
+    container.innerHTML = '<pi-shadow-dom-provider></pi-shadow-dom-provider>';
+    await new Promise((r) => setTimeout(r, 100));
+
+    expect(received).toBe('dark');
+  });
+
+  it('inject() returns value from the nearest ancestor when multiple ancestors provide the same key', async () => {
+    let consumerReceived: string | undefined = 'not-set';
+
+    component('pi-nested-outer', () => {
+      provide('pi-nested-key', 'outer');
+      return html`<slot></slot>`;
+    });
+
+    component('pi-nested-inner', () => {
+      provide('pi-nested-key', 'inner');
+      return html`<slot></slot>`;
+    });
+
+    component('pi-nested-consumer', () => {
+      consumerReceived = inject<string>('pi-nested-key', 'none');
+      return html`<div>${consumerReceived}</div>`;
+    });
+
+    container.innerHTML = `
+      <pi-nested-outer>
+        <pi-nested-inner>
+          <pi-nested-consumer></pi-nested-consumer>
+        </pi-nested-inner>
+      </pi-nested-outer>
+    `;
+    await new Promise((r) => setTimeout(r, 100));
+
+    // Consumer must see the nearest (inner) provider, not the outer one.
+    expect(consumerReceived).toBe('inner');
+  });
 });

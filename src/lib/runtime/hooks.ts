@@ -733,9 +733,12 @@ export function inject<T>(
               }
             }
           }
+          const prevNode = node;
           const next: Node | null = (node as Node).parentNode as Node | null;
           node = next ?? ((node as Node).getRootNode?.() as Node | null);
-          if (node === document) break;
+          // Guard against infinite loops: if getRootNode() returns the same
+          // node (disconnected element with no ancestors), stop traversal.
+          if (node === document || node === prevNode) break;
         }
       }
     }

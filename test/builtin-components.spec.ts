@@ -227,6 +227,41 @@ describe('<cer-error-boundary>', () => {
     expect(defaultSlot).toBeNull();
   });
 
+  it('<cer-suspense> shows built-in Loading\u2026 span when no fallback slot content is provided', async () => {
+    container.innerHTML = `<cer-suspense pending></cer-suspense>`;
+    await wait();
+
+    const el = container.querySelector('cer-suspense') as HTMLElement;
+    const shadow = el.shadowRoot!;
+    const fallbackSlot = shadow.querySelector('slot[name="fallback"]');
+    expect(fallbackSlot).not.toBeNull();
+    // The slot's built-in fallback content (rendered when nothing is
+    // slotted into slot="fallback") must be a <span> with Loading… text.
+    const builtin = fallbackSlot?.querySelector('span');
+    expect(builtin).not.toBeNull();
+    expect(builtin?.textContent).toContain('Loading');
+  });
+
+  it('<cer-error-boundary> shows built-in alert div when no fallback slot content is provided', async () => {
+    container.innerHTML = `<cer-error-boundary id="eb-default-alert"></cer-error-boundary>`;
+    await wait();
+
+    const el = container.querySelector<
+      HTMLElement & { _cerHandleChildError?: (err: unknown) => void }
+    >('#eb-default-alert')!;
+
+    el._cerHandleChildError?.(new Error('default fallback test'));
+    await wait();
+
+    const shadow = el.shadowRoot!;
+    const fallbackSlot = shadow.querySelector('slot[name="fallback"]');
+    expect(fallbackSlot).not.toBeNull();
+    // Built-in fallback inside the slot must be a div[role="alert"]
+    const alertDiv = fallbackSlot?.querySelector('[role="alert"]');
+    expect(alertDiv).not.toBeNull();
+    expect(alertDiv?.textContent).toContain('Something went wrong');
+  });
+
   it('reset() clears state after a child error is propagated', async () => {
     container.innerHTML = `
       <cer-error-boundary id="eb-reset-after-child">
