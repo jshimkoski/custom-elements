@@ -722,4 +722,3 @@ Create beautiful, smooth animations with minimal code! 🎬✨
 - [JIT CSS Guide](./jit-css.md)
 - [Directives Guide](./directives.md)
 - [Functional API](./functional-api.md)
-- [each() vs TransitionGroup Layouts](./each-vs-transitiongroup-layouts.md)

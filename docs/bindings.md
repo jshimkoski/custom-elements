@@ -252,7 +252,12 @@ Toggle element visibility using `display: none` based on a boolean condition.
 ### Example
 
 ```typescript
-import { component, html, ref } from '@jasonshimmy/custom-elements-runtime';
+import {
+  component,
+  html,
+  ref,
+  useProps,
+} from '@jasonshimmy/custom-elements-runtime';
 
 component('toggle-content', () => {
   const props = useProps({ showDetails: false });
@@ -322,19 +327,26 @@ ${when(isVisible, html`<div>Content</div>`)}
 ### Example
 
 ```typescript
-import { component, html, ref } from '@jasonshimmy/custom-elements-runtime';
+import {
+  component,
+  html,
+  ref,
+  useProps,
+  useEmit,
+} from '@jasonshimmy/custom-elements-runtime';
 
 component('conditional-message', () => {
   const props = useProps({ loggedIn: false });
+  const emit = useEmit();
   const messageCount = ref(0);
 
   return html`
     <div>
-      <div :when="${loggedIn}">
+      <div :when="${props.loggedIn}">
         <h2>Welcome back!</h2>
         <p>You have ${messageCount.value} new messages.</p>
       </div>
-      <div :when="${!loggedIn}">
+      <div :when="${!props.loggedIn}">
         <h2>Please log in</h2>
         <button @click="${() => emit('login-requested')}">Log In</button>
       </div>
