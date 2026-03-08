@@ -121,7 +121,7 @@ const keepAliveEl = document.querySelector('ce-keep-alive') as any;
 
 // Evict a specific cache entry by key (tag name, optionally with id)
 keepAliveEl.clearCache('my-component');
-keepAliveEl.clearCache('my-component#sidebar');
+keepAliveEl.clearCache('my-component:sidebar');
 
 // Evict all cached entries
 keepAliveEl.clearCache();

@@ -195,7 +195,7 @@ component('form-example', () => {
 
 ### Custom Elements with `:model`
 
-For custom elements, `:model` follows Vue.js conventions. For detailed information about custom element `:model` binding, see the [Enhanced Model Binding](./enhanced-model-binding.md) documentation.
+For custom elements, `:model` follows Vue.js conventions. The runtime maps the bound ref's value to the element's `value` property and listens for the corresponding `update:modelValue` or `input` event to write back changes.
 
 ## 🪝 Ref Binding (`:ref`)
 
@@ -412,7 +412,6 @@ component('binding-demo', () => {
 ## 📚 Learn More
 
 - [Directives Guide](./directives.md)
-- [Enhanced Model Binding](./enhanced-model-binding.md)
 - [Template Guide](./template.md)
 
 ## 🏁 Summary

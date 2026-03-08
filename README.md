@@ -90,6 +90,8 @@ Below is the **complete list of public symbols** exported by the runtime and its
 | `watch`                      | Register watchers reacting to changes in reactive values.                                  |
 | `watchEffect`                | Auto-track reactive reads and re-run a side-effect whenever dependencies change.           |
 | `nextTick`                   | Returns a Promise resolving after all pending DOM updates are flushed.                     |
+| `flushDOMUpdates`            | Synchronously flush all pending DOM update tasks (useful in tests).                        |
+| `scheduleWithPriority`       | Schedule a callback at a given `UpdatePriority` level.                                     |
 | `provide`                    | Store a value on the current component for descendant injection.                           |
 | `inject`                     | Retrieve a value provided by an ancestor component.                                        |
 | `createComposable`           | Package reusable stateful logic (hooks, reactive state) into a composable.                 |
@@ -101,8 +103,13 @@ Below is the **complete list of public symbols** exported by the runtime and its
 | `useOnAttributeChanged`      | Hook observing host attribute changes.                                                     |
 | `useOnError`                 | Hook to register a component-level error handler.                                          |
 | `useStyle`                   | Hook to register or compute component styles at runtime.                                   |
+| `useExpose`                  | Publish methods and properties onto the host element as an imperative public API.          |
+| `useSlots`                   | Inspect which named slots have been filled by the component consumer.                      |
 | `useTeleport`                | Render virtual DOM content into any DOM node outside the shadow root.                      |
 | `registerKeepAlive`          | Register `<ce-keep-alive>` to preserve component state across DOM removals.                |
+| `registerCeSuspense`         | Register the `<ce-suspense>` built-in component.                                           |
+| `registerCeErrorBoundary`    | Register the `<ce-error-boundary>` built-in component.                                     |
+| `registerBuiltinComponents`  | Register both `<ce-suspense>` and `<ce-error-boundary>` in one call.                       |
 | `unsafeHTML`                 | Insert raw HTML into a template (**unsafe; use carefully**).                               |
 | `decodeEntities`             | Utility to decode HTML entities in strings.                                                |
 | `setDevMode`                 | Toggle dev-mode logging on or off at runtime.                                              |
@@ -111,7 +118,7 @@ Below is the **complete list of public symbols** exported by the runtime and its
 | `getHealthMonitor`           | Return the global singleton health monitor instance (lazily created).                      |
 | `updateHealthMetric`         | Update a named metric on the global singleton health monitor.                              |
 | `getHealthStatus`            | Return the current `HealthReport` from the global singleton health monitor.                |
-| **Types**                    | `HealthMonitorInstance`, `HealthReport`                                                    |
+| **Types**                    | `HealthMonitorInstance`, `HealthReport`, `UpdatePriority`, `TeleportHandle`                |
 
 ---
 
@@ -209,8 +216,14 @@ Below is the **complete list of public symbols** exported by the runtime and its
 | `parseQuery`            | Parse a query string into a key/value map.                                                                                |
 | `serializeQuery`        | Serialize a key/value map into a query string (e.g. `?a=b`).                                                              |
 | `normalizePathForRoute` | Normalize a path string for consistent route matching (strips trailing slashes, etc.).                                    |
+| `DEFAULT_SCROLL_CONFIG` | Default scroll-to-fragment configuration object used by the router.                                                       |
+| `isDangerousScheme`     | Returns `true` for dangerous URL schemes (e.g. `javascript:`).                                                            |
+| `isAbsoluteUrl`         | Returns `true` when a URL string is absolute (has a protocol).                                                            |
+| `safeDecode`            | Decode a URI component, returning the original string on error.                                                           |
+| `canonicalizeBase`      | Normalize a router base path string (strips trailing slashes, ensures leading slash).                                     |
 | `resolveRouteComponent` | Resolve/load a route's component (supports async loaders + caching).                                                      |
 | `clearComponentCache`   | Clear the resolved route component cache (useful for testing and HMR).                                                    |
+| `activeRouterProxy`     | Stable proxy to the currently active router; forwards subscriptions and method calls (advanced/testing use).              |
 | **Types**               | `Route`, `RouteState`, `RouteComponent`, `GuardResult`, `RouterLinkProps`, `RouterLinkComputed`, `RouterConfig`, `Router` |
 
 ---
@@ -219,10 +232,11 @@ Below is the **complete list of public symbols** exported by the runtime and its
 
 **Package:** `@jasonshimmy/custom-elements-runtime/ssr`
 
-| Export           | Description                                            |
-| ---------------- | ------------------------------------------------------ |
-| `renderToString` | Render a VNode tree to HTML for server-side rendering. |
-| `VNode` (type)   | The runtime VNode shape used by renderers and SSR.     |
+| Export                 | Description                                                                   |
+| ---------------------- | ----------------------------------------------------------------------------- |
+| `renderToString`       | Render a VNode tree to HTML for server-side rendering.                        |
+| `VNode` (type)         | The runtime VNode shape used by renderers and SSR.                            |
+| `RenderOptions` (type) | Options for `renderToString` (`injectSvgNamespace`, `injectKnownNamespaces`). |
 
 ### Global Styles (CSS)
 
@@ -252,7 +266,7 @@ Below is the **complete list of public symbols** exported by the runtime and its
 
 **Package:** `@jasonshimmy/custom-elements-runtime/css/colors`
 
-Opt-in extended color palette with full Tailwind-compatible color names (`slate`, `gray`, `zinc`, `red`, `orange`, `amber`, `yellow`, `lime`, `green`, `teal`, `cyan`, `sky`, `blue`, `indigo`, `violet`, `purple`, `fuchsia`, `pink`, `rose`) with shades 50–950.
+Opt-in extended color palette with full Tailwind-compatible color names (`slate`, `gray`, `zinc`, `stone`, `red`, `orange`, `amber`, `yellow`, `lime`, `green`, `emerald`, `teal`, `cyan`, `sky`, `blue`, `indigo`, `violet`, `purple`, `fuchsia`, `pink`, `rose`) with shades 50–950.
 
 ```ts
 import { extendedColors } from '@jasonshimmy/custom-elements-runtime/css/colors';
@@ -307,8 +321,7 @@ Explore the complete documentation for every runtime feature:
 ### 🎨 **Styling**
 
 - [🎨 JIT CSS](./docs/jit-css.md) - On-demand utility-first styling system
-- [� JIT CSS Competitive Audit](./docs/jit-css-audit.md) - Gap analysis and improvement roadmap for the JIT CSS engine
-- [�📏 Space Utilities](./docs/space-utilities.md) - Tailwind-style `space-x-*` and `space-y-*` spacing utilities
+- [📏 Space Utilities](./docs/space-utilities.md) - Tailwind-style `space-x-*` and `space-y-*` spacing utilities
 - [📝 Prose Typography](./docs/prose.md) - Beautiful typography for long-form content
 
 ### 🔗 **Communication & State**
@@ -320,7 +333,7 @@ Explore the complete documentation for every runtime feature:
 
 ### ⚡ **Advanced Features**
 
-- [⚡ Reactive API](./docs/reactive-api.md) - `computed()` memoization, `watchEffect()` auto-tracking, and `nextTick()`
+- [⚡ Reactive API](./docs/reactive-api.md) - `watch()` targeted watchers, `computed()` memoization, `watchEffect()` auto-tracking, and `nextTick()`
 - [🏝️ Provide / Inject](./docs/provide-inject.md) - Ancestor-to-descendant dependency injection without prop-drilling
 - [🧩 Composables](./docs/composable.md) - Reusable stateful logic with `createComposable()`
 - [🚀 Teleport](./docs/teleport.md) - Render content outside the shadow root with `useTeleport()`
@@ -339,10 +352,9 @@ Explore the complete documentation for every runtime feature:
 - [🅰️ Angular Integration](./docs/angular-integration.md) - Using components in Angular apps
 - [🔥 Svelte Integration](./docs/svelte-integration.md) - Using components in Svelte apps
 
-### 🛠️ **Troubleshooting & Roadmap**
+### 🛠️ **Troubleshooting**
 
 - [🔧 Troubleshooting](./docs/troubleshooting.md) - Common issues and solutions
-- [🗺️ Improvement Roadmap](./docs/improvement-roadmap.md) - Remaining work to surpass React, Vue, and Svelte
 
 For examples and implementation details, explore the source code in `src/lib/`.
 

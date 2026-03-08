@@ -1,10 +1,94 @@
-# ⚡ Reactive API: `computed`, `watchEffect`, and `nextTick`
+# ⚡ Reactive API: `watch`, `computed`, `watchEffect`, and `nextTick`
 
-This document covers three advanced reactive utilities introduced in the runtime:
+This document covers the core reactive utilities provided by the runtime:
 
+- [`watch()`](#watch) — explicit reactive watcher with old/new value callbacks
 - [`computed()`](#computed) — memoized derived state
 - [`watchEffect()`](#watcheffect) — automatic side-effect tracking
 - [`nextTick()`](#nexttick) — defer work until after DOM updates
+
+---
+
+## `watch()`
+
+Registers a watcher that runs a callback whenever a reactive source changes. Unlike `watchEffect()`, `watch()` tracks dependencies **explicitly** and provides both the new and previous values to the callback.
+
+### Signature
+
+```typescript
+// Watch a ReactiveState (ref)
+function watch<T>(
+  source: ReactiveState<T>,
+  callback: (newValue: T, oldValue?: T) => void,
+  options?: { immediate?: boolean },
+): () => void;
+
+// Watch a getter function
+function watch<T>(
+  source: () => T,
+  callback: (newValue: T, oldValue?: T) => void,
+  options?: { immediate?: boolean },
+): () => void;
+```
+
+Returns a **stop function** — call it to cancel the watcher.
+
+### Usage
+
+```typescript
+import {
+  component,
+  html,
+  ref,
+  watch,
+  useOnDisconnected,
+} from '@jasonshimmy/custom-elements-runtime';
+
+component('search-box', () => {
+  const query = ref('');
+
+  // Watch a ref directly
+  const stop = watch(query, (newVal, oldVal) => {
+    console.log(`Query changed from "${oldVal}" to "${newVal}"`);
+  });
+
+  useOnDisconnected(stop);
+
+  // Watch a getter function
+  const stop2 = watch(
+    () => query.value.trim().toLowerCase(),
+    (normalized) => {
+      console.log('Normalized query:', normalized);
+    },
+    { immediate: true }, // run callback immediately with current value
+  );
+
+  useOnDisconnected(stop2);
+
+  return html`
+    <input
+      .value="${query.value}"
+      @input="${(e: Event) =>
+        (query.value = (e.target as HTMLInputElement).value)}"
+    />
+  `;
+});
+```
+
+### Options
+
+| Option      | Type      | Default | Description                                                                                     |
+| ----------- | --------- | ------- | ----------------------------------------------------------------------------------------------- |
+| `immediate` | `boolean` | `false` | When `true`, invoke the callback immediately with the current value (old value is `undefined`). |
+
+### Comparison with `watchEffect()`
+
+|                         | `watch()`         | `watchEffect()`      |
+| ----------------------- | ----------------- | -------------------- |
+| Tracks dependencies     | Explicit          | Automatic            |
+| Runs immediately        | No (configurable) | Yes                  |
+| Receives old+new values | Yes               | No                   |
+| Use case                | Targeted tracking | General side effects |
 
 ---
 
@@ -116,15 +200,6 @@ component('document-title', () => {
 - Automatically tracks every reactive `ref` or `ReactiveState` read during execution.
 - Re-runs synchronously whenever any tracked dependency updates.
 - Calling the returned stop function is idempotent (safe to call multiple times).
-
-### Comparison with `watch()`
-
-|                         | `watch()`         | `watchEffect()`      |
-| ----------------------- | ----------------- | -------------------- |
-| Tracks dependencies     | Explicit          | Automatic            |
-| Runs immediately        | No (configurable) | Yes                  |
-| Receives old+new values | Yes               | No                   |
-| Use case                | Targeted tracking | General side effects |
 
 ---
 
