@@ -94,15 +94,23 @@ export function parseProps(
     const isStandalone = !/=/.test(match[0]);
 
     // Interpolation detection
+    // Full interpolation: the entire value is a single marker, e.g. `{{0}}`
     const interpMatch = rawVal.match(/^{{(\d+)}}$/);
+    // Partial / mixed interpolation: the value contains markers mixed with
+    // literal text, e.g. `"loader {{0}}"` → `"loader sm"`
+    const hasMixedInterp = !interpMatch && /{{(\d+)}}/.test(rawVal);
     let value: unknown = isStandalone
       ? true // Standalone attributes are boolean true
       : interpMatch
         ? (values[Number(interpMatch[1])] ?? null)
-        : rawVal;
+        : hasMixedInterp
+          ? rawVal.replace(/{{(\d+)}}/g, (_, idx) =>
+              String(values[Number(idx)] ?? ''),
+            )
+          : rawVal;
 
     // Type inference for booleans, null, numbers
-    if (!interpMatch) {
+    if (!interpMatch && !hasMixedInterp) {
       if (value === 'true') value = true;
       else if (value === 'false') value = false;
       else if (value === 'null') value = null;
