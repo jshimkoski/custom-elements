@@ -1,6 +1,10 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v2.5.8] - 2026-03-10
+
+- fix: preserve whitespace in css calc rules (2b76282)
+
 ## [v2.5.7] - 2026-03-10
 
 - fix: publishing versions were incorrect (40acb4b)
