@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v2.5.6] - 2026-03-10
+
+- feat: inline attribute interpolation (4d67cef)
+- feat: update readme (e1f4cd0)
+
+
 ## [v2.5.5] - 2026-03-08
 
 - feat: update readme (e1f4cd0)
