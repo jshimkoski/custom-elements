@@ -57,7 +57,7 @@ Bind event listeners to DOM events.
 - Use `@eventName` to bind a handler function.
 - Handler can access and update refs, props, or call component methods.
 
-## 🎨 Class Binding (`:class`)
+## 🎨 Class Binding (`:class` and inline interpolation)
 
 Bind dynamic classes to your elements using `:class`. This enables conditional, array, and object-based class assignment for flexible styling.
 
@@ -69,12 +69,36 @@ Bind dynamic classes to your elements using `:class`. This enables conditional, 
 <div :class="${'static-class' + (isActive ? ' active' : '')}"></div>
 ```
 
+### Inline Class Interpolation (plain `class` attribute)
+
+You can embed dynamic values directly inside a regular `class` attribute using template-literal interpolation. Literal text and interpolated segments are stitched together at compile time:
+
+```html
+<!-- prefix + dynamic size variant -->
+<div class="loader ${props.size}"></div>
+<!-- → class="loader sm" -->
+
+<!-- multiple dynamic segments -->
+<button class="${base} ${variant} active"></button>
+<!-- → class="btn primary active" -->
+```
+
+This works for **any** attribute, not just `class`:
+
+```html
+<div data-id="item-${props.id}"></div>
+<!-- → data-id="item-42" -->
+```
+
+Use inline interpolation when the static parts of the class string are constant and only a few tokens need to vary. For fully conditional class logic, prefer the `:class` directive.
+
 ### Best Practices
 
 - Use object syntax for conditional classes.
 - Use array syntax for multiple dynamic classes.
 - Avoid empty strings or falsy values in arrays/objects.
-- Combine with static classes using string concatenation if needed.
+- Use inline interpolation (`class="base ${dynamic}"`) for simple prefix/suffix patterns.
+- Use `:class` for complex conditional logic or multi-class objects.
 
 ### Example
 

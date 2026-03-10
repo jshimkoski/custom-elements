@@ -58,6 +58,29 @@ component('interactive-component', () => {
 });
 ```
 
+### 🔤 Inline Attribute Interpolation
+
+You can mix literal text and dynamic values inside any plain HTML attribute — including `class` — using standard template-literal syntax. The runtime stitches the segments together at compile time:
+
+```ts
+component('loader', () => {
+  const props = useProps({ size: 'sm' });
+
+  return html`
+    <!-- class="loader sm" -->
+    <div class="loader ${props.size}"></div>
+
+    <!-- multiple dynamic segments -->
+    <button class="${props.base} ${props.variant} active"></button>
+
+    <!-- works on any attribute -->
+    <div data-id="item-${props.id}"></div>
+  `;
+});
+```
+
+Use this for simple prefix/suffix patterns where the surrounding text is constant. For conditional or object-based class logic, prefer the [`:class` directive](./bindings.md#-class-binding-class-and-inline-interpolation).
+
 Note: event handlers should be passed as function references (e.g. `@click="${increment}"`) — don't call the function in the template (for example `@click="${increment()}"`), as that will execute during render and likely cause incorrect behavior or infinite render loops. The compiler/runtime will warn when it detects common mistakes.
 
 ## 🔗 Two-way Binding
