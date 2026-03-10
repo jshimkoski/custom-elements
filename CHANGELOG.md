@@ -1,6 +1,10 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v2.5.7] - 2026-03-10
+
+- fix: publishing versions were incorrect (40acb4b)
+
 ## [v2.5.6] - 2026-03-10
 
 - feat: inline attribute interpolation (4d67cef)
