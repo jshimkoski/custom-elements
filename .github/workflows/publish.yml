@@ -12,7 +12,7 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 15
 
     steps:
       - name: Checkout code
@@ -27,7 +27,7 @@ jobs:
           registry-url: 'https://registry.npmjs.org/'
 
       - name: Cache node modules
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: node_modules
           key: ${{ runner.os }}-node-${{ hashFiles('package-lock.json') }}
@@ -64,154 +64,121 @@ jobs:
           git config user.email "actions@github.com"
           git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
 
-      - name: Determine version bump from commit
+      # Resolve the latest tag once so all subsequent steps share the same baseline.
+      - name: Resolve baseline tag
+        id: base
+        run: |
+          LATEST_TAG=$(git tag --sort=-version:refname | head -n1)
+          if [ -z "$LATEST_TAG" ]; then
+            COMMIT_RANGE="HEAD"
+          else
+            COMMIT_RANGE="${LATEST_TAG}..HEAD"
+          fi
+          echo "latest_tag=$LATEST_TAG" >> $GITHUB_OUTPUT
+          echo "commit_range=$COMMIT_RANGE" >> $GITHUB_OUTPUT
+          echo "Baseline tag: ${LATEST_TAG:-'(none - first release)'}"
+          echo "Commit range: $COMMIT_RANGE"
+
+      # Scan ALL commits since the last tag (not just HEAD) and handle the full
+      # conventional-commits spec: type(scope)!: and BREAKING CHANGE: in body.
+      - name: Determine version bump
         id: bump
         run: |
-          COMMIT_MSG=$(git log -1 --pretty=%B)
-          if [[ "$COMMIT_MSG" == *"BREAKING CHANGE:"* ]]; then
-            echo "major" > .bump
-          elif [[ "$COMMIT_MSG" == feat:* ]]; then
-            echo "minor" > .bump
-          elif [[ "$COMMIT_MSG" == fix:* ]]; then
-            echo "patch" > .bump
-          else
-            echo "patch" > .bump
+          COMMIT_RANGE="${{ steps.base.outputs.commit_range }}"
+
+          SUBJECTS=$(git log "$COMMIT_RANGE" --pretty=format:"%s" --no-merges)
+          FULL_LOG=$(git log "$COMMIT_RANGE" --pretty=format:"%s%n%b" --no-merges)
+
+          BUMP="patch"
+
+          # Major: explicit BREAKING CHANGE footer OR ! after type/scope (e.g. feat!: / feat(scope)!:)
+          if echo "$FULL_LOG" | grep -qE "^BREAKING CHANGE:" || \
+             echo "$SUBJECTS" | grep -qE "^[a-z]+(\([^)]+\))?!:"; then
+            BUMP="major"
+          # Minor: feat: or feat(scope):
+          elif echo "$SUBJECTS" | grep -qE "^feat(\([^)]+\))?:"; then
+            BUMP="minor"
           fi
 
-      - name: Generate release notes and changelog
-        id: changelog
+          echo "Bump type: $BUMP"
+          echo "bump=$BUMP" >> $GITHUB_OUTPUT
+
+      - name: Generate release notes
         run: |
-          BRANCH=${GITHUB_REF##*/}
-          BUMP_TYPE=$(cat .bump)
+          COMMIT_RANGE="${{ steps.base.outputs.commit_range }}"
 
-          # Get the previous tag to determine what commits to include
-          TAG_COUNT=$(git tag --sort=-version:refname | wc -l)
-          echo "Debug: Found $TAG_COUNT tags"
+          COMMITS=$(git log "$COMMIT_RANGE" --pretty=format:"- %s (%h)" --no-merges \
+            | grep -vE "^- (release:|chore: update changelog)" || true)
 
-          if [ "$TAG_COUNT" -gt 1 ]; then
-            # Get the second most recent tag
-            PREV_TAG=$(git tag --sort=-version:refname | head -n2 | tail -n1)
-            echo "Debug: Using second most recent tag: $PREV_TAG"
-          else
-            # If we have 1 or 0 tags, use the first commit
-            PREV_TAG=$(git rev-list --max-parents=0 HEAD)
-            echo "Debug: Using first commit as baseline: $PREV_TAG"
-          fi
-
-          echo "Debug: Previous tag/commit is: $PREV_TAG"
-          echo "Debug: Current HEAD is: $(git rev-parse HEAD)"
-          echo "Debug: Checking commits between $PREV_TAG and HEAD"
-
-          # Generate commit log since last tag (excluding merge commits and version bumps)
-          COMMITS=$(git log "$PREV_TAG..HEAD" --pretty=format:"- %s (%h)" --no-merges | grep -v "release:" | grep -v "chore: update changelog" || true)
-
-          echo "Debug: Found commits: $COMMITS"
-
-          # Handle case where no commits are found
           if [ -z "$COMMITS" ]; then
             COMMITS="- No changes since last release"
           fi
 
-          # Store commits for later use
           echo "$COMMITS" > commits.txt
 
       - name: Bump version
         id: version
         run: |
-          BUMP_TYPE=$(cat .bump)
-          BRANCH=${GITHUB_REF##*/}
-          # Ensure version includes -beta for develop
-          if [[ "$BRANCH" == "develop" ]]; then
+          BUMP="${{ steps.bump.outputs.bump }}"
+          if [[ "${{ github.ref_name }}" == "develop" ]]; then
             NEW_VERSION=$(npm version prerelease --preid=beta -m "release: %s [skip ci]")
           else
-            NEW_VERSION=$(npm version "$BUMP_TYPE" -m "release: %s [skip ci]")
+            NEW_VERSION=$(npm version "$BUMP" -m "release: %s [skip ci]")
           fi
           echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
           git push --follow-tags
 
       - name: Create release and update changelog
         run: |
-          BRANCH=${GITHUB_REF##*/}
           VERSION="${{ steps.version.outputs.version }}"
+          PREV_TAG="${{ steps.base.outputs.latest_tag }}"
           COMMITS=$(cat commits.txt)
-
-          # Get the previous tag for comparison link
-          PREV_TAG=$(git tag --sort=-version:refname | grep -v "$VERSION" | head -n1)
-
-          # Create release notes
-          RELEASE_NOTES="## Release $VERSION
-
-          ### Changes
-          $COMMITS
-
-          **Full Changelog**: https://github.com/${{ github.repository }}/compare/$PREV_TAG...$VERSION"
-
-          # Update or create CHANGELOG.md
           DATE=$(date +"%Y-%m-%d")
-          if [ ! -f CHANGELOG.md ]; then
-            echo "# Changelog" > CHANGELOG.md
-            echo "" >> CHANGELOG.md
-            echo "All notable changes to this project will be documented in this file." >> CHANGELOG.md
-            echo "" >> CHANGELOG.md
+
+          if [ -n "$PREV_TAG" ]; then
+            CHANGELOG_LINK="**Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREV_TAG}...${VERSION}"
+          else
+            CHANGELOG_LINK="**Full Changelog**: https://github.com/${{ github.repository }}/commits/${VERSION}"
           fi
 
-          # Prepare new changelog entry
-          TEMP_CHANGELOG="## [$VERSION] - $DATE
+          RELEASE_NOTES=$(printf '## Release %s\n\n### Changes\n%s\n\n%s' \
+            "$VERSION" "$COMMITS" "$CHANGELOG_LINK")
 
-          $COMMITS
+          # Update or create CHANGELOG.md
+          if [ ! -f CHANGELOG.md ]; then
+            printf "# Changelog\n\nAll notable changes to this project will be documented in this file.\n\n" > CHANGELOG.md
+          fi
 
-          "
-
-          # Insert new entry at the top of changelog (after header)
-          # Create a temporary file to avoid sed portability issues
           {
             head -3 CHANGELOG.md
-            echo "$TEMP_CHANGELOG"
+            printf "## [%s] - %s\n\n%s\n\n" "$VERSION" "$DATE" "$COMMITS"
             tail -n +4 CHANGELOG.md
           } > CHANGELOG.tmp && mv CHANGELOG.tmp CHANGELOG.md
 
-          # Commit and push changelog
           git add CHANGELOG.md
-          git commit -m "chore: update changelog for $VERSION [skip ci]" || true
+          git commit -m "chore: update changelog for ${VERSION} [skip ci]" || true
           git push || true
 
-          # Save release notes for GitHub release
-          echo "$RELEASE_NOTES" > release_notes.md
+          # Use python3 for safe multi-line JSON encoding (avoids sed escaping pitfalls)
+          ESCAPED_BODY=$(printf '%s' "$RELEASE_NOTES" | python3 -c "import sys,json; print(json.dumps(sys.stdin.read()))")
 
-          # Create GitHub release using built-in GitHub CLI or curl without jq dependency
-          ESCAPED_BODY=$(echo "$RELEASE_NOTES" | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
-
-          # Create GitHub release
-          if [[ "$BRANCH" == "develop" ]]; then
-            # Beta release
-            curl -X POST \
-              -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-              -H "Accept: application/vnd.github.v3+json" \
-              https://api.github.com/repos/${{ github.repository }}/releases \
-              -d "{
-                \"tag_name\": \"$VERSION\",
-                \"name\": \"$VERSION (Beta)\",
-                \"body\": \"$ESCAPED_BODY\",
-                \"prerelease\": true
-              }"
+          if [[ "${{ github.ref_name }}" == "develop" ]]; then
+            PRERELEASE="true"
+            RELEASE_NAME="${VERSION} (Beta)"
           else
-            # Production release
-            curl -X POST \
-              -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-              -H "Accept: application/vnd.github.v3+json" \
-              https://api.github.com/repos/${{ github.repository }}/releases \
-              -d "{
-                \"tag_name\": \"$VERSION\",
-                \"name\": \"$VERSION\",
-                \"body\": \"$ESCAPED_BODY\",
-                \"prerelease\": false
-              }"
+            PRERELEASE="false"
+            RELEASE_NAME="${VERSION}"
           fi
+
+          curl -fsSL -X POST \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/${{ github.repository }}/releases \
+            -d "{\"tag_name\":\"${VERSION}\",\"name\":\"${RELEASE_NAME}\",\"body\":${ESCAPED_BODY},\"prerelease\":${PRERELEASE}}"
 
       - name: Publish to npm
         run: |
-          BRANCH=${GITHUB_REF##*/}
-          if [[ "$BRANCH" == "develop" ]]; then
+          if [[ "${{ github.ref_name }}" == "develop" ]]; then
             npm publish --tag beta
           else
             npm publish
