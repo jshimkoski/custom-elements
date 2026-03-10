@@ -29,6 +29,18 @@ describe('minifyCSS', () => {
   it('handles empty input', () => {
     expect(minifyCSS('')).toBe('');
   });
+
+  it('preserves spaces inside calc() expressions', () => {
+    const css = '.el { bottom: calc(100% + 16px); }';
+    expect(minifyCSS(css)).toBe('.el{bottom:calc(100% + 16px)}');
+  });
+
+  it('preserves spaces inside nested calc() expressions', () => {
+    const css = '.el { width: calc(100% - 2rem); margin: calc(50% + 8px); }';
+    expect(minifyCSS(css)).toBe(
+      '.el{width:calc(100% - 2rem);margin:calc(50% + 8px)}',
+    );
+  });
 });
 
 // --- baseReset ---
