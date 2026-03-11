@@ -171,14 +171,17 @@ The monitor evaluates the following metrics against thresholds to determine stat
 ```ts
 component('perf-hud', () => {
   const report = ref<HealthReport | null>(null);
+  const monitor = getHealthMonitor();
+  const onReport = (r: HealthReport) => {
+    report.value = r;
+  };
 
   useOnConnected(() => {
-    const monitor = getHealthMonitor();
-    const onReport = (r: HealthReport) => {
-      report.value = r;
-    };
     monitor.addListener(onReport);
-    useOnDisconnected(() => monitor.removeListener(onReport));
+  });
+
+  useOnDisconnected(() => {
+    monitor.removeListener(onReport);
   });
 
   return html`
@@ -232,7 +235,7 @@ component('expensive-list', () => {
 
   watch(
     () => items.value,
-    () => {
+    async () => {
       const t0 = performance.now();
       // ... rendering happens synchronously then...
       await nextTick();

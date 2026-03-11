@@ -41,7 +41,7 @@ A guide to diagnosing and resolving common issues in the custom elements runtime
 ## 🧩 Lifecycle & Watchers
 
 - **Lifecycle hooks not called:**
-  - Use correct hook names (`onConnected`, `onDisconnected`, etc.) from the hooks object.
+  - Use correct hook names (`useOnConnected`, `useOnDisconnected`, `useOnAttributeChanged`, `useOnError`) inside functional components.
   - For the functional `watch()` helper, provide the correct source function (e.g., `() => user.profile.age`) to observe nested values.
   - Use `watch(source, cb, { deep: true })` to observe nested object/array mutations. The callback will fire whenever any property at any depth changes, with deep-cloned before/after snapshots provided to the callback.
   - Use `watchEffect/watch` for side effects, never mutate state directly during render.

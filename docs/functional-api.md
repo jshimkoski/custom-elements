@@ -383,10 +383,10 @@ component('lifecycle-demo', () => {
 
 ### Lifecycle Hook Details
 
-- **`onConnected(fn)`**: Called when the component is inserted into the DOM
-- **`onDisconnected(fn)`**: Called when the component is removed from the DOM
-- **`onAttributeChanged(fn)`**: Called when any attribute on the element changes
-- **`onError(fn)`**: Called when an error occurs during rendering or lifecycle events
+- **`useOnConnected(callback)`**: Called when the component is inserted into the DOM
+- **`useOnDisconnected(callback)`**: Called when the component is removed from the DOM
+- **`useOnAttributeChanged(callback)`**: Called when any attribute on the element changes
+- **`useOnError(callback)`**: Called when an error occurs during rendering or lifecycle events
 
 ```typescript
 // Example with external API integration
@@ -695,14 +695,12 @@ component('form-field', () => {
   });
   const value = ref(props.initialValue);
 
+  watch(value, (newVal) => emit('value-changed', newVal));
+
   return html`
     <label class="form-field">
       ${props.label}
-      <input
-        type="${props.type}"
-        :model="${value}"
-        @update:value="${(newValue) => emit('value-changed', newValue)}"
-      />
+      <input type="${props.type}" :model="${value}" />
       <p>Current value: ${value.value}</p>
     </label>
   `;

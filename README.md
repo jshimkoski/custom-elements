@@ -27,20 +27,15 @@ Build modern components with strict TypeScript, zero dependencies, and a clean f
 ```ts
 import {
   component,
-  ref,
+  defineModel,
   html,
-  useEmit,
-  useProps,
 } from '@jasonshimmy/custom-elements-runtime';
 
 component('my-counter', () => {
-  const props = useProps({ initialCount: 0 });
-  const count = ref(props.initialCount);
-  const emit = useEmit();
+  const count = defineModel('count', 0);
 
   const handleClick = () => {
     count.value++;
-    emit('update:initial-count', { count: count.value });
   };
 
   return html`
@@ -58,15 +53,14 @@ component('my-counter', () => {
 3. **Use in HTML:**
 
 ```html
-<my-counter
-  initial-count="5"
-  @update:initial-count="handleCountUpdate"
-></my-counter>
+<my-counter count="5"></my-counter>
 
 <script>
-  function handleCountUpdate(event) {
-    console.log('Count updated to:', event.detail.count);
-  }
+  const myCounter = document.querySelector('my-counter');
+  myCounter.addEventListener('update:count', (event) => {
+    myCounter.setAttribute('count', event.detail);
+    console.log('Count updated to:', event.detail);
+  });
 </script>
 ```
 

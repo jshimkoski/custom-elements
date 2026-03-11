@@ -123,7 +123,7 @@ component('search-box', () => {
 
   return html`
     <input
-      .value="${query.value}"
+      :value="${query.value}"
       @input="${(e: Event) =>
         (query.value = (e.target as HTMLInputElement).value)}"
     />
@@ -281,7 +281,7 @@ component('document-title', () => {
 
   return html`
     <input
-      .value="${title.value}"
+      :value="${title.value}"
       @input="${(e: Event) =>
         (title.value = (e.target as HTMLInputElement).value)}"
     />
