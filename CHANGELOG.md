@@ -1,6 +1,10 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v2.6.0] - 2026-03-11
+
+- feat: add defineModel (a6ecc41)
+
 ## [v2.5.8] - 2026-03-10
 
 - fix: preserve whitespace in css calc rules (2b76282)
