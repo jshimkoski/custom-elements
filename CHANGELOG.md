@@ -1,6 +1,10 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v2.6.1] - 2026-03-11
+
+- docs: fix issues in examples (18ef051)
+
 ## [v2.6.0] - 2026-03-11
 
 - feat: add defineModel (a6ecc41)
