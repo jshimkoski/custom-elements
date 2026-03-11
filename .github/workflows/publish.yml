@@ -9,6 +9,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+
 jobs:
   release:
     runs-on: ubuntu-latest
@@ -37,33 +41,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run tests
-        run: npm test
-
-      - name: Start dev server
-        run: npm run dev -- --host & echo $! > dev.pid
-
-      - name: Wait for dev server
-        run: npx wait-on --timeout 30000 http://localhost:5173
-
-      - name: Run Cypress tests
-        run: npx cypress run
-
-      - name: Shutdown dev server
-        run: |
-          if [ -f dev.pid ]; then
-            kill $(cat dev.pid)
-          fi
-
-      - name: Build library
-        run: npm run build
-
-      - name: Configure Git
-        run: |
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
-
       # Resolve the latest tag once so all subsequent steps share the same baseline.
       - name: Resolve baseline tag
         id: base
@@ -79,10 +56,61 @@ jobs:
           echo "Baseline tag: ${LATEST_TAG:-'(none - first release)'}"
           echo "Commit range: $COMMIT_RANGE"
 
+      # Skip release if every commit since the last tag is chore: or docs:
+      # Breaking variants (chore!: / docs!:) are intentionally not excluded.
+      - name: Check if release is needed
+        id: should_release
+        run: |
+          COMMIT_RANGE="${{ steps.base.outputs.commit_range }}"
+          RELEASE_COMMITS=$(git log "$COMMIT_RANGE" --pretty=format:"%s" --no-merges \
+            | grep -vE "^(chore|docs)(\([^)]+\))?:" || true)
+          if [ -z "$RELEASE_COMMITS" ]; then
+            echo "value=false" >> $GITHUB_OUTPUT
+            echo "No release-worthy commits found — skipping release."
+          else
+            echo "value=true" >> $GITHUB_OUTPUT
+            echo "Release-worthy commits found."
+          fi
+
+      - name: Run tests
+        if: steps.should_release.outputs.value == 'true'
+        run: npm test
+
+      - name: Start dev server
+        if: steps.should_release.outputs.value == 'true'
+        run: npm run dev -- --host & echo $! > dev.pid
+
+      - name: Wait for dev server
+        if: steps.should_release.outputs.value == 'true'
+        run: npx wait-on --timeout 30000 http://localhost:5173
+
+      - name: Run Cypress tests
+        if: steps.should_release.outputs.value == 'true'
+        run: npx cypress run
+
+      - name: Shutdown dev server
+        if: always() && steps.should_release.outputs.value == 'true'
+        run: |
+          if [ -f dev.pid ]; then
+            kill $(cat dev.pid)
+          fi
+
+      - name: Build library
+        if: steps.should_release.outputs.value == 'true'
+        run: npm run build
+
+      - name: Configure Git
+        if: steps.should_release.outputs.value == 'true'
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
+
       # Scan ALL commits since the last tag (not just HEAD) and handle the full
       # conventional-commits spec: type(scope)!: and BREAKING CHANGE: in body.
       - name: Determine version bump
         id: bump
+        if: steps.should_release.outputs.value == 'true'
         run: |
           COMMIT_RANGE="${{ steps.base.outputs.commit_range }}"
 
@@ -104,6 +132,7 @@ jobs:
           echo "bump=$BUMP" >> $GITHUB_OUTPUT
 
       - name: Generate release notes
+        if: steps.should_release.outputs.value == 'true'
         run: |
           COMMIT_RANGE="${{ steps.base.outputs.commit_range }}"
 
@@ -118,6 +147,7 @@ jobs:
 
       - name: Bump version
         id: version
+        if: steps.should_release.outputs.value == 'true'
         run: |
           BUMP="${{ steps.bump.outputs.bump }}"
           if [[ "${{ github.ref_name }}" == "develop" ]]; then
@@ -129,6 +159,7 @@ jobs:
           git push --follow-tags
 
       - name: Create release and update changelog
+        if: steps.should_release.outputs.value == 'true'
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           PREV_TAG="${{ steps.base.outputs.latest_tag }}"
@@ -157,7 +188,7 @@ jobs:
 
           git add CHANGELOG.md
           git commit -m "chore: update changelog for ${VERSION} [skip ci]" || true
-          git push || true
+          git push
 
           # Use python3 for safe multi-line JSON encoding (avoids sed escaping pitfalls)
           ESCAPED_BODY=$(printf '%s' "$RELEASE_NOTES" | python3 -c "import sys,json; print(json.dumps(sys.stdin.read()))")
@@ -177,6 +208,7 @@ jobs:
             -d "{\"tag_name\":\"${VERSION}\",\"name\":\"${RELEASE_NAME}\",\"body\":${ESCAPED_BODY},\"prerelease\":${PRERELEASE}}"
 
       - name: Publish to npm
+        if: steps.should_release.outputs.value == 'true'
         run: |
           if [[ "${{ github.ref_name }}" == "develop" ]]; then
             npm publish --tag beta
