@@ -10,6 +10,8 @@ export {
   useOnError,
   useStyle,
   useProps,
+  // Two-way model binding (Vue-style defineModel)
+  defineModel,
   // Context / provide-inject (Priority 2)
   provide,
   inject,
@@ -22,6 +24,7 @@ export {
   // Internal: for advanced consumers and library authors
   getCurrentComponentContext,
 } from './runtime/hooks';
+export type { ModelRef } from './runtime/hooks';
 
 // Reactive system
 export {

@@ -926,3 +926,126 @@ export function useSlots(): {
     },
   };
 }
+
+/**
+ * A writable ref that reads from a component prop and emits `update:<propName>`
+ * when its value is set, enabling two-way binding with a parent's `:model` or
+ * `:model:<propName>` directive.
+ *
+ * Also recognised by the vdom `:model` directive as a reactive value so it can
+ * be passed directly to native inputs inside the child template.
+ */
+export interface ModelRef<T> {
+  /** The current prop value. Reactive — reads trigger re-renders. */
+  value: T;
+}
+
+/**
+ * Define a two-way binding model for a component prop, similar to Vue's
+ * `defineModel()`. It combines `useProps` + `useEmit` into a single ergonomic
+ * API so child components don't need to wire the plumbing manually.
+ *
+ * The returned `ModelRef` object:
+ * - **reads** `.value` → returns the current prop value (reactive)
+ * - **writes** `.value = x` → emits `update:<propName>` so the parent's
+ *   `:model` / `:model:<propName>` directive can update its reactive state
+ *
+ * The object is also recognised by the vdom `:model` directive, so you can
+ * pass it directly to a native input's `:model` binding inside the child
+ * template and the two-way sync is wired up automatically.
+ *
+ * @example
+ * ```ts
+ * // Default model — maps to the parent's :model="..."
+ * component('my-input', () => {
+ *   const model = defineModel('');
+ *
+ *   return html`
+ *     <input :model="${model}" />
+ *   `;
+ * });
+ *
+ * // Named model — maps to the parent's :model:title="..."
+ * component('my-field', () => {
+ *   const title = defineModel('title', '');
+ *   const count = defineModel('count', 0);
+ *
+ *   return html`
+ *     <input :model="${title}" />
+ *     <input type="number" :model="${count}" />
+ *   `;
+ * });
+ * ```
+ *
+ * @param args - Either:
+ *   - No arguments → `modelValue` prop, no default.
+ *   - One argument → treated as the **default value** for the `modelValue` prop;
+ *     type is inferred from the value.
+ *   - Two arguments → first is the **prop name**, second is the **default value**;
+ *     type is inferred from the default value.
+ */
+export function defineModel<T = unknown>(): ModelRef<T | undefined>;
+export function defineModel<T>(defaultValue: T): ModelRef<T>;
+export function defineModel<T>(propName: string, defaultValue: T): ModelRef<T>;
+export function defineModel<T = unknown>(
+  ...args: [] | [T] | [string, T]
+): ModelRef<T | undefined> {
+  if (!currentComponentContext) {
+    throw new Error('defineModel must be called during component render');
+  }
+
+  const propName = args.length === 2 ? (args[0] as string) : 'modelValue';
+  const initialDefault =
+    args.length === 2
+      ? (args[1] as T)
+      : args.length === 1
+        ? (args[0] as T)
+        : undefined;
+
+  // Register the prop so the runtime discovers it during the discovery render
+  // and includes it in the component's observed attributes / prop definitions.
+  const props = useProps({
+    [propName]: initialDefault,
+  } as Record<string, unknown>);
+
+  // Capture the emit function once — during a discovery render this is a no-op.
+  const isDiscovery = _isDiscoveryRenderFn();
+  const emitFn = isDiscovery
+    ? null
+    : (() => {
+        const candidate = (currentComponentContext as { emit?: unknown }).emit;
+        if (typeof candidate !== 'function') return null;
+        return candidate as (
+          eventName: string,
+          detail?: unknown,
+          options?: CustomEventInit,
+        ) => boolean;
+      })();
+
+  // The model ref is marked with the ReactiveState symbol so that
+  // processModelDirective treats it as a reactive value and wires up
+  // `:model` on native inputs inside the child template correctly.
+  const modelRef: ModelRef<T> = {
+    get value(): T {
+      return props[propName] as T;
+    },
+    set value(newValue: T) {
+      if (emitFn) {
+        emitFn(`update:${propName}`, newValue);
+      }
+    },
+  };
+
+  try {
+    const key = Symbol.for('@cer/ReactiveState');
+    Object.defineProperty(modelRef, key, {
+      value: true,
+      enumerable: false,
+      configurable: false,
+    });
+  } catch {
+    // ignore exotic runtimes
+  }
+
+  return modelRef;
+}

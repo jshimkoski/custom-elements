@@ -11,6 +11,7 @@ Bindings allow you to connect your component's refs, props, and events directly 
 - `:class` — Class binding
 - `:style` — Style binding
 - `:model` — Two-way binding for form elements (native + custom elements)
+- `defineModel` — Declare a two-way binding prop inside a child component
 - `:ref` — Ref binding for element access
 - `:show` — Show/hide elements with display: none
 - `:when` — Conditional rendering (adds/removes from DOM)
@@ -170,11 +171,13 @@ component('style-binding-demo', () => {
 - Combine with static styles using string concatenation if needed.
 - Avoid setting styles that conflict with your CSS classes.
 
-## 🔄 Two-Way Binding (`:model`)
+## 🔄 Two-Way Binding (`:model` and `defineModel`)
 
 Two-way binding synchronizes form element values with reactive refs. The enhanced `:model` directive supports direct binding to reactive refs in the functional API.
 
-### Enhanced Functional API Usage
+### Parent side — `:model`
+
+From a parent component, pass a `ref` via `:model`. The directive wires both the initial value and updates in both directions automatically.
 
 ```typescript
 import { component, html, ref } from '@jasonshimmy/custom-elements-runtime';
@@ -217,9 +220,110 @@ component('form-example', () => {
 - `trim` — Automatically trim whitespace
 - `number` — Convert to number type
 
-### Custom Elements with `:model`
+### Child side — `defineModel`
 
-For custom elements, `:model` follows Vue.js conventions. The runtime maps the bound ref's value to the element's `value` property and listens for the corresponding `update:modelValue` or `input` event to write back changes.
+`defineModel` is the companion hook for components that _receive_ a `:model` binding. It replaces the `useProps` + `useEmit` boilerplate and returns a `ModelRef` — a writable ref whose setter automatically dispatches `update:<propName>` so the parent's `:model` directive picks up the change.
+
+```typescript
+import {
+  component,
+  html,
+  defineModel,
+} from '@jasonshimmy/custom-elements-runtime';
+
+// Default model — parent uses :model="ref"
+component('my-input', () => {
+  const model = defineModel('');
+
+  return html`
+    <input :model="${model}" />
+    <span>Current: ${model.value}</span>
+  `;
+});
+```
+
+Parent usage:
+
+```html
+<my-input :model="${searchText}"></my-input>
+```
+
+### Named models — `:model:propName` and `defineModel('propName', defaultValue)`
+
+A component can expose multiple independent models. Name them with a second argument to `defineModel` and bind them using `:model:propName` from the parent.
+
+```typescript
+// Child
+component('my-field', () => {
+  const title = defineModel('title', '');
+  const count = defineModel('count', 0);
+
+  return html`
+    <input :model="${title}" />
+    <input type="number" :model="${count}" />
+  `;
+});
+```
+
+```html
+<!-- Parent -->
+<my-field :model:title="${heading}" :model:count="${qty}"></my-field>
+```
+
+### How `defineModel` works
+
+| Direction      | Mechanism                                                                                                                                         |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Parent → Child | Parent passes a `ref` via `:model` / `:model:propName`; the child reads `model.value`                                                             |
+| Child → Parent | Setting `model.value = x` dispatches `update:modelValue` (or `update:<propName>`) from the host; the parent's `:model` listener updates its `ref` |
+
+The returned `ModelRef` is also recognised by the vdom `:model` directive, so it can be passed directly to native inputs inside the child template without any extra wiring.
+
+### `ModelRef<T>` interface
+
+```typescript
+interface ModelRef<T> {
+  value: T; // get → reads current prop; set → emits update event
+}
+```
+
+### `defineModel` signature
+
+```typescript
+// Default model (prop name is 'modelValue')
+defineModel<T>(): ModelRef<T | undefined>
+defineModel<T>(defaultValue: T): ModelRef<T>
+
+// Named model
+defineModel<T>(propName: string, defaultValue: T): ModelRef<T>
+```
+
+### Before / after comparison
+
+```typescript
+// ❌ Before — manual boilerplate
+component('my-input', () => {
+  const props = useProps({ modelValue: '' });
+  const emit = useEmit();
+  return html`
+    <input
+      value="${props.modelValue}"
+      @input="${(e: InputEvent) =>
+        emit('update:modelValue', (e.target as HTMLInputElement).value)}"
+    />
+  `;
+});
+
+// ✅ After — with defineModel
+component('my-input', () => {
+  const model = defineModel('');
+  return html`<input :model="${model}" />`;
+});
+```
+
+### Custom Elements with `:model` (without `defineModel`)
+
+If a child component does not use `defineModel`, `:model` still works by mapping the bound ref to the element's `modelValue` prop and listening for `update:modelValue` / `input` events dispatched by the element.
 
 ## 🪝 Ref Binding (`:ref`)
 

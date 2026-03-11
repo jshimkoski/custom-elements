@@ -95,6 +95,7 @@ component(
 All hooks must be called during component render and provide perfect TypeScript inference:
 
 - **`useProps(defaults)`**: Get reactive props with default values and type inference
+- **`defineModel(propName?, defaultValue?)`**: Declare a two-way model binding (see [defineModel](#-two-way-model-binding-with-definemodel))
 - **`useEmit()`**: Get the emit function for dispatching custom events
 - **`useOnConnected(callback)`**: Set up lifecycle hook for when component connects to DOM
 - **`useOnDisconnected(callback)`**: Set up lifecycle hook for when component disconnects from DOM
@@ -104,7 +105,88 @@ All hooks must be called during component render and provide perfect TypeScript 
 - **`useExpose(api)`**: Publish methods and properties onto the host element as an imperative public API. See [useExpose()](./use-expose.md).
 - **`useSlots()`**: Inspect which named slots have been filled by the consumer. See [useSlots()](./use-slots.md).
 
-## 🔒 Props and Type Safety
+## � Two-Way Model Binding with `defineModel`
+
+`defineModel` is a single hook that replaces the `useProps` + `useEmit` boilerplate needed for two-way binding. It wraps the common pattern of accepting a prop and emitting its counterpart update event, following the same contract as Vue's `defineModel()`.
+
+### Default model (`modelValue`)
+
+```typescript
+import {
+  component,
+  html,
+  defineModel,
+} from '@jasonshimmy/custom-elements-runtime';
+
+component('my-input', () => {
+  // parent uses :model="ref"
+  const model = defineModel('');
+
+  return html`
+    <input :model="${model}" />
+    <span>${model.value}</span>
+  `;
+});
+```
+
+The parent binds with `:model` as usual:
+
+```html
+<my-input :model="${searchText}"></my-input>
+```
+
+### Named model
+
+```typescript
+component('my-field', () => {
+  // parent uses :model:title="ref"
+  const title = defineModel('title', '');
+  const count = defineModel('count', 0);
+
+  return html`
+    <input :model="${title}" />
+    <input type="number" :model="${count}" />
+  `;
+});
+```
+
+The parent binds with `:model:propName`:
+
+```html
+<my-field :model:title="${heading}" :model:count="${qty}"></my-field>
+```
+
+### How it works
+
+| Direction      | Mechanism                                                                                                                                           |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Parent → Child | Parent passes a `ref` via `:model`; the child reads it through `model.value`                                                                        |
+| Child → Parent | Setting `model.value = x` dispatches `update:modelValue` (or `update:<propName>`) from the host element; the parent's `:model` listener picks it up |
+
+The returned `ModelRef` is also recognised by the vdom `:model` directive, so you can pass it directly to native inputs inside the child template without any extra wiring.
+
+### Signature
+
+```typescript
+// Default model — prop name is 'modelValue'
+defineModel<T>(): ModelRef<T | undefined>
+defineModel<T>(defaultValue: T): ModelRef<T>
+
+// Named model
+defineModel<T>(propName: string, defaultValue: T): ModelRef<T>
+```
+
+`ModelRef<T>` is a plain object with a writable `value` accessor:
+
+```typescript
+interface ModelRef<T> {
+  value: T; // get → reads current prop; set → emits update event
+}
+```
+
+---
+
+## �� Props and Type Safety
 
 ### Props with useProps Hook
 

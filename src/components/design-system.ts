@@ -2,6 +2,7 @@ import {
   component,
   html,
   ref,
+  defineModel,
   useProps,
   useEmit,
   useOnConnected,
@@ -26,12 +27,12 @@ interface Option {
 // Text Input Component
 component('ds-input', () => {
   const props = useProps({
-    modelValue: '',
     placeholder: '',
     disabled: false,
     type: 'text',
   });
-  const emit = useEmit();
+
+  const modelValue = defineModel('');
 
   return html`
     <div class="input-wrapper">
@@ -40,10 +41,10 @@ component('ds-input', () => {
         type="${props.type}"
         placeholder="${props.placeholder}"
         :disabled="${props.disabled}"
-        :value="${props.modelValue}"
+        :value="${modelValue.value}"
         @input="${(e: Event) => {
           const input = e.target as HTMLInputElement;
-          emit('update:modelValue', input.value);
+          modelValue.value = input.value;
         }}"
       />
     </div>
