@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v2.6.2] - 2026-03-12
+
+- fix: ensure child components re-render on parent ref changes without direct template exposure (a447132)
+- chore: updated publish.yml to cancel quickly if only changes are chore or docs (98e7818)
+- chore: update publish.yml to skip release on chore or docs updates (f8837e4)
+
 ## [v2.6.1] - 2026-03-11
 
 - docs: fix issues in examples (18ef051)
