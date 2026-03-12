@@ -13,6 +13,9 @@ concurrency:
   group: release-${{ github.ref_name }}
   cancel-in-progress: false
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
 jobs:
   release:
     runs-on: ubuntu-latest
@@ -23,23 +26,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0 # Fetch all history and tags
-
-      - name: Use Node.js version from .nvmrc
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: .nvmrc
-          registry-url: 'https://registry.npmjs.org/'
-
-      - name: Cache node modules
-        uses: actions/cache@v4
-        with:
-          path: node_modules
-          key: ${{ runner.os }}-node-${{ hashFiles('package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-
-
-      - name: Install dependencies
-        run: npm ci
 
       # Resolve the latest tag once so all subsequent steps share the same baseline.
       - name: Resolve baseline tag
@@ -66,11 +52,31 @@ jobs:
             | grep -vE "^(chore|docs)(\([^)]+\))?:" || true)
           if [ -z "$RELEASE_COMMITS" ]; then
             echo "value=false" >> $GITHUB_OUTPUT
-            echo "No release-worthy commits found — skipping release."
+            echo "## Release skipped" >> $GITHUB_STEP_SUMMARY
+            echo "All commits since the last release use \`chore:\` or \`docs:\` prefixes — nothing to publish." >> $GITHUB_STEP_SUMMARY
           else
             echo "value=true" >> $GITHUB_OUTPUT
-            echo "Release-worthy commits found."
           fi
+
+      - name: Use Node.js version from .nvmrc
+        if: steps.should_release.outputs.value == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          registry-url: 'https://registry.npmjs.org/'
+
+      - name: Cache node modules
+        if: steps.should_release.outputs.value == 'true'
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Install dependencies
+        if: steps.should_release.outputs.value == 'true'
+        run: npm ci
 
       - name: Run tests
         if: steps.should_release.outputs.value == 'true'
@@ -92,7 +98,7 @@ jobs:
         if: always() && steps.should_release.outputs.value == 'true'
         run: |
           if [ -f dev.pid ]; then
-            kill $(cat dev.pid)
+            kill $(cat dev.pid) 2>/dev/null || true
           fi
 
       - name: Build library
