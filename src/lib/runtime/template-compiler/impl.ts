@@ -701,11 +701,24 @@ export function htmlImpl(
                 );
               } else {
                 initial = modelVal;
-                // Unwrap reactive state objects
                 // Keep ReactiveState objects intact for runtime so children
                 // receive the ReactiveState instance instead of an unwrapped
                 // plain object. The runtime knows how to handle ReactiveState
                 // when applying props/attrs.
+                //
+                // Also read `.value` here as a side-effect: this call happens
+                // during the parent component's render function execution
+                // (inside setCurrentComponent), so trackDependency is invoked
+                // and the parent subscribes to the reactive ref. This ensures
+                // the parent re-renders whenever the ref changes even when
+                // ${open.value} is not explicitly referenced in the template.
+                if (isReactiveState(modelVal)) {
+                  try {
+                    void (modelVal as { value: unknown }).value;
+                  } catch {
+                    // ignore
+                  }
+                }
               }
 
               vnodeProps.props[argToUse] = initial;

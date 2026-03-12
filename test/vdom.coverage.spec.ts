@@ -665,7 +665,7 @@ describe('VDOM Coverage - Edge Cases', () => {
   });
 
   describe('processModelDirective - Attribute fallback', () => {
-    it('should set attribute for custom elements', () => {
+    it('should NOT set attribute for custom elements bound with a ReactiveState (prop is set instead)', () => {
       const state = new ReactiveState('test value');
       const props: any = {};
       const attrs: any = {};
@@ -682,8 +682,33 @@ describe('VDOM Coverage - Edge Cases', () => {
         customEl,
       );
 
-      // Should set attribute for initialization
-      expect(attrs['model-value']).toBeDefined();
+      // ReactiveState props are passed via `props`, not `attrs`, to prevent
+      // patchElement from overwriting the live ReactiveState with a stale
+      // primitive value during subsequent parent re-renders.
+      expect(props.modelValue).toBe(state);
+      expect(attrs['model-value']).toBeUndefined();
+    });
+
+    it('should set attribute for native inputs bound with a ReactiveState', () => {
+      const state = new ReactiveState('test value');
+      const props: any = {};
+      const attrs: any = {};
+      const listeners: any = {};
+      const input = document.createElement('input');
+
+      processModelDirective(
+        state,
+        [],
+        props,
+        attrs,
+        listeners,
+        { _state: {} },
+        input,
+      );
+
+      // Native inputs always receive the unwrapped primitive via attrs so the
+      // DOM input value stays in sync.
+      expect(attrs['value']).toBeDefined();
     });
   });
 

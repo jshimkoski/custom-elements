@@ -131,16 +131,20 @@ export function processModelDirective(
     // inputs we must set the unwrapped current value.
     if (!isNativeInput && isReactiveState(value)) {
       props[propName] = value; // pass the ReactiveState instance
+      // Do NOT set attrs here: adding the primitive current value as an
+      // attribute causes patchElement's attrs loop to later overwrite the
+      // ReactiveState property with a stale primitive, which would break
+      // reactive dependency tracking in the child component.
     } else {
       props[propName] = currentValue;
-    }
-    // Also set an attribute so custom element constructors / applyProps can
-    // read initial values via getAttribute during their initialization.
-    try {
-      const attrName = toKebab(propName);
-      if (attrs) attrs[attrName] = currentValue;
-    } catch {
-      // ignore
+      // Also set an attribute so custom element constructors / applyProps can
+      // read initial values via getAttribute during their initialization.
+      try {
+        const attrName = toKebab(propName);
+        if (attrs) attrs[attrName] = currentValue;
+      } catch {
+        // ignore
+      }
     }
   }
 
