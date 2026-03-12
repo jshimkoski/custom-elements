@@ -1,6 +1,10 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v2.6.3] - 2026-03-12
+
+- fix: simplify transition handling by removing inline styles and enhancing class-swap logic (36f8d43)
+
 ## [v2.6.2] - 2026-03-12
 
 - fix: ensure child components re-render on parent ref changes without direct template exposure (a447132)
