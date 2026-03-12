@@ -1,4 +1,4 @@
-import { devWarn, devError } from './logger';
+import { devError } from './logger';
 
 /**
  * Transition lifecycle hook signatures
@@ -53,61 +53,6 @@ function removeClasses(el: HTMLElement, classes: string[]): void {
   if (validClasses.length > 0) {
     el.classList.remove(...validClasses);
   }
-}
-
-/**
- * Track if we've successfully waited for styles at least once
- * After the first successful load, we don't need to wait again
- */
-let stylesLoadedOnce = false;
-
-/**
- * Wait for styles to be computed and applied to an element.
- * This ensures CSS is loaded before attempting to read computed styles.
- * Uses a timeout to prevent infinite waiting.
- */
-async function waitForStyles(
-  el: HTMLElement,
-  _classesToCheck: string[],
-  maxAttempts = 10,
-): Promise<void> {
-  // If we've already loaded styles once, skip the wait
-  if (stylesLoadedOnce) {
-    return;
-  }
-
-  // If element is not in the document, styles won't compute
-  if (!el.isConnected) {
-    devWarn('⚠️ Element not connected to DOM, skipping style wait');
-    return;
-  }
-
-  // Check if any of the classes produce computed styles
-  for (let i = 0; i < maxAttempts; i++) {
-    const computed = window.getComputedStyle(el);
-
-    // Check if transform or opacity has been computed (non-empty)
-    // Empty string means CSS hasn't loaded yet
-    // 'none' for transform or '0'/'1' for opacity means CSS IS loaded
-    const hasTransform = computed.transform && computed.transform !== '';
-    const hasOpacity = computed.opacity && computed.opacity !== '';
-
-    // If we have valid computed values (even if they're 'none' or '0'), styles are loaded
-    if (hasTransform || hasOpacity) {
-      stylesLoadedOnce = true;
-      return;
-    }
-
-    // Wait a frame and try again
-    await new Promise((resolve) =>
-      requestAnimationFrame(() => resolve(undefined)),
-    );
-  }
-
-  // If we timeout, continue anyway - styles might not be for transform/opacity
-  // But mark as loaded so we don't keep checking
-  stylesLoadedOnce = true;
-  devWarn('⚠️ Styles did not load in time for transition, continuing anyway');
 }
 
 /**
@@ -253,72 +198,36 @@ export async function performEnterTransition(
     }
   }
 
-  // Wait for next frame - this is critical for the transition to work
-  // The browser needs a frame where it sees: element + enterFrom + enterActive
-  await new Promise((resolve) =>
-    requestAnimationFrame(() => resolve(undefined)),
-  );
+  // Wait one animation frame. The browser must paint a frame with enterFrom +
+  // enterActive before we swap to the "to" state.
+  //
+  // At this point applyStyle() has already run synchronously (it executes right
+  // after vdomRenderer() returns, before the rAF fires), so the shadow root's
+  // adoptedStyleSheets already contain JIT CSS rules for all enterFrom / enterTo
+  // classes. No getComputedStyle() call is needed to capture the "from" state.
+  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
 
-  // Force another reflow to ensure styles are applied
-
+  // Force reflow so the browser confirms the "from" state before the swap.
   void el.offsetHeight;
 
-  // CRITICAL: CSS class-based transitions with conflicting properties don't work
-  // reliably because of cascade conflicts. When both translate-x-[100%] and
-  // translate-x-[0%] are utility classes with same specificity, whichever appears
-  // last in the stylesheet wins immediately - no animation.
+  // Swap: remove enterFrom classes, add enterTo classes.
   //
-  // SOLUTION: Use inline styles for the actual transition values.
-  // - Inline styles have highest specificity
-  // - We capture the "from" computed values as inline styles
-  // - Then add "to" classes which override the inline values
-  // - Browser animates from inline styles to class-based styles
+  // The browser animates because:
+  //   a) The transition-* timing properties (from enterActive) are already active.
+  //   b) The element's computed values change when enterFrom leaves and enterTo arrives.
+  //   c) Only one set is on the element at a time — no utility-class cascade
+  //      conflict (equal specificity, only the matching selector applies).
   //
-  // The JIT CSS classes are still used for:
-  // - transition-all, duration-300, ease-out (timing/easing)
-  // - Non-animated properties (padding, colors, etc.)
-  //
-  // Only the ANIMATED values (transform, opacity during transition) use inline.
-
-  // Capture current computed values
-  const computedStyle = window.getComputedStyle(el);
-  const fromTransform = computedStyle.transform;
-  const fromOpacity = computedStyle.opacity;
-
-  // Remove enterFrom classes
+  // This matches Vue 3's Transition strategy, which also avoids reading computed
+  // styles and does not use inline-style bridging.
   removeClasses(el, enterFromClasses);
-
-  // Apply captured values as inline styles (highest specificity)
-  if (fromTransform && fromTransform !== 'none') {
-    el.style.transform = fromTransform;
-  }
-  if (fromOpacity && fromOpacity !== '') {
-    el.style.opacity = fromOpacity;
-  }
-
-  // Force reflow
-
-  void el.offsetHeight;
-
-  // Wait for next frame
-  await new Promise((resolve) =>
-    requestAnimationFrame(() => resolve(undefined)),
-  );
-
-  // Remove inline styles and add enterTo classes
-  // Browser will animate from inline values to class values
-  el.style.transform = '';
-  el.style.opacity = '';
   addClasses(el, enterToClasses);
 
-  // Force reflow to ensure styles are applied
-
+  // Force reflow to ensure the class swap is processed.
   void el.offsetHeight;
 
-  // Wait for next frame so browser recalculates computed styles
-  await new Promise((resolve) =>
-    requestAnimationFrame(() => resolve(undefined)),
-  );
+  // Wait one more frame for the browser to start the transition.
+  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
 
   // Get duration
   let transitionDuration: number | undefined;
@@ -433,12 +342,7 @@ export async function performLeaveTransition(
   }
 
   // Use requestAnimationFrame
-  await new Promise((resolve) =>
-    requestAnimationFrame(() => resolve(undefined)),
-  );
-
-  // Wait for CSS to be applied
-  await waitForStyles(el, [...leaveFromClasses, ...leaveActiveClasses]);
+  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
 
   // Remove leave-from and add leave-to
   removeClasses(el, leaveFromClasses);

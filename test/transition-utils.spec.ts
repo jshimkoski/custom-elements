@@ -210,45 +210,108 @@ describe('transition-utils.ts', () => {
       );
     });
 
-    it('should use inline styles for transform and opacity', async () => {
-      // Mock getComputedStyle to return transform and opacity values
-      const mockComputedStyle = {
-        transform: 'translateX(-100%)',
-        opacity: '0',
-        transitionDuration: '300ms',
-        transitionDelay: '0s',
-      };
-      vi.spyOn(window, 'getComputedStyle').mockReturnValue(
-        mockComputedStyle as any,
-      );
+    it('should use class-swap approach without setting inline styles', async () => {
+      // The new implementation removes enterFrom and adds enterTo without ever
+      // setting el.style.transform or el.style.opacity inline.
+      // This avoids the Shadow DOM getComputedStyle() race where freshly-inserted
+      // elements return default values before adoptedStyleSheets rules apply.
 
-      const promise = performEnterTransition(element, mockTransitionMeta);
+      const styleSetSpy = vi.spyOn(element.style, 'setProperty');
 
-      // Allow time for inline styles to be applied
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      await performEnterTransition(element, mockTransitionMeta);
 
-      await promise;
-
-      // After transition, inline styles should be cleared
+      // Inline styles should never be touched for transform / opacity
       expect(element.style.transform).toBe('');
       expect(element.style.opacity).toBe('');
+
+      // setProperty should not have been called for these properties
+      const calls = styleSetSpy.mock.calls.map((c) => c[0]);
+      expect(calls).not.toContain('transform');
+      expect(calls).not.toContain('opacity');
     });
 
-    it('should handle elements with no transform', async () => {
-      const mockComputedStyle = {
+    it('should never have both enterFrom and enterTo classes simultaneously', async () => {
+      let sawBothAtOnce = false;
+      const observer = new MutationObserver(() => {
+        const hasFrom = element.classList.contains('opacity-0');
+        const hasTo = element.classList.contains('opacity-100');
+        if (hasFrom && hasTo) sawBothAtOnce = true;
+      });
+      observer.observe(element, {
+        attributes: true,
+        attributeFilter: ['class'],
+      });
+
+      await performEnterTransition(element, mockTransitionMeta);
+
+      observer.disconnect();
+      expect(sawBothAtOnce).toBe(false);
+    });
+
+    it('should not call getComputedStyle to capture from-state', async () => {
+      // getComputedStyle may still be called by getTransitionDuration (for implicit
+      // duration), but it must NOT be called with the explicit goal of reading
+      // the enterFrom values. With an explicit duration, getComputedStyle should
+      // not be called at all during the enter transition.
+      const spy = vi.spyOn(window, 'getComputedStyle');
+      // duration is already set to 300 on mockTransitionMeta, so waitForTransition
+      // uses it directly and never calls getComputedStyle.
+      await performEnterTransition(element, mockTransitionMeta);
+
+      // getComputedStyle must NOT have been called to capture from-state:
+      // with an explicit duration no calls are expected at all.
+      expect(spy).not.toHaveBeenCalled();
+    });
+
+    it('enter transition works correctly when getComputedStyle returns browser defaults', async () => {
+      // Simulate the Shadow DOM race scenario: getComputedStyle returns default
+      // values (opacity: 1, transform: none) even though enterFrom classes are set.
+      vi.spyOn(window, 'getComputedStyle').mockReturnValue({
         transform: 'none',
         opacity: '1',
         transitionDuration: '300ms',
         transitionDelay: '0s',
-      };
-      vi.spyOn(window, 'getComputedStyle').mockReturnValue(
-        mockComputedStyle as any,
-      );
+      } as unknown as CSSStyleDeclaration);
 
       await performEnterTransition(element, mockTransitionMeta);
 
-      // Should complete without error
+      // Transition must still complete correctly
       expect(element.classList.contains('opacity-100')).toBe(true);
+      expect(element.classList.contains('opacity-0')).toBe(false);
+      expect(element.classList.contains('transition-opacity')).toBe(false);
+      // Inline styles must not be applied
+      expect(element.style.opacity).toBe('');
+      expect(element.style.transform).toBe('');
+    });
+
+    it('enter transition completes correctly when element is in a shadow root', async () => {
+      // Create a shadow root to simulate real component usage
+      const host = document.createElement('div');
+      document.body.appendChild(host);
+      const shadow = host.attachShadow({ mode: 'open' });
+      const shadowEl = document.createElement('div');
+      shadow.appendChild(shadowEl);
+
+      await performEnterTransition(shadowEl, mockTransitionMeta);
+
+      expect(shadowEl.classList.contains('opacity-100')).toBe(true);
+      expect(shadowEl.classList.contains('opacity-0')).toBe(false);
+      expect(shadowEl.classList.contains('transition-opacity')).toBe(false);
+      expect(shadowEl.style.transform).toBe('');
+      expect(shadowEl.style.opacity).toBe('');
+
+      host.remove();
+    });
+
+    it('enter transition leaves enterFrom classes absent and enterTo classes present', async () => {
+      await performEnterTransition(element, mockTransitionMeta);
+
+      // Class-swap postconditions
+      expect(element.classList.contains('opacity-0')).toBe(false);
+      expect(element.classList.contains('opacity-100')).toBe(true);
+      // Timing classes cleaned up
+      expect(element.classList.contains('transition-opacity')).toBe(false);
+      expect(element.classList.contains('duration-300')).toBe(false);
     });
 
     it('should wait for transitionend event', async () => {
