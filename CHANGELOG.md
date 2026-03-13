@@ -1,6 +1,10 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v2.8.2] - 2026-03-13
+
+- fix: ensure sibling order is preserved when handling nested anchor blocks in patchChildrenBetween (590658d)
+
 ## [v2.8.1] - 2026-03-13
 
 - fix: implement scoped directive index management for stable key generation (e907840)
