@@ -1,6 +1,10 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v2.8.0] - 2026-03-13
+
+- feat: enhance directive key generation with unique positional keys and reset mechanism (99071a9)
+
 ## [v2.7.0] - 2026-03-13
 
 - feat: enhance reactive system with dependency propagation and improve ref equality guard tests (8e4d009)
