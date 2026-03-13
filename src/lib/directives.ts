@@ -1,25 +1,73 @@
 import type { VNode } from './runtime/types';
 
-/* --- Directive call counter (per-render, reset by the component renderer) --- */
-let _directiveCallIndex = 0;
+// ── Per-render directive scope tracking ─────────────────────────────────────
+//
+// A FLAT counter (index++) breaks when a when() factory itself contains more
+// when() calls: those inner calls consume counter slots, causing SUBSEQUENT
+// SIBLING when() calls to get a different index depending on whether the factory
+// ran. For example:
+//
+//   when(A, () => { when(B); when(C); })  // ← factory may or may not run
+//   when(D)                               // ← index shifts when factory runs
+//
+// The fix: each when() call claims its own slot (stable regardless of whether
+// the factory runs), then ENTERS a new child scope for the factory. Inner
+// when() calls consume indices in that child scope, never bleeding into the
+// sibling counter of the outer scope.
+//
+// Key format:  root sibling 0 → "when-block-0"
+//              child of "when-block-0" at pos 1 → "when-block-0.1"
+//              grandchild → "when-block-0.1.0"  etc.
+
+/** Current scope's parent prefix (empty string = root scope). */
+let _scopeParent = '';
+/** Next sibling index inside the current scope. */
+let _scopeIndex = 0;
+/** Stack of [parentPrefix, siblingIndex] for nested scopes. */
+const _scopeStack: Array<readonly [string, number]> = [];
 
 /**
- * Reset the per-render directive call counter.
- * Must be called once at the start of every component render pass so that
- * all sibling directive calls automatically receive stable, unique positional keys.
+ * Reset all scope state at the start of each component render pass.
+ * Called automatically by the component renderer — not needed in user code.
  * @internal
  */
 export function resetWhenCounter(): void {
-  _directiveCallIndex = 0;
+  _scopeParent = '';
+  _scopeIndex = 0;
+  _scopeStack.length = 0;
 }
 
 /**
- * Get the next per-render directive call index and increment the counter.
- * Used by directives in directive-enhancements.ts to generate unique anchor keys.
+ * Claim the next directive call index within the current scope.
+ * Used by directive-enhancements.ts for non-when() directives (switchOnLength,
+ * switchOnPromise, etc.) that need a stable unique number per call site.
  * @internal
  */
 export function nextDirectiveIndex(): number {
-  return _directiveCallIndex++;
+  return _scopeIndex++;
+}
+
+/** Claim the next slot in the current scope and return its anchor key. */
+function claimKey(explicitKey?: string): string {
+  const idx = _scopeIndex++;
+  if (explicitKey !== undefined) return explicitKey;
+  return _scopeParent ? `${_scopeParent}.${idx}` : `when-block-${idx}`;
+}
+
+/** Push a new child scope keyed under `anchorKey`. */
+function enterScope(anchorKey: string): void {
+  _scopeStack.push([_scopeParent, _scopeIndex] as const);
+  _scopeParent = anchorKey;
+  _scopeIndex = 0;
+}
+
+/** Pop back to the parent scope. */
+function exitScope(): void {
+  const top = _scopeStack[_scopeStack.length - 1];
+  if (top) {
+    _scopeStack.length--;
+    [_scopeParent, _scopeIndex] = top;
+  }
 }
 
 /* --- When --- */
@@ -38,11 +86,25 @@ export function when(
   childrenOrFactory: VNode | VNode[] | (() => VNode | VNode[]),
   key?: string,
 ): VNode {
-  const anchorKey = key ?? `when-block-${_directiveCallIndex++}`;
-  if (typeof childrenOrFactory === 'function') {
-    return anchorBlock(cond ? childrenOrFactory() : [], anchorKey);
+  // Claim this call's position BEFORE potentially entering a child scope.
+  // This guarantees sibling when() calls always get the same index regardless
+  // of whether a factory executes and how many when() calls it contains.
+  const anchorKey = claimKey(key);
+
+  if (typeof childrenOrFactory !== 'function') {
+    return anchorBlock(cond ? childrenOrFactory : [], anchorKey);
   }
-  return anchorBlock(cond ? childrenOrFactory : [], anchorKey);
+
+  if (!cond) {
+    return anchorBlock([], anchorKey);
+  }
+
+  // Run the factory in a child scope so its inner when() calls don't
+  // affect the sibling counter of the outer scope.
+  enterScope(anchorKey);
+  const children = childrenOrFactory();
+  exitScope();
+  return anchorBlock(children, anchorKey);
 }
 
 /* --- Each --- */
@@ -79,18 +141,21 @@ export function match() {
       return this;
     },
     done() {
-      const mi = _directiveCallIndex++;
+      const matchKey = `match-${claimKey()}`;
       for (let idx = 0; idx < branches.length; idx++) {
         const [cond, content] = branches[idx];
         if (cond) {
-          const payload =
-            typeof content === 'function'
-              ? (content as () => VNode | VNode[])()
-              : content;
-          return [anchorBlock(payload, `match-${mi}-branch-${idx}`)];
+          const branchKey = `${matchKey}-branch-${idx}`;
+          if (typeof content === 'function') {
+            enterScope(branchKey);
+            const payload = (content as () => VNode | VNode[])();
+            exitScope();
+            return [anchorBlock(payload, branchKey)];
+          }
+          return [anchorBlock(content, branchKey)];
         }
       }
-      return [anchorBlock([], `match-${mi}-empty`)];
+      return [anchorBlock([], `${matchKey}-empty`)];
     },
   };
 }
