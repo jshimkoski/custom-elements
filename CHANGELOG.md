@@ -1,6 +1,10 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v2.8.1] - 2026-03-13
+
+- fix: implement scoped directive index management for stable key generation (e907840)
+
 ## [v2.8.0] - 2026-03-13
 
 - feat: enhance directive key generation with unique positional keys and reset mechanism (99071a9)
