@@ -472,4 +472,64 @@ describe('vdom.ts targeted ref patch coverage', () => {
     expect(node.textContent).toBe('B');
     expect((node as HTMLElement).tagName).toBe('DIV');
   });
+
+  // Regression: patchChildrenBetween must handle #anchor VNode children without
+  // corrupting the `next` cursor.  Previously, nested anchor blocks fell through
+  // to `createElement()`, which returns an empty DocumentFragment after
+  // `insertBefore`.  `fragment.nextSibling` is null, so all subsequent siblings
+  // were appended at the end of the parent — past unrelated nodes like
+  // `picker-actions`.
+  it('rerender preserves sibling order when anchor contains nested anchors', () => {
+    const root = document.createElement('div').attachShadow({ mode: 'open' });
+
+    function makeTree(weekdaysText: string): VNode {
+      return vnode(
+        'div',
+        [
+          vnode('div', 'headline', 'headline', undefined),
+          {
+            tag: '#anchor',
+            key: 'outer',
+            children: [
+              vnode('div', 'cal-header', 'cal-header', undefined),
+              // inner empty anchor (e.g. year view hidden)
+              { tag: '#anchor', key: 'outer.0', children: [] },
+              // inner populated anchor (e.g. day view)
+              {
+                tag: '#anchor',
+                key: 'outer.1',
+                children: [
+                  vnode('div', weekdaysText, 'cal-weekdays', undefined),
+                  vnode('div', 'cal-grid', 'cal-grid', undefined),
+                ],
+              },
+            ],
+          },
+          // second outer anchor (e.g. input view, empty)
+          { tag: '#anchor', key: 'outer2', children: [] },
+          vnode('div', 'actions', 'actions', undefined),
+        ],
+        'root',
+        undefined,
+      );
+    }
+
+    vdomRenderer(root, makeTree('weekdays-v1'));
+
+    // Verify initial render is correct
+    const htmlBefore = root.innerHTML;
+    expect(htmlBefore.indexOf('weekdays-v1')).toBeLessThan(
+      htmlBefore.indexOf('actions'),
+    );
+
+    // Re-render with same structure — triggers patchChildrenBetween for nested anchors
+    vdomRenderer(root, makeTree('weekdays-v2'));
+
+    const htmlAfter = root.innerHTML;
+    const weekdaysIdx = htmlAfter.indexOf('weekdays-v2');
+    const actionsIdx = htmlAfter.indexOf('actions');
+
+    expect(weekdaysIdx).toBeGreaterThan(-1); // weekdays is present in DOM
+    expect(actionsIdx).toBeGreaterThan(weekdaysIdx); // actions comes AFTER weekdays
+  });
 });

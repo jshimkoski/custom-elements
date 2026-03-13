@@ -1905,6 +1905,77 @@ export function patchChildren(
       let next: Node | null = start.nextSibling;
 
       for (const newVNode of newChildren) {
+        // Handle nested anchor blocks (e.g. when() inside when()).
+        // Anchor boundaries are stored as `key:start` / `key:end` text nodes, not
+        // as a single node with key `key`.  Without this path the keyed diff falls
+        // through to `createElement()`, which returns a DocumentFragment that is
+        // empty after `insertBefore`.  `fragment.nextSibling` is then null, so
+        // every subsequent sibling gets appended at the very end of the parent
+        // element — past unrelated nodes such as `picker-actions`.
+        if (typeof newVNode === 'object' && newVNode.tag === '#anchor') {
+          const innerKey = newVNode.key!;
+          const innerStartKey = `${innerKey}:start`;
+          const innerEndKey = `${innerKey}:end`;
+          const existingStart = oldNodeByKeyRange.get(innerStartKey) as
+            | Comment
+            | undefined;
+          const existingEnd = oldNodeByKeyRange.get(innerEndKey) as
+            | Comment
+            | undefined;
+          const innerChildren = Array.isArray(newVNode.children)
+            ? newVNode.children
+            : [];
+          const innerOldVNode = oldVNodeByKeyRange.get(innerKey);
+          let anchorStart: Comment;
+          let anchorEnd: Comment;
+
+          if (existingStart && existingEnd && parent.contains(existingStart)) {
+            // Reuse existing boundaries and recursively patch their content.
+            anchorStart = existingStart;
+            anchorEnd = existingEnd;
+            patchChildrenBetween(
+              anchorStart,
+              anchorEnd,
+              innerOldVNode?.children as VNode[] | undefined,
+              innerChildren,
+            );
+          } else {
+            // No existing boundaries — create them and insert all content before `next`.
+            anchorStart = document.createTextNode('') as unknown as Comment;
+            anchorEnd = document.createTextNode('') as unknown as Comment;
+            setNodeKey(anchorStart, innerStartKey);
+            setNodeKey(anchorEnd, innerEndKey);
+            parent.insertBefore(anchorStart, next);
+            for (const child of innerChildren) {
+              const childEl = createElement(
+                child,
+                context,
+                undefined,
+                parent instanceof Element
+                  ? (parent.namespaceURI ?? null)
+                  : null,
+              );
+              parent.insertBefore(childEl, next);
+              usedInRange.add(childEl);
+            }
+            parent.insertBefore(anchorEnd, next);
+          }
+
+          // Mark every node in the anchor range as used so the cleanup pass
+          // below does not remove the newly reconciled (or reused) boundaries.
+          let rangeNode: Node | null = anchorStart;
+          while (rangeNode) {
+            usedInRange.add(rangeNode);
+            if (rangeNode === anchorEnd) break;
+            rangeNode = rangeNode.nextSibling;
+          }
+
+          (newVNode as AnchorBlockVNode)._startNode = anchorStart;
+          (newVNode as AnchorBlockVNode)._endNode = anchorEnd;
+          next = anchorEnd.nextSibling;
+          continue;
+        }
+
         let node: Node;
         if (newVNode.key != null && oldNodeByKeyRange.has(newVNode.key)) {
           const oldVNode = oldVNodeByKeyRange.get(newVNode.key)!;
