@@ -1,6 +1,10 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v2.7.0] - 2026-03-13
+
+- feat: enhance reactive system with dependency propagation and improve ref equality guard tests (8e4d009)
+
 ## [v2.6.3] - 2026-03-12
 
 - fix: simplify transition handling by removing inline styles and enhancing class-swap logic (36f8d43)
