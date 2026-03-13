@@ -1,13 +1,44 @@
 import type { VNode } from './runtime/types';
 
+/* --- Directive call counter (per-render, reset by the component renderer) --- */
+let _directiveCallIndex = 0;
+
+/**
+ * Reset the per-render directive call counter.
+ * Must be called once at the start of every component render pass so that
+ * all sibling directive calls automatically receive stable, unique positional keys.
+ * @internal
+ */
+export function resetWhenCounter(): void {
+  _directiveCallIndex = 0;
+}
+
+/**
+ * Get the next per-render directive call index and increment the counter.
+ * Used by directives in directive-enhancements.ts to generate unique anchor keys.
+ * @internal
+ */
+export function nextDirectiveIndex(): number {
+  return _directiveCallIndex++;
+}
+
 /* --- When --- */
-export function when(cond: boolean, children: VNode | VNode[]): VNode;
-export function when(cond: boolean, factory: () => VNode | VNode[]): VNode;
+export function when(
+  cond: boolean,
+  children: VNode | VNode[],
+  key?: string,
+): VNode;
+export function when(
+  cond: boolean,
+  factory: () => VNode | VNode[],
+  key?: string,
+): VNode;
 export function when(
   cond: boolean,
   childrenOrFactory: VNode | VNode[] | (() => VNode | VNode[]),
+  key?: string,
 ): VNode {
-  const anchorKey = 'when-block'; // stable key regardless of condition
+  const anchorKey = key ?? `when-block-${_directiveCallIndex++}`;
   if (typeof childrenOrFactory === 'function') {
     return anchorBlock(cond ? childrenOrFactory() : [], anchorKey);
   }
@@ -31,6 +62,11 @@ export function each<
 }
 
 /* --- match --- */
+type Branch = [
+  condition: unknown,
+  content: VNode | VNode[] | (() => VNode | VNode[]),
+];
+
 export function match() {
   const branches: Branch[] = [];
   return {
@@ -43,29 +79,20 @@ export function match() {
       return this;
     },
     done() {
-      return whenChain(...branches);
+      const mi = _directiveCallIndex++;
+      for (let idx = 0; idx < branches.length; idx++) {
+        const [cond, content] = branches[idx];
+        if (cond) {
+          const payload =
+            typeof content === 'function'
+              ? (content as () => VNode | VNode[])()
+              : content;
+          return [anchorBlock(payload, `match-${mi}-branch-${idx}`)];
+        }
+      }
+      return [anchorBlock([], `match-${mi}-empty`)];
     },
   };
-}
-
-/* --- WhenChain --- */
-type Branch = [
-  condition: unknown,
-  content: VNode | VNode[] | (() => VNode | VNode[]),
-];
-
-function whenChain(...branches: Branch[]): VNode[] {
-  for (let idx = 0; idx < branches.length; idx++) {
-    const [cond, content] = branches[idx];
-    if (cond) {
-      const payload =
-        typeof content === 'function'
-          ? (content as () => VNode | VNode[])()
-          : content;
-      return [anchorBlock(payload, `whenChain-branch-${idx}`)];
-    }
-  }
-  return [anchorBlock([], 'whenChain-empty')];
 }
 
 /**

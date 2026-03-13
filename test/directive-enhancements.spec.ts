@@ -62,7 +62,7 @@ describe('directive-enhancements', () => {
       const result = unless(false, content);
 
       expect(result.tag).toBe('#anchor');
-      expect(result.key).toBe('when-block');
+      expect(result.key).toMatch(/^when-block-\d+$/);
       const children = getChildren(result);
       expect(children).toHaveLength(1);
       expect(children[0]).toEqual(content);
@@ -73,7 +73,7 @@ describe('directive-enhancements', () => {
       const result = unless(true, content);
 
       expect(result.tag).toBe('#anchor');
-      expect(result.key).toBe('when-block');
+      expect(result.key).toMatch(/^when-block-\d+$/);
       const children = getChildren(result);
       expect(children).toHaveLength(0);
     });
@@ -223,7 +223,7 @@ describe('directive-enhancements', () => {
       const result = switchOnLength([], { empty: emptyContent });
 
       expect(result.tag).toBe('#anchor');
-      expect(result.key).toBe('switch-length-empty');
+      expect(result.key).toMatch(/^switch-length-\d+-empty$/);
       const children = getChildren(result);
       expect(children).toHaveLength(1);
       expect(children[0]).toEqual(emptyContent);
@@ -235,7 +235,7 @@ describe('directive-enhancements', () => {
         one: (item) => createVNode('div', `one: ${item}`),
       });
 
-      expect(result.key).toBe('switch-length-one');
+      expect(result.key).toMatch(/^switch-length-\d+-one$/);
       const children = getChildren(result);
       expect(children[0].children).toBe('one: single');
     });
@@ -246,7 +246,7 @@ describe('directive-enhancements', () => {
         many: (items) => createVNode('div', `many: ${items.length}`),
       });
 
-      expect(result.key).toBe('switch-length-many');
+      expect(result.key).toMatch(/^switch-length-\d+-many$/);
       const children = getChildren(result);
       expect(children[0].children).toBe('many: 3');
     });
@@ -259,7 +259,7 @@ describe('directive-enhancements', () => {
         },
       });
 
-      expect(result.key).toBe('switch-length-2');
+      expect(result.key).toMatch(/^switch-length-\d+-2$/);
       const children = getChildren(result);
       expect(children[0].children).toBe('exactly two: a,b');
     });
@@ -268,7 +268,7 @@ describe('directive-enhancements', () => {
       const items = ['a', 'b', 'c'];
       const result = switchOnLength(items, {});
 
-      expect(result.key).toBe('switch-length-fallback');
+      expect(result.key).toMatch(/^switch-length-\d+-fallback$/);
       const children = getChildren(result);
       expect(children).toHaveLength(0);
     });
@@ -282,7 +282,7 @@ describe('directive-enhancements', () => {
         },
       });
 
-      expect(result.key).toBe('switch-length-2');
+      expect(result.key).toMatch(/^switch-length-\d+-2$/);
       const children = getChildren(result);
       expect(children[0].children).toBe('exactly two');
     });
@@ -399,7 +399,7 @@ describe('directive-enhancements', () => {
         { loading: loadingContent },
       );
 
-      expect(result.key).toBe('promise-loading');
+      expect(result.key).toMatch(/^promise-\d+-loading$/);
       const children = getChildren(result);
       expect(children[0]).toEqual(loadingContent);
     });
@@ -411,7 +411,7 @@ describe('directive-enhancements', () => {
         { success: (data) => createVNode('div', data.name) },
       );
 
-      expect(result.key).toBe('promise-success');
+      expect(result.key).toMatch(/^promise-\d+-success$/);
       const children = getChildren(result);
       expect(children[0].children).toBe('Test');
     });
@@ -423,7 +423,7 @@ describe('directive-enhancements', () => {
         { error: (err) => createVNode('div', err.message) },
       );
 
-      expect(result.key).toBe('promise-error');
+      expect(result.key).toMatch(/^promise-\d+-error$/);
       const children = getChildren(result);
       expect(children[0].children).toBe('Test error');
     });
@@ -432,7 +432,7 @@ describe('directive-enhancements', () => {
       const idleContent = createVNode('div', 'idle');
       const result = switchOnPromise({}, { idle: idleContent });
 
-      expect(result.key).toBe('promise-idle');
+      expect(result.key).toMatch(/^promise-\d+-idle$/);
       const children = getChildren(result);
       expect(children[0]).toEqual(idleContent);
     });
@@ -448,7 +448,7 @@ describe('directive-enhancements', () => {
         },
       );
 
-      expect(result.key).toBe('promise-loading');
+      expect(result.key).toMatch(/^promise-\d+-loading$/);
     });
 
     it('should prioritize error over success', () => {
@@ -461,7 +461,7 @@ describe('directive-enhancements', () => {
         },
       );
 
-      expect(result.key).toBe('promise-error');
+      expect(result.key).toMatch(/^promise-\d+-error$/);
     });
   });
 
@@ -603,7 +603,7 @@ describe('directive-enhancements', () => {
       const result = responsiveSwitch({ base: baseContent });
 
       expect(result).toHaveLength(1);
-      expect(result[0].key).toBe('responsive-base');
+      expect(result[0].key).toMatch(/^responsive-\d+-base$/);
       const children = getChildren(result[0]);
       expect(children[0]).toEqual(baseContent);
     });
@@ -624,7 +624,7 @@ describe('directive-enhancements', () => {
         .case('other', createVNode('div', 'not matched'))
         .done();
 
-      expect(result.key).toBe('switch-case-0');
+      expect(result.key).toMatch(/^switch-on-\d+-case-0$/);
       const children = getChildren(result);
       expect(children[0].children).toBe('matched');
     });
@@ -635,7 +635,7 @@ describe('directive-enhancements', () => {
         .case((val) => val < 3, createVNode('div', 'less than 3'))
         .done();
 
-      expect(result.key).toBe('switch-case-0');
+      expect(result.key).toMatch(/^switch-on-\d+-case-0$/);
       const children = getChildren(result);
       expect(children[0].children).toBe('greater than 3');
     });
@@ -646,7 +646,7 @@ describe('directive-enhancements', () => {
         .when((val) => val % 2 === 1, createVNode('div', 'odd'))
         .done();
 
-      expect(result.key).toBe('switch-case-0');
+      expect(result.key).toMatch(/^switch-on-\d+-case-0$/);
       const children = getChildren(result);
       expect(children[0].children).toBe('even');
     });
@@ -658,7 +658,7 @@ describe('directive-enhancements', () => {
         .otherwise(createVNode('div', 'default'))
         .done();
 
-      expect(result.key).toBe('switch-otherwise');
+      expect(result.key).toMatch(/^switch-on-\d+-otherwise$/);
       const children = getChildren(result);
       expect(children[0].children).toBe('default');
     });
@@ -669,7 +669,7 @@ describe('directive-enhancements', () => {
         .case('other', createVNode('div', 'other'))
         .done();
 
-      expect(result.key).toBe('switch-otherwise');
+      expect(result.key).toMatch(/^switch-on-\d+-otherwise$/);
       const children = getChildren(result);
       expect(children).toHaveLength(0);
     });
@@ -680,7 +680,7 @@ describe('directive-enhancements', () => {
         .case((val) => val > 3, createVNode('div', 'second match'))
         .done();
 
-      expect(result.key).toBe('switch-case-0');
+      expect(result.key).toMatch(/^switch-on-\d+-case-0$/);
       const children = getChildren(result);
       expect(children[0].children).toBe('first match');
     });

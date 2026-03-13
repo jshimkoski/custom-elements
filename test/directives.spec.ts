@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { when, each, match } from '../src/lib/directives';
+import { when, each, match, resetWhenCounter } from '../src/lib/directives';
 import type { VNode } from '../src/lib/runtime/types';
 
 function getChildren(v: VNode | VNode[]) {
@@ -82,5 +82,41 @@ describe('directives', () => {
     const m = match().done();
     expect(m[0]?.tag).toBe('#anchor');
     expect(Array.isArray(m[0]?.children) ? m[0].children.length : 0).toBe(0);
+  });
+
+  it('when uses default key "when-block"', () => {
+    const vnode = when(true, { tag: 'div', children: 'test' } as VNode);
+    expect(vnode.key).toMatch(/^when-block-\d+$/);
+  });
+
+  it('when accepts a custom key to disambiguate sibling when() calls', () => {
+    const a = when(true, { tag: 'div', children: 'a' } as VNode, 'branch-a');
+    const b = when(false, { tag: 'div', children: 'b' } as VNode, 'branch-b');
+    expect(a.key).toBe('branch-a');
+    expect(b.key).toBe('branch-b');
+  });
+
+  it('two when() calls without explicit keys get unique positional keys', () => {
+    // Simulate what the component renderer does before each render pass
+    resetWhenCounter();
+    const first = when(true, { tag: 'div', children: 'x' } as VNode);
+    const second = when(false, { tag: 'div', children: 'y' } as VNode);
+    expect(first.key).toBe('when-block-0');
+    expect(second.key).toBe('when-block-1');
+    expect(first.key).not.toBe(second.key);
+  });
+
+  it('counter resets to 0 on each render pass so keys are stable across re-renders', () => {
+    resetWhenCounter();
+    const a1 = when(true, { tag: 'div', children: 'x' } as VNode);
+    const b1 = when(false, { tag: 'div', children: 'y' } as VNode);
+
+    // Simulate a second render pass
+    resetWhenCounter();
+    const a2 = when(true, { tag: 'div', children: 'x' } as VNode);
+    const b2 = when(false, { tag: 'div', children: 'y' } as VNode);
+
+    expect(a1.key).toBe(a2.key);
+    expect(b1.key).toBe(b2.key);
   });
 });

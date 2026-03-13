@@ -1,7 +1,7 @@
 // Enhanced collection directives for better developer experience
 
 import type { VNode } from './runtime/types';
-import { when, anchorBlock } from './directives';
+import { when, anchorBlock, nextDirectiveIndex } from './directives';
 
 /**
  * Conditional rendering with negated condition (opposite of when)
@@ -86,25 +86,29 @@ export function switchOnLength<T>(
     exactly?: { [count: number]: (items: T[]) => VNode | VNode[] };
   },
 ): VNode {
+  const si = nextDirectiveIndex();
   const length = list?.length ?? 0;
 
   if (length === 0 && cases.empty) {
-    return anchorBlock(cases.empty, 'switch-length-empty');
+    return anchorBlock(cases.empty, `switch-length-${si}-empty`);
   }
 
   if (length === 1 && cases.one) {
-    return anchorBlock(cases.one(list[0]), 'switch-length-one');
+    return anchorBlock(cases.one(list[0]), `switch-length-${si}-one`);
   }
 
   if (cases.exactly?.[length]) {
-    return anchorBlock(cases.exactly[length](list), `switch-length-${length}`);
+    return anchorBlock(
+      cases.exactly[length](list),
+      `switch-length-${si}-${length}`,
+    );
   }
 
   if (length > 1 && cases.many) {
-    return anchorBlock(cases.many(list), 'switch-length-many');
+    return anchorBlock(cases.many(list), `switch-length-${si}-many`);
   }
 
-  return anchorBlock([], 'switch-length-fallback');
+  return anchorBlock([], `switch-length-${si}-fallback`);
 }
 
 /**
@@ -189,23 +193,28 @@ export function switchOnPromise<T, E = Error>(
     idle?: VNode | VNode[];
   },
 ): VNode {
+  const si = nextDirectiveIndex();
+
   if (promiseState.loading && cases.loading) {
-    return anchorBlock(cases.loading, 'promise-loading');
+    return anchorBlock(cases.loading, `promise-${si}-loading`);
   }
 
   if (promiseState.error && cases.error) {
-    return anchorBlock(cases.error(promiseState.error), 'promise-error');
+    return anchorBlock(cases.error(promiseState.error), `promise-${si}-error`);
   }
 
   if (promiseState.data !== undefined && cases.success) {
-    return anchorBlock(cases.success(promiseState.data), 'promise-success');
+    return anchorBlock(
+      cases.success(promiseState.data),
+      `promise-${si}-success`,
+    );
   }
 
   if (cases.idle) {
-    return anchorBlock(cases.idle, 'promise-idle');
+    return anchorBlock(cases.idle, `promise-${si}-idle`);
   }
 
-  return anchorBlock([], 'promise-fallback');
+  return anchorBlock([], `promise-${si}-fallback`);
 }
 
 /* --- Utility Directives --- */
@@ -329,10 +338,12 @@ export function responsiveSwitch(content: {
 }): VNode[] {
   const results: VNode[] = [];
 
+  const si = nextDirectiveIndex();
+
   // Handle light mode variants
   if (content.base) {
     // Base content (no media query)
-    results.push(anchorBlock(content.base, 'responsive-base'));
+    results.push(anchorBlock(content.base, `responsive-${si}-base`));
   }
 
   // Add responsive variants in order
@@ -381,13 +392,14 @@ export function switchOn<T>(value: T) {
     },
 
     done() {
+      const si = nextDirectiveIndex();
       for (let i = 0; i < branches.length; i++) {
         const { condition, content } = branches[i];
         if (condition(value)) {
-          return anchorBlock(content, `switch-case-${i}`);
+          return anchorBlock(content, `switch-on-${si}-case-${i}`);
         }
       }
-      return anchorBlock(otherwiseContent || [], 'switch-otherwise');
+      return anchorBlock(otherwiseContent || [], `switch-on-${si}-otherwise`);
     },
   };
 }

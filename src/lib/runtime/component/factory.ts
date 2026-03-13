@@ -7,6 +7,7 @@ import {
   beginDiscoveryRender,
   endDiscoveryRender,
 } from '../hooks';
+import { resetWhenCounter } from '../../directives';
 import { devError, devWarn } from '../logger';
 import { registry, initGlobalRegistryIfNeeded } from './registry';
 import { createElementClass } from './element-class';
@@ -180,6 +181,10 @@ export function component(
         });
         // Set current component context for hooks
         setCurrentComponentContext(context);
+
+        // Reset the when() call counter so sibling when() calls in the render
+        // function automatically receive unique, stable positional keys.
+        resetWhenCounter();
 
         // Call render function with no arguments - use useProps() hook for props access
         // If renderFn throws synchronously (for example due to eager interpolation
@@ -377,6 +382,7 @@ export function component(
       };
       setCurrentComponentContext(discoveryContext);
       beginDiscoveryRender();
+      resetWhenCounter();
       try {
         // Run with discovery flag active. The html`` tag and side-effectful
         // primitives will no-op; only useProps() actually registers metadata.
