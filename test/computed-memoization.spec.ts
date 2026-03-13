@@ -110,3 +110,78 @@ describe('🧮 computed() memoization', () => {
     expect(el.shadowRoot?.querySelector('span')?.textContent).toBe('8');
   });
 });
+
+describe('🧮 computed() fn() call efficiency', () => {
+  it('should not re-run fn() when accessing .value while the cache is fresh', () => {
+    const x = ref(1);
+    let fnCalls = 0;
+    const doubled = computed(() => {
+      fnCalls++;
+      return x.value * 2;
+    });
+
+    // First access — the initial setup already ran fn() once; accessing .value
+    // when not dirty must NOT run it again.
+    const v1 = doubled.value;
+    expect(v1).toBe(2);
+    const callsAfterFirstAccess = fnCalls;
+
+    // Second and third access — cache is still fresh, fn() must NOT run again
+    void doubled.value;
+    void doubled.value;
+    expect(fnCalls).toBe(callsAfterFirstAccess); // no extra calls
+  });
+
+  it('should re-run fn() exactly once when a dependency changes', () => {
+    const x = ref(3);
+    let fnCalls = 0;
+    const triple = computed(() => {
+      fnCalls++;
+      return x.value * 3;
+    });
+
+    // Access to establish initial cache
+    void triple.value;
+    const callsAfterInit = fnCalls;
+
+    // Change the dependency — marks computed dirty
+    x.value = 10;
+
+    // First access after dirty: should re-run fn() exactly once
+    const v = triple.value;
+    expect(v).toBe(30);
+    expect(fnCalls).toBe(callsAfterInit + 1);
+
+    // Subsequent accesses while cache is fresh: no extra fn() calls
+    void triple.value;
+    void triple.value;
+    expect(fnCalls).toBe(callsAfterInit + 1);
+  });
+
+  it('should propagate computed deps to the outer component context', async () => {
+    const x = ref(5);
+    const renders: number[] = [];
+
+    component('test-computed-propagate', () => {
+      const doubled = computed(() => x.value * 2);
+      renders.push(doubled.value); // access triggers dep propagation
+      return html`<span>${doubled.value}</span>`;
+    });
+
+    container.innerHTML = '<test-computed-propagate></test-computed-propagate>';
+    await new Promise((r) => setTimeout(r, 50));
+
+    const before = renders.length;
+    x.value = 20; // changing x should re-render the component
+    flushDOMUpdates();
+    await new Promise((r) => setTimeout(r, 50));
+
+    expect(renders.length).toBeGreaterThan(before);
+    const el = container.querySelector(
+      'test-computed-propagate',
+    ) as HTMLElement;
+    expect(el.shadowRoot?.querySelector('span')?.textContent?.trim()).toBe(
+      '40',
+    );
+  });
+});

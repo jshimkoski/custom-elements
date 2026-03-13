@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   Transition,
   TransitionGroup,
@@ -35,5 +35,58 @@ describe('transitions top-level API', () => {
     expect(meta).toBeDefined();
     // default moveClass should be present in options (internal handling)
     expect(meta.classes).toBeDefined();
+  });
+});
+
+describe('Transition() lazy factory content', () => {
+  it('calls the factory when show is true', () => {
+    const factory = vi.fn(() => [] as any);
+    Transition({ show: true }, factory);
+    expect(factory).toHaveBeenCalledOnce();
+  });
+
+  it('does NOT call the factory when show is false', () => {
+    const factory = vi.fn(() => [] as any);
+    Transition({ show: false }, factory);
+    expect(factory).not.toHaveBeenCalled();
+  });
+
+  it('transitions from visible to hidden without calling the factory', () => {
+    const factory = vi.fn(() => [] as any);
+
+    Transition({ show: true }, factory);
+    const callsWhenVisible = factory.mock.calls.length;
+
+    Transition({ show: false }, factory);
+    // factory must not be called again for the hide render
+    expect(factory.mock.calls.length).toBe(callsWhenVisible);
+  });
+
+  it('accepts factory output and attaches transition metadata', () => {
+    const content = [{ tag: 'div', props: {}, children: [] }] as any;
+    const factory = vi.fn(() => content);
+    const vnode = Transition({ preset: 'fade', show: true }, factory);
+    // @ts-expect-error access internal transition metadata
+    const meta = (vnode as any)._transition;
+    expect(meta).toBeDefined();
+    expect(meta.classes.enterFrom).toBe(transitionPresets.fade.enterFrom);
+  });
+
+  it('backward-compatible: plain VNode array still works when show is true', () => {
+    const content = [{ tag: 'div', props: {}, children: [] }] as any;
+    const vnode = Transition({ show: true }, content);
+    // @ts-expect-error access internal transition metadata
+    const meta = (vnode as any)._transition;
+    expect(meta).toBeDefined();
+    expect(meta.state).toBe('visible');
+  });
+
+  it('backward-compatible: plain VNode array still works when show is false', () => {
+    const content = [{ tag: 'div', props: {}, children: [] }] as any;
+    const vnode = Transition({ show: false }, content);
+    // @ts-expect-error access internal transition metadata
+    const meta = (vnode as any)._transition;
+    expect(meta).toBeDefined();
+    expect(meta.state).toBe('hidden');
   });
 });

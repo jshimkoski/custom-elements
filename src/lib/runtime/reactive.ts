@@ -186,6 +186,29 @@ class ReactiveSystem {
   }
 
   /**
+   * Re-register all reactive dependencies that `fromId` tracks into the
+   * currently-active (outer) component context.
+   *
+   * Used by `computed()` to forward its dep-set to the consuming component
+   * without re-executing the getter function a second time.
+   */
+  propagateDependencies(fromId: string): void {
+    if (this.trackingDisabled) return;
+    const current = this.currentComponentStack.length
+      ? this.currentComponentStack[this.currentComponentStack.length - 1]
+      : null;
+    if (!current || current === fromId) return;
+    const sourceData = this.componentData.get(fromId);
+    if (!sourceData) return;
+    const targetData = this.componentData.get(current);
+    if (!targetData) return;
+    for (const state of sourceData.dependencies) {
+      targetData.dependencies.add(state);
+      state.addDependent(current);
+    }
+  }
+
+  /**
    * Trigger updates for all components that depend on a state
    */
   triggerUpdate(state: ReactiveState<unknown>): void {
@@ -230,9 +253,12 @@ export { reactiveSystem };
  */
 export class ReactiveState<T> {
   private _value: T;
+  /** The unwrapped value last assigned — used for Object.is equality checks. */
+  private _rawValue: T;
   private dependents = new Set<string>();
 
   constructor(initialValue: T) {
+    this._rawValue = initialValue;
     this._value = this.makeReactive(initialValue);
     // Mark instances with a stable cross-bundle symbol so other modules
     // can reliably detect ReactiveState objects even when classes are
@@ -257,6 +283,12 @@ export class ReactiveState<T> {
   }
 
   set value(newValue: T) {
+    // Skip update entirely when the new value is identical to the current raw
+    // value. This prevents spurious triggerUpdate() calls and downstream
+    // re-renders when the same primitive or same object reference is re-assigned
+    // (e.g. setting viewYear.value = viewYear.value has zero cost).
+    if (Object.is(newValue, this._rawValue)) return;
+
     // Check for state modifications during render (potential infinite loop)
     if (reactiveSystem.isRenderingComponent()) {
       if (reactiveSystem.shouldEmitRenderWarning()) {
@@ -269,6 +301,7 @@ export class ReactiveState<T> {
       }
     }
 
+    this._rawValue = newValue;
     this._value = this.makeReactive(newValue);
     // Trigger updates for all dependent components
     reactiveSystem.triggerUpdate(this);
@@ -293,6 +326,7 @@ export class ReactiveState<T> {
    * @internal
    */
   initSilent(value: T): void {
+    this._rawValue = value;
     this._value = value;
   }
 
@@ -427,13 +461,10 @@ export function computed<T>(fn: () => T): { readonly value: T } {
         isDirty = false;
       }
 
-      // Run fn() once more in the CURRENT (calling) context so that whoever is
-      // consuming this computed — a component or an outer computed — directly tracks
-      // the same reactive dependencies. This preserves the original synchronous
-      // notification behaviour: when any dep changes, the consumer is notified
-      // directly without going through an async microtask cascade.
-      // The result of this call is discarded; we return the cached value above.
-      fn();
+      // Forward the computed's tracked dependencies into the calling context so
+      // that the outer component (or outer computed) is notified directly when any
+      // dep changes — without re-executing fn() a second time.
+      reactiveSystem.propagateDependencies(computedId);
 
       return cachedValue;
     },

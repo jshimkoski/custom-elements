@@ -231,11 +231,15 @@ export const transitionPresets = {
  *   onAfterEnter: (el) => console.log('Entered!'),
  *   onAfterLeave: (el) => console.log('Left!')
  * }, html`<div>Content</div>`)}
+ *
+ * // Lazy factory — only evaluated when show is true (avoids constructing
+ * // expensive VNode trees when the content is hidden)
+ * ${Transition({ show: isVisible.value }, () => html`<div>Expensive content</div>`)}
  * ```
  */
 export function Transition(
   options: TransitionOptions,
-  content: VNode | VNode[],
+  content: VNode | VNode[] | (() => VNode | VNode[]),
 ): VNode {
   const {
     preset,
@@ -283,10 +287,22 @@ export function Transition(
     };
   }
 
+  // Resolve content: only call the factory when show is true so that expensive
+  // VNode trees (e.g. those that trigger calender builds or heavy computeds)
+  // are never constructed while the transition is hidden. Leave animations
+  // operate on existing DOM nodes and do not require the content VNode.
+  const resolvedContent: VNode | VNode[] =
+    show && typeof content === 'function'
+      ? content()
+      : (content as VNode | VNode[]);
+
   // Create anchor block with transition metadata
   const transitionKey =
     name || (preset ? `transition-${preset}` : 'transition');
-  const transitionVNode = anchorBlock(show ? content : [], transitionKey);
+  const transitionVNode = anchorBlock(
+    show ? resolvedContent : [],
+    transitionKey,
+  );
 
   // Attach metadata for VDOM to consume during patching
   (transitionVNode as VNode & { _transition?: unknown })._transition = {
