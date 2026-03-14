@@ -234,4 +234,7 @@ export const activeRouterProxy: Router = {
       ? activeRouter.scrollToFragment(frag)
       : Promise.resolve(false);
   },
+  destroy() {
+    if (activeRouter) activeRouter.destroy();
+  },
 };

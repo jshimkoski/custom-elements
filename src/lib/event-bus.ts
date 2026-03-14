@@ -21,7 +21,7 @@ export class GlobalEventBus extends EventTarget {
   private static instance: GlobalEventBus;
   private eventCounters: Map<string, { count: number; window: number }> =
     new Map();
-  private nativeUnsubscribers: Array<() => void> = [];
+  private nativeUnsubscribers: Map<() => void, true> = new Map();
   private readonly MAX_EVENT_COUNTERS = 1000;
 
   /**
@@ -145,10 +145,9 @@ export class GlobalEventBus extends EventTarget {
     // preventing indefinite accumulation in long-lived apps.
     const unsubscribe: () => void = () => {
       this.removeEventListener(eventName, handler as EventListener);
-      const idx = this.nativeUnsubscribers.indexOf(unsubscribe);
-      if (idx !== -1) this.nativeUnsubscribers.splice(idx, 1);
+      this.nativeUnsubscribers.delete(unsubscribe);
     };
-    this.nativeUnsubscribers.push(unsubscribe);
+    this.nativeUnsubscribers.set(unsubscribe, true);
     return unsubscribe;
   }
 
@@ -201,10 +200,11 @@ export class GlobalEventBus extends EventTarget {
    */
   clear(): void {
     this.handlers = {};
-    for (const unsubscribe of this.nativeUnsubscribers) {
+    const toCleanup = Array.from(this.nativeUnsubscribers.keys());
+    this.nativeUnsubscribers.clear();
+    for (const unsubscribe of toCleanup) {
       unsubscribe();
     }
-    this.nativeUnsubscribers = [];
   }
 
   /**

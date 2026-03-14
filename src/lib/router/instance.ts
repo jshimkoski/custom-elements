@@ -67,6 +67,7 @@ export function useRouter(config: RouterConfig): Router {
   let push: (path: string) => Promise<void>;
   let replaceFn: (path: string) => Promise<void>;
   let back: () => void;
+  let destroyFn: () => void = () => {};
 
   // Track redirects to prevent infinite loops
   const redirectTracker = new Set<string>();
@@ -557,6 +558,7 @@ export function useRouter(config: RouterConfig): Router {
 
     const handlePopState = () => update(true);
     window.addEventListener('popstate', handlePopState);
+    destroyFn = () => window.removeEventListener('popstate', handlePopState);
 
     push = (path: string) => navigate(path, false);
     replaceFn = (path: string) => navigate(path, true);
@@ -687,6 +689,7 @@ export function useRouter(config: RouterConfig): Router {
 
   const router: Router = {
     _cleanupScrollState: cleanupScrollState,
+    destroy: destroyFn,
     store,
     push,
     replace: replaceFn,
@@ -727,9 +730,14 @@ export function initRouter(config: RouterConfig): Router {
 
   const router = useRouter(config);
 
-  // Clean up scroll state from any previous router instance
+  // Clean up previous router instance to prevent listener accumulation
   const prevRouter = getActiveRouter();
   if (prevRouter) {
+    try {
+      prevRouter.destroy();
+    } catch {
+      // Ignore cleanup errors - function may not exist in older instances
+    }
     try {
       prevRouter._cleanupScrollState?.();
     } catch {

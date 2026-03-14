@@ -146,6 +146,8 @@ export interface Router {
   base: string;
   /** Scroll to a fragment/hash element */
   scrollToFragment: (frag?: string) => Promise<boolean>;
+  /** Destroy the router instance, removing event listeners. Call before reinitializing. */
+  destroy: () => void;
   /** Internal scroll state cleanup (optional) */
   _cleanupScrollState?: () => void;
 }
