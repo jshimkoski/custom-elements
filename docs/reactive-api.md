@@ -53,7 +53,7 @@ user.value = { name: 'Alice' }; // later assign a value
 ### Notes
 
 - `ref` works with any value: primitives, objects, arrays, or `null`.
-- For objects and arrays, `ref` wraps the value in a shallow reactive Proxy so property mutations on the value also trigger updates.
+- For objects and arrays, `ref` wraps the value in a **deep** reactive Proxy — nested objects are wrapped recursively — so mutations at any depth (e.g. `user.value.address.city = 'LA'`) also trigger reactive updates.
 - **Do not destructure** `ref.value` into a plain variable — the plain variable won't be reactive. Instead, always read `.value` inside the render function or a `computed`.
 - `ref` called outside a component's render return is still reactive and can be shared across components (like a micro-store).
 
@@ -397,3 +397,93 @@ function useDoubled(
 
 - This function is a TypeScript type-guard — the compiler narrows the type to `ReactiveState<unknown>` inside the `if` branch.
 - Detection uses a global symbol (`Symbol.for('@cer/ReactiveState')`) that is resilient across multiple bundle copies, minifiers, and different JS realms.
+
+---
+
+## Watcher Lifecycle and Manual Cleanup
+
+Watchers and effects created with `watch()` and `watchEffect()` return **stop functions**. You are responsible for calling the stop function when the watcher is no longer needed, to prevent memory leaks and stale updates.
+
+### Inside Components
+
+The recommended pattern is to register the stop function with `useOnDisconnected()` so it is cancelled automatically when the component is removed from the DOM:
+
+```typescript
+component('search-box', () => {
+  const query = ref('');
+
+  const stop = watch(query, (newVal) => {
+    console.log('Query:', newVal);
+  });
+
+  // Cancel the watcher when the component disconnects
+  useOnDisconnected(stop);
+
+  return html`<input :value="${query.value}" @input="${(e: Event) =>
+    (query.value = (e.target as HTMLInputElement).value)}" />`;
+});
+```
+
+### Outside Components (Module-Level Watchers)
+
+When you create watchers at module scope (e.g., for a shared store), call the stop function explicitly when the store is no longer needed, or use `reactiveSystem.cleanup(componentId)` to remove all reactive subscriptions for a given component ID:
+
+```typescript
+import { ref, watch } from '@jasonshimmy/custom-elements-runtime';
+
+// Module-level reactive state shared across components
+const theme = ref<'light' | 'dark'>('light');
+
+// Store the stop function and call it to cancel
+const stopThemeWatcher = watch(theme, (newTheme) => {
+  document.documentElement.setAttribute('data-theme', newTheme);
+}, { immediate: true });
+
+// Later, when tearing down:
+stopThemeWatcher();
+```
+
+### `reactiveSystem.cleanup(componentId)`
+
+The `reactiveSystem` object exposes a `cleanup(componentId: string)` method that removes all reactive dependency records for the given component. This is called automatically by the runtime on `disconnectedCallback` for every component rendered via `component()`. You only need to call it manually if you are building low-level integrations outside the standard component lifecycle.
+
+---
+
+## `useOnConnected` Fires Once Per Instance Lifetime
+
+> **Important:** `useOnConnected` fires **exactly once** per component instance — on the first DOM insertion. It does **not** re-fire if a component is removed from the DOM and re-inserted. This differs from the native Web Component `connectedCallback`, which fires on every insertion.
+
+This means:
+
+- Watchers and subscriptions set up inside `useOnConnected` are cancelled by `useOnDisconnected` when the component leaves the DOM.
+- If the component is later re-inserted, those subscriptions are **not** automatically re-established, because `useOnConnected` won't run again.
+
+### Pattern: Store Subscriptions That Survive Reconnect
+
+When subscribing to a `createStore()` store, set up the subscription inside the render function body (not inside `useOnConnected`) and clean it up in `useOnDisconnected`. Because the render function re-runs on each attribute change and re-render, subscriptions set up this way will be re-registered when the component reconnects.
+
+The simplest pattern is to subscribe unconditionally in the render function body and always clean up:
+
+```typescript
+import { createStore } from '@jasonshimmy/custom-elements-runtime/store';
+import { component, html, ref, useOnDisconnected } from '@jasonshimmy/custom-elements-runtime';
+
+const counterStore = createStore({ count: 0 });
+
+component('store-consumer', () => {
+  const count = ref(counterStore.getState().count);
+
+  // Subscribe here — outside useOnConnected — so re-renders (including
+  // those triggered by reconnection) always have an active subscription.
+  const unsubscribe = counterStore.subscribe((state) => {
+    count.value = state.count;
+  });
+
+  // Always clean up on disconnect.
+  useOnDisconnected(unsubscribe);
+
+  return html`<p>Count: ${count.value}</p>`;
+});
+```
+
+> **Note:** `store.subscribe()` calls the listener immediately with the current state. This is by design — it ensures the component always starts with up-to-date data without needing a separate initial read.

@@ -51,8 +51,8 @@ export interface Route {
   /** Guard that runs right before navigation commits — can cancel or redirect */
   onEnter?: (to: RouteState, from: RouteState) => GuardResult;
 
-  /** Hook that runs after navigation completes — cannot cancel */
-  afterEnter?: (to: RouteState, from: RouteState) => void;
+  /** Hook that runs after navigation completes — cannot cancel. May return a Promise. */
+  afterEnter?: (to: RouteState, from: RouteState) => void | Promise<void>;
 }
 
 /**

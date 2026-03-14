@@ -1653,4 +1653,14 @@ All of the following are exported from `@jasonshimmy/custom-elements-runtime/jit
 - `JITCSSOptions` — Options for `useJITCSS()` / `enableJITCSS()` / `createDOMJITCSS()` / `cerJITCSS()`
 - `DesignTokens` — Token keys accepted by `useDesignTokens()`
 
+---
+
+## Known Limitations
+
+- **No arbitrary value syntax for all properties.** Classes like `w-[42px]` or `mt-[1.5rem]` are supported for spacing and a subset of layout properties, but not every CSS property has arbitrary-value support. If you need a value not covered by a static utility, use `useStyle()` with the `css` tag instead.
+- **CSS is regenerated on every render.** The JIT engine scans the rendered HTML for class names and rebuilds the component's stylesheet on each render pass. There is no render-to-render diffing of generated CSS rules. For components that re-render frequently with a large, stable set of classes, the overhead is minimal in practice (the generated CSS string is the same and browser style application is idempotent), but it is not zero. If this is a bottleneck, measure with `updateHealthMetric('averageRenderTime', …)` and consider moving stable base styles to `useStyle()`.
+- **No design-time Intellisense.** Because classes are resolved at runtime from string literals, editor autocomplete for class names (like Tailwind's VS Code extension) does not work out of the box. Use the `cls()` helper or configure your editor's Tailwind plugin to scan the relevant file patterns.
+- **Shadow DOM isolation applies.** JIT CSS rules are injected into each component's shadow root, not into the global document stylesheet. Classes set on elements outside the shadow root (e.g., on the host element itself via `:host`) must be handled with `useDesignTokens()` or explicit `:host` rules in `useStyle()`.
+- **`dark:` variant requires a `prefers-color-scheme` media query.** The JIT engine's `dark:` variant is implemented via `@media (prefers-color-scheme: dark)`. Class-based dark mode toggling (e.g., `document.documentElement.classList.add('dark')`) is not supported out of the box.
+
 For complete implementation details, see [`src/lib/runtime/style.ts`](../src/lib/runtime/style.ts).

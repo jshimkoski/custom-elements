@@ -142,11 +142,16 @@ export function useRouter(config: RouterConfig): Router {
     }
   };
 
-  const runAfterEnter = (to: RouteState, from: RouteState) => {
+  const runAfterEnter = (to: RouteState, from: RouteState): void => {
     const matched = findMatchedRoute(routes, to.path);
     if (!matched || !matched.afterEnter) return;
     try {
-      matched.afterEnter(to, from);
+      const result: void | Promise<void> = matched.afterEnter(to, from);
+      if (result instanceof Promise) {
+        result.catch((err: unknown) => {
+          devError('afterEnter async error', err);
+        });
+      }
     } catch (err) {
       devError('afterEnter error', err);
     }
@@ -238,12 +243,16 @@ export function useRouter(config: RouterConfig): Router {
     return new Promise<boolean>((resolve) => {
       let resolved = false;
       let timeoutId: number | null = null;
+      let rafHandle: number | null = null;
       const startTime = Date.now();
 
       const safeResolve = (value: boolean) => {
         if (resolved) return;
         resolved = true;
         if (timeoutId) clearTimeout(timeoutId);
+        // Cancel any pending rAF so orphaned retry loops don't keep firing
+        // after the promise has already resolved (e.g. on rapid navigation).
+        if (rafHandle !== null) cancelAnimationFrame(rafHandle);
         resolve(value);
       };
 
@@ -270,17 +279,15 @@ export function useRouter(config: RouterConfig): Router {
                 return safeResolve(true);
               }
 
-              // Try again after a short delay
-              requestAnimationFrame(retryScroll);
+              rafHandle = requestAnimationFrame(retryScroll);
             } catch (error) {
               devWarn('Scroll retry attempt failed:', error);
-              // Continue retrying even if one attempt fails
-              requestAnimationFrame(retryScroll);
+              rafHandle = requestAnimationFrame(retryScroll);
             }
           };
 
           // Start retry loop after initial attempt
-          requestAnimationFrame(retryScroll);
+          rafHandle = requestAnimationFrame(retryScroll);
         } catch (error) {
           devWarn('Initial scroll attempt failed:', error);
           safeResolve(false);

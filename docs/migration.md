@@ -1,6 +1,6 @@
 # Migration & Upgrade Guide
 
-> What changed in v3.0 and how to adopt the new features
+> Migrating from **v2.x → v3.x**
 
 ---
 

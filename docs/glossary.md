@@ -179,6 +179,10 @@ A single-purpose CSS class that applies one specific style rule (e.g., `p-4` for
 
 An in-memory description of a DOM element or text node. The runtime builds a tree of VNodes from `html` template output, then diffs the new tree against the previous one to calculate the minimal set of real DOM mutations needed (virtual DOM reconciliation).
 
+### VNodePropBag
+
+The internal object attached to a VNode's `props` field. It carries attributes (`attrs`), directives, event listeners, reactive refs, and component prop values in a single flat record. You may see `VNodePropBag` referenced in runtime error messages when a prop or binding is malformed — it indicates the issue originates from the props object passed to that VNode rather than the element tag or children.
+
 ### VDOM (Virtual DOM)
 
 The in-memory representation of the UI as a tree of VNodes, maintained by the runtime. On each render, the new VDOM tree is diffed against the previous tree and only the changed parts of the real DOM are updated.

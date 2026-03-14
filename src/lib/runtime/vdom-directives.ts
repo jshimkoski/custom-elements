@@ -331,14 +331,35 @@ export function processModelDirective(
           !String(k).startsWith('_') &&
           k !== 'constructor',
       );
+      // Build the set of nested event names for the current object shape,
+      // then remove any stale nested update listeners whose keys are gone.
+      const newNestedKebabKeys = new Set(
+        (userKeys as string[]).map((k) => `update:${toKebab(k)}`),
+      );
+      for (const existingKey of Object.keys(listeners)) {
+        if (
+          existingKey.startsWith('update:') &&
+          existingKey !== eventNameKebab &&
+          existingKey !== eventNameCamel &&
+          !newNestedKebabKeys.has(existingKey)
+        ) {
+          if (el) EventManager.removeListener(el, existingKey, listeners[existingKey]);
+          delete listeners[existingKey];
+        }
+      }
+
       // preparing nested listeners
       for (const nestedKey of userKeys) {
         const nestedKeyStr = String(nestedKey);
         const nestedKebab = `update:${toKebab(nestedKeyStr)}`;
         const nestedCamel = `update:${nestedKeyStr}`;
         // Avoid overwriting the primary handler for the main prop
-        // and avoid registering internal keys
-        if (listeners[nestedKebab]) continue;
+        if (nestedKebab === eventNameKebab) continue;
+        // Remove existing handler before replacing so EventManager stays in sync
+        if (listeners[nestedKebab] && el) {
+          EventManager.removeListener(el, nestedKebab, listeners[nestedKebab]);
+          delete listeners[nestedKebab];
+        }
         listeners[nestedKebab] = (event: Event) => {
           const newVal =
             (event as CustomEvent).detail !== undefined
@@ -946,22 +967,8 @@ export function processDirectives(
       }
       // If it's NOT reactive/wrapper, prefer attrs to avoid accidental truthiness
       if (!isWrapper && !isReactiveVal) {
-        try {
-          attrs['disabled'] = candidate;
-          delete props['disabled'];
-          const w = globalThis as VDomGlobal;
-          if (!w.__VDOM_DISABLED_PROMOTIONS) w.__VDOM_DISABLED_PROMOTIONS = [];
-          (w.__VDOM_DISABLED_PROMOTIONS as unknown[]).push({
-            phase: 'bind-directive:postfix-move',
-            location: 'attrs',
-            key: 'disabled',
-            value: candidate,
-            time: Date.now(),
-            stack: new Error().stack,
-          });
-        } catch {
-          // ignore
-        }
+        attrs['disabled'] = candidate;
+        delete props['disabled'];
       }
     }
   } catch {

@@ -35,12 +35,24 @@ export function minifyCSS(input: string): string {
 }
 
 /**
- * Sanitize CSS to prevent injection attacks (XSS, javascript: URLs, expression())
+ * Sanitize CSS to prevent injection attacks (XSS, javascript: URLs, expression(), etc.)
  */
 export function sanitizeCSS(input: string): string {
   return input
+    // Remove @charset rules (can alter encoding interpretation in some parsers)
+    .replace(/@charset\s+[^;]*;/gi, '')
+    // Remove javascript: URL references inside url()
     .replace(/url\s*\(\s*['"]?javascript:[^)]*\)/gi, '')
+    // Remove data: URI references inside url() (can embed scripts/SVGs)
+    .replace(/url\s*\(\s*['"]?data:[^)]*\)/gi, '')
+    // Remove @import rules (can load external malicious stylesheets)
+    .replace(/@import\s[^;{]*/gi, '')
+    // Remove IE-era -moz-binding and behavior properties
+    .replace(/-moz-binding\s*:[^;]*/gi, '')
+    .replace(/\bbehavior\s*:[^;]*/gi, '')
+    // Remove <script> tags that may be injected alongside CSS
     .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
+    // Remove IE expression() calls
     .replace(/expression\s*\([^)]*\)/gi, '');
 }
 

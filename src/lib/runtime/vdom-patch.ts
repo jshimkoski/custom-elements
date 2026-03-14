@@ -141,6 +141,8 @@ export function assignKeysDeep(
 ): VNode | VNode[] {
   if (Array.isArray(nodeOrNodes)) {
     const usedKeys = new Set<string>();
+    // Per-base-key counters so uniqueness search is O(1) instead of O(n).
+    const keyCounters = new Map<string, number>();
 
     return nodeOrNodes.map((child) => {
       if (!child || typeof child !== 'object') return child;
@@ -173,12 +175,14 @@ export function assignKeysDeep(
           : `${baseKey}:${tagPart}`;
       }
 
-      // Ensure uniqueness among siblings
-      let uniqueKey = key;
-      let counter = 1;
-      while (usedKeys.has(uniqueKey)) {
-        uniqueKey = `${key}#${counter++}`;
+      // Ensure uniqueness among siblings using a per-base-key counter (O(1)).
+      let uniqueKey = key as string;
+      if (usedKeys.has(uniqueKey)) {
+        const next = (keyCounters.get(uniqueKey) ?? 1) + 1;
+        keyCounters.set(uniqueKey, next);
+        uniqueKey = `${key}#${next}`;
       }
+      keyCounters.set(key as string, (keyCounters.get(key as string) ?? 0) + 1);
       usedKeys.add(uniqueKey);
 
       // Recurse into children with this node's unique key
@@ -258,7 +262,11 @@ export function patchProps(
     newProps?.isCustomElement ?? oldProps?.isCustomElement ?? false,
   );
   let anyChange = false;
-  for (const key in { ...oldPropProps, ...newPropProps }) {
+  // Collect keys from both old and new without allocating a merged object.
+  const visitedPropKeys = new Set<string>();
+  for (const k in oldPropProps) visitedPropKeys.add(k);
+  for (const k in newPropProps) visitedPropKeys.add(k);
+  for (const key of visitedPropKeys) {
     const oldVal = oldPropProps[key];
     const newVal = newPropProps[key];
 
@@ -430,18 +438,6 @@ export function patchProps(
     processedDirectives.listeners || {},
   )) {
     EventManager.addListener(el, eventType, listener as EventListener);
-    try {
-      const parentEl = el && (el.parentElement as HTMLElement | null);
-      if (parentEl && parentEl !== el) {
-        EventManager.addListener(
-          parentEl,
-          eventType,
-          listener as EventListener,
-        );
-      }
-    } catch {
-      void 0;
-    }
   }
 
   // Use a copy of oldProps.attrs as the authoritative prior-state for

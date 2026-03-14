@@ -5,7 +5,7 @@
 
 import { isReactiveState } from './reactive';
 import { toKebab } from './helpers';
-import { devWarn } from './logger';
+import { devWarn, devError } from './logger';
 import { isDiscoveryRender as _isDiscoveryRenderFn } from './discovery-state';
 import { sanitizeCSS, minifyCSS } from './css-utils';
 import type { JITCSSOptions } from './style';
@@ -143,7 +143,7 @@ function ensureHookCallbacks(context: Record<string, unknown>): void {
       value: {},
       writable: true,
       enumerable: false,
-      configurable: false,
+      configurable: true,
     });
   }
 }
@@ -266,13 +266,14 @@ export function useOnError(callback: (error: Error) => void): void {
   ensureHookCallbacks(currentComponentContext as InternalComponentContext);
   const hooks = currentComponentContext._hookCallbacks as InternalHookCallbacks;
   if (!hooks.onError) hooks.onError = [];
-  // Wrap to normalize to Error and swallow re-throws.
+  // Wrap to normalize to Error. If the user's handler itself throws, log it in
+  // dev mode so it doesn't vanish silently — the original error is already handled.
   hooks.onError.push((err: unknown) => {
     try {
       if (err instanceof Error) callback(err);
       else callback(new Error(String(err)));
-    } catch {
-      /* swallow */
+    } catch (handlerErr) {
+      devError('[useOnError] The error handler itself threw an exception:', handlerErr);
     }
   });
 }
@@ -494,13 +495,11 @@ export function useProps<T extends Record<string, unknown>>(defaults: T): T {
                 return (hostValue as { value: unknown }).value;
               }
 
-              // Primitive on host - return directly (but coerce strings if default provided)
+              // Primitive on host - return directly (but coerce strings if default provided).
+              // Use the same rule as the attribute path: empty string (standalone attribute
+              // presence) or the literal string 'true' coerce to true; everything else is false.
               if (typeof def === 'boolean' && typeof hostValue === 'string') {
-                // For boolean attributes, only explicit 'true' string or non-empty presence means true
-                return (
-                  hostValue === 'true' ||
-                  (hostValue !== '' && hostValue !== 'false')
-                );
+                return hostValue === '' || hostValue === 'true';
               }
               if (
                 typeof def === 'number' &&
@@ -860,7 +859,13 @@ export function inject<T>(
       let node: Node | null = host.parentNode as Node | null;
       if (!node) node = host.getRootNode() as Node | null;
 
-      while (node) {
+      // Depth counter prevents infinite loops in detached subtrees where
+      // getRootNode() may return a subtree root instead of `document`.
+      let depth = 0;
+      const MAX_DEPTH = 50;
+
+      while (node && depth < MAX_DEPTH) {
+        depth++;
         if (node instanceof ShadowRoot) {
           const shadowHost = node.host;
           const hostCtx = (
@@ -1049,6 +1054,22 @@ export function useSlots(): {
 
   const host = (currentComponentContext as { _host?: HTMLElement })._host;
 
+  // Single-pass collection: group children by slot name once, reuse for all methods.
+  const getSlotMap = (): Map<string, Element[]> => {
+    const map = new Map<string, Element[]>();
+    if (!host) return map;
+    for (const child of host.children) {
+      const key = child.getAttribute('slot') ?? 'default';
+      const bucket = map.get(key);
+      if (bucket) {
+        bucket.push(child);
+      } else {
+        map.set(key, [child]);
+      }
+    }
+    return map;
+  };
+
   return {
     /**
      * Returns true if the named slot (or the default slot when name is
@@ -1056,12 +1077,9 @@ export function useSlots(): {
      */
     has(name?: string): boolean {
       if (!host) return false;
-      if (!name || name === 'default') {
-        return Array.from(host.children).some((el) => !el.hasAttribute('slot'));
-      }
-      return Array.from(host.children).some(
-        (el) => el.getAttribute('slot') === name,
-      );
+      const slotName = !name || name === 'default' ? 'default' : name;
+      const bucket = getSlotMap().get(slotName);
+      return bucket !== undefined && bucket.length > 0;
     },
     /**
      * Returns all child elements assigned to the named slot (or the default
@@ -1069,24 +1087,13 @@ export function useSlots(): {
      */
     getNodes(name?: string): Element[] {
       if (!host) return [];
-      if (!name || name === 'default') {
-        return Array.from(host.children).filter(
-          (el) => !el.hasAttribute('slot'),
-        );
-      }
-      return Array.from(host.children).filter(
-        (el) => el.getAttribute('slot') === name,
-      );
+      const slotName = !name || name === 'default' ? 'default' : name;
+      return getSlotMap().get(slotName) ?? [];
     },
     /** Returns the names of all slots that have content, including 'default'. */
     names(): string[] {
       if (!host) return [];
-      const slotNames = new Set<string>();
-      for (const child of Array.from(host.children)) {
-        const slotAttr = child.getAttribute('slot');
-        slotNames.add(slotAttr ?? 'default');
-      }
-      return Array.from(slotNames);
+      return Array.from(getSlotMap().keys());
     },
   };
 }

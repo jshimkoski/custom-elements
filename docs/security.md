@@ -94,7 +94,7 @@ component('themed-box', () => {
 
 Template attribute expressions (e.g., `:disabled="${isDisabled}"`) are evaluated by an internal secure evaluator, not by `eval` or `new Function`. The evaluator:
 
-- **Blocks dangerous identifiers**: `eval`, `Function`, `constructor`, `prototype`, `__proto__`, `globalThis`, `window`, `document`, `fetch`, `XMLHttpRequest`, and others
+- **Blocks dangerous substrings**: Rejects any expression whose text contains a dangerous keyword — `eval`, `Function`, `constructor`, `prototype`, `__proto__`, `window`, `document`, `fetch`, `XMLHttpRequest`, and others. Matching is **substring-based**, not identifier-based, so an expression referencing a variable whose name happens to contain one of these strings (e.g. `constructorArgs`, `fetchResult`) will also be blocked. Rename such variables if you encounter this in practice.
 - **Caps expression length** at 1,000 characters to limit denial-of-service via complex expressions
 - **Caches compiled expressions** via an LRU cache to avoid re-parsing on every render
 
@@ -151,7 +151,7 @@ For light-DOM contexts using `createDOMJITCSS()` with a `<style>` element fallba
 | `html` template interpolation | Yes | All values are escaped |
 | `unsafeHTML()` | No | Only use with trusted / sanitized content |
 | `css` template tag | Partially | `sanitizeCSS` strips common vectors; apply dedicated sanitizer for user CSS |
-| Secure expression evaluator | Yes | Blocks `eval` and dangerous globals |
+| Secure expression evaluator | Yes | Blocks expressions containing dangerous substrings (`eval`, `window`, etc.) — see note above |
 | `decodeEntities` | Yes | Decodes text — do not pipe to `unsafeHTML` |
 | Event handlers | Yes | Standard browser security rules apply |
 | CSP `unsafe-eval` | Not required | Runtime never uses `eval` |

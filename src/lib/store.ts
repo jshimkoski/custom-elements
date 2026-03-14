@@ -37,7 +37,10 @@ export function createStore<T extends object>(initial: T): Store<T> {
   }
 
   function notify() {
-    for (const fn of listeners) fn(state);
+    // Snapshot the listeners array before iterating so that a listener calling
+    // setState() (re-entrant notify) cannot corrupt the current iteration.
+    const snapshot = listeners.slice();
+    for (const fn of snapshot) fn(state);
   }
 
   return { subscribe, getState, setState };

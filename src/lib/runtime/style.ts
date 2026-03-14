@@ -18,6 +18,30 @@ import { _registerRenderBridge } from './render-bridge';
 let proseSheet: CSSStyleSheet | null = null;
 const detectedProseSizes = new Set<string>();
 let proseCSSCache = ''; // Cache the actual CSS text for environments where cssRules doesn't work
+// Track the set of sizes that were used to build the current proseCSSCache so
+// we only regenerate when the set actually changes.
+let proseSizesSnapshot = '';
+
+function buildProseCSS(): void {
+  const snapshot = Array.from(detectedProseSizes).sort().join(',');
+  if (snapshot === proseSizesSnapshot) return; // nothing changed
+  proseSizesSnapshot = snapshot;
+
+  let combinedProseCSS = '';
+  for (const size of detectedProseSizes) {
+    const css = generateProseCSS(size);
+    if (css) combinedProseCSS += css;
+  }
+  proseCSSCache = minifyCSS(combinedProseCSS);
+
+  if (proseSheet && typeof proseSheet.replaceSync === 'function' && combinedProseCSS) {
+    try {
+      proseSheet.replaceSync(proseCSSCache);
+    } catch {
+      // Ignore errors in environments that don't support replaceSync
+    }
+  }
+}
 
 export function getProseSheet(): CSSStyleSheet | null {
   if (detectedProseSizes.size === 0) return null;
@@ -36,29 +60,11 @@ export function getProseSheet(): CSSStyleSheet | null {
       (proseSheet as { toString?: () => string }).toString = () =>
         proseCSSCache;
     }
+    // Force a build now that the sheet exists
+    proseSizesSnapshot = '';
   }
 
-  // Regenerate prose CSS for all detected sizes
-  let combinedProseCSS = '';
-  for (const size of detectedProseSizes) {
-    // Import happens at top of file - tree-shaken if prose never used
-    const css = generateProseCSS(size);
-    if (css) {
-      combinedProseCSS += css;
-    }
-  }
-
-  // Cache the CSS text
-  proseCSSCache = minifyCSS(combinedProseCSS);
-
-  if (typeof proseSheet.replaceSync === 'function' && combinedProseCSS) {
-    try {
-      proseSheet.replaceSync(proseCSSCache);
-    } catch {
-      // Ignore errors in environments that don't support replaceSync
-    }
-  }
-
+  buildProseCSS();
   return proseSheet;
 }
 
@@ -69,7 +75,7 @@ export function registerProseSize(size: string): void {
   // If new size detected, regenerate prose sheet (if it exists)
   // Note: If proseSheet is null, it will be generated fresh when getProseSheet() is called
   if (sizesChanged && proseSheet) {
-    getProseSheet();
+    buildProseCSS();
   }
 }
 

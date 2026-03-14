@@ -12,6 +12,25 @@ import { devError, devWarn } from '../logger';
 import { registry, initGlobalRegistryIfNeeded } from './registry';
 import { createElementClass } from './element-class';
 
+/** Shape of the internal component context object used during rendering. */
+type InternalContext = Record<string, unknown> & {
+  _componentId?: string;
+  _hookCallbacks?: Record<string, unknown> & {
+    onConnected?: Array<() => void>;
+    onDisconnected?: Array<() => void>;
+    onAttributeChanged?: Array<
+      (
+        name: string,
+        oldValue: string | null,
+        newValue: string | null,
+      ) => void
+    >;
+    onError?: Array<(err: unknown) => void>;
+    style?: (el: HTMLElement) => void;
+    props?: Record<string, unknown>;
+  };
+};
+
 /**
  * Invoke a lifecycle callback array, logging any errors in dev mode.
  * Errors are caught so one failing callback does not block the others.
@@ -157,23 +176,6 @@ export function component(
     render: (context) => {
       // Track dependencies for rendering
       // Use stable component ID from context if available, otherwise generate new one
-      type InternalContext = Record<string, unknown> & {
-        _componentId?: string;
-        _hookCallbacks?: Record<string, unknown> & {
-          onConnected?: Array<() => void>;
-          onDisconnected?: Array<() => void>;
-          onAttributeChanged?: Array<
-            (
-              name: string,
-              oldValue: string | null,
-              newValue: string | null,
-            ) => void
-          >;
-          onError?: Array<(err: unknown) => void>;
-          style?: (el: HTMLElement) => void;
-          props?: Record<string, unknown>;
-        };
-      };
 
       const ictx = context as InternalContext;
       const componentId =
@@ -327,8 +329,11 @@ export function component(
           // `useStyle()` stores a computed style string directly on the
           // current context as `_computedStyle`. The runtime reads
           // `_computedStyle` in `applyStyle`.
-          // If useProps() was called, update config.props with the defaults
-          if (hookCallbacks.props) {
+          // If useProps() was called, update config.props with the defaults.
+          // Only update props if not already set (idempotent after discovery render)
+          // so that subsequent re-renders don't overwrite with a fresh object,
+          // avoiding ordering-sensitive behaviour across multiple instances.
+          if (hookCallbacks.props && !Object.keys(config.props ?? {}).length) {
             const propsDefaults = hookCallbacks.props as Record<
               string,
               unknown
@@ -431,12 +436,13 @@ export function component(
         } catch {
           /* best-effort */
         }
+        throw err;
+      } finally {
+        // Always restore state regardless of success or failure so that
+        // isDiscoveryRender() never stays permanently true after an error.
         endDiscoveryRender();
         clearCurrentComponentContext();
-        throw err;
       }
-      endDiscoveryRender();
-      clearCurrentComponentContext();
 
       if (discoveryContext._hookCallbacks?.props) {
         const propsDefaults = discoveryContext._hookCallbacks.props;

@@ -4,7 +4,7 @@ import type {
   Refs,
   WatcherState,
 } from '../types';
-import { isReactiveState } from '../reactive';
+import { isReactiveState, reactiveSystem } from '../reactive';
 import { toKebab, safe } from '../helpers';
 import { initWatchers, triggerWatchers } from '../watchers';
 import { applyProps } from '../props';
@@ -65,6 +65,13 @@ export function createElementClass<
      */
     public get lastHtmlStringForJitCSS(): string {
       return this._lastHtmlStringForJitCSS;
+    }
+
+    /**
+     * Returns true if the most recent render or lifecycle call threw an error.
+     */
+    public get hasError(): boolean {
+      return this._hasError;
     }
 
     /**
@@ -294,6 +301,9 @@ export function createElementClass<
             this._mounted = val;
           },
         );
+        // Clean up reactive system entries (componentData + stateStorage) so
+        // disconnected components do not accumulate in the global Maps forever.
+        reactiveSystem.cleanup(this._componentId);
       });
     }
 
@@ -406,9 +416,12 @@ export function createElementClass<
       cfg: ComponentConfig<S, C, P, T>,
       fn: () => void,
     ) {
-      if (this._hasError) this._hasError = false;
       try {
         fn();
+        // Clear error state only after a successful execution so that
+        // getLastError() remains valid between a failed and a subsequent
+        // successful render, rather than being wiped at the start of every call.
+        this._hasError = false;
       } catch (error) {
         this._hasError = true;
 

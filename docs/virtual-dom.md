@@ -56,8 +56,8 @@ interface VNode {
   props?: {
     // Props object (optional)
     key?: string; // Alternative key location
-    props?: any; // Component props
-    attrs?: Record<string, any>; // Raw attributes
+    props?: Record<string, unknown>; // Component props
+    attrs?: Record<string, unknown>; // Raw attributes
     directives?: Record<
       string,
       {
@@ -68,10 +68,10 @@ interface VNode {
       }
     >;
     ref?: string; // String ref name
-    reactiveRef?: any; // Reactive state ref
+    reactiveRef?: unknown; // Reactive state ref
     isCustomElement?: boolean; // Compiler hint for custom elements
-    _transitionGroup?: any; // Transition group metadata
-    [key: string]: any; // Other dynamic props/attributes
+    _transitionGroup?: unknown; // Transition group metadata
+    [key: string]: unknown; // Other dynamic props/attributes
   };
   children?: VNode[] | string; // Child nodes or text content
 }
@@ -107,22 +107,14 @@ component('card-demo', () => {
 });
 ```
 
-## 🔄 How vdomRenderer Works
+## 🔄 How Rendering Works
 
 1. **Receives VNode(s) and ctx**
 2. **Diffs** current and previous VNode trees
 3. **Patches** only the changed parts of the real DOM
 4. **Handles directives, bindings, and events**
 
-Note: `vdomRenderer` is an internal runtime entry exported from `src/lib/runtime/vdom.ts`. It is the low-level renderer used by the runtime. It is not re-exported from the package root; most users should rely on the higher-level `component()` API and the runtime's standard rendering flow instead of calling `vdomRenderer` directly. If you are building low-level integrations or debugging the renderer, you can inspect `src/lib/runtime/vdom.ts` for the implementation and signature.
-
-**Internal usage (for advanced cases / debugging):**
-
-```ts
-// internal runtime usage (not recommended for regular applications)
-// See src/lib/runtime/vdom.ts for the exact signature and behavior.
-vdomRenderer(shadowRoot, [vnode], context, refs);
-```
+The rendering pipeline is fully managed by the runtime. Component authors interact with it exclusively through `component()` and the `html` template tag — the underlying renderer, diffing engine, and patch functions are implementation details.
 
 ## 🕵️‍♂️ Diffing Algorithm
 
@@ -155,30 +147,32 @@ vdomRenderer(shadowRoot, [vnode], context, refs);
 ## 📚 Example: Dynamic List Rendering
 
 ```typescript
+import { component, html } from '@jasonshimmy/custom-elements-runtime';
+import { each } from '@jasonshimmy/custom-elements-runtime/directives';
+
 const items = ['Apple', 'Banana', 'Cherry'];
-const vnode = {
-  tag: 'ul',
-  props: {},
-  children: items.map((item, i) => ({
-    tag: 'li',
-    key: item,
-    props: {},
-    children: [item],
-  })),
-};
-vdomRenderer(shadowRoot, [vnode], context);
+
+component('fruit-list', () => {
+  return html`
+    <ul>
+      ${each(items, (item) => html`<li key="${item}">${item}</li>`)}
+    </ul>
+  `;
+});
 ```
 
-## 🧩 Internal API Reference
+## 🧩 Public API Reference
 
-- **vdomRenderer(root, vnodes, ctx):** Main entry for rendering
-- **VNode:** Type definition for virtual nodes
-- **Diffing & patching:** Internal logic for efficient updates
+- **`VNode` (type):** The only VDOM type that is part of the public API. Import it from the main entry or the SSR entry as shown above.
+- **`html` tag function:** The standard way to produce VNode trees in component render functions.
+- **`renderToString` / `renderToStringWithJITCSS`:** SSR renderers that consume VNode trees.
+
+> **Internal APIs — not stable:** `vdomRenderer`, `assignKeysDeep`, `patchChildren`, and the internal diffing/patching functions are implementation details. They are not exported from the package root and their signatures may change between releases without a semver bump. Do not depend on them in application or library code.
 
 ## ❓ FAQ
 
 **Q: Is the VDOM required for all components?**
-A: Yes, all rendering is powered by VNode trees and vdomRenderer for consistency and performance.
+A: Yes, all rendering is powered by VNode trees for consistency and performance. The runtime handles the diffing and patching automatically.
 
 **Q: Can I use custom VNode types?**
 A: Yes, as long as they follow the VNode interface.

@@ -4,7 +4,7 @@ A comprehensive guide to SSR support in the custom elements runtime. Learn how S
 
 ## 🌐 What is SSR?
 
-Server-Side Rendering (SSR) is the process of generating HTML on the server, sending it to the client, and hydrating it for interactivity. SSR improves performance, SEO, and user experience by delivering ready-to-display content.
+Server-Side Rendering (SSR) is the process of generating HTML on the server and sending it to the client, where the runtime performs a fresh client render to attach event listeners, bindings, and styles. SSR improves performance, SEO, and user experience by delivering ready-to-display content.
 
 - **Purpose:** Faster initial load, better SEO, improved accessibility.
 - **Benefits:** Universal rendering, progressive enhancement, reduced time-to-interactive.
@@ -13,7 +13,7 @@ Server-Side Rendering (SSR) is the process of generating HTML on the server, sen
 
 - **Functional API:** Components are defined as pure functions/configs, making them easy to render on the server.
 - **No DOM Dependency:** SSR mode avoids direct DOM APIs, using VNode trees for output.
-- **Hydration:** Client-side runtime attaches interactivity to server-rendered markup.
+- **Client render:** The client runtime performs a fresh render that replaces server-generated markup and attaches event listeners, bindings, and styles.
 - **Error Boundaries:** SSR gracefully handles errors and fallback rendering.
 
 ## ⚡ How SSR Works
@@ -22,7 +22,7 @@ Server-Side Rendering (SSR) is the process of generating HTML on the server, sen
 2. **SSR detection:** If `window` is undefined, the runtime switches to SSR mode.
 3. **VNode rendering:** The `render` function returns VNode trees, which are serialized to HTML.
 4. **No DOM/lifecycle:** In SSR, no DOM APIs or lifecycle hooks are called.
-5. **Hydration:** On the client, the runtime hydrates the markup and attaches event listeners, bindings, and styles.
+5. **Client render:** On the client, the runtime performs a fresh render that replaces the server-rendered markup and attaches event listeners, bindings, and styles. There is no incremental DOM-preserving hydration — the client render starts fresh inside the shadow root.
 
 ## 🧩 SSR-Friendly Component Example
 
@@ -42,7 +42,7 @@ component('ssr-demo', () => {
 ```
 
 - On the server: `render` returns a VNode, which is converted to HTML.
-- On the client: The runtime hydrates the markup and enables interactivity.
+- On the client: The runtime performs a fresh render, replacing the server markup and enabling interactivity.
 
 Rendering to string with `renderToString`
 
@@ -101,9 +101,9 @@ http
   .listen(3000);
 ```
 
-Client-side hydration example
+Client-side render example
 
-On the client register the same component and let the runtime hydrate existing server markup. The runtime attaches listeners and enables bindings; note that the client renderer reconciles VNodes and may replace server nodes in certain cases (keep server/client output shapes identical to avoid visual/hydration mismatches).
+Register the same component on the client. When the custom element upgrades, the runtime performs a fresh client-side render inside the shadow root — it does not preserve the server-rendered markup. Keep server and client render output identical to avoid a visible content shift on upgrade.
 
 ```html
 <!doctype html>
@@ -126,7 +126,7 @@ On the client register the same component and let the runtime hydrate existing s
         return html`<div>${msg.value}</div>`;
       });
 
-      // Runtime will hydrate the existing <ssr-demo> node.
+      // Runtime will re-render <ssr-demo> client-side, replacing the server HTML.
     </script>
   </body>
 </html>
@@ -139,7 +139,7 @@ Notes
     - `injectSvgNamespace?: boolean` (default: `true`) — when true, the SSR renderer will inject the standard SVG namespace attribute (`xmlns=\"http://www.w3.org/2000/svg\"`) onto `<svg>` elements that do not already provide an explicit `xmlns`.
     - `injectKnownNamespaces?: boolean` (default: follows `injectSvgNamespace`) — when true, the renderer will also inject known non-HTML namespaces for well-known top-level tags (for example `<math>` will receive the MathML namespace) when the vnode doesn't provide an explicit `xmlns`.
 - Server rendering does not execute client lifecycle hooks.
-- Ensure server and client render shapes match to avoid hydration mismatches.
+- Ensure server and client render shapes match to avoid a visible content shift on first render.
 
 ## 🖼️ SVG namespace behavior
 
@@ -147,8 +147,7 @@ When rendering SVGs on the server you can encounter subtle differences between
 server-produced markup and the client DOM unless namespaces are handled
 explicitly. The client runtime creates SVG elements using the SVG namespace
 internally (equivalent to `document.createElementNS('http://www.w3.org/2000/svg', ...)`).
-To avoid hydration/namespace mismatches, the SSR renderer injects the standard
-SVG namespace attribute on `<svg>` elements by default.
+To avoid namespace mismatches between the server-rendered string and the client DOM, the SSR renderer injects the standard SVG namespace attribute on `<svg>` elements by default.
 
 Key points:
 
@@ -175,16 +174,12 @@ const htmlNoNs = renderToString(vnodeTree, { injectSvgNamespace: false });
 
 When to keep the default (recommended)
 
-- If you plan to hydrate server markup with the client runtime, leave the
-  default enabled so namespaces match and hydration is reliable.
-- If your server output may be parsed by an XML/XHTML consumer or re-used in
-  contexts where the HTML parser isn't available, an explicit xmlns is safer.
+- If the client runtime will render the same component tree, leave the default enabled so SVG namespaces match between server HTML and the fresh client render.
+- If your server output may be parsed by an XML/XHTML consumer or re-used in contexts where the HTML parser isn't available, an explicit xmlns is safer.
 
 When to opt out
 
-- If you intentionally need the smallest possible HTML output and you control
-  the client parsing context (and are sure hydration won't be affected), you
-  can set `injectSvgNamespace: false`.
+- If you intentionally need the smallest possible HTML output and you control the client parsing context, you can set `injectSvgNamespace: false`.
 
 ## 🛠️ SSR Fallback Logic
 
@@ -203,19 +198,21 @@ if (typeof window === 'undefined') {
 }
 ```
 
-## 🔄 Hydration Process
+## 🔄 Client Render (Not Hydration)
 
-- **Server:** Renders HTML from VNode trees
-- **Client:** Attaches event listeners, bindings, and styles
-- **Attachment:** On the client the runtime will re-run the render to attach interactivity. The renderer will reconcile VNodes and apply listeners/styles; currently this re-render may replace the server DOM rather than perform a DOM-preserving hydration pass — ensure server and client render output match to avoid visual/hydration mismatch.
-- **Error handling:** Any hydration errors are caught by error boundaries
+> **Important:** This runtime does **not** implement DOM-preserving hydration. The client performs a full fresh render inside each component's shadow root, replacing whatever the server placed there.
+
+- **Server:** Renders HTML from VNode trees, which is sent to the browser
+- **Client:** Runs a fresh render pass, discarding server HTML and building new DOM nodes from VNodes
+- **Match output:** Because the client replaces server HTML, ensure that server and client render functions produce visually identical output to avoid a flash of content change on first render
+- **Error handling:** Render errors are caught by error boundaries
 
 ## 🚀 SSR Best Practices
 
 - **Avoid direct DOM manipulation:** Use VNode trees and pure functions
 - **Keep logic stateless:** SSR should not depend on browser-only APIs
 - **Use error boundaries:** Provide fallback UI for rendering errors
-- **Design for hydration:** Ensure markup matches between server and client
+- **Match server and client output:** Ensure both render functions produce identical markup to avoid a visible content shift on upgrade
 
 ## 📚 Example: Universal Component
 
@@ -228,11 +225,11 @@ component('universal-greeting', () => {
 ```
 
 - Works in SSR and client environments
-- Hydrates seamlessly for interactivity
+- Client re-renders seamlessly for interactivity
 
 ## 🎨 SSR with JIT CSS Pre-generation (`renderToStringWithJITCSS`)
 
-Use `renderToStringWithJITCSS()` to server-render a VNode tree **and** simultaneously pre-generate the JIT CSS for every utility class in the output. Embedding this CSS in `<head>` eliminates the Flash of Unstyled Content (FOUC) that occurs when the client runtime applies styles after hydration.
+Use `renderToStringWithJITCSS()` to server-render a VNode tree **and** simultaneously pre-generate the JIT CSS for every utility class in the output. Embedding this CSS in `<head>` eliminates the Flash of Unstyled Content (FOUC) that occurs when the client runtime applies styles on the first client render.
 
 ```ts
 import { html } from '@jasonshimmy/custom-elements-runtime';
@@ -382,14 +379,14 @@ A: SSR is automatic when `window` is undefined (e.g., in Node.js or serverless e
 **Q: Can I use lifecycle hooks in SSR?**
 A: No, lifecycle hooks are ignored in SSR mode. Use them only for client-side logic.
 
-**Q: How do I hydrate server-rendered markup?**
-A: The runtime runs client render to attach interactivity; this will reconcile the DOM but may replace server nodes on initial render. To ensure smooth transition, keep markup identical and avoid browser-only side effects during server render.
+**Q: Does the runtime preserve server-rendered markup on the client?**
+A: No. The runtime performs a full fresh client render inside each shadow root, replacing the server HTML. To avoid a visible content shift, ensure server and client render functions produce identical output, and avoid browser-only side effects during server render.
 
 **Q: Is SSR secure?**
 A: Yes, the runtime escapes HTML and sanitizes styles to prevent XSS and injection attacks.
 
 ## 🏁 Summary
 
-SSR support in the custom elements runtime enables fast, SEO-friendly, and universal web components. By leveraging VNode trees, pure functions, and hydration, you can build components that work seamlessly on both server and client.
+SSR support in the custom elements runtime enables fast, SEO-friendly, and universal web components. By leveraging VNode trees and pure functions, you can build components that work seamlessly on both server and client.
 
 For more details, see the SSR entrypoint and helper in `src/lib/ssr.ts` (which re-exports the runtime SSR helpers) and inspect the SSR fallback logic in `src/lib/runtime/component.ts`.
