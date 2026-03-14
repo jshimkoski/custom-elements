@@ -99,14 +99,23 @@ export function renderComponent<
 
     if (outputOrPromise instanceof Promise) {
       setLoading(true);
+      // Capture connection state at dispatch time. If the host was connected
+      // when the async render started but is disconnected when it resolves,
+      // we can skip the write — it would be wasted work and could overwrite a
+      // subsequent render triggered after reconnection. If the host was never
+      // connected (e.g. in unit tests), wasConnected stays false and the guard
+      // is never triggered so test expectations are unaffected.
+      const wasConnected = shadowRoot.host.isConnected;
       outputOrPromise
         .then((output) => {
+          if (wasConnected && !shadowRoot.host.isConnected) return;
           setLoading(false);
           setError(null);
           renderOutput(shadowRoot, output, context, refs, setHtmlString);
           applyStyle(shadowRoot.innerHTML);
         })
         .catch((error) => {
+          if (wasConnected && !shadowRoot.host.isConnected) return;
           setLoading(false);
           setError(error instanceof Error ? error : new Error(String(error)));
         });

@@ -328,6 +328,10 @@ class SecureExpressionEvaluator {
               `<<#${placeholderIndex}#>>`,
             );
           }
+          // Mutation changed the string length, so identRegex.lastIndex now
+          // points at the wrong position in the new string. Reset to 0 and let
+          // the `seen` Set prevent re-processing already-handled identifiers.
+          identRegex.lastIndex = 0;
         }
 
         // Restore string literals
