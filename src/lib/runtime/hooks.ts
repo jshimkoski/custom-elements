@@ -7,13 +7,12 @@ import { isReactiveState } from './reactive';
 import { toKebab } from './helpers';
 import { devWarn } from './logger';
 import { isDiscoveryRender as _isDiscoveryRenderFn } from './discovery-state';
-import {
-  enableJITCSS,
-  registerJITCSSComponent,
-  sanitizeCSS,
-  minifyCSS,
-  type JITCSSOptions,
-} from './style';
+import { sanitizeCSS, minifyCSS } from './css-utils';
+import type { JITCSSOptions } from './style';
+
+// Re-export JITCSSOptions as a type-only re-export so consumers can still
+// import it from './runtime/hooks' without creating a runtime dependency on style.ts.
+export type { JITCSSOptions };
 
 // Re-export discovery helpers so consumers continue to use the same import path.
 export { beginDiscoveryRender, endDiscoveryRender } from './discovery-state';
@@ -637,55 +636,6 @@ export function useStyle(callback: () => string): void {
     });
   }
 }
-
-// ---------- useJITCSS / useDesignTokens ----------
-
-/**
- * Configure the JIT CSS engine for the current session.
- * This is a convenience wrapper around `enableJITCSS()` that can be called
- * inside a component render function or at module initialisation time.
- *
- * @example
- * ```ts
- * component('my-component', () => {
- *   // Enable extended Tailwind colors so bg-blue-500, text-violet-700, etc. generate CSS
- *   useJITCSS({ extendedColors: true });
- *   return html`<div class="bg-blue-500 text-white">Hello</div>`;
- * });
- * ```
- *
- * @example
- * ```ts
- * // At app entry – enable once for all components
- * useJITCSS({ extendedColors: true, customColors: { brand: { '500': '#e63946' } } });
- * ```
- */
-export function useJITCSS(options?: JITCSSOptions): void {
-  // During discovery renders (component registration phase) there is no real
-  // shadow root. Without this guard, useJITCSS() falls through to
-  // enableJITCSS() and globally enables JIT CSS for every component — exactly
-  // the opt-in behaviour we are trying to prevent.
-  if (_isDiscoveryRenderFn()) return;
-
-  // When called inside a component render function, register this component's
-  // shadow root for per-component JIT CSS opt-in. Context is always set during
-  // a real render; it may be absent (null) or missing _host when called at app
-  // startup level (outside any component context).
-  const host = (currentComponentContext as { _host?: Element } | null)?._host;
-  const shadowRoot = host?.shadowRoot ?? null;
-
-  if (shadowRoot) {
-    // Per-component opt-in: register this shadow root only.
-    registerJITCSSComponent(shadowRoot, options);
-  } else {
-    // App-level call (outside component context) — enable for all components
-    // globally, preserving v2 behaviour when called at the entry point.
-    enableJITCSS(options);
-  }
-}
-
-// Re-export JITCSSOptions so consumers can import it from the hooks module
-export type { JITCSSOptions };
 
 /**
  * Cache of globally-injected stylesheets keyed by their CSS content.

@@ -2,7 +2,11 @@
  * Tests for useJITCSS() and useDesignTokens() hooks.
  */
 import { describe, it, expect, afterEach } from 'vitest';
-import { useJITCSS, useDesignTokens, type DesignTokens } from '../src/lib';
+import {
+  useJITCSS,
+  useDesignTokens,
+  type DesignTokens,
+} from '../src/lib/jit-css';
 import {
   setCurrentComponentContext,
   clearCurrentComponentContext,

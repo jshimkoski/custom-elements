@@ -46,6 +46,14 @@ export default defineConfig({
         globals: {
           // Add global mappings for UMD if needed
         },
+        // Force css-utils into its own shared chunk so that consumers who never
+        // import JIT CSS symbols (enableJITCSS, useJITCSS, …) do NOT transitively
+        // pull in the style chunk.  Without this hint Rollup merges css-utils into
+        // the style chunk and then hooks has to import from there.
+        manualChunks(id) {
+          if (id.includes('/runtime/css-utils')) return 'css-utils';
+          if (id.includes('/runtime/render-bridge')) return 'css-utils';
+        },
       },
     },
     minify: 'esbuild',

@@ -6,13 +6,17 @@ A comprehensive plan for evolving the JIT CSS engine across five key areas: opt-
 
 ## 1. 🔌 Make JIT CSS Optional via `useJITCSS()`
 
-### Is this a stupid idea?
+### Status: ✅ Implemented
 
-No — it is the right idea. The JIT CSS engine in `src/lib/runtime/style.ts` is the single largest module in the library and it is unconditionally bundled into every consumer's output today. For users who only need `useStyle()` (raw CSS strings), the utility map, parser, and variant engine are dead weight. Making JIT CSS opt-in is a clean, principled separation of concerns and enables a dramatically smaller base bundle.
+The JIT CSS engine is now exclusively exported from `@jasonshimmy/custom-elements-runtime/jit-css`. It is not present in the root entry (`@jasonshimmy/custom-elements-runtime`) at all. Consumers who never import from the `/jit-css` subpath get zero JIT engine code in their bundle — guaranteed, regardless of bundler tree-shaking support.
 
-### Current problem
+### Original rationale
 
-`render.ts` calls `jitCSS(aggregatedHtml)` on every render cycle, regardless of whether the component author ever writes a utility class. There is no way to opt out, and `style.ts` ships in full every time.
+The JIT CSS engine in `src/lib/runtime/style.ts` is the single largest module in the library. For users who only need `useStyle()` (raw CSS strings), the utility map, parser, and variant engine are dead weight. Making JIT CSS opt-in via its own entry point is a clean, principled separation of concerns and enables a dramatically smaller base bundle.
+
+### Original problem (resolved)
+
+`render.ts` called `jitCSS(aggregatedHtml)` on every render cycle, regardless of whether the component author ever wrote a utility class. There was no way to opt out, and `style.ts` shipped in full every time.
 
 ### Proposed architecture
 
@@ -35,7 +39,7 @@ export function useJITCSS(options?: JITCSSOptions): void;
 **Add a global opt-in for app-level control:**
 
 ```ts
-// src/lib/index.ts (new export)
+// src/lib/jit-css.ts (dedicated entry — not the root entry)
 export function enableJITCSS(options?: JITCSSOptions): void;
 ```
 
@@ -45,8 +49,12 @@ Calling `enableJITCSS()` once sets a global flag that enables JIT CSS for **all*
 
 ```ts
 export interface JITCSSOptions {
-  /** Include extended Tailwind color palette (slate, gray, red, etc.) */
-  extendedColors?: boolean;
+  /**
+   * Include extended Tailwind color families.
+   * - `true` — all 21 families
+   * - `string[]` — only the listed families, e.g. `['slate', 'blue', 'rose']`
+   */
+  extendedColors?: boolean | string[];
   /** Custom color palette entries to add to the JIT engine */
   customColors?: Record<string, Record<string, string>>;
   /** Disable specific variant groups for smaller output */
@@ -69,9 +77,9 @@ import {
 
 ### Migration path
 
-This is a **major version (v3) breaking change** — the announcement is clear:
+This is a **breaking change** — the migration announcement:
 
-> In v3, JIT CSS must be explicitly opted into. Add `useJITCSS()` to components that use utility classes, or call `enableJITCSS()` once at your app entry point to preserve v2 behaviour globally.
+> JIT CSS must now be explicitly imported from `@jasonshimmy/custom-elements-runtime/jit-css`. Importing `useJITCSS`, `enableJITCSS`, or related symbols from the root entry (`@jasonshimmy/custom-elements-runtime`) is no longer supported. Update your imports and add `useJITCSS()` to components that use utility classes, or call `enableJITCSS()` once at your app entry point to enable JIT CSS globally.
 
 Codemods or ESLint rules can assist migration.
 
@@ -95,7 +103,7 @@ Codemods or ESLint rules can assist migration.
 
 #### A. Register extended colors in the JIT engine
 
-Expand `parseColorClass()` to include all 22 extended palette names. The cleanest implementation merges `extendedColors` into the existing color lookup map at module initialisation time. No runtime performance cost — it is a one-time map construction.
+Expand `parseColorClass()` to include all 21 extended palette names. The cleanest implementation merges `extendedColors` into the existing color lookup map at module initialisation time. No runtime performance cost — it is a one-time map construction.
 
 ```ts
 // Inside jit-css-engine.ts
@@ -109,18 +117,18 @@ const ALL_COLOR_PALETTES: Record<string, Record<string, string>> = {
 
 This makes `bg-blue-500`, `text-emerald-700`, `border-rose-300`, `shadow-violet-200`, etc. work identically to semantic colors, including the `/opacity` modifier syntax.
 
-When `useJITCSS()` is used with `extendedColors: false` (the default to minimise bundle size), only the semantic palette is registered. Setting `extendedColors: true` or calling `enableJITCSS({ extendedColors: true })` merges the full palette in.
+When `useJITCSS()` is used with `extendedColors: false` (the default to minimise bundle size), only the semantic palette is registered. Setting `extendedColors: true` or calling `enableJITCSS({ extendedColors: true })` merges all 21 families in. Passing an array (e.g. `extendedColors: ['slate', 'blue']`) merges only those specific families.
 
 #### B. Extend `variables.css` with extended color CSS variables
 
-Add `--cer-color-{name}-{shade}` CSS variable declarations for all 22 extended color scales to `src/lib/css/variables.css`. This makes extended colors themeable the same way semantic colors are today:
+Add `--cer-color-{name}-{shade}` CSS variable declarations for all 21 extended color scales to `src/lib/css/variables.css`. This makes extended colors themeable the same way semantic colors are today:
 
 ```css
 /* variables.css — auto-generated block for extended palette */
 :root {
   --cer-color-slate-50: #f8fafc;
   --cer-color-slate-100: #f1f5f9;
-  /* … 950 shades × 22 colors … */
+  /* … 950 shades × 21 colors … */
 }
 ```
 

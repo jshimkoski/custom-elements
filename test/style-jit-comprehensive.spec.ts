@@ -7,13 +7,13 @@ import {
   parseOpacity,
   parseColorWithOpacity,
   extractClassesFromHTML,
-  escapeClassName,
   hexToRgb,
   utilityMap,
   colors,
   selectorVariants,
   mediaVariants,
 } from '../src/lib/runtime/style';
+import { escapeClassName } from '../src/lib/runtime/css-utils';
 
 describe('JIT CSS Comprehensive Tests', () => {
   describe('Core utility parsing', () => {

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { minifyCSS, jitCSS } from '../src/lib/runtime/style';
+import { jitCSS } from '../src/lib/runtime/style';
+import { minifyCSS } from '../src/lib/runtime/css-utils';
 
 describe('Gradient Utilities', () => {
   describe('Linear Gradients', () => {

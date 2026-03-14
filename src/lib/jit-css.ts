@@ -11,7 +11,8 @@
  */
 
 // Hooks
-export { useJITCSS, useDesignTokens, useGlobalStyle } from './runtime/hooks';
+export { useJITCSS } from './runtime/jit-hooks';
+export { useDesignTokens, useGlobalStyle } from './runtime/hooks';
 export type { JITCSSOptions, DesignTokens } from './runtime/hooks';
 
 // Global configuration

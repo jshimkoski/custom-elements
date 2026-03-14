@@ -1,4 +1,4 @@
-import { cssEscape } from './style';
+import { cssEscape } from './css-utils';
 
 /**
  * Prose typography plugin - tree-shaken if never used

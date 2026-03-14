@@ -11,8 +11,8 @@ import {
   useOnConnected,
   useOnError,
   useStyle,
-  enableJITCSS,
 } from './lib';
+import { enableJITCSS } from './lib/jit-css';
 import { createDOMJITCSS } from './lib/dom-jit-css';
 import { when, each, match } from './lib/directives';
 import { eventBus } from './lib/event-bus';

@@ -9,7 +9,6 @@ export {
   useOnAttributeChanged,
   useOnError,
   useStyle,
-  useJITCSS,
   useDesignTokens,
   useGlobalStyle,
   useProps,
@@ -43,14 +42,9 @@ export { ReactiveState } from './runtime/reactive';
 
 // Template and styling
 export { html } from './runtime/template-compiler';
-export {
-  css,
-  enableJITCSS,
-  disableJITCSS,
-  isJITCSSEnabled,
-  isJITCSSEnabledFor,
-  registerJITCSSComponent,
-} from './runtime/style';
+// css template tag — imported from its own lightweight module so the JIT engine
+// is not pulled in for consumers who only need the css tag.
+export { css } from './runtime/css-utils';
 export { unsafeHTML, decodeEntities } from './runtime/helpers';
 
 // Virtual DOM types

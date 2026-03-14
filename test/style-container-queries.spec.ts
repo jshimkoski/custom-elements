@@ -3,8 +3,8 @@ import {
   utilityMap,
   containerVariants,
   containerOrder,
-  minifyCSS,
 } from '../src/lib/runtime/style';
+import { minifyCSS } from '../src/lib/runtime/css-utils';
 import { describe, it, expect } from 'vitest';
 
 describe('🔧 Container Queries', () => {

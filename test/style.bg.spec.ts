@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { jitCSS, jitCssCache, minifyCSS } from '../src/lib/runtime/style';
+import { jitCSS, jitCssCache } from '../src/lib/runtime/style';
+import { minifyCSS } from '../src/lib/runtime/css-utils';
 
 describe('style - utility class rendering', () => {
   beforeEach(() => {

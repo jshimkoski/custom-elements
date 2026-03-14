@@ -4,18 +4,15 @@ Custom Elements Runtime provides a high-performance, zero-dependency JIT CSS eng
 
 ## 🔌 Opt-in Architecture
 
-JIT CSS is **opt-in** — it is disabled by default and only runs for components that request it. This keeps bundle sizes small for projects that don't use utility classes at all.
+JIT CSS is **opt-in** — it is disabled by default and only runs for components that request it. The JIT engine (~20 KB gzip) lives in its own dedicated entry (`@jasonshimmy/custom-elements-runtime/jit-css`) and is **entirely absent** from the main bundle (`@jasonshimmy/custom-elements-runtime`). Importing from the root entry never pulls in the JIT engine.
 
 ### `useJITCSS()` — Per-Component Opt-in
 
 Call `useJITCSS()` inside a component's render function to enable JIT CSS for that specific component. This is the recommended approach for most projects.
 
 ```ts
-import {
-  component,
-  html,
-  useJITCSS,
-} from '@jasonshimmy/custom-elements-runtime';
+import { component, html } from '@jasonshimmy/custom-elements-runtime';
+import { useJITCSS } from '@jasonshimmy/custom-elements-runtime/jit-css';
 
 component('my-card', () => {
   useJITCSS(); // Enable JIT CSS for this component only
@@ -32,7 +29,7 @@ component('my-card', () => {
 Call `enableJITCSS()` once at your app entry point to enable JIT CSS for **all** components. This is the easiest migration path to preserve v2-style behaviour.
 
 ```ts
-import { enableJITCSS } from '@jasonshimmy/custom-elements-runtime';
+import { enableJITCSS } from '@jasonshimmy/custom-elements-runtime/jit-css';
 
 // Enable for all components, including extended color palette
 enableJITCSS({ extendedColors: true });
@@ -44,8 +41,13 @@ Both `useJITCSS()` and `enableJITCSS()` accept an optional options object:
 
 ```ts
 interface JITCSSOptions {
-  /** Include the extended Tailwind color palette (slate, gray, red, violet, rose, etc.) */
-  extendedColors?: boolean;
+  /**
+   * Include extended Tailwind color families.
+   * - `true` — all 21 families (slate, gray, zinc, stone, red, orange, amber, yellow,
+   *   lime, green, emerald, teal, cyan, sky, blue, indigo, violet, purple, fuchsia, pink, rose)
+   * - `string[]` — only the listed families, e.g. `['slate', 'blue', 'rose']`
+   */
+  extendedColors?: boolean | string[];
   /** Register project-specific color scales */
   customColors?: Record<string, Record<string, string>>;
   /** Disable specific variant groups to reduce output size */
@@ -57,12 +59,34 @@ interface JITCSSOptions {
 
 #### `extendedColors`
 
-Enable all 22 Tailwind-compatible color scales (`slate`, `gray`, `zinc`, `stone`, `red`, `orange`, `amber`, `yellow`, `lime`, `green`, `emerald`, `teal`, `cyan`, `sky`, `blue`, `indigo`, `violet`, `purple`, `fuchsia`, `pink`, `rose`) in addition to the built-in semantic palette.
+Extend the built-in semantic palette with additional Tailwind-compatible color families.
+
+Accepts a **boolean** or an **array of family names**:
 
 ```ts
+// Include all 21 extended families
 enableJITCSS({ extendedColors: true });
 // Now bg-blue-500, text-violet-700, border-rose-300, etc. all generate CSS
+
+// Include only specific families — keeps generated CSS smaller
+enableJITCSS({ extendedColors: ['slate', 'blue', 'rose'] });
 ```
+
+Available families: `slate`, `gray`, `zinc`, `stone`, `red`, `orange`, `amber`, `yellow`, `lime`, `green`, `emerald`, `teal`, `cyan`, `sky`, `blue`, `indigo`, `violet`, `purple`, `fuchsia`, `pink`, `rose`.
+
+> **Why are extended colors disabled by default? Performance.**
+>
+> Each CSS rule the JIT engine generates is injected via `CSSStyleSheet.insertRule()`. Every `insertRule()` call can trigger the browser to re-run style matching for all elements in scope — this is called a **style recalculation**. In Shadow DOM, style recalculations are scoped to each component's shadow root, but they still cost CPU time, especially during initial render when many classes are encountered at once.
+>
+> The extended palette contains **21 families × 11 shades = 231 color tokens**. Each token can appear as `bg-`, `text-`, `border-`, `ring-`, `shadow-`, `outline-`, `from-`, `to-`, or `via-`, giving a theoretical maximum of ~2,000 injectable rules. In a real app the JIT engine only generates rules for classes it actually encounters, but a large component tree with varied color usage can easily produce hundreds of `insertRule()` calls per render cycle.
+>
+> To make things worse, each component's shadow root gets its **own scoped stylesheet**. The rule for `bg-blue-500` inside `<my-card>` is a separate injection from the same rule inside `<my-button>`. CSS rules are not shared across shadow boundaries. More active color families means more injections, multiplied by the number of components using them.
+>
+> The JIT engine's memoization cache also grows with the number of unique class/shade combinations it has seen. Enabling all 21 families in a large app puts real pressure on that cache and increases memory usage over the lifetime of the page.
+>
+> **The practical guidance:** leave extended colors off (the default) unless you need them. If you need specific families, use `string[]` — e.g. `extendedColors: ['slate', 'blue', 'rose']` — to expose only the tokens you actually use. This keeps the potential rule count small and style recalculations fast.
+>
+> **Runtime flag, not a bundle boundary.** The extended color data is statically imported into the JIT engine chunk and is always present in `custom-elements-runtime.jit-css.*.js` once the JIT engine is bundled — regardless of what you pass to `extendedColors`. Setting `extendedColors: false` (or omitting it) prevents those color utilities from generating CSS at runtime, but does not reduce bundle size. The only way to exclude the extended color data from your bundle entirely is to not import from `@jasonshimmy/custom-elements-runtime/jit-css` at all.
 
 #### `customColors`
 
@@ -110,7 +134,7 @@ isJITCSSEnabledFor(root: ShadowRoot): boolean
 disableJITCSS(): void
 ```
 
-These are importable from `@jasonshimmy/custom-elements-runtime` (root entry) or `@jasonshimmy/custom-elements-runtime/jit-css` (dedicated subpath).
+These are importable from `@jasonshimmy/custom-elements-runtime/jit-css`.
 
 ---
 
@@ -924,7 +948,7 @@ JIT CSS provides a rich set of built-in color palettes, all accessible via utili
 
 **Extended Color Palette (opt-in):**
 
-For a full Tailwind-compatible color palette (`gray`, `slate`, `zinc`, `red`, `orange`, `amber`, `yellow`, `lime`, `green`, `teal`, `cyan`, `sky`, `blue`, `indigo`, `violet`, `purple`, `fuchsia`, `pink`, `rose`), import the opt-in module:
+For a full Tailwind-compatible color palette (`slate`, `gray`, `zinc`, `stone`, `red`, `orange`, `amber`, `yellow`, `lime`, `green`, `emerald`, `teal`, `cyan`, `sky`, `blue`, `indigo`, `violet`, `purple`, `fuchsia`, `pink`, `rose`), import the opt-in module:
 
 ```ts
 import { extendedColors } from '@jasonshimmy/custom-elements-runtime/css/colors';
@@ -1577,11 +1601,16 @@ Use `cls()` when you store class name strings outside template literals — for 
 
 ### **Opt-in Hooks & Global Control**
 
+All of the following are exported from `@jasonshimmy/custom-elements-runtime/jit-css`:
+
 - `useJITCSS(options?: JITCSSOptions): void` — Enable JIT CSS for the current component (or globally if called outside a component)
 - `enableJITCSS(options?: JITCSSOptions): void` — Enable JIT CSS globally for all components
 - `disableJITCSS(): void` — Disable JIT CSS globally
 - `isJITCSSEnabled(): boolean` — Check whether JIT CSS is globally active
 - `isJITCSSEnabledFor(root: ShadowRoot): boolean` — Check whether JIT CSS is active for a specific component
+
+The following are exported from the root entry (`@jasonshimmy/custom-elements-runtime`):
+
 - `useDesignTokens(tokens: DesignTokens): void` — Set typed CSS custom property overrides on `:host`
 - `useGlobalStyle(factory: () => string): void` — Inject CSS into `document.adoptedStyleSheets`, escaping Shadow DOM
 
@@ -1617,7 +1646,7 @@ All of the following are exported from `@jasonshimmy/custom-elements-runtime/jit
 - `mediaVariants: MediaVariantMap` — Responsive breakpoint media queries (`sm:`, `md:`, `lg:`, `xl:`, `2xl:`, `dark:`)
 - `containerVariants: MediaVariantMap` — Container query breakpoints (`@sm:`, `@md:`, `@lg:`, `@xl:`, `@2xl:`)
 
-> **Note:** Lower-level helpers such as `minifyCSS`, `baseReset`, `spacingProps`, `parseOpacityModifier`, and `parseArbitraryVariant` are available directly from `src/lib/runtime/style.ts` for library authors but are not re-exported from any public entry point.
+> **Note:** Lower-level helpers such as `spacingProps`, `parseOpacityModifier`, and `parseArbitraryVariant` are available from `src/lib/runtime/style.ts` for library authors but are not re-exported from any public entry point. Pure CSS utilities (`minifyCSS`, `sanitizeCSS`, `baseReset`, `cssEscape`, `escapeClassName`, `css`) live in `src/lib/runtime/css-utils.ts`; `css` is re-exported from the root package entry.
 
 ### **Types**
 

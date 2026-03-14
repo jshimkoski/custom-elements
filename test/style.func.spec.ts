@@ -1,12 +1,12 @@
 import {
   parseArbitrary,
   parseArbitraryVariant,
-  escapeClassName,
   extractClassesFromHTML,
   jitCSS,
   jitCssCache,
   JIT_CSS_THROTTLE_MS,
 } from '../src/lib/runtime/style';
+import { escapeClassName } from '../src/lib/runtime/css-utils';
 import { describe, it, expect } from 'vitest';
 
 // --- parseArbitrary ---

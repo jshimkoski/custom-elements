@@ -97,30 +97,33 @@ return <my-custom ref={elRef} value={value} />;
 
 - Manual (no compiler):
 
+```jsx
 // React functional component that consumes a runtime-registered custom element
 function MyWrapper() {
-const ref = React.useRef();
-const [value, setValue] = React.useState('hello');
+  const ref = React.useRef();
+  const [value, setValue] = React.useState('hello');
 
-React.useEffect(() => {
-const el = ref.current;
-if (!el) return;
-// listen for updates emitted by the custom element
-function onUpdate(e) { setValue(e.detail); }
-el.addEventListener('update:value', onUpdate);
-// set initial prop for non-string/complex values imperatively
-el.value = value;
-return () => el.removeEventListener('update:value', onUpdate);
-}, []);
+  React.useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    // listen for updates emitted by the custom element
+    function onUpdate(e) {
+      setValue(e.detail);
+    }
+    el.addEventListener('update:value', onUpdate);
+    // set initial prop for non-string/complex values imperatively
+    el.value = value;
+    return () => el.removeEventListener('update:value', onUpdate);
+  }, []);
 
-return (
-
-<div>
-<my-custom ref={ref}></my-custom>
-<div>Value: {value}</div>
-</div>
-);
+  return (
+    <div>
+      <my-custom ref={ref}></my-custom>
+      <div>Value: {value}</div>
+    </div>
+  );
 }
+```
 
 Runtime note: the renderer will only notify custom elements when a prop or attribute actually changes; parent updates that don't change a child's props/attrs won't retrigger the child's apply/update lifecycle.
 

@@ -3,12 +3,14 @@ import { setAttributeSmart } from './namespace-helpers';
 import {
   minifyCSS,
   getBaseResetSheet,
-  getProseSheet,
   sanitizeCSS,
-  jitCSS,
-  isJITCSSEnabledFor,
   baseReset,
-} from './style';
+} from './css-utils';
+import {
+  isJITCSSActiveFor,
+  processJITCSS,
+  getProseStyleSheet,
+} from './render-bridge';
 import { getTransitionStyleSheet } from '../transitions';
 import type { ComponentConfig, ComponentContext, VNode, Refs } from './types';
 import { devWarn, devError } from './logger';
@@ -401,8 +403,10 @@ export function applyStyle<
   aggregatedHtmlCache.set(shadowRoot, aggregatedHtml);
 
   // Generate JIT CSS and get computed styles
-  const jitCss = isJITCSSEnabledFor(shadowRoot) ? jitCSS(aggregatedHtml) : '';
-  const proseSheet = getProseSheet();
+  const jitCss = isJITCSSActiveFor(shadowRoot)
+    ? processJITCSS(aggregatedHtml)
+    : '';
+  const proseSheet = getProseStyleSheet();
   const computedStyle = (context as { _computedStyle?: string })._computedStyle;
 
   // Early return for empty styles

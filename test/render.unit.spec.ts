@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import * as style from '../src/lib/runtime/style';
+import * as renderBridge from '../src/lib/runtime/render-bridge';
+import * as cssUtils from '../src/lib/runtime/css-utils';
 import * as transitions from '../src/lib/transitions';
 import * as vdom from '../src/lib/runtime/vdom';
 import { renderComponent, applyStyle } from '../src/lib/runtime/render';
@@ -10,12 +11,12 @@ describe('render module - applyStyle and renderComponent', () => {
     const root = document.createElement('div').attachShadow({ mode: 'open' });
     const ctx: any = {};
     const setStyleSheet = vi.fn();
-    // stub jitCSS to return empty
-    vi.spyOn(style, 'jitCSS').mockReturnValue('');
+    // stub render-bridge to report JIT as inactive
+    vi.spyOn(renderBridge, 'isJITCSSActiveFor').mockReturnValue(false);
     // stub base and transition sheets
     const base = new CSSStyleSheet();
     const trans = new CSSStyleSheet();
-    vi.spyOn(style, 'getBaseResetSheet').mockReturnValue(base);
+    vi.spyOn(cssUtils, 'getBaseResetSheet').mockReturnValue(base);
     vi.spyOn(transitions, 'getTransitionStyleSheet').mockReturnValue(trans);
 
     applyStyle(root, ctx, '', null, setStyleSheet);
@@ -27,13 +28,14 @@ describe('render module - applyStyle and renderComponent', () => {
     const root = document.createElement('div').attachShadow({ mode: 'open' });
     const ctx: any = { _computedStyle: undefined };
     const setStyleSheet = vi.fn();
-    // Enable JIT CSS for this shadow root so applyStyle will invoke jitCSS
+    // Enable JIT CSS for this shadow root so applyStyle will invoke processJITCSS
     enableJITCSS();
-    // stub jitCSS to return some css
-    vi.spyOn(style, 'jitCSS').mockReturnValue('.x{}');
+    // stub render-bridge to return some CSS
+    vi.spyOn(renderBridge, 'isJITCSSActiveFor').mockReturnValue(true);
+    vi.spyOn(renderBridge, 'processJITCSS').mockReturnValue('.x{}');
     const base = new CSSStyleSheet();
     const trans = new CSSStyleSheet();
-    vi.spyOn(style, 'getBaseResetSheet').mockReturnValue(base);
+    vi.spyOn(cssUtils, 'getBaseResetSheet').mockReturnValue(base);
     vi.spyOn(transitions, 'getTransitionStyleSheet').mockReturnValue(trans);
 
     applyStyle(root, ctx, '<div class="x"></div>', null, setStyleSheet);

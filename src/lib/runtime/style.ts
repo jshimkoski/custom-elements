@@ -1,57 +1,18 @@
 import { generateProseCSS, generateProseElementModifier } from './prose';
 import { extendedColors } from '../css/colors';
+import {
+  minifyCSS,
+  cssEscape,
+  escapeClassName,
+  escapeRegExp,
+  _resetBaseResetSheet,
+  spacing,
+} from './css-utils';
+import { _registerRenderBridge } from './render-bridge';
 
 /**
  * Optimized JIT CSS implementation with reduced bloat and enhanced utilities
  */
-
-/**
- * CSS template literal
- */
-export function css(
-  strings: TemplateStringsArray,
-  ...values: unknown[]
-): string {
-  let result = '';
-  for (let i = 0; i < strings.length; i++) {
-    result += strings[i];
-    if (i < values.length) result += values[i];
-  }
-  return result;
-}
-
-/**
- * CSS minification utility (basic)
- */
-export function minifyCSS(css: string): string {
-  return css
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/\s+/g, ' ')
-    .replace(/\s*([{}:;,>~])\s*/g, '$1')
-    .replace(/;}/g, '}')
-    .trim();
-}
-
-// --- Shared baseReset stylesheet ---
-let baseResetSheet: CSSStyleSheet | null = null;
-export function getBaseResetSheet(): CSSStyleSheet {
-  if (!baseResetSheet) {
-    if (typeof CSSStyleSheet === 'undefined') {
-      // SSR / older browsers: provide a safe stub that won't throw when
-      // consumed by runtime paths that expect a CSSStyleSheet-like object.
-      baseResetSheet = {
-        cssRules: [],
-        replaceSync: () => {},
-        toString: () => minifyCSS(baseReset),
-      } as unknown as CSSStyleSheet;
-    } else {
-      baseResetSheet = new CSSStyleSheet();
-      baseResetSheet.replaceSync(minifyCSS(baseReset));
-    }
-  }
-
-  return baseResetSheet;
-}
 
 // --- Shared prose stylesheet (singleton like baseReset) ---
 let proseSheet: CSSStyleSheet | null = null;
@@ -112,163 +73,6 @@ export function registerProseSize(size: string): void {
   }
 }
 
-export function sanitizeCSS(css: string): string {
-  return css
-    .replace(/url\s*\(\s*['"]?javascript:[^)]*\)/gi, '')
-    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
-    .replace(/expression\s*\([^)]*\)/gi, '');
-}
-
-import variables from '../css/variables.css?raw';
-
-export const baseReset = css`
-  ${variables}
-  :host,
-  *,
-  ::before,
-  ::after {
-    all: isolate;
-    box-sizing: border-box;
-    border: 0 solid currentColor;
-    margin: 0;
-    padding: 0;
-    font: inherit;
-    vertical-align: baseline;
-    background: transparent;
-    color: inherit;
-    -webkit-tap-highlight-color: transparent;
-    /* Transform composition variables (reset per-element for composability) */
-    --cer-translate-x: 0px;
-    --cer-translate-y: 0px;
-    --cer-rotate: 0deg;
-    --cer-skew-x: 0deg;
-    --cer-skew-y: 0deg;
-    --cer-scale-x: 1;
-    --cer-scale-y: 1;
-    /* Ring variables */
-    --cer-ring-color: rgb(59 130 246 / 0.5);
-    /* Filter composition variables (empty = no-op in filter chain) */
-    --cer-blur: ;
-    --cer-brightness: ;
-    --cer-contrast: ;
-    --cer-grayscale: ;
-    --cer-hue-rotate: ;
-    --cer-invert: ;
-    --cer-saturate: ;
-    --cer-sepia: ;
-    --cer-drop-shadow: ;
-    --cer-backdrop-blur: ;
-    --cer-backdrop-brightness: ;
-    --cer-backdrop-contrast: ;
-    --cer-backdrop-grayscale: ;
-    --cer-backdrop-hue-rotate: ;
-    --cer-backdrop-invert: ;
-    --cer-backdrop-saturate: ;
-    --cer-backdrop-sepia: ;
-  }
-  :host {
-    display: contents;
-    font: 16px/1.5 var(--cer-font-sans, ui-sans-serif, system-ui, sans-serif);
-    /* Default CE line-height variable so leading-* can reliably override */
-    --cer-line-height: 1.5;
-    -webkit-text-size-adjust: 100%;
-    text-size-adjust: 100%;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    /* Default gradient variables to avoid undefined var() usage in generated utilities */
-    --cer-gradient-from-position: 0%;
-    --cer-gradient-to-position: 100%;
-    --cer-gradient-via-position: 50%;
-    --cer-gradient-from: rgba(255, 255, 255, 0);
-    --cer-gradient-to: rgba(255, 255, 255, 0);
-    --cer-gradient-stops: var(--cer-gradient-from), var(--cer-gradient-to);
-    /* Default outline style variable */
-    --cer-outline-style: solid;
-  }
-  button,
-  input,
-  select,
-  textarea {
-    background: transparent;
-    outline: none;
-  }
-  textarea {
-    resize: vertical;
-  }
-  progress {
-    vertical-align: baseline;
-  }
-  button,
-  textarea {
-    overflow: visible;
-  }
-  img,
-  svg,
-  video,
-  canvas,
-  audio,
-  iframe,
-  embed,
-  object {
-    display: block;
-    max-width: 100%;
-    height: auto;
-  }
-  svg {
-    fill: currentColor;
-    stroke: none;
-  }
-  a {
-    text-decoration: inherit;
-    cursor: pointer;
-  }
-  button,
-  [type='button'],
-  [type='reset'],
-  [type='submit'] {
-    cursor: pointer;
-    appearance: button;
-    background: none;
-    -webkit-user-select: none;
-    user-select: none;
-  }
-  ::-webkit-input-placeholder,
-  ::placeholder {
-    color: inherit;
-    opacity: 0.5;
-  }
-  *:focus-visible {
-    outline: 2px solid var(--cer-color-primary-500, #3b82f6);
-    outline-offset: 2px;
-  }
-  ol,
-  ul {
-    list-style: none;
-  }
-  table {
-    border-collapse: collapse;
-  }
-  sub,
-  sup {
-    font-size: 0.75em;
-    line-height: 0;
-    position: relative;
-  }
-  sub {
-    bottom: -0.25em;
-  }
-  sup {
-    top: -0.5em;
-  }
-  [disabled],
-  [aria-disabled='true'] {
-    cursor: not-allowed;
-  }
-  [hidden] {
-    display: none;
-  }
-`;
-
 // Types
 export type CSSMap = Record<string, string>;
 
@@ -282,8 +86,13 @@ export type CSSMap = Record<string, string>;
  * ```
  */
 export interface JITCSSOptions {
-  /** Include the extended Tailwind color palette (slate, gray, red, orange, blue, violet, rose, etc.) */
-  extendedColors?: boolean;
+  /**
+   * Include the extended Tailwind color palette (slate, gray, red, orange, blue, violet, rose, etc.).
+   * Pass `true` to include all 21 color families, or an array of specific family names to include only
+   * those (e.g. `['slate', 'blue', 'red']`). A targeted list reduces `_activeColors` size and improves
+   * JIT match performance when only a few extended families are needed.
+   */
+  extendedColors?: boolean | string[];
   /** Custom color palette entries to add to the JIT engine */
   customColors?: Record<string, Record<string, string>>;
   /** Disable specific variant groups for smaller output */
@@ -418,25 +227,27 @@ export const colors: Record<
   ]),
 );
 
-export const spacing = '0.25rem';
+// Module-level active color map. Starts with semantic colors; extended colors
+// are added on demand when enableJITCSS({ extendedColors }) is called.
+// Initialized here as a plain data assignment (no function call side effect)
+// so bundlers can tree-shake this module when JIT is not used.
+let _activeColors: Record<string, Record<string, string>> = { ...colors };
 
-// Module-level active color map — rebuilt by enableJITCSS().
-// Starts with semantic colors only; extended colors are opt-in.
-let _activeColors: Record<string, Record<string, string>> = {};
-
-// Initialise synchronously so _activeColors is always populated after module load.
 function rebuildActiveColors(options: JITCSSOptions): void {
   _activeColors = { ...colors };
   if (options.extendedColors) {
-    for (const [name, shades] of Object.entries(extendedColors)) {
-      if (!_activeColors[name]) {
-        _activeColors[name] = Object.fromEntries(
-          Object.entries(shades).map(([shade, hex]) => [
-            shade,
-            `var(--cer-color-${name}-${shade}, ${hex})`,
-          ]),
-        );
-      }
+    const families = Array.isArray(options.extendedColors)
+      ? options.extendedColors
+      : Object.keys(extendedColors);
+    for (const name of families) {
+      const shades = extendedColors[name as keyof typeof extendedColors];
+      if (!shades || _activeColors[name]) continue;
+      _activeColors[name] = Object.fromEntries(
+        Object.entries(shades).map(([shade, hex]) => [
+          shade,
+          `var(--cer-color-${name}-${shade}, ${hex})`,
+        ]),
+      );
     }
   }
   if (options.customColors) {
@@ -447,7 +258,15 @@ function rebuildActiveColors(options: JITCSSOptions): void {
 }
 
 let _globalJITCSSOptions: JITCSSOptions = {};
-rebuildActiveColors(_globalJITCSSOptions);
+
+// Lazy render-bridge registration — avoids a module-level side effect.
+// Called the first time enableJITCSS() or registerJITCSSComponent() runs.
+let _bridgeRegistered = false;
+function _ensureBridgeRegistered(): void {
+  if (_bridgeRegistered) return;
+  _registerRenderBridge(isJITCSSEnabledFor, jitCSS, getProseSheet);
+  _bridgeRegistered = true;
+}
 
 /**
  * Whether the JIT CSS engine is active. Defaults to `true` for v2 backwards
@@ -501,6 +320,8 @@ export function registerJITCSSComponent(
     rebuildActiveColors(_globalJITCSSOptions);
     jitCssCache.clear();
   }
+  // Lazy registration so render.ts can call back into the JIT engine.
+  _ensureBridgeRegistered();
 }
 
 /**
@@ -527,6 +348,8 @@ export function enableJITCSS(options?: JITCSSOptions): void {
     _globalJITCSSOptions = { ..._globalJITCSSOptions, ...options };
   }
   rebuildActiveColors(_globalJITCSSOptions);
+  // Lazy registration so render.ts can call back into the JIT engine.
+  _ensureBridgeRegistered();
   // Invalidate cache so new colors take effect on the next render.
   jitCssCache.clear();
 }
@@ -561,7 +384,8 @@ export function _resetJITCSS(): void {
   _globalJITCSSOptions = {};
   _jitCSSEnabled = false;
   _jitCSSEnabledComponents = new WeakSet<ShadowRoot>();
-  rebuildActiveColors(_globalJITCSSOptions);
+  _bridgeRegistered = false;
+  _activeColors = { ...colors };
   jitCssCache.clear();
 }
 
@@ -2399,80 +2223,6 @@ export function parseArbitraryVariant(token: string): string | null {
   return null;
 }
 
-/**
- * Polyfill for CSS.escape() for SSR environments
- * Based on https://drafts.csswg.org/cssom/#serialize-an-identifier
- */
-export function cssEscape(value: string): string {
-  // Use native CSS.escape if available (browser)
-  if (typeof CSS !== 'undefined' && CSS.escape) {
-    return CSS.escape(value);
-  }
-
-  // SSR fallback: Manual implementation
-  const str = String(value);
-  const length = str.length;
-  let result = '';
-  let i = 0;
-
-  while (i < length) {
-    const char = str.charAt(i);
-    const code = str.charCodeAt(i);
-
-    if (code === 0x0000) {
-      result += '\uFFFD';
-    } else if (
-      // If the character is in the range [\1-\1f] (U+0001 to U+001F) or is U+007F
-      (code >= 0x0001 && code <= 0x001f) ||
-      code === 0x007f ||
-      // If the character is the first character and is in the range [0-9] (U+0030 to U+0039)
-      (i === 0 && code >= 0x0030 && code <= 0x0039) ||
-      // If the character is the second character and is in the range [0-9] (U+0030 to U+0039) and the first character is a "-" (U+002D)
-      (i === 1 &&
-        code >= 0x0030 &&
-        code <= 0x0039 &&
-        str.charCodeAt(0) === 0x002d)
-    ) {
-      result += '\\' + code.toString(16) + ' ';
-    } else if (
-      // If the character is the first character and is a "-" (U+002D), and there is no second character
-      i === 0 &&
-      length === 1 &&
-      code === 0x002d
-    ) {
-      result += '\\' + char;
-    } else if (
-      // If the character is not handled by one of the above rules and is one of the following
-      code >= 0x0080 ||
-      code === 0x002d || // -
-      code === 0x005f || // _
-      (code >= 0x0030 && code <= 0x0039) || // 0-9
-      (code >= 0x0041 && code <= 0x005a) || // A-Z
-      (code >= 0x0061 && code <= 0x007a) // a-z
-    ) {
-      result += char;
-    } else {
-      // Otherwise, escape it
-      result += '\\' + char;
-    }
-
-    i++;
-  }
-
-  return result;
-}
-
-export function escapeClassName(name: string): string {
-  // Use CSS.escape() API which properly handles all special characters including:
-  // - Leading digits (e.g., "2xl" -> "\32 xl")
-  // - Colons (e.g., ":" -> "\:")
-  // This works in CSSStyleSheet.replaceSync() unlike manual backslash escaping
-  return '.' + cssEscape(name);
-}
-export function escapeRegExp(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
 // Optimized HTML class extraction
 export function extractClassesFromHTML(html: string): string[] {
   // Use [\s\S] instead of . to match newlines in class attributes
@@ -2504,7 +2254,8 @@ if (typeof import.meta !== 'undefined' && import.meta.hot) {
     detectedProseSizes.clear();
     proseSheet = null;
     proseCSSCache = '';
-    baseResetSheet = null;
+    _resetBaseResetSheet();
+    _bridgeRegistered = false;
   });
 
   // Also clear on accept to force regeneration

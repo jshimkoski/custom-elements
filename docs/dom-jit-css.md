@@ -4,6 +4,8 @@ The `dom-jit-css` module brings the JIT CSS engine to **non-Shadow DOM** context
 
 It watches the real DOM for class changes and injects CSS rules into a shared stylesheet, providing the same utility-first experience as the Shadow DOM JIT CSS engine but scoped to the document or a specific container.
 
+> **Bundle note:** Importing `@jasonshimmy/custom-elements-runtime/dom-jit-css` always includes the full JIT engine (~20 KB gzip). The JIT engine is only available via the `/jit-css` and `/dom-jit-css` subpath entries — it is not exported from the root entry and is never included in the main bundle.
+
 ## 📦 Import
 
 ```ts
@@ -58,11 +60,17 @@ const jit = createDOMJITCSS({
   // ID of the injected <style> element (defaults to 'cer-dom-jit-css')
   styleId?: string;
   // JIT CSS options (same as JITCSSOptions)
-  extendedColors?: boolean;
+  extendedColors?: boolean | string[]; // true = all 21 families, string[] = specific families
   customColors?: Record<string, Record<string, string>>;
   disableVariants?: Array<'responsive' | 'dark' | 'motion' | 'print' | 'container'>;
 });
 ```
+
+> **`extendedColors` is a runtime flag, not a bundle boundary.** Because `dom-jit-css` always includes the full JIT engine, the extended color data is always present in your bundle regardless of what you pass to `extendedColors`. Setting it to `false` or omitting it only prevents those color utilities from generating CSS — it does not reduce bundle size.
+>
+> The reason to leave it disabled (the default) is **generated CSS size and style recalculation cost**. The extended palette has 21 families × 11 shades = 231 color tokens. Each can appear as `bg-`, `text-`, `border-`, `ring-`, `shadow-`, `outline-`, `from-`, `to-`, or `via-`, giving ~2,000 injectable rules at the theoretical maximum.
+>
+> Every rule injection via `insertRule()` can trigger a browser style recalculation. In a large DOM tree with many color utilities in use, enabling all 21 families adds measurable overhead to initial render and any subsequent DOM mutations the observer picks up. Use `string[]` to expose only the families you actually need.
 
 ### `DOMJITCSSHandle`
 
@@ -86,9 +94,14 @@ jit.mount();
 ### Extended color palette
 
 ```ts
+// All 21 extended families
 const jit = createDOMJITCSS({ extendedColors: true });
 jit.mount();
 // Now bg-violet-500, text-rose-300, etc. generate CSS
+
+// Only specific families
+const jit2 = createDOMJITCSS({ extendedColors: ['slate', 'violet', 'rose'] });
+jit2.mount();
 ```
 
 ### Custom project colors

@@ -1,4 +1,5 @@
-import { component, html, useJITCSS } from '../../lib';
+import { component, html } from '../../lib';
+import { useJITCSS } from '../../lib/jit-css';
 
 component('prose-example', () => {
   useJITCSS();

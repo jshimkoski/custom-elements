@@ -57,9 +57,6 @@
   "types": "dist/index.d.ts",
   "files": [
     "dist",
-    "dist/index.d.ts",
-    "dist/*.d.ts",
-    "dist/css/*.d.ts",
     "entities.json"
   ],
   "sideEffects": [
