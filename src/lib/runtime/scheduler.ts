@@ -441,8 +441,17 @@ export function nextTick(): Promise<void> {
   // (e.g. watcher-triggered re-renders), before resolving. Looping ensures
   // callers always observe fully-settled DOM state rather than a partial flush.
   return new Promise<void>((resolve) => {
-    while (updateScheduler.hasPendingUpdates) {
+    const MAX_FLUSH_ITERATIONS = 100;
+    let iterations = 0;
+    while (updateScheduler.hasPendingUpdates && iterations < MAX_FLUSH_ITERATIONS) {
       updateScheduler.flushImmediately();
+      iterations++;
+    }
+    if (iterations >= MAX_FLUSH_ITERATIONS) {
+      devWarn(
+        '[nextTick] Maximum flush iterations reached — possible circular update loop. ' +
+          'Check for watchers or computed values that unconditionally mutate reactive state.',
+      );
     }
     // Resolve after all synchronous flushes have completed.
     queueMicrotask(resolve);

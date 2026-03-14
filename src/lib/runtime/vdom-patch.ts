@@ -25,7 +25,7 @@ import {
   performEnterTransition,
   performLeaveTransition,
 } from './transition-utils';
-import { devError } from './logger';
+import { devError, devWarn } from './logger';
 import {
   getNodeKey,
   setNodeKey,
@@ -860,6 +860,10 @@ export function createElement(
   // Raw HTML vnode - insert provided HTML as nodes (unsafe: caller must opt-in)
   if (vnode.tag === '#raw') {
     const html = typeof vnode.children === 'string' ? vnode.children : '';
+    devWarn(
+      '[#raw] Inserting unsanitized HTML. Ensure the content is trusted or ' +
+        'sanitized before use — unsanitized input can lead to XSS vulnerabilities.',
+    );
     const range = document.createRange();
     // createContextualFragment is broadly supported and safe when used with
     // controlled input. We intentionally call it for opt-in raw HTML insertion.

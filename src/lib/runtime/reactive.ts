@@ -541,10 +541,24 @@ export function watchEffect(fn: () => void): () => void {
  *
  * @internal — used by deep watchers to capture before/after state snapshots.
  */
-function deepClone<T>(value: T, seen = new WeakMap<object, unknown>()): T {
+const DEEP_CLONE_MAX_DEPTH = 50;
+
+function deepClone<T>(
+  value: T,
+  seen = new WeakMap<object, unknown>(),
+  depth = 0,
+): T {
   if (value === null || typeof value !== 'object') return value;
   const obj = value as object;
   if (seen.has(obj)) return seen.get(obj) as T;
+  if (depth > DEEP_CLONE_MAX_DEPTH) {
+    devWarn(
+      `[watch] Deep clone exceeded ${DEEP_CLONE_MAX_DEPTH} nesting levels. ` +
+        'Returning a reference at this depth instead of cloning further. ' +
+        'Consider restructuring your state or switching to a shallow watch.',
+    );
+    return value;
+  }
   // Do not attempt to clone DOM nodes
   if (typeof Node !== 'undefined' && obj instanceof Node) return value;
   // Clone Date
@@ -554,7 +568,7 @@ function deepClone<T>(value: T, seen = new WeakMap<object, unknown>()): T {
     const arr: unknown[] = [];
     seen.set(obj, arr);
     for (let i = 0; i < (obj as unknown[]).length; i++) {
-      arr.push(deepClone((obj as unknown[])[i], seen));
+      arr.push(deepClone((obj as unknown[])[i], seen, depth + 1));
     }
     return arr as unknown as T;
   }
@@ -563,7 +577,11 @@ function deepClone<T>(value: T, seen = new WeakMap<object, unknown>()): T {
   seen.set(obj, copy);
   for (const key of Object.keys(obj)) {
     try {
-      copy[key] = deepClone((obj as Record<string, unknown>)[key], seen);
+      copy[key] = deepClone(
+        (obj as Record<string, unknown>)[key],
+        seen,
+        depth + 1,
+      );
     } catch {
       // skip inaccessible or throwing properties
     }

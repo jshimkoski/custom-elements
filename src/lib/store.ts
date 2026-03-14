@@ -1,5 +1,9 @@
 type Listener<T> = (state: T) => void;
 
+import { devWarn } from './runtime/logger';
+
+const STORE_LISTENER_WARN_THRESHOLD = 50;
+
 export interface Store<T extends object> {
   /**
    * Subscribe to store updates.
@@ -16,6 +20,14 @@ export function createStore<T extends object>(initial: T): Store<T> {
 
   function subscribe(listener: Listener<T>) {
     listeners.push(listener);
+    if (listeners.length >= STORE_LISTENER_WARN_THRESHOLD) {
+      devWarn(
+        `[store] ${listeners.length} active subscriptions detected. ` +
+          'This may indicate orphaned listeners from components that were destroyed ' +
+          'without calling their unsubscribe function. Check that every subscribe() ' +
+          'call is paired with the returned unsubscribe in a disconnect/cleanup handler.',
+      );
+    }
     listener(state); // initial push
 
     // Return unsubscribe function
