@@ -1766,18 +1766,29 @@ component('async-data', () => {
 
 ## 🧪 Testing Components
 
-The streamlined API makes testing straightforward:
+The functional API is straightforward to test with any DOM-capable test runner (Vitest + happy-dom is the recommended pairing). See [Testing Guide](./testing.md) for a complete reference including lifecycle, async components, and event testing.
+
+Key tips:
+- Use `flushDOMUpdates()` instead of `setTimeout` for deterministic, synchronous DOM flushing.
+- Register each component once — use a unique tag name per test or a shared `beforeAll` setup.
+- Query into `element.shadowRoot` to inspect rendered output.
 
 ```typescript
 import { describe, it, expect, beforeEach } from 'vitest';
-import { component, html } from '@jasonshimmy/custom-elements-runtime';
+import {
+  component,
+  html,
+  useProps,
+  useEmit,
+  flushDOMUpdates,
+} from '@jasonshimmy/custom-elements-runtime';
 
 describe('Streamlined Component', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
   });
 
-  it('should render with reactive props', async () => {
+  it('should render with reactive props', () => {
     component('test-component', () => {
       const props = useProps({
         message: 'default',
@@ -1799,7 +1810,7 @@ describe('Streamlined Component', () => {
     element.setAttribute('count', '5');
     document.body.appendChild(element);
 
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    flushDOMUpdates();
 
     const messageEl = element.shadowRoot?.querySelector('.message');
     const countEl = element.shadowRoot?.querySelector('.count');
@@ -1808,7 +1819,7 @@ describe('Streamlined Component', () => {
     expect(countEl?.textContent).toBe('5');
   });
 
-  it('should emit events correctly', async () => {
+  it('should emit events correctly', () => {
     let emittedData = null;
 
     component('emitter-test', () => {
@@ -1827,7 +1838,7 @@ describe('Streamlined Component', () => {
     });
 
     document.body.appendChild(element);
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    flushDOMUpdates();
 
     const button = element.shadowRoot?.querySelector('button');
     button?.click();

@@ -13,6 +13,28 @@ import { registry, initGlobalRegistryIfNeeded } from './registry';
 import { createElementClass } from './element-class';
 
 /**
+ * Invoke a lifecycle callback array, logging any errors in dev mode.
+ * Errors are caught so one failing callback does not block the others.
+ */
+function invokeCallbacks(
+  tag: string,
+  hookName: string,
+  cbs: Array<(...args: unknown[]) => void>,
+  args: unknown[],
+): void {
+  for (const cb of cbs) {
+    try {
+      cb(...args);
+    } catch (err) {
+      devError(
+        `[${tag}] Error in ${hookName} lifecycle hook:`,
+        err,
+      );
+    }
+  }
+}
+
+/**
  * Streamlined functional component API with automatic reactive props and lifecycle hooks.
  *
  * @example
@@ -96,8 +118,8 @@ export function component(
       if (lifecycleHooks.onConnected) {
         try {
           lifecycleHooks.onConnected(context);
-        } catch {
-          // swallow user errors in lifecycle hooks
+        } catch (err) {
+          devError(`[${normalizedTag}] Error in onConnected lifecycle hook:`, err);
         }
       }
     },
@@ -106,8 +128,8 @@ export function component(
       if (lifecycleHooks.onDisconnected) {
         try {
           lifecycleHooks.onDisconnected(context);
-        } catch {
-          /* swallow */
+        } catch (err) {
+          devError(`[${normalizedTag}] Error in onDisconnected lifecycle hook:`, err);
         }
       }
     },
@@ -116,8 +138,8 @@ export function component(
       if (lifecycleHooks.onAttributeChanged) {
         try {
           lifecycleHooks.onAttributeChanged(name, oldValue, newValue, context);
-        } catch {
-          /* swallow */
+        } catch (err) {
+          devError(`[${normalizedTag}] Error in onAttributeChanged lifecycle hook:`, err);
         }
       }
     },
@@ -126,8 +148,8 @@ export function component(
       if (lifecycleHooks.onError && error) {
         try {
           lifecycleHooks.onError(error, context);
-        } catch {
-          /* swallow */
+        } catch (err) {
+          devError(`[${normalizedTag}] Error in onError handler (the error handler itself threw):`, err);
         }
       }
     },
@@ -267,13 +289,7 @@ export function component(
               (context?: unknown) => void
             >;
             lifecycleHooks.onConnected = (context?: unknown) => {
-              for (const cb of cbs) {
-                try {
-                  cb(context);
-                } catch {
-                  /* swallow */
-                }
-              }
+              invokeCallbacks(normalizedTag, 'useOnConnected', cbs as Array<(...args: unknown[]) => void>, [context]);
             };
           }
           if (hookCallbacks.onDisconnected) {
@@ -281,13 +297,7 @@ export function component(
               (context?: unknown) => void
             >;
             lifecycleHooks.onDisconnected = (context?: unknown) => {
-              for (const cb of cbs) {
-                try {
-                  cb(context);
-                } catch {
-                  /* swallow */
-                }
-              }
+              invokeCallbacks(normalizedTag, 'useOnDisconnected', cbs as Array<(...args: unknown[]) => void>, [context]);
             };
           }
           if (hookCallbacks.onAttributeChanged) {
@@ -305,25 +315,13 @@ export function component(
               newValue: string | null,
               context?: unknown,
             ) => {
-              for (const cb of cbs) {
-                try {
-                  cb(name, oldValue, newValue, context);
-                } catch {
-                  /* swallow */
-                }
-              }
+              invokeCallbacks(normalizedTag, 'useOnAttributeChanged', cbs as Array<(...args: unknown[]) => void>, [name, oldValue, newValue, context]);
             };
           }
           if (hookCallbacks.onError) {
             const cbs = hookCallbacks.onError as Array<(err: Error) => void>;
             lifecycleHooks.onError = (err: Error) => {
-              for (const cb of cbs) {
-                try {
-                  cb(err);
-                } catch {
-                  /* swallow */
-                }
-              }
+              invokeCallbacks(normalizedTag, 'useOnError', cbs as Array<(...args: unknown[]) => void>, [err]);
             };
           }
           // `useStyle()` stores a computed style string directly on the

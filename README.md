@@ -8,6 +8,8 @@ Build modern components with strict TypeScript, zero dependencies, and a clean f
 
 🕹️ Try it on [Codepen.io](https://codepen.io/jshimkoski/pen/JoYmpxm).
 
+Learn more about the author at [jasonshimmy.com](https://jasonshimmy.com) and check out the [changelog](./CHANGELOG.md) for recent updates.
+
 ## ✨ Why You'll Love It
 
 - ⚡ **Blazing Fast:** Minimal runtime, instant updates, zero dependencies.
@@ -76,49 +78,49 @@ Below is the **complete list of public symbols** exported by the runtime and its
 
 **Package:** `@jasonshimmy/custom-elements-runtime`
 
-| Export                       | Description                                                                                                                                                              |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `component`                  | Define a custom element with the functional component API.                                                                                                               |
-| `html`                       | Template tag function producing runtime VNodes from template literals.                                                                                                   |
-| `css`                        | Define component-scoped/JIT styles or register stylesheets.                                                                                                              |
-| `ref`                        | Create a reactive reference object with a `.value` property.                                                                                                             |
-| `computed`                   | Create a memoized, derived read-only value from other reactive sources.                                                                                                  |
-| `watch`                      | Register watchers reacting to changes in reactive values.                                                                                                                |
-| `watchEffect`                | Auto-track reactive reads and re-run a side-effect whenever dependencies change.                                                                                         |
-| `nextTick`                   | Returns a Promise resolving after all pending DOM updates are flushed.                                                                                                   |
-| `flushDOMUpdates`            | Synchronously flush all pending DOM update tasks (useful in tests).                                                                                                      |
-| `scheduleWithPriority`       | Schedule a callback at a given `UpdatePriority` level.                                                                                                                   |
-| `provide`                    | Store a value on the current component for descendant injection.                                                                                                         |
-| `inject`                     | Retrieve a value provided by an ancestor component.                                                                                                                      |
-| `createComposable`           | Package reusable stateful logic (hooks, reactive state) into a composable.                                                                                               |
-| `getCurrentComponentContext` | Access the active component context from within a composable or render function.                                                                                         |
-| `useProps`                   | Hook to declare/consume typed component props with defaults.                                                                                                             |
-| `defineModel`                | Declare a two-way model binding prop; combines `useProps` + `useEmit` in one ergonomic hook.                                                                             |
-| `useEmit`                    | Hook returning an emit function for dispatching custom events.                                                                                                           |
-| `useOnConnected`             | Hook that runs a callback when the component connects.                                                                                                                   |
-| `useOnDisconnected`          | Hook that runs a callback when the component disconnects.                                                                                                                |
-| `useOnAttributeChanged`      | Hook observing host attribute changes.                                                                                                                                   |
-| `useOnError`                 | Hook to register a component-level error handler.                                                                                                                        |
-| `useStyle`                   | Hook to register or compute component styles at runtime.                                                                                                                 |
-| `useDesignTokens`            | Apply typed design token overrides to `:host` as CSS custom properties.                                                                                                  |
-| `useGlobalStyle`             | Inject CSS into `document.adoptedStyleSheets`, escaping Shadow DOM encapsulation. Use sparingly.                                                                         |
-| `useExpose`                  | Publish methods and properties onto the host element as an imperative public API.                                                                                        |
-| `useSlots`                   | Inspect which named slots have been filled by the component consumer.                                                                                                    |
-| `useTeleport`                | Render virtual DOM content into any DOM node outside the shadow root.                                                                                                    |
-| `registerKeepAlive`          | Register `<cer-keep-alive>` to preserve component state across DOM removals.                                                                                             |
-| `registerSuspense`           | Register the `<cer-suspense>` built-in component.                                                                                                                        |
-| `registerErrorBoundary`      | Register the `<cer-error-boundary>` built-in component.                                                                                                                  |
-| `registerBuiltinComponents`  | Register `<cer-keep-alive>`, `<cer-suspense>` and `<cer-error-boundary>` in one call.                                                                                    |
-| `unsafeHTML`                 | Insert raw HTML into a template (**unsafe; use carefully**).                                                                                                             |
-| `decodeEntities`             | Utility to decode HTML entities in strings.                                                                                                                              |
-| `setDevMode`                 | Toggle dev-mode logging on or off at runtime.                                                                                                                            |
-| `devLog`                     | Log a message to the console in dev mode only (no-op in production).                                                                                                     |
-| `isReactiveState`            | Type-guard returning `true` when a value is a `ReactiveState` instance.                                                                                                  |
-| `createHealthMonitor`        | Create a new health monitor instance (factory; each call returns an independent instance).                                                                               |
-| `getHealthMonitor`           | Return the global singleton health monitor instance (lazily created).                                                                                                    |
-| `updateHealthMetric`         | Update a named metric on the global singleton health monitor.                                                                                                            |
-| `getHealthStatus`            | Return the current `HealthReport` from the global singleton health monitor.                                                                                              |
-| **Types**                    | `ModelRef`, `HealthMonitorInstance`, `HealthReport`, `UpdatePriority`, `TeleportHandle`, `ReactiveState`, `VNode`, `JITCSSOptions`, `DesignTokens`                       |
+| Export                       | Description                                                                                                                                        |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `component`                  | Define a custom element with the functional component API.                                                                                         |
+| `html`                       | Template tag function producing runtime VNodes from template literals.                                                                             |
+| `css`                        | Define component-scoped/JIT styles or register stylesheets.                                                                                        |
+| `ref`                        | Create a reactive reference object with a `.value` property.                                                                                       |
+| `computed`                   | Create a memoized, derived read-only value from other reactive sources.                                                                            |
+| `watch`                      | Register watchers reacting to changes in reactive values.                                                                                          |
+| `watchEffect`                | Auto-track reactive reads and re-run a side-effect whenever dependencies change.                                                                   |
+| `nextTick`                   | Returns a Promise resolving after all pending DOM updates are flushed.                                                                             |
+| `flushDOMUpdates`            | Synchronously flush all pending DOM update tasks (useful in tests).                                                                                |
+| `scheduleWithPriority`       | Schedule a callback at a given `UpdatePriority` level.                                                                                             |
+| `provide`                    | Store a value on the current component for descendant injection.                                                                                   |
+| `inject`                     | Retrieve a value provided by an ancestor component.                                                                                                |
+| `createComposable`           | Package reusable stateful logic (hooks, reactive state) into a composable.                                                                         |
+| `getCurrentComponentContext` | Access the active component context from within a composable or render function.                                                                   |
+| `useProps`                   | Hook to declare/consume typed component props with defaults.                                                                                       |
+| `defineModel`                | Declare a two-way model binding prop; combines `useProps` + `useEmit` in one ergonomic hook.                                                       |
+| `useEmit`                    | Hook returning an emit function for dispatching custom events.                                                                                     |
+| `useOnConnected`             | Hook that runs a callback when the component connects.                                                                                             |
+| `useOnDisconnected`          | Hook that runs a callback when the component disconnects.                                                                                          |
+| `useOnAttributeChanged`      | Hook observing host attribute changes.                                                                                                             |
+| `useOnError`                 | Hook to register a component-level error handler.                                                                                                  |
+| `useStyle`                   | Hook to register or compute component styles at runtime.                                                                                           |
+| `useDesignTokens`            | Apply typed design token overrides to `:host` as CSS custom properties.                                                                            |
+| `useGlobalStyle`             | Inject CSS into `document.adoptedStyleSheets`, escaping Shadow DOM encapsulation. Use sparingly.                                                   |
+| `useExpose`                  | Publish methods and properties onto the host element as an imperative public API.                                                                  |
+| `useSlots`                   | Inspect which named slots have been filled by the component consumer.                                                                              |
+| `useTeleport`                | Render virtual DOM content into any DOM node outside the shadow root.                                                                              |
+| `registerKeepAlive`          | Register `<cer-keep-alive>` to preserve component state across DOM removals.                                                                       |
+| `registerSuspense`           | Register the `<cer-suspense>` built-in component.                                                                                                  |
+| `registerErrorBoundary`      | Register the `<cer-error-boundary>` built-in component.                                                                                            |
+| `registerBuiltinComponents`  | Register `<cer-keep-alive>`, `<cer-suspense>` and `<cer-error-boundary>` in one call.                                                              |
+| `unsafeHTML`                 | Insert raw HTML into a template (**unsafe; use carefully**).                                                                                       |
+| `decodeEntities`             | Utility to decode HTML entities in strings.                                                                                                        |
+| `setDevMode`                 | Toggle dev-mode logging on or off at runtime.                                                                                                      |
+| `devLog`                     | Log a message to the console in dev mode only (no-op in production).                                                                               |
+| `isReactiveState`            | Type-guard returning `true` when a value is a `ReactiveState` instance.                                                                            |
+| `createHealthMonitor`        | Create a new health monitor instance (factory; each call returns an independent instance).                                                         |
+| `getHealthMonitor`           | Return the global singleton health monitor instance (lazily created).                                                                              |
+| `updateHealthMetric`         | Update a named metric on the global singleton health monitor.                                                                                      |
+| `getHealthStatus`            | Return the current `HealthReport` from the global singleton health monitor.                                                                        |
+| **Types**                    | `ModelRef`, `HealthMonitorInstance`, `HealthReport`, `UpdatePriority`, `TeleportHandle`, `ReactiveState`, `VNode`, `JITCSSOptions`, `DesignTokens` |
 
 ---
 
@@ -443,9 +445,20 @@ Explore the complete documentation for every runtime feature:
 - [🅰️ Angular Integration](./docs/angular-integration.md) - Using components in Angular apps
 - [🔥 Svelte Integration](./docs/svelte-integration.md) - Using components in Svelte apps
 
-### 🛠️ **Troubleshooting**
+### 🛡️ **Security & Quality**
 
+- [🔒 Security](./docs/security.md) - XSS prevention, `unsafeHTML`, CSP guidance, and safe input handling
+- [🧪 Testing](./docs/testing.md) - Testing components with Vitest + happy-dom, reactive state, events, and async components
+- [⚡ Performance](./docs/performance.md) - Update scheduler, `computed` memoization, avoiding re-renders, profiling
 - [🔧 Troubleshooting](./docs/troubleshooting.md) - Common issues and solutions
+
+### 🔄 **Upgrading**
+
+- [📦 Migration Guide](./docs/migration.md) - Upgrade instructions, including the v2.8 JIT CSS opt-in change
+
+### 📖 **Reference**
+
+- [📚 Glossary](./docs/glossary.md) - Definitions for library-specific and web-components terms
 
 For examples and implementation details, explore the source code in `src/lib/`.
 

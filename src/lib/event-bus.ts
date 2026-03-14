@@ -100,6 +100,11 @@ export class GlobalEventBus extends EventTarget {
     const eventHandlers = this.handlers[eventName];
     if (eventHandlers) {
       eventHandlers.delete(handler as EventHandler<unknown>);
+      // Remove the entry entirely once it is empty so stale keys don't
+      // accumulate indefinitely in long-lived apps.
+      if (eventHandlers.size === 0) {
+        delete this.handlers[eventName];
+      }
     }
   }
 
