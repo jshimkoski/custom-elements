@@ -28,31 +28,24 @@ const store = createStore({
 
 Use the store in your component logic or templates. Note: calling `store.getState()` returns the current snapshot but does not automatically cause components to re-render — use `subscribe` to react to updates or call your component's render/request routine when the store changes.
 
-Recommended pattern: subscribe inside your component and update local state or request a re-render when the store changes. `subscribe` returns an unsubscribe function and _immediately_ calls the listener with the current state when registered.
+Recommended pattern: subscribe in the render function body (not inside `useOnConnected`) so the subscription is re-established if the component is ever removed from the DOM and re-inserted. `subscribe` returns an unsubscribe function and _immediately_ calls the listener with the current state when registered.
+
+> **Important:** Do **not** subscribe inside `useOnConnected`. `useOnConnected` fires exactly once per component instance lifetime — it does not re-fire on reconnect. Subscriptions set up there are permanently removed when the component disconnects and are never re-established. See [`useOnConnected` Fires Once Per Instance Lifetime](./reactive-api.md#useonconnected-fires-once-per-instance-lifetime) for the full explanation and the reconnect-safe pattern.
 
 ```ts
 const store = createStore({ count: 0 });
 
 component('my-counter', () => {
-  // Subscribe when the component connects and unsubscribe on disconnect.
-  // Note: import `useOnConnected` and `useOnDisconnected` from the runtime hooks
-  // in real component code. The example below shows the recommended pattern.
-  let unsubscribe: (() => void) | undefined;
+  const count = ref(store.getState().count);
 
-  useOnConnected(() => {
-    unsubscribe = store.subscribe(() => {
-      // React to state changes
-    });
+  // Subscribe in the render body so the subscription is active after
+  // reconnects. subscribe() calls the listener immediately with current state.
+  const unsubscribe = store.subscribe((state) => {
+    count.value = state.count;
   });
 
-  useOnDisconnected(() => {
-    try {
-      unsubscribe?.();
-    } catch {
-      // swallow unsubscribe errors - best-effort cleanup
-    }
-    unsubscribe = undefined;
-  });
+  // Always clean up on disconnect.
+  useOnDisconnected(unsubscribe);
 
   const handleIncrement = () => {
     store.setState((prev) => ({ count: (prev.count as number) + 1 }));
@@ -60,7 +53,7 @@ component('my-counter', () => {
 
   return html`
     <button @click="${handleIncrement}">
-      Count: ${store.getState().count}
+      Count: ${count.value}
     </button>
   `;
 });
