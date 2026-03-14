@@ -168,7 +168,7 @@ The DOM JIT CSS scanner is designed to be extremely lightweight:
 
 2. **`queueMicrotask` batching** — multiple class mutations in the same tick (e.g., a framework rendering a list) are batched into a single CSS generation pass, executed before the browser paints.
 
-3. **`CSSStyleSheet.insertRule()`** — new rules are appended one at a time rather than replacing the full stylesheet, so only new rules trigger a style recalculation.
+3. **`CSSStyleSheet.replaceSync()`** — the accumulated CSS is re-applied as a single `@layer cer-utilities { … }` block. Using `replaceSync` correctly handles nested at-rules (`@media`, `@container`, `@supports`) so dark and responsive variants apply as intended.
 
 4. **`TreeWalker` initial scan** — the first full-tree class extraction uses `NodeFilter.SHOW_ELEMENT` for maximum performance.
 

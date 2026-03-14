@@ -389,6 +389,41 @@ describe('createDOMJITCSS', () => {
       expect(() => jit.mount()).not.toThrow();
       jit.destroy();
     });
+
+    it('scans classes inside a ShadowRoot', async () => {
+      const host = document.createElement('div');
+      document.body.appendChild(host);
+      const shadow = host.attachShadow({ mode: 'open' });
+      const inner = document.createElement('span');
+      inner.className = 'flex items-center gap-4';
+      shadow.appendChild(inner);
+
+      const jit = createDOMJITCSS({ root: shadow });
+      jit.mount();
+      await flushAsync();
+      // flex, items-center, gap-4 = 3 classes from inside the shadow DOM
+      expect(jit.processedCount).toBe(3);
+      jit.destroy();
+    });
+
+    it('does not scan light-DOM siblings when root is a ShadowRoot', async () => {
+      const host = document.createElement('div');
+      const outsider = document.createElement('div');
+      outsider.className = 'text-red-500 font-bold';
+      document.body.appendChild(host);
+      document.body.appendChild(outsider);
+      const shadow = host.attachShadow({ mode: 'open' });
+      const inner = document.createElement('span');
+      inner.className = 'hidden';
+      shadow.appendChild(inner);
+
+      const jit = createDOMJITCSS({ root: shadow });
+      jit.mount();
+      await flushAsync();
+      // Only 'hidden' from inside the shadow DOM; light-DOM outsider is excluded
+      expect(jit.processedCount).toBe(1);
+      jit.destroy();
+    });
   });
 
   // ─── <style> element fallback path ───────────────────────────────────────

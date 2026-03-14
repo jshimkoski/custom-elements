@@ -316,9 +316,16 @@ export function registerJITCSSComponent(
 ): void {
   _jitCSSEnabledComponents.add(root);
   if (options) {
-    _globalJITCSSOptions = { ..._globalJITCSSOptions, ...options };
-    rebuildActiveColors(_globalJITCSSOptions);
-    jitCssCache.clear();
+    const merged = { ..._globalJITCSSOptions, ...options };
+    // Only rebuild colors and clear the cache when the merged options actually
+    // differ from the current state. Without this guard, components that pass
+    // options inline (e.g. useJITCSS({ extendedColors: true })) would thrash
+    // the cache on every re-render, effectively disabling caching.
+    if (JSON.stringify(merged) !== JSON.stringify(_globalJITCSSOptions)) {
+      _globalJITCSSOptions = merged;
+      rebuildActiveColors(_globalJITCSSOptions);
+      jitCssCache.clear();
+    }
   }
   // Lazy registration so render.ts can call back into the JIT engine.
   _ensureBridgeRegistered();
@@ -366,6 +373,9 @@ export function enableJITCSS(options?: JITCSSOptions): void {
  */
 export function disableJITCSS(): void {
   _jitCSSEnabled = false;
+  // Also clear per-component opt-ins so components that called useJITCSS()
+  // don't continue processing JIT CSS after the global flag is disabled.
+  _jitCSSEnabledComponents = new WeakSet<ShadowRoot>();
 }
 
 /**
@@ -1609,8 +1619,6 @@ const generateUtilities = (): CSSMap => {
     'cursor-nesw-resize': 'cursor:nesw-resize;',
     'cursor-nwse-resize': 'cursor:nwse-resize;',
     'cursor-all-scroll': 'cursor:all-scroll;',
-    'cursor-grab': 'cursor:grab;',
-    'cursor-grabbing': 'cursor:grabbing;',
   });
 
   // Logical border utilities
@@ -2225,12 +2233,12 @@ export function parseArbitraryVariant(token: string): string | null {
 
 // Optimized HTML class extraction
 export function extractClassesFromHTML(html: string): string[] {
-  // Use [\s\S] instead of . to match newlines in class attributes
-  const classAttrRegex = /class\s*=\s*(['"])([\s\S]*?)\1/g;
   const classList: string[] = [];
   let match: RegExpExecArray | null;
+  // Reset the shared regex before use (required because of the `g` flag)
+  _classAttrRegex.lastIndex = 0;
 
-  while ((match = classAttrRegex.exec(html))) {
+  while ((match = _classAttrRegex.exec(html))) {
     const tokens = match[2].split(/\s+/).filter(Boolean);
     if (tokens.length) classList.push(...tokens);
   }
@@ -2238,11 +2246,60 @@ export function extractClassesFromHTML(html: string): string[] {
   return classList;
 }
 
+// Module-level regex for extracting class attributes from HTML strings.
+// Defined here so the regex object is compiled once, not on every call to
+// extractClassesFromHTML(). lastIndex must be reset before each use.
+const _classAttrRegex = /class\s*=\s*(['"])([\s\S]*?)\1/g;
+
+// Module-level lookup tables used by the sort-by-breakpoint comparator.
+// Defined here so they are allocated once, not recreated on every comparison.
+const _responsiveSizePx: Record<string, number> = {
+  sm: 640,
+  md: 768,
+  lg: 1024,
+  xl: 1280,
+  '2xl': 1536,
+};
+const _containerSizePx: Record<string, number> = {
+  xs: 320,
+  sm: 384,
+  md: 448,
+  lg: 512,
+  xl: 576,
+  '2xl': 672,
+  '3xl': 768,
+  '4xl': 896,
+  '5xl': 1024,
+  '6xl': 1152,
+  '7xl': 1280,
+};
+
+function _getResponsivePixels(rule: string): number {
+  for (const [key, px] of Object.entries(_responsiveSizePx)) {
+    if (rule.includes(`@media ${mediaVariants[key]}`)) return px;
+  }
+  return -1;
+}
+
+function _getContainerPixels(rule: string): number {
+  for (const [key, px] of Object.entries(_containerSizePx)) {
+    if (rule.includes(`@container ${containerVariants[key]}`)) return px;
+  }
+  if (rule.includes('@container (min-width:')) {
+    const match = /@container \(min-width:(\d+(?:\.\d+)?)(px|rem|em)/.exec(
+      rule,
+    );
+    if (match) {
+      const value = parseFloat(match[1]);
+      const unit = match[2];
+      return unit === 'rem' || unit === 'em' ? value * 16 : value;
+    }
+  }
+  return -1;
+}
+
 // Enhanced JIT CSS generation with better performance
-export const jitCssCache = new Map<
-  string,
-  { css: string; timestamp: number }
->();
+export const jitCssCache = new Map<string, string>();
 export const JIT_CSS_THROTTLE_MS = 16;
 const MAX_CACHE_SIZE = 1000;
 
@@ -2268,17 +2325,35 @@ if (typeof import.meta !== 'undefined' && import.meta.hot) {
 }
 
 export function jitCSS(html: string): string {
-  // Check cache first - use exact HTML as key for proper cache invalidation
-  const cached = jitCssCache.get(html);
-  if (cached) {
-    return cached.css;
-  }
-
+  // Extract classes first so we can derive a stable, compact cache key.
   const classes = extractClassesFromHTML(html);
   if (!classes.length) return '';
 
+  // Use sorted unique class names as cache key instead of the full HTML string.
+  // This way, non-class content changes (text nodes, ARIA attributes, data
+  // attributes) don't cause cache misses when the set of utility classes is
+  // identical — a significant performance win for reactive components.
   const seen = new Set(classes);
-  const buckets: string[][] = [[], [], [], []];
+  const cacheKey = Array.from(seen).sort().join('\x00');
+  const cached = jitCssCache.get(cacheKey);
+  if (cached !== undefined) {
+    // Maintain LRU order: delete + re-insert moves this entry to the end of
+    // the Map so the eviction path (which removes from the front) always
+    // evicts the least-recently-used entry.
+    jitCssCache.delete(cacheKey);
+    jitCssCache.set(cacheKey, cached);
+    return cached;
+  }
+  // Bucket layout:
+  //   0 — base (no variants)
+  //   1 — pseudo / structural variants (hover:, focus:, group-*, etc.)
+  //   2 — responsive / container queries without dark (sm:, @lg:, …)
+  //   3 — dark: only (@media prefers-color-scheme: dark, no breakpoint)
+  //   4 — dark: combined with responsive / container (dark:sm:, dark:@lg:, …)
+  // Keeping dark-only in its own bucket (3) ensures it always comes after all
+  // responsive rules (bucket 2) so dark-mode overrides are deterministic
+  // regardless of the order classes appear in the HTML.
+  const buckets: string[][] = [[], [], [], [], []];
   const ruleCache: Record<string, string | null> = {};
 
   const generateRuleCached = (
@@ -2302,7 +2377,8 @@ export function jitCSS(html: string): string {
     const hasDark = variants.includes('dark');
     if (!variants.length) return 0;
     if (!hasResponsive && !hasDark && !hasContainer) return 1;
-    if (hasDark && (hasResponsive || hasContainer)) return 3;
+    if (hasDark && (hasResponsive || hasContainer)) return 4;
+    if (hasDark) return 3; // dark-only — comes after responsive, before dark+responsive
     return 2;
   };
 
@@ -2998,106 +3074,59 @@ export function jitCSS(html: string): string {
   // testable we generate standalone rules for any from-*/via-*/to-*
   // classes so their selectors are present in the CSS output.
   const gradientStopRegex = /^(from|via|to)-[a-z]+-?\d{2,3}?$/;
+  // Snapshot the generated CSS once before iterating — avoids calling
+  // buckets.flat().join('') O(N) times inside the loop.
+  const preGradientCSS = buckets.flat().join('');
   for (const cls of seen) {
     if (gradientStopRegex.test(cls)) {
-      // If we already generated a rule for this class, skip. Evaluate
-      // current generated output from buckets instead of `css` var.
-      const generatedBuckets = buckets.flat().join('');
-      if (generatedBuckets.includes(escapeClassName(cls))) continue;
+      if (preGradientCSS.includes(escapeClassName(cls))) continue;
       const generated = generateRuleCached(cls);
       if (generated) buckets[0].push(generated);
     }
   }
 
-  // Sort rules within buckets to ensure proper CSS cascade order
-  // Larger breakpoints must come after smaller ones for correct precedence
+  // Sort rules within buckets to ensure proper CSS cascade order.
+  // Larger breakpoints must come after smaller ones for correct precedence.
+  // Uses module-level _getResponsivePixels / _getContainerPixels helpers so
+  // the lookup tables are not re-allocated on every sort comparison.
   const sortRulesByBreakpoint = (rules: string[]): string[] => {
     return rules.sort((a, b) => {
-      // Extract responsive breakpoint from media query and return pixel value
-      const getResponsivePixels = (rule: string): number => {
-        const responsiveSizes: Record<string, number> = {
-          sm: 640,
-          md: 768,
-          lg: 1024,
-          xl: 1280,
-          '2xl': 1536,
-        };
-        for (const [key, px] of Object.entries(responsiveSizes)) {
-          if (rule.includes(`@media ${mediaVariants[key]}`)) return px;
-        }
-        return -1;
-      };
+      const aRespPx = _getResponsivePixels(a);
+      const bRespPx = _getResponsivePixels(b);
+      const aContPx = _getContainerPixels(a);
+      const bContPx = _getContainerPixels(b);
 
-      // Extract container breakpoint and return pixel value
-      const getContainerPixels = (rule: string): number => {
-        const containerSizes: Record<string, number> = {
-          xs: 320, // 20rem
-          sm: 384, // 24rem
-          md: 448, // 28rem
-          lg: 512, // 32rem
-          xl: 576, // 36rem
-          '2xl': 672, // 42rem
-          '3xl': 768, // 48rem
-          '4xl': 896, // 56rem
-          '5xl': 1024, // 64rem
-          '6xl': 1152, // 72rem
-          '7xl': 1280, // 80rem
-        };
-
-        // Check for named container breakpoints
-        for (const [key, px] of Object.entries(containerSizes)) {
-          if (rule.includes(`@container ${containerVariants[key]}`)) return px;
-        }
-
-        // Check for arbitrary container queries like @container (min-width:300px)
-        if (rule.includes('@container (min-width:')) {
-          const match =
-            /@container \(min-width:(\d+(?:\.\d+)?)(px|rem|em)/.exec(rule);
-          if (match) {
-            const value = parseFloat(match[1]);
-            const unit = match[2];
-            // Convert to pixels for comparison
-            return unit === 'rem' || unit === 'em' ? value * 16 : value;
-          }
-        }
-        return -1;
-      };
-
-      const aRespPx = getResponsivePixels(a);
-      const bRespPx = getResponsivePixels(b);
-      const aContPx = getContainerPixels(a);
-      const bContPx = getContainerPixels(b);
-
-      // Sort by responsive breakpoint if both have responsive queries
       if (aRespPx >= 0 && bRespPx >= 0 && aRespPx !== bRespPx)
         return aRespPx - bRespPx;
 
-      // Sort by container breakpoint if both have container queries
       if (aContPx >= 0 && bContPx >= 0 && aContPx !== bContPx)
         return aContPx - bContPx;
 
-      // Keep original order for same breakpoint or no breakpoint
       return 0;
     });
   };
 
-  // Sort buckets 2 and 3 which contain responsive/container queries
+  // Sort buckets 2 and 4 which contain responsive/container queries.
+  // Bucket 3 (dark-only) needs no sort — all its rules share the same
+  // @media (prefers-color-scheme: dark) wrapper with no breakpoint dimension.
   buckets[2] = sortRulesByBreakpoint(buckets[2]);
-  buckets[3] = sortRulesByBreakpoint(buckets[3]);
+  buckets[4] = sortRulesByBreakpoint(buckets[4]);
 
   const css = buckets.flat().join('');
 
-  // Cache size management to prevent memory leaks
+  // Cache size management: evict the LRU half when the cache is full.
+  // Map preserves insertion order and the hit path (delete + re-insert)
+  // promotes accessed entries to the end, so entries at the front are
+  // always the least-recently-used ones. Iterate keys directly to avoid
+  // allocating an intermediate array.
   if (jitCssCache.size >= MAX_CACHE_SIZE) {
-    // Remove oldest entries (simple FIFO cleanup)
-    const keysToDelete = Array.from(jitCssCache.keys()).slice(
-      0,
-      Math.floor(MAX_CACHE_SIZE / 2),
-    );
-    keysToDelete.forEach((key) => jitCssCache.delete(key));
+    let evictCount = Math.floor(MAX_CACHE_SIZE / 2);
+    for (const key of jitCssCache.keys()) {
+      if (evictCount-- === 0) break;
+      jitCssCache.delete(key);
+    }
   }
 
-  // Store generated CSS with current timestamp
-  jitCssCache.set(html, { css, timestamp: Date.now() });
+  jitCssCache.set(cacheKey, css);
   return css;
 }

@@ -76,11 +76,11 @@ Available families: `slate`, `gray`, `zinc`, `stone`, `red`, `orange`, `amber`, 
 
 > **Why are extended colors disabled by default? Performance.**
 >
-> Each CSS rule the JIT engine generates is injected via `CSSStyleSheet.insertRule()`. Every `insertRule()` call can trigger the browser to re-run style matching for all elements in scope — this is called a **style recalculation**. In Shadow DOM, style recalculations are scoped to each component's shadow root, but they still cost CPU time, especially during initial render when many classes are encountered at once.
+> On each render the JIT engine calls `CSSStyleSheet.replaceSync()` to replace the component's entire accumulated stylesheet in one shot. Every `replaceSync()` call triggers the browser to re-run style matching for all elements in that shadow root — this is called a **style recalculation**. In Shadow DOM, style recalculations are scoped to each component's shadow root, but they still cost CPU time, especially during initial render when many classes are encountered at once.
 >
-> The extended palette contains **21 families × 11 shades = 231 color tokens**. Each token can appear as `bg-`, `text-`, `border-`, `ring-`, `shadow-`, `outline-`, `from-`, `to-`, or `via-`, giving a theoretical maximum of ~2,000 injectable rules. In a real app the JIT engine only generates rules for classes it actually encounters, but a large component tree with varied color usage can easily produce hundreds of `insertRule()` calls per render cycle.
+> The extended palette contains **21 families × 11 shades = 231 color tokens**. Each token can appear as `bg-`, `text-`, `border-`, `ring-`, `shadow-`, `outline-`, `from-`, `to-`, or `via-`, giving a theoretical maximum of ~2,000 CSS rules. In a real app the JIT engine only generates rules for classes it actually encounters, but a large component tree with varied color usage can accumulate a substantial stylesheet on that first `replaceSync()` pass.
 >
-> To make things worse, each component's shadow root gets its **own scoped stylesheet**. The rule for `bg-blue-500` inside `<my-card>` is a separate injection from the same rule inside `<my-button>`. CSS rules are not shared across shadow boundaries. More active color families means more injections, multiplied by the number of components using them.
+> Each component's shadow root also gets its **own scoped stylesheet**. The rule for `bg-blue-500` inside `<my-card>` is a separate stylesheet from the one inside `<my-button>`. CSS rules are not shared across shadow boundaries. More active color families means more generated CSS per component, multiplied by the number of components using them.
 >
 > The JIT engine's memoization cache also grows with the number of unique class/shade combinations it has seen. Enabling all 21 families in a large app puts real pressure on that cache and increases memory usage over the lifetime of the page.
 >
@@ -1123,7 +1123,7 @@ import {
 } from '@jasonshimmy/custom-elements-runtime';
 
 component('dynamic-card', () => {
-  const props = useProps({ theme: 'light', size: 'md' });
+  const { theme, size } = useProps({ theme: 'light', size: 'md' });
   const isExpanded = ref(false);
 
   useStyle(
@@ -1167,7 +1167,7 @@ component('dynamic-card', () => {
 
 ```typescript
 component('chart-widget', () => {
-  const props = useProps({ data: [], colorScheme: 'blue' });
+  const { data, colorScheme } = useProps({ data: [], colorScheme: 'blue' });
   const hoveredIndex = ref(-1);
 
   useStyle(

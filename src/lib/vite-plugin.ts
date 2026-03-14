@@ -121,11 +121,21 @@ export function cerJITCSS(options: CerJITCSSPluginOptions): Plugin {
   };
 
   let generatedCSS = '';
+  // Resolved file set built in buildStart and reused in handleHotUpdate to
+  // avoid re-running globSync for every HMR file-change event.
+  let watchedFiles: Set<string> | null = null;
 
   return {
     name: 'cer-jit-css',
 
     buildStart() {
+      const cwd = process.cwd();
+      const resolved = new Set<string>();
+      for (const pattern of content) {
+        globSync(pattern, { cwd }).forEach((f) => resolved.add(resolve(cwd, f)));
+      }
+      watchedFiles = resolved;
+
       generatedCSS = generateFromFiles(content, jitOptions);
 
       if (output) {
@@ -150,12 +160,9 @@ export function cerJITCSS(options: CerJITCSSPluginOptions): Plugin {
     },
 
     handleHotUpdate({ file, server }: { file: string; server: unknown }) {
-      // Re-generate when a watched source file changes
-      const cwd = process.cwd();
-      const isWatched = content.some((pattern) => {
-        const matches = globSync(pattern, { cwd }).map((f) => resolve(cwd, f));
-        return matches.includes(file);
-      });
+      // Re-generate when a watched source file changes.
+      // Use the cached file set from buildStart to avoid re-globbing.
+      const isWatched = watchedFiles?.has(file) ?? false;
 
       if (!isWatched) return;
 

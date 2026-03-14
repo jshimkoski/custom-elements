@@ -30,8 +30,10 @@ import {
   defineModel,
   html,
 } from '@jasonshimmy/custom-elements-runtime';
+import { useJITCSS } from '@jasonshimmy/custom-elements-runtime/jit-css';
 
 component('my-counter', () => {
+  useJITCSS();
   const count = defineModel('count', 0);
 
   const handleClick = () => {
@@ -98,11 +100,6 @@ Below is the **complete list of public symbols** exported by the runtime and its
 | `useOnAttributeChanged`      | Hook observing host attribute changes.                                                                                                                                   |
 | `useOnError`                 | Hook to register a component-level error handler.                                                                                                                        |
 | `useStyle`                   | Hook to register or compute component styles at runtime.                                                                                                                 |
-| `useJITCSS`                  | Enable JIT CSS for the current component (per-component opt-in). Pass `JITCSSOptions` to configure colors and variants.                                                  |
-| `enableJITCSS`               | Enable JIT CSS globally for all components. Call once at app entry point to preserve v2-style behaviour.                                                                 |
-| `disableJITCSS`              | Disable JIT CSS globally (useful in tests or opt-out scenarios).                                                                                                         |
-| `isJITCSSEnabled`            | Returns `true` when JIT CSS is globally active.                                                                                                                          |
-| `isJITCSSEnabledFor`         | Returns `true` when JIT CSS is active for a specific `ShadowRoot` (per-component or global).                                                                             |
 | `useDesignTokens`            | Apply typed design token overrides to `:host` as CSS custom properties.                                                                                                  |
 | `useGlobalStyle`             | Inject CSS into `document.adoptedStyleSheets`, escaping Shadow DOM encapsulation. Use sparingly.                                                                         |
 | `useExpose`                  | Publish methods and properties onto the host element as an imperative public API.                                                                                        |
@@ -121,7 +118,7 @@ Below is the **complete list of public symbols** exported by the runtime and its
 | `getHealthMonitor`           | Return the global singleton health monitor instance (lazily created).                                                                                                    |
 | `updateHealthMetric`         | Update a named metric on the global singleton health monitor.                                                                                                            |
 | `getHealthStatus`            | Return the current `HealthReport` from the global singleton health monitor.                                                                                              |
-| **Types**                    | `ModelRef`, `DefineModelOptions`, `HealthMonitorInstance`, `HealthReport`, `UpdatePriority`, `TeleportHandle`, `ReactiveState`, `VNode`, `JITCSSOptions`, `DesignTokens` |
+| **Types**                    | `ModelRef`, `HealthMonitorInstance`, `HealthReport`, `UpdatePriority`, `TeleportHandle`, `ReactiveState`, `VNode`, `JITCSSOptions`, `DesignTokens`                       |
 
 ---
 

@@ -482,6 +482,36 @@ describe('🎯 Container Query Precedence', () => {
     expect(smIndex).toBeLessThan(lgIndex);
   });
 
+  it('should place dark-only rules after all responsive rules regardless of class order', () => {
+    // If dark: ends up in the same bucket as sm:/md: the relative position of
+    // these two media-query rules depends on which class was written first in
+    // the HTML — non-deterministic behaviour. The fix assigns dark-only to a
+    // dedicated bucket that is always flushed after the responsive bucket.
+
+    // dark: listed first in the class attribute
+    const htmlDarkFirst = `<div class="dark:text-white sm:text-lg md:text-xl">test</div>`;
+    // dark: listed last in the class attribute
+    const htmlDarkLast = `<div class="sm:text-lg md:text-xl dark:text-white">test</div>`;
+
+    const cssDarkFirst = jitCSS(htmlDarkFirst);
+    const cssDarkLast = jitCSS(htmlDarkLast);
+
+    // Both orderings must produce identical CSS (deterministic output)
+    expect(cssDarkFirst).toBe(cssDarkLast);
+
+    // dark: rule must come AFTER sm: and md: rules so dark-mode overrides win
+    const darkIdx = cssDarkFirst.indexOf('@media (prefers-color-scheme: dark)');
+    const smIdx = cssDarkFirst.indexOf('@media (min-width:640px)');
+    const mdIdx = cssDarkFirst.indexOf('@media (min-width:768px)');
+
+    expect(darkIdx).toBeGreaterThan(-1);
+    expect(smIdx).toBeGreaterThan(-1);
+    expect(mdIdx).toBeGreaterThan(-1);
+
+    expect(smIdx).toBeLessThan(darkIdx);
+    expect(mdIdx).toBeLessThan(darkIdx);
+  });
+
   it('should also order responsive media queries correctly', () => {
     const html = `
       <div class="xl:bg-warning-500 sm:bg-error-500 lg:bg-info-500 md:bg-success-500">

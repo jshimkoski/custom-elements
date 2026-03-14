@@ -1,5 +1,8 @@
 import { component, html, ref } from '../lib';
 import { initRouter } from '../lib/router';
+import { enableJITCSS } from '../lib/jit-css';
+
+enableJITCSS();
 
 // Export a top-level function so tests can exercise and cover it directly.
 export function homeDoSomething() {

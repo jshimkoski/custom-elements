@@ -95,7 +95,9 @@ Codemods or ESLint rules can assist migration.
 
 ## 2. 🎨 Extended Color Palette in JIT CSS
 
-### Current problem
+### Status: ✅ Implemented
+
+### Original problem
 
 `extendedColors` (`src/lib/css/colors.ts`) exports the full Tailwind palette as hex values for use with TypeScript. However, `parseColorClass()` inside `style.ts` only recognizes the seven semantic palette names (`neutral`, `primary`, `secondary`, `success`, `info`, `warning`, `error`) plus `white`, `black`, `transparent`, `current`. This means writing `bg-violet-500` or `text-rose-300` in a template produces **no CSS output** — silently broken.
 
@@ -150,6 +152,10 @@ useJITCSS({
 ---
 
 ## 3. 🌊 Closing the Tailwind CSS 4 Feature Gap
+
+### Status: ✅ Mostly Implemented
+
+Sections 3.1–3.10, 3.12, and 3.13 are fully implemented. Section 3.11 (`oklch`/`color-mix()`) is partially implemented: `color-mix()` is used for opacity modifiers and arbitrary `bg-[oklch(...)]` values already work, but `variables.css` still defines color tokens as hex rather than `oklch()`.
 
 The following are the most impactful gaps between the current JIT engine and Tailwind CSS 4, ordered by implementation value.
 
@@ -300,6 +306,12 @@ Tailwind 4 expands the spacing scale with half-step values (`0.5`, `1.5`, `2.5`,
 ---
 
 ## 4. ⚡ Non-Shadow DOM JIT CSS
+
+### Status: ✅ Implemented
+
+Both the runtime DOM scanner (`createDOMJITCSS` in `@jasonshimmy/custom-elements-runtime/dom-jit-css`) and the Vite plugin (`cerJITCSS` in `@jasonshimmy/custom-elements-runtime/vite-plugin`) are shipped. See [DOM JIT CSS docs](./dom-jit-css.md) and [Vite Plugin docs](./vite-plugin.md).
+
+> **Implementation note:** Section 4.1 below describes `insertRule()` as the planned injection strategy, but the actual implementation uses `replaceSync()` instead. `insertRule()` does not support nested at-rules (`@media`, `@container`), which are required for responsive and dark-mode variants. `replaceSync()` replaces the accumulated stylesheet in one call, which correctly handles all at-rule nesting.
 
 Supporting JIT CSS outside of Web Components requires a different injection strategy. Two complementary approaches are recommended.
 
@@ -482,7 +494,7 @@ src/lib/vite-plugin.ts
 
 ## 5. ✨ Additional Opportunities
 
-### 5.1 `useDesignTokens()` hook
+### 5.1 `useDesignTokens()` hook — ✅ Implemented
 
 A hook that sets CSS custom properties on `:host` in one call, typed to the token system:
 
@@ -496,7 +508,7 @@ useDesignTokens({
 
 This replaces common `useStyle(() => css\`:host { --cer-color-primary-500: #6366f1 }\`)` boilerplate with a typed, validated API.
 
-### 5.2 `@property` Houdini registration for composition variables
+### 5.2 `@property` Houdini registration for composition variables — ✅ Implemented
 
 The transform composition variables (`--cer-rotate`, `--cer-translate-x`, `--cer-scale-x`, etc.) and filter variables are registered as plain CSS custom properties (untyped). Browsers cannot animate or interpolate untyped custom properties correctly.
 
@@ -517,7 +529,7 @@ Register them with `@property` in `variables.css`:
 
 This enables smooth CSS transitions on `rotate-*`, `scale-*`, and `translate-*` utilities — something that currently requires explicit `transition-transform` and can behave unexpectedly at boundary values.
 
-### 5.3 `useGlobalStyle()` hook
+### 5.3 `useGlobalStyle()` hook — ✅ Implemented
 
 Allows components to inject CSS that escapes the Shadow DOM boundary via `document.adoptedStyleSheets`. This is intentionally an escape hatch with a warning in dev mode:
 
@@ -544,7 +556,7 @@ Add a Vite plugin transform that removes utility definitions from `jit-css-engin
 
 Potential savings: a project that only uses layout and spacing utilities could reduce the JIT engine from ~22 KB gzip to ~6–8 KB.
 
-### 5.5 TypeScript class-name autocomplete helper
+### 5.5 TypeScript class-name autocomplete helper — ✅ Implemented
 
 A typed `cls()` function that provides IDE autocomplete for utility class names:
 
@@ -557,7 +569,7 @@ cls('flex items-center gap-4 bg-primary-500');
 
 Implemented as a no-op at runtime (`return input`) with a `.d.ts` file that maps the string union of all known utility names. Useful for catching typos and enabling rename-refactoring in IDEs.
 
-### 5.6 CSS Cascade Layers for non-Shadow DOM path
+### 5.6 CSS Cascade Layers for non-Shadow DOM path — ✅ Implemented
 
 When injecting global styles (§4.1, §4.2), use `@layer` to ensure library utilities never overpower user styles without `!important`:
 
@@ -590,7 +602,7 @@ A browser DevTools panel (via the Chrome DevTools Protocol extension API) that:
 
 This would live in a separate optional `dev-tools` entry point and be tree-shaken in production.
 
-### 5.8 SSR pre-generation
+### 5.8 SSR pre-generation — ✅ Implemented
 
 Extend the SSR path (`src/lib/ssr.ts`) to pre-generate JIT CSS during server render and embed it in the `<head>` as a `<style>` element. Currently the SSR path produces a no-op for JIT CSS. Pre-generating eliminates the Flash of Unstyled Content (FOUC) on hydration.
 
@@ -598,30 +610,30 @@ Extend the SSR path (`src/lib/ssr.ts`) to pre-generate JIT CSS during server ren
 
 ## Summary Table
 
-| Item                                    | Type         | Breaking?     | Complexity | Value   |
-| --------------------------------------- | ------------ | ------------- | ---------- | ------- |
-| `useJITCSS()` opt-in hook               | Architecture | ✅ Major (v3) | Medium     | 🔥 High |
-| Extended colors in JIT parser           | Feature      | ❌            | Low        | 🔥 High |
-| `variables.css` extended vars           | Feature      | ❌            | Low        | Medium  |
-| Logical properties (`ms-`, `me-`, etc.) | Utilities    | ❌            | Low        | 🔥 High |
-| `text-shadow-*`                         | Utilities    | ❌            | Low        | 🔥 High |
-| `mask-*`                                | Utilities    | ❌            | Medium     | Medium  |
-| `field-sizing-*`                        | Utilities    | ❌            | Low        | Medium  |
-| `scheme-*`                              | Utilities    | ❌            | Low        | Medium  |
-| `font-stretch-*`                        | Utilities    | ❌            | Low        | Low     |
-| `inert:` variant                        | Variant      | ❌            | Low        | Medium  |
-| `flow-root` display                     | Utility      | ❌            | Low        | Low     |
-| Extended cursor utilities               | Utilities    | ❌            | Low        | Low     |
-| `@layer` integration                    | Architecture | ❌            | Medium     | Medium  |
-| `oklch` / `color-mix()`                 | Enhancement  | ❌            | Medium     | Medium  |
-| `grid-cols-subgrid`                     | Utility      | ❌            | Low        | Medium  |
-| Runtime DOM scanner                     | New module   | ❌            | High       | 🔥 High |
-| Vite plugin                             | New module   | ❌            | High       | 🔥 High |
-| `useDesignTokens()`                     | Hook         | ❌            | Low        | 🔥 High |
-| `@property` Houdini registration        | Enhancement  | ❌            | Low        | Medium  |
-| `useGlobalStyle()`                      | Hook         | ❌            | Low        | Medium  |
-| Static utility purging                  | Build        | ❌            | High       | Medium  |
-| TypeScript autocomplete helper          | DX           | ❌            | Medium     | Medium  |
-| CSS Cascade Layers (non-ShadowDOM)      | Architecture | ❌            | Medium     | Medium  |
-| SSR pre-generation                      | Enhancement  | ❌            | Medium     | High    |
-| DevTools integration                    | Tooling      | ❌            | High       | Low     |
+| Item                                    | Status          | Type         | Breaking?     | Complexity | Value   |
+| --------------------------------------- | --------------- | ------------ | ------------- | ---------- | ------- |
+| `useJITCSS()` opt-in hook               | ✅ Implemented  | Architecture | ✅ Major (v3) | Medium     | 🔥 High |
+| Extended colors in JIT parser           | ✅ Implemented  | Feature      | ❌            | Low        | 🔥 High |
+| `variables.css` extended vars           | ✅ Implemented  | Feature      | ❌            | Low        | Medium  |
+| Logical properties (`ms-`, `me-`, etc.) | ✅ Implemented  | Utilities    | ❌            | Low        | 🔥 High |
+| `text-shadow-*`                         | ✅ Implemented  | Utilities    | ❌            | Low        | 🔥 High |
+| `mask-*`                                | ✅ Implemented  | Utilities    | ❌            | Medium     | Medium  |
+| `field-sizing-*`                        | ✅ Implemented  | Utilities    | ❌            | Low        | Medium  |
+| `scheme-*`                              | ✅ Implemented  | Utilities    | ❌            | Low        | Medium  |
+| `font-stretch-*`                        | ✅ Implemented  | Utilities    | ❌            | Low        | Low     |
+| `inert:` variant                        | ✅ Implemented  | Variant      | ❌            | Low        | Medium  |
+| `flow-root` display                     | ✅ Implemented  | Utility      | ❌            | Low        | Low     |
+| Extended cursor utilities               | ✅ Implemented  | Utilities    | ❌            | Low        | Low     |
+| `@layer` integration                    | ✅ Implemented  | Architecture | ❌            | Medium     | Medium  |
+| `oklch` / `color-mix()`                 | 🔲 Partial     | Enhancement  | ❌            | Medium     | Medium  |
+| `grid-cols-subgrid`                     | ✅ Implemented  | Utility      | ❌            | Low        | Medium  |
+| Runtime DOM scanner                     | ✅ Implemented  | New module   | ❌            | High       | 🔥 High |
+| Vite plugin                             | ✅ Implemented  | New module   | ❌            | High       | 🔥 High |
+| `useDesignTokens()`                     | ✅ Implemented  | Hook         | ❌            | Low        | 🔥 High |
+| `@property` Houdini registration        | ✅ Implemented  | Enhancement  | ❌            | Low        | Medium  |
+| `useGlobalStyle()`                      | ✅ Implemented  | Hook         | ❌            | Low        | Medium  |
+| Static utility purging                  | 🔲 Planned     | Build        | ❌            | High       | Medium  |
+| TypeScript autocomplete helper (`cls`)  | ✅ Implemented  | DX           | ❌            | Medium     | Medium  |
+| CSS Cascade Layers (non-ShadowDOM)      | ✅ Implemented  | Architecture | ❌            | Medium     | Medium  |
+| SSR pre-generation                      | ✅ Implemented  | Enhancement  | ❌            | Medium     | High    |
+| DevTools integration                    | 🔲 Planned     | Tooling      | ❌            | High       | Low     |

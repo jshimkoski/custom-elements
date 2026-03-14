@@ -179,6 +179,15 @@ export function component(
           enumerable: false,
           configurable: true,
         });
+        // Reset computed style so useDesignTokens doesn't accumulate duplicate
+        // :host blocks across re-renders. Uses defineProperty for the same reason
+        // as _hookCallbacks: bypass the reactive proxy set-trap.
+        Object.defineProperty(context, '_computedStyle', {
+          value: undefined,
+          writable: true,
+          enumerable: false,
+          configurable: true,
+        });
         // Set current component context for hooks
         setCurrentComponentContext(context);
 

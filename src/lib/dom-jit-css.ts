@@ -94,20 +94,28 @@ export function createDOMJITCSS(
   let pendingClasses = new Set<string>();
   let flushScheduled = false;
   let isMounted = false;
+  // The target for adoptedStyleSheets / <style> injection. Set during mount().
+  // When rootOption is a ShadowRoot the sheet is scoped to that shadow tree;
+  // otherwise styles are adopted by the host document.
+  let adoptionTarget: Document | ShadowRoot | null = null;
 
   function injectStylesheet(): void {
     if (typeof document === 'undefined') return;
+
+    // Scope stylesheet injection to the shadow root when one was supplied,
+    // so the generated utility classes do not leak into the host document.
+    adoptionTarget = rootOption instanceof ShadowRoot ? rootOption : document;
 
     // Try constructable stylesheets first (faster incremental updates)
     if (
       typeof CSSStyleSheet !== 'undefined' &&
       'replaceSync' in CSSStyleSheet.prototype &&
-      document.adoptedStyleSheets !== undefined
+      adoptionTarget.adoptedStyleSheets !== undefined
     ) {
       try {
         adoptedSheet = new CSSStyleSheet();
-        document.adoptedStyleSheets = [
-          ...document.adoptedStyleSheets,
+        adoptionTarget.adoptedStyleSheets = [
+          ...adoptionTarget.adoptedStyleSheets,
           adoptedSheet,
         ];
         useAdoptedSheet = true;
@@ -117,12 +125,20 @@ export function createDOMJITCSS(
       }
     }
 
-    // Fallback: a plain <style> element
-    styleEl = document.getElementById(styleId) as HTMLStyleElement | null;
-    if (!styleEl) {
+    // Fallback: a plain <style> element.
+    // For a ShadowRoot target, append directly inside the shadow tree.
+    // ShadowRoot has no getElementById(), so we always create a fresh element.
+    if (rootOption instanceof ShadowRoot) {
       styleEl = document.createElement('style');
       styleEl.id = styleId;
-      (document.head ?? document.documentElement).appendChild(styleEl);
+      rootOption.appendChild(styleEl);
+    } else {
+      styleEl = document.getElementById(styleId) as HTMLStyleElement | null;
+      if (!styleEl) {
+        styleEl = document.createElement('style');
+        styleEl.id = styleId;
+        (document.head ?? document.documentElement).appendChild(styleEl);
+      }
     }
   }
 
@@ -131,20 +147,12 @@ export function createDOMJITCSS(
     injectedCSS += `\n${css}`;
     if (useAdoptedSheet && adoptedSheet) {
       try {
-        // Wrap each rule in @layer cer-utilities so non-Shadow DOM utility
-        // classes never overpower user styles without !important (spec §5.6).
-        // Multiple @layer blocks with the same name are merged by the cascade.
-        const rules = css.match(/[^{}]+\{[^{}]*\}/g) ?? [];
-        for (const rule of rules) {
-          try {
-            adoptedSheet.insertRule(
-              `@layer cer-utilities { ${rule} }`,
-              adoptedSheet.cssRules.length,
-            );
-          } catch {
-            // Ignore invalid rules (e.g. empty selector)
-          }
-        }
+        // Replace the entire sheet with the accumulated CSS wrapped in a single
+        // @layer block. replaceSync handles nested at-rules (@media, @container,
+        // @supports) correctly — the previous insertRule approach used a flat
+        // regex that stripped at-rule wrappers, causing dark: and responsive
+        // variants to apply unconditionally.
+        adoptedSheet.replaceSync(`@layer cer-utilities {\n${injectedCSS}\n}`);
         return;
       } catch {
         // Fall through to style element
@@ -215,10 +223,12 @@ export function createDOMJITCSS(
     scheduleFlush();
   }
 
-  function getObserverRoot(): Element | null {
+  function getObserverRoot(): Element | ShadowRoot | null {
     if (rootOption) {
-      if (rootOption instanceof ShadowRoot) return rootOption.host ?? null;
-      return rootOption as Element;
+      // Return the ShadowRoot directly so the MutationObserver observes inside
+      // the shadow tree. Previously we returned rootOption.host which caused the
+      // observer to watch the light DOM of the host element instead.
+      return rootOption;
     }
 
     // Auto-detect [data-jitcss] elements
@@ -250,13 +260,17 @@ export function createDOMJITCSS(
     const observerRoot = getObserverRoot();
     if (!observerRoot) return;
 
-    const mode = observerRoot.hasAttribute('data-jitcss')
-      ? getDataJITCSSMode(observerRoot)
-      : 'container';
+    // ShadowRoot does not inherit hasAttribute() from Element; guard with an
+    // instanceof check so passing a ShadowRoot as root does not throw.
+    const mode =
+      observerRoot instanceof Element &&
+      observerRoot.hasAttribute('data-jitcss')
+        ? getDataJITCSSMode(observerRoot)
+        : 'container';
     const actualRoot = mode === 'global' ? document.body : observerRoot;
 
     // Initial scan
-    if (mode === 'self') {
+    if (mode === 'self' && actualRoot instanceof Element) {
       addClassesFromElement(actualRoot);
       scheduleFlush();
     } else {
@@ -277,8 +291,9 @@ export function createDOMJITCSS(
           for (const node of mutation.addedNodes) {
             if (node instanceof Element) {
               if (mode === 'self') continue; // Only own classes in self mode
-              // Scan added element and its subtree
-              addClassesFromElement(node);
+              // scanSubtree already processes the root element as its first
+              // walker node, so a separate addClassesFromElement call here
+              // would process the same element twice.
               scanSubtree(node);
             }
           }
@@ -308,7 +323,8 @@ export function createDOMJITCSS(
     // Remove injected styles
     if (useAdoptedSheet && adoptedSheet) {
       try {
-        document.adoptedStyleSheets = document.adoptedStyleSheets.filter(
+        const target = adoptionTarget ?? document;
+        target.adoptedStyleSheets = target.adoptedStyleSheets.filter(
           (s) => s !== adoptedSheet,
         );
       } catch {
@@ -326,6 +342,7 @@ export function createDOMJITCSS(
     pendingClasses.clear();
     injectedCSS = '';
     flushScheduled = false;
+    adoptionTarget = null;
   }
 
   return {
