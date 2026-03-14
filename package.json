@@ -62,6 +62,21 @@
   "sideEffects": [
     "*.css"
   ],
+  "typesVersions": {
+    "*": {
+      "ssr": ["./dist/ssr.d.ts"],
+      "transitions": ["./dist/transitions.d.ts"],
+      "directives": ["./dist/directives.d.ts"],
+      "directive-enhancements": ["./dist/directive-enhancements.d.ts"],
+      "event-bus": ["./dist/event-bus.d.ts"],
+      "store": ["./dist/store.d.ts"],
+      "router": ["./dist/router.d.ts"],
+      "css/colors": ["./dist/css/colors.d.ts"],
+      "jit-css": ["./dist/jit-css.d.ts"],
+      "dom-jit-css": ["./dist/dom-jit-css.d.ts"],
+      "vite-plugin": ["./dist/vite-plugin.d.ts"]
+    }
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
