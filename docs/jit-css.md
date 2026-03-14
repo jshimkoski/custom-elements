@@ -2,6 +2,118 @@
 
 Custom Elements Runtime provides a high-performance, zero-dependency JIT CSS engine for custom elements. It enables utility-first, variant-rich, and arbitrary-value styling directly from your Shadow DOM.
 
+## 🔌 Opt-in Architecture
+
+JIT CSS is **opt-in** — it is disabled by default and only runs for components that request it. This keeps bundle sizes small for projects that don't use utility classes at all.
+
+### `useJITCSS()` — Per-Component Opt-in
+
+Call `useJITCSS()` inside a component's render function to enable JIT CSS for that specific component. This is the recommended approach for most projects.
+
+```ts
+import {
+  component,
+  html,
+  useJITCSS,
+} from '@jasonshimmy/custom-elements-runtime';
+
+component('my-card', () => {
+  useJITCSS(); // Enable JIT CSS for this component only
+  return html`<div
+    class="flex items-center gap-4 bg-primary-500 text-white p-4 rounded-lg"
+  >
+    <slot></slot>
+  </div>`;
+});
+```
+
+### `enableJITCSS()` — Global Opt-in
+
+Call `enableJITCSS()` once at your app entry point to enable JIT CSS for **all** components. This is the easiest migration path to preserve v2-style behaviour.
+
+```ts
+import { enableJITCSS } from '@jasonshimmy/custom-elements-runtime';
+
+// Enable for all components, including extended color palette
+enableJITCSS({ extendedColors: true });
+```
+
+### `JITCSSOptions`
+
+Both `useJITCSS()` and `enableJITCSS()` accept an optional options object:
+
+```ts
+interface JITCSSOptions {
+  /** Include the extended Tailwind color palette (slate, gray, red, violet, rose, etc.) */
+  extendedColors?: boolean;
+  /** Register project-specific color scales */
+  customColors?: Record<string, Record<string, string>>;
+  /** Disable specific variant groups to reduce output size */
+  disableVariants?: Array<
+    'responsive' | 'dark' | 'motion' | 'print' | 'container'
+  >;
+}
+```
+
+#### `extendedColors`
+
+Enable all 22 Tailwind-compatible color scales (`slate`, `gray`, `zinc`, `stone`, `red`, `orange`, `amber`, `yellow`, `lime`, `green`, `emerald`, `teal`, `cyan`, `sky`, `blue`, `indigo`, `violet`, `purple`, `fuchsia`, `pink`, `rose`) in addition to the built-in semantic palette.
+
+```ts
+enableJITCSS({ extendedColors: true });
+// Now bg-blue-500, text-violet-700, border-rose-300, etc. all generate CSS
+```
+
+#### `customColors`
+
+Register project-specific color scales at the call site:
+
+```ts
+useJITCSS({
+  customColors: {
+    brand: { '500': '#e63946', '600': '#c1121f' },
+    accent: { '300': '#a8dadc', '500': '#457b9d' },
+  },
+});
+// Now bg-brand-500, text-accent-300, etc. generate CSS
+```
+
+#### `disableVariants`
+
+Suppress entire variant groups to reduce output size:
+
+```ts
+enableJITCSS({
+  disableVariants: ['dark', 'motion', 'print'],
+});
+// dark:, motion-reduce:, motion-safe:, and print: variants produce no CSS
+```
+
+Available groups:
+
+- `'responsive'` — suppresses `sm:`, `md:`, `lg:`, `xl:`, `2xl:` breakpoints
+- `'dark'` — suppresses `dark:` variant
+- `'motion'` — suppresses `motion-reduce:` and `motion-safe:` variants
+- `'print'` — suppresses `print:` variant
+- `'container'` — suppresses `@sm:`, `@md:`, `@lg:`, `@xl:`, `@2xl:` container query variants
+
+### Additional Control Functions
+
+```ts
+// Check if JIT CSS is globally enabled
+isJITCSSEnabled(): boolean
+
+// Check if JIT CSS is enabled for a specific ShadowRoot (per-component or global)
+isJITCSSEnabledFor(root: ShadowRoot): boolean
+
+// Disable JIT CSS globally (useful in tests or opt-out scenarios)
+disableJITCSS(): void
+```
+
+These are importable from `@jasonshimmy/custom-elements-runtime` (root entry) or `@jasonshimmy/custom-elements-runtime/jit-css` (dedicated subpath).
+
+---
+
 ## 🏗️ How JIT CSS Works
 
 1. **Base Reset:** Applies a minimal Shadow DOM reset for consistent rendering. This is shared across all components to save space.
@@ -63,6 +175,9 @@ The `size-*` shorthand sets both `width` and `height` in a single utility — id
 `pointer-events-none`, `pointer-events-auto`
 `cursor-auto`, `cursor-default`, `cursor-pointer`, `cursor-wait`, `cursor-text`, `cursor-move`, `cursor-help`, `cursor-not-allowed`, `cursor-grab`, `cursor-grabbing`
 
+**Extended cursors (Tailwind 4):**
+`cursor-zoom-in`, `cursor-zoom-out`, `cursor-cell`, `cursor-crosshair`, `cursor-copy`, `cursor-alias`, `cursor-context-menu`, `cursor-vertical-text`, `cursor-no-drop`, `cursor-progress`, `cursor-col-resize`, `cursor-row-resize`, `cursor-ew-resize`, `cursor-ns-resize`, `cursor-nesw-resize`, `cursor-nwse-resize`, `cursor-all-scroll`
+
 ### **Accessibility**
 
 `sr-only`, `not-sr-only`
@@ -84,6 +199,9 @@ The `size-*` shorthand sets both `width` and `height` in a single utility — id
 `auto-cols-auto`, `auto-cols-min`, `auto-cols-max`, `auto-cols-fr`
 `auto-rows-auto`, `auto-rows-min`, `auto-rows-max`, `auto-rows-fr`
 `grid-flow-row`, `grid-flow-col`, `grid-flow-row-dense`, `grid-flow-col-dense`
+
+**Subgrid (Tailwind 4):**
+`grid-cols-subgrid`, `grid-rows-subgrid` — align children to the parent grid's track definition, enabling perfectly aligned nested layouts.
 
 ### **Flexbox**
 
@@ -430,6 +548,91 @@ Apply filter effects to the area **behind** an element (e.g., frosted glass). Us
 
 **Z-Index:** See the Z-Index section in Built-in Utilities above (`z-0` through `z-50`, plus `z-auto` and negative `-z-10` through `-z-50`)
 
+**Display:** `flow-root` — establishes a new block formatting context (replaces clearfix hacks).
+
+**Field Sizing (Tailwind 4):**
+`field-sizing-content` — auto-resize `<textarea>` and `<input>` to fit their content without JavaScript.
+`field-sizing-fixed` — revert to fixed-size sizing.
+
+```html
+<!-- Auto-growing textarea -->
+<textarea
+  class="field-sizing-content w-full min-h-[2.5rem] p-2 border rounded"
+></textarea>
+```
+
+**Color Scheme (Tailwind 4):**
+`scheme-light`, `scheme-dark`, `scheme-both`, `scheme-only-light`, `scheme-only-dark` — control browser-native UI elements (scrollbars, form controls) to match the active color scheme.
+
+```html
+<html class="scheme-dark">
+  <!-- Dark-mode native controls everywhere -->
+</html>
+<section class="scheme-light">
+  <!-- Force light native controls in this section -->
+</section>
+```
+
+**Font Stretch (Tailwind 4):**
+`font-stretch-ultra-condensed`, `font-stretch-extra-condensed`, `font-stretch-condensed`, `font-stretch-semi-condensed`, `font-stretch-normal`, `font-stretch-semi-expanded`, `font-stretch-expanded`, `font-stretch-extra-expanded`, `font-stretch-ultra-expanded`
+
+**Logical (flow-relative) Properties (Tailwind 4):**
+
+Logical properties improve RTL and vertical writing-mode support by using flow-relative directions instead of physical left/right/top/bottom.
+
+| Utility            | CSS property                                            |
+| ------------------ | ------------------------------------------------------- |
+| `ms-4`, `me-4`     | `margin-inline-start`, `margin-inline-end`              |
+| `ps-4`, `pe-4`     | `padding-inline-start`, `padding-inline-end`            |
+| `bs-4`, `be-4`     | `border-block-start-width`, `border-block-end-width`    |
+| `start-4`, `end-4` | `inset-inline-start`, `inset-inline-end`                |
+| `border-s-*`       | `border-inline-start-width`                             |
+| `border-e-*`       | `border-inline-end-width`                               |
+| `rounded-s-*`      | `border-start-start-radius` + `border-end-start-radius` |
+| `rounded-e-*`      | `border-start-end-radius` + `border-end-end-radius`     |
+| `text-start`       | `text-align: start`                                     |
+| `text-end`         | `text-align: end`                                       |
+
+```html
+<!-- RTL-aware padding and margin -->
+<div dir="rtl" class="ps-4 me-2">Logical padding + margin</div>
+
+<!-- Logical border radius (rounded on the start side) -->
+<div class="rounded-s-lg">Rounded on the inline-start side</div>
+```
+
+All logical spacing utilities accept the same numeric, fraction, and negative values as their physical equivalents.
+
+**Text Shadow (Tailwind 4):**
+
+`text-shadow-xs`, `text-shadow-sm`, `text-shadow`, `text-shadow-md`, `text-shadow-lg`, `text-shadow-xl`, `text-shadow-2xl`, `text-shadow-none`
+
+Pair with a color utility to tint the shadow:
+
+```html
+<h1 class="text-shadow-lg text-shadow-primary-500/30 text-2xl font-bold">
+  Primary shadow
+</h1>
+<span class="text-shadow text-shadow-error-700">Error state heading</span>
+```
+
+Color utilities follow the standard palette pattern: `text-shadow-{palette}-{shade}` and support the `/opacity` modifier.
+
+**CSS Masking (Tailwind 4):**
+
+`mask-none`, `mask-linear-to-t`, `mask-linear-to-b`, `mask-linear-to-l`, `mask-linear-to-r`, `mask-linear-to-tl`, `mask-linear-to-tr`, `mask-linear-to-bl`, `mask-linear-to-br`
+`mask-radial`, `mask-radial-circle`, `mask-radial-from-t`, `mask-radial-from-b`, `mask-radial-from-l`, `mask-radial-from-r`
+`mask-conic`, `mask-size-contain`, `mask-size-cover`, `mask-no-repeat`
+`mask-alpha`, `mask-luminance`
+
+```html
+<!-- Fade image out towards the bottom -->
+<img class="mask-linear-to-b w-full" src="hero.jpg" />
+
+<!-- Radial mask for a spotlight effect -->
+<div class="mask-radial bg-primary-500 p-8">Spotlight content</div>
+```
+
 ### **Pseudo-Element Content**
 
 `content-none` — `content: none`
@@ -511,6 +714,18 @@ Used exclusively with the `before:` and `after:` variants to add decorative cont
 ```html
 <!-- Hide decorative elements in high contrast mode -->
 <div class="bg-primary-500 forced-colors:bg-transparent">Important content</div>
+```
+
+**Inert (Tailwind 4):** `inert:` — style elements that carry the `inert` global HTML attribute (useful for modals, drawers, and off-screen content):
+
+```html
+<!-- Dim content while a modal is open -->
+<main
+  inert
+  class="inert:opacity-50 inert:pointer-events-none transition-opacity"
+>
+  Page content (dimmed when inert)
+</main>
 ```
 
 **Dynamic (Relational) Variants:**
@@ -1243,6 +1458,102 @@ component('dashboard-layout', () => {
 </form>
 ```
 
+## 🎨 Design Tokens (`useDesignTokens`)
+
+Apply design tokens to `:host` as typed CSS custom property overrides. This is a concise, validated alternative to writing `useStyle(() => css\`:host { ... }\`)` by hand.
+
+```ts
+import {
+  component,
+  html,
+  useDesignTokens,
+} from '@jasonshimmy/custom-elements-runtime';
+
+component('app-root', () => {
+  useDesignTokens({
+    primary: '#6366f1', // → --cer-color-primary-500
+    fontSans: '"Inter", sans-serif',
+    '--cer-color-neutral-900': '#0a0a0a', // arbitrary CSS var override
+  });
+  return html`<slot></slot>`;
+});
+```
+
+### Supported Token Keys
+
+| Key         | CSS property set            |
+| ----------- | --------------------------- |
+| `primary`   | `--cer-color-primary-500`   |
+| `secondary` | `--cer-color-secondary-500` |
+| `neutral`   | `--cer-color-neutral-500`   |
+| `success`   | `--cer-color-success-500`   |
+| `info`      | `--cer-color-info-500`      |
+| `warning`   | `--cer-color-warning-500`   |
+| `error`     | `--cer-color-error-500`     |
+| `fontSans`  | `--cer-font-sans`           |
+| `fontSerif` | `--cer-font-serif`          |
+| `fontMono`  | `--cer-font-mono`           |
+| `--cer-*`   | any arbitrary CSS variable  |
+
+`useDesignTokens()` must be called during component render. It appends a `:host { … }` style block for only the tokens you provide — unspecified tokens retain their defaults from `variables.css`.
+
+---
+
+## 🌐 Global Styles (`useGlobalStyle`)
+
+Inject CSS that escapes the Shadow DOM boundary into `document.adoptedStyleSheets`. Suitable for `@font-face` declarations, `:root` variable overrides, and global scroll styling. Deduplicated by CSS content so calling it in multiple component instances is safe.
+
+> **Use sparingly** — this intentionally breaks Shadow DOM encapsulation. A dev-mode warning is emitted to keep the escape hatch visible.
+
+```ts
+import {
+  component,
+  html,
+  css,
+  useGlobalStyle,
+} from '@jasonshimmy/custom-elements-runtime';
+
+component('app-root', () => {
+  useGlobalStyle(
+    () => css`
+      @font-face {
+        font-family: 'Inter';
+        src: url('/fonts/inter.woff2') format('woff2');
+      }
+      :root {
+        --app-font: 'Inter', sans-serif;
+        scroll-behavior: smooth;
+      }
+    `,
+  );
+  return html`<slot></slot>`;
+});
+```
+
+The CSS is minified, sanitized, and deduplicated before injection. In environments without `CSSStyleSheet` support (older Safari, SSR), the function is a no-op.
+
+---
+
+## ✅ Class Name Helper (`cls`)
+
+`cls()` is a **no-op identity function** that returns its input unchanged at runtime. Its purpose is to signal to development tools — IDEs, linters, and static analysis scanners — that a string contains JIT CSS utility class names.
+
+```ts
+import { cls } from '@jasonshimmy/custom-elements-runtime/jit-css';
+
+const buttonClasses = cls(
+  'flex items-center gap-2 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600',
+);
+
+component('my-button', () => {
+  return html`<button class="${buttonClasses}"><slot></slot></button>`;
+});
+```
+
+Use `cls()` when you store class name strings outside template literals — for example in configuration objects, constants files, or computed class name logic — so that build-time tooling (the [Vite plugin](./vite-plugin.md)) can discover them during static analysis.
+
+---
+
 ## 📚 Tips & Best Practices
 
 - **Utility-first approach:** Start with utility classes, use `useStyle` for complex dynamic logic
@@ -1264,33 +1575,53 @@ component('dashboard-layout', () => {
 
 ## 🔍 API Reference
 
+### **Opt-in Hooks & Global Control**
+
+- `useJITCSS(options?: JITCSSOptions): void` — Enable JIT CSS for the current component (or globally if called outside a component)
+- `enableJITCSS(options?: JITCSSOptions): void` — Enable JIT CSS globally for all components
+- `disableJITCSS(): void` — Disable JIT CSS globally
+- `isJITCSSEnabled(): boolean` — Check whether JIT CSS is globally active
+- `isJITCSSEnabledFor(root: ShadowRoot): boolean` — Check whether JIT CSS is active for a specific component
+- `useDesignTokens(tokens: DesignTokens): void` — Set typed CSS custom property overrides on `:host`
+- `useGlobalStyle(factory: () => string): void` — Inject CSS into `document.adoptedStyleSheets`, escaping Shadow DOM
+
 ### **Core Functions**
 
-- `minifyCSS(css: string): string` - Minifies CSS by removing whitespace and comments
-- `jitCSS(html: string): string` - Generates CSS from HTML class names
-- `css(strings, ...values): string` - Template literal function for CSS-in-JS
-- `useStyle(callback: () => string): void` - Hook for dynamic CSS injection
+- `jitCSS(html: string): string` — Generates JIT CSS from an HTML string containing utility class names
+- `extractClassesFromHTML(html: string): Set<string>` — Extracts unique class names from an HTML string
+- `css(strings, ...values): string` — Template literal function for CSS-in-JS (re-exported from root package)
+- `useStyle(callback: () => string): void` — Hook for dynamic CSS injection (re-exported from root package)
 
 ### **Built-in Exports**
 
-- `baseReset: string` - Base CSS reset for Shadow DOM
-- `colors: Record<string, Record<string, string>>` - Color palette object
-- `utilityMap: CSSMap` - Complete mapping of utility classes to CSS
+- `colors: Record<string, Record<string, string>>` - Semantic color palette object (neutral, primary, secondary, etc.)
+- `utilityMap: CSSMap` - Complete mapping of all static utility class names to CSS declarations
+
+### **Utility Helpers**
+
+- `cls(className: string): string` — Identity function for IDE tooling and static analysis (no-op at runtime; signals JIT class names to scanners)
 
 ### **Parser Functions**
 
-- `parseSpacing(className: string): string | null` - Parses spacing utilities
-- `parseColorClass(className: string): string | null` - Parses color utilities
-- `parseOpacityModifier(className: string): string | null` - Parses opacity modifiers
-- `parseGradientColorStop(className: string): string | null` - Parses gradient color stops (`from-*`, `via-*`, `to-*`)
-- `parseArbitrary(className: string): string | null` - Parses arbitrary value utilities
-- `parseArbitraryVariant(token: string): string | null` - Parses arbitrary variant selectors
+All of the following are exported from `@jasonshimmy/custom-elements-runtime/jit-css`:
+
+- `parseSpacing(className: string): string | null` — Parses spacing utilities (`w-4`, `p-2`, `m-auto`, etc.)
+- `parseColorClass(className: string): string | null` — Parses color utility classes (`bg-primary-500`, `text-neutral-700`, etc.)
+- `parseColorWithOpacity(className: string): string | null` — Parses a color class with an optional `/opacity` modifier
+- `parseGradientColorStop(className: string): string | null` — Parses gradient color stop utilities (`from-*`, `via-*`, `to-*`)
+- `parseArbitrary(className: string): string | null` — Parses arbitrary value utilities (`w-[200px]`, `bg-[#ff0000]`, etc.)
 
 ### **Configuration Objects**
 
-- `selectorVariants: SelectorVariantMap` - State and pseudo-class variants
-- `mediaVariants: MediaVariantMap` - Responsive breakpoints and media queries
-- `containerVariants: MediaVariantMap` - Container query breakpoints
-- `spacingProps: Record<string, string[]>` - Property mappings for spacing utilities
+- `selectorVariants: SelectorVariantMap` — State and pseudo-class variants (`hover:`, `focus:`, `disabled:`, `inert:`, etc.)
+- `mediaVariants: MediaVariantMap` — Responsive breakpoint media queries (`sm:`, `md:`, `lg:`, `xl:`, `2xl:`, `dark:`)
+- `containerVariants: MediaVariantMap` — Container query breakpoints (`@sm:`, `@md:`, `@lg:`, `@xl:`, `@2xl:`)
+
+> **Note:** Lower-level helpers such as `minifyCSS`, `baseReset`, `spacingProps`, `parseOpacityModifier`, and `parseArbitraryVariant` are available directly from `src/lib/runtime/style.ts` for library authors but are not re-exported from any public entry point.
+
+### **Types**
+
+- `JITCSSOptions` — Options for `useJITCSS()` / `enableJITCSS()` / `createDOMJITCSS()` / `cerJITCSS()`
+- `DesignTokens` — Token keys accepted by `useDesignTokens()`
 
 For complete implementation details, see [`src/lib/runtime/style.ts`](../src/lib/runtime/style.ts).

@@ -34,3 +34,73 @@ export {
   loadEntityMap,
   clearRegisteredEntityMap,
 } from './runtime/helpers';
+
+// ---- SSR JIT CSS pre-generation (§5.8) ----
+
+import { renderToString as _render } from './runtime/vdom-ssr';
+import { jitCSS, enableJITCSS, type JITCSSOptions } from './runtime/style';
+import type { VNode } from './runtime/types';
+import type { RenderOptions } from './runtime/vdom-ssr';
+
+/**
+ * Result of `renderToStringWithJITCSS()`.
+ */
+export interface SSRJITResult {
+  /** The rendered HTML string. */
+  html: string;
+  /**
+   * Pre-generated JIT CSS extracted from the rendered HTML.
+   * Embed this in a `<style>` element in your document `<head>` to eliminate
+   * Flash of Unstyled Content (FOUC) on hydration.
+   */
+  css: string;
+  /**
+   * Convenience: the HTML with a `<style>` element injected before `</head>`.
+   * If no `</head>` tag is found, the `<style>` is prepended to the HTML.
+   */
+  htmlWithStyles: string;
+}
+
+/**
+ * Server-side render a VNode tree and simultaneously pre-generate JIT CSS for
+ * all utility classes present in the rendered output.
+ *
+ * Embed the returned `css` in a `<style>` element in your document `<head>`
+ * to ensure correct styles are present before the client runtime hydrates,
+ * eliminating Flash of Unstyled Content (FOUC).
+ *
+ * @example
+ * ```ts
+ * import { renderToStringWithJITCSS } from '@jasonshimmy/custom-elements-runtime/ssr';
+ *
+ * const { htmlWithStyles } = await renderToStringWithJITCSS(appVNode, {
+ *   jit: { extendedColors: true },
+ * });
+ * res.send(`<!DOCTYPE html><html><head>${headTags}</head><body>${htmlWithStyles}</body></html>`);
+ * ```
+ */
+export function renderToStringWithJITCSS(
+  vnode: VNode,
+  options?: RenderOptions & { jit?: JITCSSOptions },
+): SSRJITResult {
+  const { jit, ...renderOptions } = options ?? {};
+
+  if (jit) enableJITCSS(jit);
+
+  const html = _render(vnode, renderOptions);
+  const css = jitCSS(html);
+
+  let htmlWithStyles: string;
+  if (css) {
+    const styleTag = `<style id="cer-ssr-jit">${css}</style>`;
+    if (html.includes('</head>')) {
+      htmlWithStyles = html.replace('</head>', `${styleTag}</head>`);
+    } else {
+      htmlWithStyles = `${styleTag}${html}`;
+    }
+  } else {
+    htmlWithStyles = html;
+  }
+
+  return { html, css, htmlWithStyles };
+}

@@ -7,6 +7,13 @@ import { isReactiveState } from './reactive';
 import { toKebab } from './helpers';
 import { devWarn } from './logger';
 import { isDiscoveryRender as _isDiscoveryRenderFn } from './discovery-state';
+import {
+  enableJITCSS,
+  registerJITCSSComponent,
+  sanitizeCSS,
+  minifyCSS,
+  type JITCSSOptions,
+} from './style';
 
 // Re-export discovery helpers so consumers continue to use the same import path.
 export { beginDiscoveryRender, endDiscoveryRender } from './discovery-state';
@@ -40,6 +47,9 @@ type InternalComponentContext = Record<string, unknown> & {
 };
 
 let currentComponentContext: InternalComponentContext | null = null;
+
+/** Symbol key used to store provides map on a component's context object. */
+const PROVIDES_KEY = Symbol('cer:provides');
 
 /**
  * Set the current component context (called internally during render)
@@ -628,9 +638,213 @@ export function useStyle(callback: () => string): void {
   }
 }
 
-// ---------- provide / inject ----------
+// ---------- useJITCSS / useDesignTokens ----------
 
-const PROVIDES_KEY = Symbol.for('@cer/provides');
+/**
+ * Configure the JIT CSS engine for the current session.
+ * This is a convenience wrapper around `enableJITCSS()` that can be called
+ * inside a component render function or at module initialisation time.
+ *
+ * @example
+ * ```ts
+ * component('my-component', () => {
+ *   // Enable extended Tailwind colors so bg-blue-500, text-violet-700, etc. generate CSS
+ *   useJITCSS({ extendedColors: true });
+ *   return html`<div class="bg-blue-500 text-white">Hello</div>`;
+ * });
+ * ```
+ *
+ * @example
+ * ```ts
+ * // At app entry – enable once for all components
+ * useJITCSS({ extendedColors: true, customColors: { brand: { '500': '#e63946' } } });
+ * ```
+ */
+export function useJITCSS(options?: JITCSSOptions): void {
+  // During discovery renders (component registration phase) there is no real
+  // shadow root. Without this guard, useJITCSS() falls through to
+  // enableJITCSS() and globally enables JIT CSS for every component — exactly
+  // the opt-in behaviour we are trying to prevent.
+  if (_isDiscoveryRenderFn()) return;
+
+  // When called inside a component render function, register this component's
+  // shadow root for per-component JIT CSS opt-in. Context is always set during
+  // a real render; it may be absent (null) or missing _host when called at app
+  // startup level (outside any component context).
+  const host = (currentComponentContext as { _host?: Element } | null)?._host;
+  const shadowRoot = host?.shadowRoot ?? null;
+
+  if (shadowRoot) {
+    // Per-component opt-in: register this shadow root only.
+    registerJITCSSComponent(shadowRoot, options);
+  } else {
+    // App-level call (outside component context) — enable for all components
+    // globally, preserving v2 behaviour when called at the entry point.
+    enableJITCSS(options);
+  }
+}
+
+// Re-export JITCSSOptions so consumers can import it from the hooks module
+export type { JITCSSOptions };
+
+/**
+ * Cache of globally-injected stylesheets keyed by their CSS content.
+ * Prevents duplicate `<style>` injections when the same `useGlobalStyle()`
+ * factory runs across multiple component instances.
+ */
+const _globalStyleSheets = new Map<string, CSSStyleSheet>();
+
+/**
+ * Inject CSS into `document.adoptedStyleSheets`, escaping the Shadow DOM
+ * boundary. Suitable for `@font-face` declarations, `:root` variable overrides,
+ * and global scroll/scroll-bar styling. Deduplicated by CSS content so calling
+ * this in multiple component instances is safe.
+ *
+ * **Use sparingly** — this intentionally breaks Shadow DOM encapsulation.
+ * A dev-mode warning is emitted to make the escape hatch visible.
+ *
+ * @example
+ * ```ts
+ * component('app-root', () => {
+ *   useGlobalStyle(() => css`
+ *     @font-face {
+ *       font-family: 'Inter';
+ *       src: url('/fonts/inter.woff2') format('woff2');
+ *     }
+ *     :root {
+ *       --app-font: 'Inter', sans-serif;
+ *     }
+ *   `);
+ *   return html`<slot></slot>`;
+ * });
+ * ```
+ */
+export function useGlobalStyle(styleFactory: () => string): void {
+  if (typeof document === 'undefined' || typeof CSSStyleSheet === 'undefined') {
+    return; // SSR / no-DOM environment — skip silently
+  }
+  devWarn(
+    '[useGlobalStyle] Injecting global styles from a component. ' +
+      'This escapes Shadow DOM encapsulation — use sparingly.',
+  );
+  const raw = styleFactory();
+  const style = minifyCSS(sanitizeCSS(raw));
+  if (!style || _globalStyleSheets.has(style)) return;
+  try {
+    const sheet = new CSSStyleSheet();
+    sheet.replaceSync(style);
+    document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
+    _globalStyleSheets.set(style, sheet);
+  } catch {
+    // Fallback: inject a <style> element in <head>
+    const el = document.createElement('style');
+    el.textContent = style;
+    (document.head ?? document.documentElement).appendChild(el);
+  }
+}
+
+/**
+ * Design token definitions accepted by `useDesignTokens()`.
+ * Map high-level token names to CSS custom property overrides.
+ */
+export interface DesignTokens {
+  /** Override the primary color scale root (sets --cer-color-primary-500) */
+  primary?: string;
+  /** Override the secondary color scale root */
+  secondary?: string;
+  /** Override the neutral color scale root */
+  neutral?: string;
+  /** Override the success color root */
+  success?: string;
+  /** Override the info color root */
+  info?: string;
+  /** Override the warning color root */
+  warning?: string;
+  /** Override the error color root */
+  error?: string;
+  /** Override the sans-serif font family */
+  fontSans?: string;
+  /** Override the serif font family */
+  fontSerif?: string;
+  /** Override the monospace font family */
+  fontMono?: string;
+  /** Additional arbitrary CSS custom property overrides */
+  [key: string]: string | undefined;
+}
+
+/**
+ * Apply design tokens to `:host` as CSS custom property overrides.
+ * Must be called during component render. This is a typed, validated
+ * alternative to writing `useStyle(() => css\`:host { ... }\`)` by hand.
+ *
+ * Semantic color tokens (e.g. `primary: '#6366f1'`) set the `*-500` shade
+ * for that scale. Use arbitrary `'--cer-color-primary-500'` keys to override
+ * individual shades.
+ *
+ * @example
+ * ```ts
+ * component('app-root', () => {
+ *   useDesignTokens({
+ *     primary: '#6366f1',
+ *     fontSans: '"Inter", sans-serif',
+ *     '--cer-color-neutral-900': '#0a0a0a',
+ *   });
+ *   return html`<slot></slot>`;
+ * });
+ * ```
+ */
+export function useDesignTokens(tokens: DesignTokens): void {
+  if (!currentComponentContext) {
+    throw new Error('useDesignTokens must be called during component render');
+  }
+
+  if (_isDiscoveryRenderFn()) return;
+
+  const declarations: string[] = [];
+  const semanticColorMap: Record<string, string> = {
+    primary: '--cer-color-primary-500',
+    secondary: '--cer-color-secondary-500',
+    neutral: '--cer-color-neutral-500',
+    success: '--cer-color-success-500',
+    info: '--cer-color-info-500',
+    warning: '--cer-color-warning-500',
+    error: '--cer-color-error-500',
+  };
+  const fontMap: Record<string, string> = {
+    fontSans: '--cer-font-sans',
+    fontSerif: '--cer-font-serif',
+    fontMono: '--cer-font-mono',
+  };
+
+  for (const [key, value] of Object.entries(tokens)) {
+    if (value === undefined) continue;
+    if (key in semanticColorMap) {
+      declarations.push(`${semanticColorMap[key]}:${value}`);
+    } else if (key in fontMap) {
+      declarations.push(`${fontMap[key]}:${value}`);
+    } else if (key.startsWith('--')) {
+      declarations.push(`${key}:${value}`);
+    }
+  }
+
+  if (declarations.length === 0) return;
+
+  const cssText = `:host{${declarations.join(';')}}`;
+
+  // Append to any existing computed style
+  const ctx = currentComponentContext as { _computedStyle?: string };
+  const existing = ctx._computedStyle ?? '';
+  const combined = existing ? `${existing}\n${cssText}` : cssText;
+
+  Object.defineProperty(currentComponentContext, '_computedStyle', {
+    value: combined,
+    writable: true,
+    enumerable: false,
+    configurable: true,
+  });
+}
+
+// ---------- provide / inject ----------
 
 /**
  * Store a value under a key so that descendant components can retrieve it

@@ -230,6 +230,95 @@ component('universal-greeting', () => {
 - Works in SSR and client environments
 - Hydrates seamlessly for interactivity
 
+## 🎨 SSR with JIT CSS Pre-generation (`renderToStringWithJITCSS`)
+
+Use `renderToStringWithJITCSS()` to server-render a VNode tree **and** simultaneously pre-generate the JIT CSS for every utility class in the output. Embedding this CSS in `<head>` eliminates the Flash of Unstyled Content (FOUC) that occurs when the client runtime applies styles after hydration.
+
+```ts
+import { html } from '@jasonshimmy/custom-elements-runtime';
+import { renderToStringWithJITCSS } from '@jasonshimmy/custom-elements-runtime/ssr';
+
+const appVNode = html`<div
+  class="flex items-center gap-4 bg-primary-500 text-white p-4 rounded-lg"
+>
+  <h1 class="text-2xl font-bold">Hello from SSR</h1>
+</div>`;
+
+const {
+  html: bodyHTML,
+  css,
+  htmlWithStyles,
+} = renderToStringWithJITCSS(appVNode);
+
+// Option A: use htmlWithStyles (pre-injects a <style> before </head>)
+res.send(
+  `<!DOCTYPE html><html><head>${headTags}</head><body>${htmlWithStyles}</body></html>`,
+);
+
+// Option B: use html + css separately
+res.send(`<!DOCTYPE html><html>
+  <head>${headTags}<style id="cer-ssr-jit">${css}</style></head>
+  <body>${bodyHTML}</body>
+</html>`);
+```
+
+### Options
+
+```ts
+renderToStringWithJITCSS(
+  vnode: VNode,
+  options?: RenderOptions & {
+    jit?: JITCSSOptions; // extendedColors, customColors, disableVariants
+  }
+): SSRJITResult
+```
+
+### `SSRJITResult`
+
+| Property         | Description                                                                              |
+| ---------------- | ---------------------------------------------------------------------------------------- |
+| `html`           | The rendered HTML string (no styles injected)                                            |
+| `css`            | Pre-generated JIT CSS for all utility classes found in `html`                            |
+| `htmlWithStyles` | `html` with `<style id="cer-ssr-jit">…</style>` injected before `</head>` (or prepended) |
+
+### With extended colors
+
+```ts
+const { htmlWithStyles } = renderToStringWithJITCSS(appVNode, {
+  jit: { extendedColors: true },
+});
+```
+
+### Express example
+
+```ts
+import express from 'express';
+import { html } from '@jasonshimmy/custom-elements-runtime';
+import { renderToStringWithJITCSS } from '@jasonshimmy/custom-elements-runtime/ssr';
+
+const app = express();
+
+app.get('*', (req, res) => {
+  const vnode = html`<div class="flex flex-col gap-6 p-8">
+    <h1 class="text-3xl font-bold text-primary-500">My App</h1>
+    <p class="text-neutral-700">Server rendered with JIT CSS.</p>
+  </div>`;
+
+  const { htmlWithStyles } = renderToStringWithJITCSS(vnode, {
+    jit: { extendedColors: true },
+  });
+
+  res.send(`<!DOCTYPE html><html lang="en">
+    <head><meta charset="utf-8"><title>My App</title></head>
+    <body>${htmlWithStyles}</body>
+  </html>`);
+});
+
+app.listen(3000);
+```
+
+---
+
 ## 🗺️ registerEntityMap (server-side entity map)
 
 When performing server-side rendering you may want full HTML5 named-entity decoding (e.g. `&rsquo;`, `&hellip;`, etc.). The library keeps the client bundle small by not shipping the full entity map to the browser. If your SSR pipeline needs complete decoding, register a full entity map at server startup.

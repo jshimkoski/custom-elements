@@ -9,6 +9,9 @@ export {
   useOnAttributeChanged,
   useOnError,
   useStyle,
+  useJITCSS,
+  useDesignTokens,
+  useGlobalStyle,
   useProps,
   // Two-way model binding (Vue-style defineModel)
   defineModel,
@@ -24,7 +27,7 @@ export {
   // Internal: for advanced consumers and library authors
   getCurrentComponentContext,
 } from './runtime/hooks';
-export type { ModelRef } from './runtime/hooks';
+export type { ModelRef, JITCSSOptions, DesignTokens } from './runtime/hooks';
 
 // Reactive system
 export {
@@ -40,7 +43,14 @@ export { ReactiveState } from './runtime/reactive';
 
 // Template and styling
 export { html } from './runtime/template-compiler';
-export { css } from './runtime/style';
+export {
+  css,
+  enableJITCSS,
+  disableJITCSS,
+  isJITCSSEnabled,
+  isJITCSSEnabledFor,
+  registerJITCSSComponent,
+} from './runtime/style';
 export { unsafeHTML, decodeEntities } from './runtime/helpers';
 
 // Virtual DOM types

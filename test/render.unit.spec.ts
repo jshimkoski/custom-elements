@@ -3,6 +3,7 @@ import * as style from '../src/lib/runtime/style';
 import * as transitions from '../src/lib/transitions';
 import * as vdom from '../src/lib/runtime/vdom';
 import { renderComponent, applyStyle } from '../src/lib/runtime/render';
+import { enableJITCSS, _resetJITCSS } from '../src/lib/runtime/style';
 
 describe('render module - applyStyle and renderComponent', () => {
   it('applyStyle sets reset and transition sheets when no jitCss and no computed', () => {
@@ -26,6 +27,8 @@ describe('render module - applyStyle and renderComponent', () => {
     const root = document.createElement('div').attachShadow({ mode: 'open' });
     const ctx: any = { _computedStyle: undefined };
     const setStyleSheet = vi.fn();
+    // Enable JIT CSS for this shadow root so applyStyle will invoke jitCSS
+    enableJITCSS();
     // stub jitCSS to return some css
     vi.spyOn(style, 'jitCSS').mockReturnValue('.x{}');
     const base = new CSSStyleSheet();
@@ -37,6 +40,7 @@ describe('render module - applyStyle and renderComponent', () => {
     // should set a sheet (third stylesheet)
     expect(setStyleSheet).toHaveBeenCalled();
     expect(root.adoptedStyleSheets.length).toBe(3);
+    _resetJITCSS();
   });
 
   it('renderComponent handles promise-returning render functions', async () => {

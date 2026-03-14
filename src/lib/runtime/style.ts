@@ -1,4 +1,5 @@
 import { generateProseCSS, generateProseElementModifier } from './prose';
+import { extendedColors } from '../css/colors';
 
 /**
  * Optimized JIT CSS implementation with reduced bloat and enhanced utilities
@@ -270,6 +271,27 @@ export const baseReset = css`
 
 // Types
 export type CSSMap = Record<string, string>;
+
+/**
+ * Options for configuring the JIT CSS engine.
+ *
+ * @example
+ * ```ts
+ * import { enableJITCSS } from '@jasonshimmy/custom-elements-runtime';
+ * enableJITCSS({ extendedColors: true });
+ * ```
+ */
+export interface JITCSSOptions {
+  /** Include the extended Tailwind color palette (slate, gray, red, orange, blue, violet, rose, etc.) */
+  extendedColors?: boolean;
+  /** Custom color palette entries to add to the JIT engine */
+  customColors?: Record<string, Record<string, string>>;
+  /** Disable specific variant groups for smaller output */
+  disableVariants?: Array<
+    'responsive' | 'dark' | 'motion' | 'print' | 'container'
+  >;
+}
+
 type SelectorVariantMap = Record<
   string,
   (selector: string, body: string) => string
@@ -398,6 +420,151 @@ export const colors: Record<
 
 export const spacing = '0.25rem';
 
+// Module-level active color map — rebuilt by enableJITCSS().
+// Starts with semantic colors only; extended colors are opt-in.
+let _activeColors: Record<string, Record<string, string>> = {};
+
+// Initialise synchronously so _activeColors is always populated after module load.
+function rebuildActiveColors(options: JITCSSOptions): void {
+  _activeColors = { ...colors };
+  if (options.extendedColors) {
+    for (const [name, shades] of Object.entries(extendedColors)) {
+      if (!_activeColors[name]) {
+        _activeColors[name] = Object.fromEntries(
+          Object.entries(shades).map(([shade, hex]) => [
+            shade,
+            `var(--cer-color-${name}-${shade}, ${hex})`,
+          ]),
+        );
+      }
+    }
+  }
+  if (options.customColors) {
+    for (const [name, shades] of Object.entries(options.customColors)) {
+      _activeColors[name] = shades;
+    }
+  }
+}
+
+let _globalJITCSSOptions: JITCSSOptions = {};
+rebuildActiveColors(_globalJITCSSOptions);
+
+/**
+ * Whether the JIT CSS engine is active. Defaults to `true` for v2 backwards
+ * compatibility. In v3 this will default to `false` — components must opt in
+ * via `useJITCSS()` or call `enableJITCSS()` once at app startup.
+ *
+ * @internal — use `isJITCSSEnabled()` to read, `enableJITCSS()` to set.
+ */
+let _jitCSSEnabled = false;
+
+/**
+ * Per-component opt-in set. Populated by `registerJITCSSComponent()` when a
+ * component calls `useJITCSS()` inside its render function.
+ * @internal
+ */
+let _jitCSSEnabledComponents = new WeakSet<ShadowRoot>();
+
+/**
+ * Returns `true` when the JIT CSS engine is globally active.
+ * The render engine uses this to skip the JIT pass for projects that do not
+ * use utility classes.
+ */
+export function isJITCSSEnabled(): boolean {
+  return _jitCSSEnabled;
+}
+
+/**
+ * Returns `true` when JIT CSS should run for the given shadow root.
+ * JIT CSS is active if the global flag is set (`enableJITCSS()`) OR if the
+ * specific shadow root was registered via `registerJITCSSComponent()`
+ * (i.e. the component called `useJITCSS()` in its render function).
+ * @internal — used by render.ts
+ */
+export function isJITCSSEnabledFor(root: ShadowRoot): boolean {
+  return _jitCSSEnabled || _jitCSSEnabledComponents.has(root);
+}
+
+/**
+ * Register a shadow root for per-component JIT CSS opt-in.
+ * Called by `useJITCSS()` when invoked inside a component render function.
+ * Optionally processes colour / variant options for this render pass.
+ * @internal
+ */
+export function registerJITCSSComponent(
+  root: ShadowRoot,
+  options?: JITCSSOptions,
+): void {
+  _jitCSSEnabledComponents.add(root);
+  if (options) {
+    _globalJITCSSOptions = { ..._globalJITCSSOptions, ...options };
+    rebuildActiveColors(_globalJITCSSOptions);
+    jitCssCache.clear();
+  }
+}
+
+/**
+ * Configure the JIT CSS engine globally.
+ * Call once at app startup to set options that apply to all components.
+ *
+ * Calling this function also activates the JIT CSS engine if it has been
+ * disabled (e.g. by `disableJITCSS()`).
+ *
+ * @example
+ * ```ts
+ * import { enableJITCSS } from '@jasonshimmy/custom-elements-runtime';
+ *
+ * // Enable extended Tailwind color palette (bg-blue-500, text-violet-700, etc.)
+ * enableJITCSS({ extendedColors: true });
+ *
+ * // Add custom colors
+ * enableJITCSS({ customColors: { brand: { '500': '#e63946', '600': '#c1121f' } } });
+ * ```
+ */
+export function enableJITCSS(options?: JITCSSOptions): void {
+  _jitCSSEnabled = true;
+  if (options) {
+    _globalJITCSSOptions = { ..._globalJITCSSOptions, ...options };
+  }
+  rebuildActiveColors(_globalJITCSSOptions);
+  // Invalidate cache so new colors take effect on the next render.
+  jitCssCache.clear();
+}
+
+/**
+ * Disable the JIT CSS engine globally. Útil for projects that use only
+ * `useStyle()` and want to avoid any JIT parsing overhead.
+ *
+ * @example
+ * ```ts
+ * import { disableJITCSS } from '@jasonshimmy/custom-elements-runtime';
+ * disableJITCSS(); // JIT CSS will not run for any component
+ * ```
+ */
+export function disableJITCSS(): void {
+  _jitCSSEnabled = false;
+}
+
+/**
+ * Get the current global JIT CSS options.
+ * @internal
+ */
+export function getJITCSSOptions(): JITCSSOptions {
+  return { ..._globalJITCSSOptions };
+}
+
+/**
+ * Reset JIT CSS to default state (semantic colors only). Intended for tests.
+ * @internal
+ */
+export function _resetJITCSS(): void {
+  _globalJITCSSOptions = {};
+  _jitCSSEnabled = false;
+  _jitCSSEnabledComponents = new WeakSet<ShadowRoot>();
+  rebuildActiveColors(_globalJITCSSOptions);
+  jitCssCache.clear();
+}
+
 const semanticSizes: Record<string, number> = {
   '3xs': 64,
   '2xs': 72,
@@ -448,6 +615,17 @@ export const spacingProps: Record<string, string[]> = {
   'gap-y': ['row-gap'],
   // size-* sets both width and height simultaneously (Tailwind v3+)
   size: ['width', 'height'],
+  // Logical (flow-relative) properties — RTL / vertical writing mode support
+  ms: ['margin-inline-start'],
+  me: ['margin-inline-end'],
+  ps: ['padding-inline-start'],
+  pe: ['padding-inline-end'],
+  bs: ['margin-block-start'],
+  be: ['margin-block-end'],
+  start: ['inset-inline-start'],
+  end: ['inset-inline-end'],
+  'inset-s': ['inset-inline-start'],
+  'inset-e': ['inset-inline-end'],
 };
 
 // Utility generators for reduced code bloat
@@ -1499,6 +1677,170 @@ const generateUtilities = (): CSSMap => {
     `.replace(/\s+/g, ''),
   });
 
+  // --- Tailwind CSS 4 parity additions ---
+
+  // flow-root display
+  utils['flow-root'] = 'display:flow-root;';
+
+  // Logical text alignment
+  utils['text-start'] = 'text-align:start;';
+  utils['text-end'] = 'text-align:end;';
+
+  // Grid subgrid (broad browser support since 2023)
+  utils['grid-cols-subgrid'] = 'grid-template-columns:subgrid;';
+  utils['grid-rows-subgrid'] = 'grid-template-rows:subgrid;';
+
+  // text-shadow utilities
+  Object.assign(utils, {
+    'text-shadow-xs':
+      '--cer-text-shadow-color:rgb(0 0 0 / 0.05);text-shadow:0 1px 1px var(--cer-text-shadow-color, rgb(0 0 0 / 0.05));',
+    'text-shadow-sm':
+      '--cer-text-shadow-color:rgb(0 0 0 / 0.15);text-shadow:0 1px 2px var(--cer-text-shadow-color, rgb(0 0 0 / 0.15));',
+    'text-shadow':
+      '--cer-text-shadow-color:rgb(0 0 0 / 0.3);text-shadow:0 1px 3px var(--cer-text-shadow-color, rgb(0 0 0 / 0.3));',
+    'text-shadow-md':
+      '--cer-text-shadow-color:rgb(0 0 0 / 0.3);text-shadow:0 2px 4px var(--cer-text-shadow-color, rgb(0 0 0 / 0.3));',
+    'text-shadow-lg':
+      '--cer-text-shadow-color:rgb(0 0 0 / 0.3);text-shadow:0 4px 8px var(--cer-text-shadow-color, rgb(0 0 0 / 0.3));',
+    'text-shadow-xl':
+      '--cer-text-shadow-color:rgb(0 0 0 / 0.3);text-shadow:0 6px 16px var(--cer-text-shadow-color, rgb(0 0 0 / 0.3));',
+    'text-shadow-2xl':
+      '--cer-text-shadow-color:rgb(0 0 0 / 0.3);text-shadow:0 8px 24px var(--cer-text-shadow-color, rgb(0 0 0 / 0.3));',
+    'text-shadow-none': 'text-shadow:none;',
+  });
+
+  // mask utilities
+  Object.assign(utils, {
+    'mask-none': 'mask-image:none;',
+    'mask-linear-to-t': 'mask-image:linear-gradient(to top,black,transparent);',
+    'mask-linear-to-tr':
+      'mask-image:linear-gradient(to top right,black,transparent);',
+    'mask-linear-to-r':
+      'mask-image:linear-gradient(to right,black,transparent);',
+    'mask-linear-to-br':
+      'mask-image:linear-gradient(to bottom right,black,transparent);',
+    'mask-linear-to-b':
+      'mask-image:linear-gradient(to bottom,black,transparent);',
+    'mask-linear-to-bl':
+      'mask-image:linear-gradient(to bottom left,black,transparent);',
+    'mask-linear-to-l':
+      'mask-image:linear-gradient(to left,black,transparent);',
+    'mask-linear-to-tl':
+      'mask-image:linear-gradient(to top left,black,transparent);',
+    'mask-radial':
+      'mask-image:radial-gradient(ellipse at center,black,transparent);',
+    'mask-radial-from-center':
+      'mask-image:radial-gradient(ellipse at center,black 0%,transparent 100%);',
+    'mask-size-contain': 'mask-size:contain;',
+    'mask-size-cover': 'mask-size:cover;',
+    'mask-no-repeat': 'mask-repeat:no-repeat;',
+    'mask-repeat': 'mask-repeat:repeat;',
+    'mask-alpha': 'mask-mode:alpha;',
+    'mask-luminance': 'mask-mode:luminance;',
+  });
+
+  // field-sizing utilities (auto-resizing inputs/textareas)
+  utils['field-sizing-content'] = 'field-sizing:content;';
+  utils['field-sizing-fixed'] = 'field-sizing:fixed;';
+
+  // color-scheme utilities
+  Object.assign(utils, {
+    'scheme-light': 'color-scheme:light;',
+    'scheme-dark': 'color-scheme:dark;',
+    'scheme-both': 'color-scheme:light dark;',
+    'scheme-only-light': 'color-scheme:only light;',
+    'scheme-only-dark': 'color-scheme:only dark;',
+    'scheme-normal': 'color-scheme:normal;',
+  });
+
+  // font-stretch utilities
+  Object.assign(utils, {
+    'font-stretch-ultra-condensed': 'font-stretch:ultra-condensed;',
+    'font-stretch-extra-condensed': 'font-stretch:extra-condensed;',
+    'font-stretch-condensed': 'font-stretch:condensed;',
+    'font-stretch-semi-condensed': 'font-stretch:semi-condensed;',
+    'font-stretch-normal': 'font-stretch:normal;',
+    'font-stretch-semi-expanded': 'font-stretch:semi-expanded;',
+    'font-stretch-expanded': 'font-stretch:expanded;',
+    'font-stretch-extra-expanded': 'font-stretch:extra-expanded;',
+    'font-stretch-ultra-expanded': 'font-stretch:ultra-expanded;',
+  });
+
+  // Extended cursor utilities (Tailwind 4)
+  Object.assign(utils, {
+    'cursor-zoom-in': 'cursor:zoom-in;',
+    'cursor-zoom-out': 'cursor:zoom-out;',
+    'cursor-cell': 'cursor:cell;',
+    'cursor-crosshair': 'cursor:crosshair;',
+    'cursor-copy': 'cursor:copy;',
+    'cursor-alias': 'cursor:alias;',
+    'cursor-context-menu': 'cursor:context-menu;',
+    'cursor-vertical-text': 'cursor:vertical-text;',
+    'cursor-no-drop': 'cursor:no-drop;',
+    'cursor-progress': 'cursor:progress;',
+    'cursor-col-resize': 'cursor:col-resize;',
+    'cursor-row-resize': 'cursor:row-resize;',
+    'cursor-ew-resize': 'cursor:ew-resize;',
+    'cursor-ns-resize': 'cursor:ns-resize;',
+    'cursor-nesw-resize': 'cursor:nesw-resize;',
+    'cursor-nwse-resize': 'cursor:nwse-resize;',
+    'cursor-all-scroll': 'cursor:all-scroll;',
+    'cursor-grab': 'cursor:grab;',
+    'cursor-grabbing': 'cursor:grabbing;',
+  });
+
+  // Logical border utilities
+  Object.assign(utils, {
+    // border-inline-start / border-inline-end widths
+    'border-s': 'border-inline-start-width:1px;',
+    'border-e': 'border-inline-end-width:1px;',
+    'border-s-0': 'border-inline-start-width:0px;',
+    'border-e-0': 'border-inline-end-width:0px;',
+    'border-s-2': 'border-inline-start-width:2px;',
+    'border-e-2': 'border-inline-end-width:2px;',
+    'border-s-4': 'border-inline-start-width:4px;',
+    'border-e-4': 'border-inline-end-width:4px;',
+    'border-s-8': 'border-inline-start-width:8px;',
+    'border-e-8': 'border-inline-end-width:8px;',
+  });
+
+  // Logical border-radius utilities
+  Object.assign(utils, {
+    'rounded-s-none': 'border-start-start-radius:0;border-end-start-radius:0;',
+    'rounded-e-none': 'border-start-end-radius:0;border-end-end-radius:0;',
+    'rounded-s-sm':
+      'border-start-start-radius:0.125rem;border-end-start-radius:0.125rem;',
+    'rounded-e-sm':
+      'border-start-end-radius:0.125rem;border-end-end-radius:0.125rem;',
+    'rounded-s':
+      'border-start-start-radius:0.25rem;border-end-start-radius:0.25rem;',
+    'rounded-e':
+      'border-start-end-radius:0.25rem;border-end-end-radius:0.25rem;',
+    'rounded-s-md':
+      'border-start-start-radius:0.375rem;border-end-start-radius:0.375rem;',
+    'rounded-e-md':
+      'border-start-end-radius:0.375rem;border-end-end-radius:0.375rem;',
+    'rounded-s-lg':
+      'border-start-start-radius:0.5rem;border-end-start-radius:0.5rem;',
+    'rounded-e-lg':
+      'border-start-end-radius:0.5rem;border-end-end-radius:0.5rem;',
+    'rounded-s-xl':
+      'border-start-start-radius:0.75rem;border-end-start-radius:0.75rem;',
+    'rounded-e-xl':
+      'border-start-end-radius:0.75rem;border-end-end-radius:0.75rem;',
+    'rounded-s-2xl':
+      'border-start-start-radius:1rem;border-end-start-radius:1rem;',
+    'rounded-e-2xl': 'border-start-end-radius:1rem;border-end-end-radius:1rem;',
+    'rounded-s-3xl':
+      'border-start-start-radius:1.5rem;border-end-start-radius:1.5rem;',
+    'rounded-e-3xl':
+      'border-start-end-radius:1.5rem;border-end-end-radius:1.5rem;',
+    'rounded-s-full':
+      'border-start-start-radius:9999px;border-end-start-radius:9999px;',
+    'rounded-e-full':
+      'border-start-end-radius:9999px;border-end-end-radius:9999px;',
+  });
+
   return utils;
 };
 
@@ -1606,6 +1948,8 @@ export const selectorVariants: SelectorVariantMap = {
   // State variants
   open: (sel, body) =>
     `${insertPseudoBeforeCombinator(sel, '[open]')}{${body}}`,
+  inert: (sel, body) =>
+    `${insertPseudoBeforeCombinator(sel, '[inert]')}{${body}}`,
 };
 
 export const mediaVariants: MediaVariantMap = {
@@ -1768,7 +2112,7 @@ export function hexToRgb(hex: string): string {
 
 // Optimized color parsing with lookup tables
 const colorRegex =
-  /^(bg|text|border|decoration|shadow|outline|caret|accent|fill|stroke|ring|divide)-([a-z]+)-?(\d{2,3}|DEFAULT)?$/;
+  /^(text-shadow|bg|text|border|decoration|shadow|outline|caret|accent|fill|stroke|ring|divide)-([a-z]+)-?(\d{2,3}|DEFAULT)?$/;
 const propMap: Record<string, string> = {
   bg: 'background-color',
   decoration: 'text-decoration-color',
@@ -1786,12 +2130,13 @@ export function parseColorClass(className: string): string | null {
   if (!match) return null;
 
   const [, type, colorName, shade = 'DEFAULT'] = match;
-  const colorValue = colors[colorName]?.[shade];
+  const colorValue = _activeColors[colorName]?.[shade];
   if (!colorValue) return null;
 
   if (type === 'shadow') return `--cer-shadow-color:${colorValue};`;
   if (type === 'ring') return `--cer-ring-color:${colorValue};`;
   if (type === 'divide') return `border-color:${colorValue};`;
+  if (type === 'text-shadow') return `--cer-text-shadow-color:${colorValue};`;
   const prop = propMap[type];
   return prop ? `${prop}:${colorValue};` : null;
 }
@@ -1924,7 +2269,7 @@ export function parseGradientColorStop(className: string): string | null {
   if (!match) return null;
 
   const [, position, colorName, shade = 'DEFAULT'] = match;
-  const colorValue = colors[colorName]?.[shade];
+  const colorValue = _activeColors[colorName]?.[shade];
   if (!colorValue) return null;
 
   switch (position) {
@@ -2541,6 +2886,23 @@ export function jitCSS(html: string): string {
       ? containerTokens[containerTokens.length - 1]
       : null;
     const hasDark = variants.includes('dark');
+
+    // Respect disableVariants option — skip rules that use disabled variant groups
+    const _disabledGroups = _globalJITCSSOptions.disableVariants ?? [];
+    if (_disabledGroups.length > 0) {
+      if (_disabledGroups.includes('dark') && hasDark) return null;
+      if (_disabledGroups.includes('responsive') && responsiveTokens.length > 0)
+        return null;
+      if (_disabledGroups.includes('container') && containerTokens.length > 0)
+        return null;
+      if (
+        _disabledGroups.includes('motion') &&
+        variants.some((v) => v === 'motion-reduce' || v === 'motion-safe')
+      )
+        return null;
+      if (_disabledGroups.includes('print') && variants.includes('print'))
+        return null;
+    }
 
     // Handle media queries and container queries
     let mediaQuery = '';

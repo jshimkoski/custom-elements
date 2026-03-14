@@ -1,6 +1,7 @@
-import { component, html } from '../../lib';
+import { component, html, useJITCSS } from '../../lib';
 
 component('prose-example', () => {
+  useJITCSS();
   return html`
     <div
       class="prose prose-error dark:prose-a:bg-error-500 dark:prose-headings:bg-primary-500 2xl:prose-2xl dark:prose-invert text-left"

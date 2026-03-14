@@ -6,6 +6,7 @@ import {
   getProseSheet,
   sanitizeCSS,
   jitCSS,
+  isJITCSSEnabledFor,
   baseReset,
 } from './style';
 import { getTransitionStyleSheet } from '../transitions';
@@ -400,7 +401,7 @@ export function applyStyle<
   aggregatedHtmlCache.set(shadowRoot, aggregatedHtml);
 
   // Generate JIT CSS and get computed styles
-  const jitCss = jitCSS(aggregatedHtml);
+  const jitCss = isJITCSSEnabledFor(shadowRoot) ? jitCSS(aggregatedHtml) : '';
   const proseSheet = getProseSheet();
   const computedStyle = (context as { _computedStyle?: string })._computedStyle;
 

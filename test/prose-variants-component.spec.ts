@@ -1,11 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { component } from '../src/lib/runtime/component';
 import { html } from '../src/lib/runtime/template-compiler';
+import { enableJITCSS, _resetJITCSS } from '../src/lib/runtime/style';
 
 describe('Prose Variants - Component Context Integration', () => {
   let container: HTMLElement;
 
   beforeEach(() => {
+    enableJITCSS();
     container = document.createElement('div');
     document.body.appendChild(container);
   });
@@ -13,6 +15,7 @@ describe('Prose Variants - Component Context Integration', () => {
   afterEach(() => {
     document.body.removeChild(container);
     container.innerHTML = '';
+    _resetJITCSS();
   });
 
   const getComponentCSS = (element: HTMLElement): string => {

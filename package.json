@@ -20,8 +20,8 @@
   "homepage": "https://github.com/jshimkoski/custom-elements#readme",
   "scripts": {
     "dev": "vite",
-    "build": "npm run lint:ci && vite build && tsc",
-    "typecheck": "tsc --noEmit",
+    "build": "npm run lint:ci && vite build && tsc && tsc -p tsconfig.vite-plugin.json",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.node.json",
     "lint": "eslint . --ext .ts",
     "lint:fix": "eslint . --ext .ts --fix",
     "lint:ci": "npm run lint && npm run typecheck",
@@ -115,6 +115,21 @@
       "types": "./dist/css/colors.d.ts",
       "import": "./dist/custom-elements-runtime.colors.es.js",
       "require": "./dist/custom-elements-runtime.colors.cjs.js"
+    },
+    "./jit-css": {
+      "types": "./dist/jit-css.d.ts",
+      "import": "./dist/custom-elements-runtime.jit-css.es.js",
+      "require": "./dist/custom-elements-runtime.jit-css.cjs.js"
+    },
+    "./dom-jit-css": {
+      "types": "./dist/dom-jit-css.d.ts",
+      "import": "./dist/custom-elements-runtime.dom-jit-css.es.js",
+      "require": "./dist/custom-elements-runtime.dom-jit-css.cjs.js"
+    },
+    "./vite-plugin": {
+      "types": "./dist/vite-plugin.d.ts",
+      "import": "./dist/custom-elements-runtime.vite-plugin.es.js",
+      "require": "./dist/custom-elements-runtime.vite-plugin.cjs.js"
     }
   },
   "publishConfig": {
