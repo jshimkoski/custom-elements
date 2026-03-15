@@ -11,7 +11,7 @@
 
 import { anchorBlock } from './directives';
 import type { VNode } from './runtime/types';
-import { jitCSS } from './runtime/style';
+import { processJITCSS } from './runtime/render-bridge';
 
 /* --- Types --- */
 
@@ -550,8 +550,8 @@ export function getTransitionStyleSheet(): CSSStyleSheet {
     // Create a fake HTML string with all transition classes
     const fakeHtml = `<div class="${allClasses.join(' ')}"></div>`;
 
-    // Trigger JIT CSS generation
-    const generatedCSS = jitCSS(fakeHtml);
+    // Trigger JIT CSS generation (no-op if JIT CSS engine is not loaded)
+    const generatedCSS = processJITCSS(fakeHtml);
 
     // Create stylesheet
     try {
@@ -571,18 +571,3 @@ export function getTransitionStyleSheet(): CSSStyleSheet {
   return transitionStyleSheet;
 }
 
-function initializeTransitionCSS(): void {
-  // Initialize lazily and only in environments that support it.
-  if (typeof window === 'undefined' || typeof CSSStyleSheet === 'undefined') {
-    return;
-  }
-
-  try {
-    getTransitionStyleSheet();
-  } catch {
-    // swallow errors during initialization to avoid breaking SSR or tests
-  }
-}
-
-// Attempt to initialize transition CSS in supported environments only
-initializeTransitionCSS();
