@@ -1,7 +1,7 @@
 {
   "name": "@jasonshimmy/custom-elements-runtime",
   "description": "A powerful, modern, and lightweight runtime for creating reactive web components with TypeScript",
-  "version": "2.8.2",
+  "version": "3.0.0",
   "type": "module",
   "keywords": [
     "web-components",
@@ -64,17 +64,39 @@
   ],
   "typesVersions": {
     "*": {
-      "ssr": ["./dist/ssr.d.ts"],
-      "transitions": ["./dist/transitions.d.ts"],
-      "directives": ["./dist/directives.d.ts"],
-      "directive-enhancements": ["./dist/directive-enhancements.d.ts"],
-      "event-bus": ["./dist/event-bus.d.ts"],
-      "store": ["./dist/store.d.ts"],
-      "router": ["./dist/router.d.ts"],
-      "css/colors": ["./dist/css/colors.d.ts"],
-      "jit-css": ["./dist/jit-css.d.ts"],
-      "dom-jit-css": ["./dist/dom-jit-css.d.ts"],
-      "vite-plugin": ["./dist/vite-plugin.d.ts"]
+      "ssr": [
+        "./dist/ssr.d.ts"
+      ],
+      "transitions": [
+        "./dist/transitions.d.ts"
+      ],
+      "directives": [
+        "./dist/directives.d.ts"
+      ],
+      "directive-enhancements": [
+        "./dist/directive-enhancements.d.ts"
+      ],
+      "event-bus": [
+        "./dist/event-bus.d.ts"
+      ],
+      "store": [
+        "./dist/store.d.ts"
+      ],
+      "router": [
+        "./dist/router.d.ts"
+      ],
+      "css/colors": [
+        "./dist/css/colors.d.ts"
+      ],
+      "jit-css": [
+        "./dist/jit-css.d.ts"
+      ],
+      "dom-jit-css": [
+        "./dist/dom-jit-css.d.ts"
+      ],
+      "vite-plugin": [
+        "./dist/vite-plugin.d.ts"
+      ]
     }
   },
   "exports": {
