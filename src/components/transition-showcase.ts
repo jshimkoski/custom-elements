@@ -4,8 +4,11 @@
  */
 
 import { component, html, ref } from '../lib/index';
+import { enableJITCSS } from '../lib/jit-css';
 import { when, each } from '../lib/directives';
 import { Transition, TransitionGroup } from '../lib/transitions';
+
+enableJITCSS();
 
 // Simple fade demo
 component('fade-demo', () => {

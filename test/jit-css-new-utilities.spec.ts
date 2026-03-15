@@ -292,6 +292,19 @@ describe('JIT CSS — new utility gaps', () => {
       expect(parseSpacing('w-16')).toContain('width:');
     });
 
+    it('decimal spacing values (1.5, 2.5, 3.5) resolve to correct calc values', () => {
+      expect(parseSpacing('w-1.5')).toBe('width:calc(0.25rem * 1.5);');
+      expect(parseSpacing('p-2.5')).toBe('padding:calc(0.25rem * 2.5);');
+      expect(parseSpacing('m-3.5')).toBe('margin:calc(0.25rem * 3.5);');
+      expect(parseSpacing('h-2.5')).toBe('height:calc(0.25rem * 2.5);');
+    });
+
+    it('large spacing values (72, 80, 96) resolve to correct calc values', () => {
+      expect(parseSpacing('w-72')).toBe('width:calc(0.25rem * 72);');
+      expect(parseSpacing('w-80')).toBe('width:calc(0.25rem * 80);');
+      expect(parseSpacing('h-96')).toBe('height:calc(0.25rem * 96);');
+    });
+
     it('fractional w/h work end-to-end via jitCSS', () => {
       const css = jitCSS('<div class="w-1/2 h-3/4"></div>');
       expect(css).toContain('width:50%');

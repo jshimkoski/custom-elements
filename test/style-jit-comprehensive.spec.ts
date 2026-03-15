@@ -7,13 +7,13 @@ import {
   parseOpacity,
   parseColorWithOpacity,
   extractClassesFromHTML,
-  escapeClassName,
   hexToRgb,
   utilityMap,
   colors,
   selectorVariants,
   mediaVariants,
 } from '../src/lib/runtime/style';
+import { escapeClassName } from '../src/lib/runtime/css-utils';
 
 describe('JIT CSS Comprehensive Tests', () => {
   describe('Core utility parsing', () => {
@@ -250,6 +250,12 @@ describe('JIT CSS Comprehensive Tests', () => {
       expect(hexToRgb('#3b82f6')).toBe('59 130 246');
       expect(hexToRgb('3b82f6')).toBe('59 130 246');
     });
+
+    it('should expand 3-digit shorthand hex (#09f → #0099ff)', () => {
+      expect(hexToRgb('#fff')).toBe('255 255 255');
+      expect(hexToRgb('#000')).toBe('0 0 0');
+      expect(hexToRgb('#09f')).toBe('0 153 255');
+    });
   });
 
   describe('Selector variants', () => {
@@ -263,9 +269,92 @@ describe('JIT CSS Comprehensive Tests', () => {
       expect(result).toBe('.test:focus{outline:none;}');
     });
 
+    it('should apply after variant', () => {
+      const result = selectorVariants.after('.test', 'content:"";');
+      expect(result).toBe('.test::after{content:"";}');
+    });
+
+    it('should apply active variant', () => {
+      const result = selectorVariants.active('.test', 'opacity:0.8;');
+      expect(result).toBe('.test:active{opacity:0.8;}');
+    });
+
+    it('should apply disabled variant', () => {
+      const result = selectorVariants.disabled('.test', 'opacity:0.5;');
+      expect(result).toBe('.test:disabled{opacity:0.5;}');
+    });
+
+    it('should apply visited variant', () => {
+      const result = selectorVariants.visited('.test', 'color:purple;');
+      expect(result).toBe('.test:visited{color:purple;}');
+    });
+
+    it('should apply checked variant', () => {
+      const result = selectorVariants.checked('.test', 'background:blue;');
+      expect(result).toBe('.test:checked{background:blue;}');
+    });
+
+    it('should apply first variant', () => {
+      const result = selectorVariants.first('.test', 'margin-top:0;');
+      expect(result).toBe('.test:first-child{margin-top:0;}');
+    });
+
+    it('should apply last variant', () => {
+      const result = selectorVariants.last('.test', 'margin-bottom:0;');
+      expect(result).toBe('.test:last-child{margin-bottom:0;}');
+    });
+
+    it('should apply odd variant', () => {
+      const result = selectorVariants.odd('.test', 'background:gray;');
+      expect(result).toBe('.test:nth-child(odd){background:gray;}');
+    });
+
+    it('should apply even variant', () => {
+      const result = selectorVariants.even('.test', 'background:white;');
+      expect(result).toBe('.test:nth-child(even){background:white;}');
+    });
+
+    it('should apply focus-within variant', () => {
+      const result = selectorVariants['focus-within']('.test', 'ring:2px;');
+      expect(result).toBe('.test:focus-within{ring:2px;}');
+    });
+
+    it('should apply focus-visible variant', () => {
+      const result = selectorVariants['focus-visible']('.test', 'outline:2px;');
+      expect(result).toBe('.test:focus-visible{outline:2px;}');
+    });
+
     it('should apply group variants', () => {
       const result = selectorVariants['group-hover']('.test', 'color:red;');
       expect(result).toBe('.group:hover .test{color:red;}');
+    });
+
+    it('should apply group-focus variant', () => {
+      const result = selectorVariants['group-focus']('.test', 'color:blue;');
+      expect(result).toBe('.group:focus .test{color:blue;}');
+    });
+
+    it('should apply group-active variant', () => {
+      const result = selectorVariants['group-active']('.test', 'opacity:0.8;');
+      expect(result).toBe('.group:active .test{opacity:0.8;}');
+    });
+
+    it('should apply group-disabled variant', () => {
+      const result = selectorVariants['group-disabled'](
+        '.test',
+        'opacity:0.5;',
+      );
+      expect(result).toBe('.group:disabled .test{opacity:0.5;}');
+    });
+
+    it('should apply peer-hover variant', () => {
+      const result = selectorVariants['peer-hover']('.test', 'color:red;');
+      expect(result).toBe('.peer:hover ~ .test{color:red;}');
+    });
+
+    it('should apply peer-focus variant', () => {
+      const result = selectorVariants['peer-focus']('.test', 'border:blue;');
+      expect(result).toBe('.peer:focus ~ .test{border:blue;}');
     });
 
     it('should apply peer variants', () => {
@@ -274,6 +363,11 @@ describe('JIT CSS Comprehensive Tests', () => {
         'display:block;',
       );
       expect(result).toBe('.peer:checked ~ .test{display:block;}');
+    });
+
+    it('should apply peer-disabled variant', () => {
+      const result = selectorVariants['peer-disabled']('.test', 'opacity:0.5;');
+      expect(result).toBe('.peer:disabled ~ .test{opacity:0.5;}');
     });
   });
 

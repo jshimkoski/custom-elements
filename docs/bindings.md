@@ -509,6 +509,7 @@ import {
   component,
   html,
   ref,
+  useProps,
   useOnConnected,
 } from '@jasonshimmy/custom-elements-runtime';
 

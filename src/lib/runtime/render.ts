@@ -3,11 +3,14 @@ import { setAttributeSmart } from './namespace-helpers';
 import {
   minifyCSS,
   getBaseResetSheet,
-  getProseSheet,
   sanitizeCSS,
-  jitCSS,
   baseReset,
-} from './style';
+} from './css-utils';
+import {
+  isJITCSSActiveFor,
+  processJITCSS,
+  getProseStyleSheet,
+} from './render-bridge';
 import { getTransitionStyleSheet } from '../transitions';
 import type { ComponentConfig, ComponentContext, VNode, Refs } from './types';
 import { devWarn, devError } from './logger';
@@ -96,14 +99,32 @@ export function renderComponent<
 
     if (outputOrPromise instanceof Promise) {
       setLoading(true);
+      // Capture connection state at dispatch time. If the host was connected
+      // when the async render started but is disconnected when it resolves,
+      // we can skip the write — it would be wasted work and could overwrite a
+      // subsequent render triggered after reconnection. If the host was never
+      // connected (e.g. in unit tests), wasConnected stays false and the guard
+      // is never triggered so test expectations are unaffected.
+      //
+      // Additionally, track a monotonic render token on the shadowRoot so that
+      // if the component is disconnected and then reconnected (triggering a new
+      // async render) before this promise resolves, the stale result is discarded.
+      const wasConnected = shadowRoot.host.isConnected;
+      type TokenHost = { _asyncRenderToken?: number };
+      const sr = shadowRoot as unknown as TokenHost;
+      const renderToken = (sr._asyncRenderToken = (sr._asyncRenderToken ?? 0) + 1);
       outputOrPromise
         .then((output) => {
+          if (wasConnected && !shadowRoot.host.isConnected) return;
+          if (sr._asyncRenderToken !== renderToken) return;
           setLoading(false);
           setError(null);
           renderOutput(shadowRoot, output, context, refs, setHtmlString);
           applyStyle(shadowRoot.innerHTML);
         })
         .catch((error) => {
+          if (wasConnected && !shadowRoot.host.isConnected) return;
+          if (sr._asyncRenderToken !== renderToken) return;
           setLoading(false);
           setError(error instanceof Error ? error : new Error(String(error)));
         });
@@ -400,8 +421,10 @@ export function applyStyle<
   aggregatedHtmlCache.set(shadowRoot, aggregatedHtml);
 
   // Generate JIT CSS and get computed styles
-  const jitCss = jitCSS(aggregatedHtml);
-  const proseSheet = getProseSheet();
+  const jitCss = isJITCSSActiveFor(shadowRoot)
+    ? processJITCSS(aggregatedHtml)
+    : '';
+  const proseSheet = getProseStyleSheet();
   const computedStyle = (context as { _computedStyle?: string })._computedStyle;
 
   // Early return for empty styles

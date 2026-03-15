@@ -1,13 +1,10 @@
 import {
-  css,
-  sanitizeCSS,
   parseSpacing,
   hexToRgb,
   parseColorClass,
   parseOpacityModifier,
   parseColorWithOpacity,
   parseArbitrary,
-  escapeClassName,
   extractClassesFromHTML,
   colors,
   utilityMap,
@@ -17,7 +14,14 @@ import {
   containerOrder,
 } from '../src/lib/runtime/style';
 import { describe, it, expect } from 'vitest';
-import { minifyCSS, baseReset, jitCSS } from '../src/lib/runtime/style';
+import {
+  css,
+  minifyCSS,
+  sanitizeCSS,
+  escapeClassName,
+  baseReset,
+} from '../src/lib/runtime/css-utils';
+import { jitCSS } from '../src/lib/runtime/style';
 
 // --- minifyCSS ---
 describe('minifyCSS', () => {

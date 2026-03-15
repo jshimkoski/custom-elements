@@ -12,6 +12,8 @@ import {
   useOnError,
   useStyle,
 } from './lib';
+import { enableJITCSS } from './lib/jit-css';
+import { createDOMJITCSS } from './lib/dom-jit-css';
 import { when, each, match } from './lib/directives';
 import { eventBus } from './lib/event-bus';
 
@@ -27,6 +29,11 @@ import './components/examples/Prose';
 import './components/design-system';
 // Test components used by automated tests
 import './components/test-props';
+
+// Enable JIT CSS globally
+enableJITCSS();
+const domJIT = createDOMJITCSS({ extendedColors: true });
+domJIT.mount();
 
 // --- Simple Switch ---
 

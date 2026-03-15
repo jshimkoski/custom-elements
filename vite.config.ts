@@ -24,6 +24,12 @@ export default defineConfig({
         variables: 'src/lib/css/variables.css',
         // Extended color palette (opt-in)
         colors: resolve(__dirname, 'src/lib/css/colors.ts'),
+        // JIT CSS engine (opt-in separate entry)
+        'jit-css': resolve(__dirname, 'src/lib/jit-css.ts'),
+        // Non-Shadow DOM runtime scanner
+        'dom-jit-css': resolve(__dirname, 'src/lib/dom-jit-css.ts'),
+        // Vite build-time plugin
+        'vite-plugin': resolve(__dirname, 'src/lib/vite-plugin.ts'),
       },
       name: 'CustomElementsRuntime',
       fileName: (format, entryName) =>
@@ -34,10 +40,19 @@ export default defineConfig({
       formats: ['es', 'cjs'],
     },
     rollupOptions: {
-      external: [], // Add external dependencies here if needed
+      // Externalize Node.js built-ins and Vite (used only by the vite-plugin entry)
+      external: (id: string) => id.startsWith('node:') || id === 'vite',
       output: {
         globals: {
           // Add global mappings for UMD if needed
+        },
+        // Force css-utils into its own shared chunk so that consumers who never
+        // import JIT CSS symbols (enableJITCSS, useJITCSS, …) do NOT transitively
+        // pull in the style chunk.  Without this hint Rollup merges css-utils into
+        // the style chunk and then hooks has to import from there.
+        manualChunks(id) {
+          if (id.includes('/runtime/css-utils')) return 'css-utils';
+          if (id.includes('/runtime/render-bridge')) return 'css-utils';
         },
       },
     },

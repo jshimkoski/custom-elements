@@ -67,6 +67,7 @@ export function useRouter(config: RouterConfig): Router {
   let push: (path: string) => Promise<void>;
   let replaceFn: (path: string) => Promise<void>;
   let back: () => void;
+  let destroyFn: () => void = () => {};
 
   // Track redirects to prevent infinite loops
   const redirectTracker = new Set<string>();
@@ -142,11 +143,16 @@ export function useRouter(config: RouterConfig): Router {
     }
   };
 
-  const runAfterEnter = (to: RouteState, from: RouteState) => {
+  const runAfterEnter = (to: RouteState, from: RouteState): void => {
     const matched = findMatchedRoute(routes, to.path);
     if (!matched || !matched.afterEnter) return;
     try {
-      matched.afterEnter(to, from);
+      const result: void | Promise<void> = matched.afterEnter(to, from);
+      if (result instanceof Promise) {
+        result.catch((err: unknown) => {
+          devError('afterEnter async error', err);
+        });
+      }
     } catch (err) {
       devError('afterEnter error', err);
     }
@@ -238,12 +244,16 @@ export function useRouter(config: RouterConfig): Router {
     return new Promise<boolean>((resolve) => {
       let resolved = false;
       let timeoutId: number | null = null;
+      let rafHandle: number | null = null;
       const startTime = Date.now();
 
       const safeResolve = (value: boolean) => {
         if (resolved) return;
         resolved = true;
         if (timeoutId) clearTimeout(timeoutId);
+        // Cancel any pending rAF so orphaned retry loops don't keep firing
+        // after the promise has already resolved (e.g. on rapid navigation).
+        if (rafHandle !== null) cancelAnimationFrame(rafHandle);
         resolve(value);
       };
 
@@ -270,17 +280,15 @@ export function useRouter(config: RouterConfig): Router {
                 return safeResolve(true);
               }
 
-              // Try again after a short delay
-              requestAnimationFrame(retryScroll);
+              rafHandle = requestAnimationFrame(retryScroll);
             } catch (error) {
               devWarn('Scroll retry attempt failed:', error);
-              // Continue retrying even if one attempt fails
-              requestAnimationFrame(retryScroll);
+              rafHandle = requestAnimationFrame(retryScroll);
             }
           };
 
           // Start retry loop after initial attempt
-          requestAnimationFrame(retryScroll);
+          rafHandle = requestAnimationFrame(retryScroll);
         } catch (error) {
           devWarn('Initial scroll attempt failed:', error);
           safeResolve(false);
@@ -550,6 +558,7 @@ export function useRouter(config: RouterConfig): Router {
 
     const handlePopState = () => update(true);
     window.addEventListener('popstate', handlePopState);
+    destroyFn = () => window.removeEventListener('popstate', handlePopState);
 
     push = (path: string) => navigate(path, false);
     replaceFn = (path: string) => navigate(path, true);
@@ -680,6 +689,7 @@ export function useRouter(config: RouterConfig): Router {
 
   const router: Router = {
     _cleanupScrollState: cleanupScrollState,
+    destroy: destroyFn,
     store,
     push,
     replace: replaceFn,
@@ -720,9 +730,14 @@ export function initRouter(config: RouterConfig): Router {
 
   const router = useRouter(config);
 
-  // Clean up scroll state from any previous router instance
+  // Clean up previous router instance to prevent listener accumulation
   const prevRouter = getActiveRouter();
   if (prevRouter) {
+    try {
+      prevRouter.destroy();
+    } catch {
+      // Ignore cleanup errors - function may not exist in older instances
+    }
     try {
       prevRouter._cleanupScrollState?.();
     } catch {

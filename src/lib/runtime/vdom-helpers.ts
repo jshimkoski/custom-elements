@@ -62,7 +62,6 @@ export interface VNodePropBag {
 export interface VDomGlobal {
   process?: { env?: { NODE_ENV?: string } };
   __vitest__?: unknown;
-  __VDOM_DISABLED_PROMOTIONS?: unknown[];
 }
 
 // ---------------------------------------------------------------------------

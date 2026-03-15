@@ -189,7 +189,6 @@ export function htmlImpl(
     children: VNode[];
     key: string | number | undefined;
   }> = [];
-  const root: VNode | null = null;
   let match: RegExpExecArray | null;
   let currentChildren: VNode[] = [];
   let currentTag: string | null = null;
@@ -980,12 +979,6 @@ export function htmlImpl(
         }
       }
     }
-  }
-
-  // Normalize output: prefer array for true multi-root, single node for single root
-  if (root) {
-    // If root is an anchor block or element, return as-is
-    return root;
   }
 
   // Filter out empty text nodes and whitespace-only nodes

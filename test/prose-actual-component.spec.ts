@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { _resetJITCSS } from '../src/lib/runtime/style';
 import '../src/components/examples/Prose';
 
 describe('Prose.ts Component - Actual CSS Generation', () => {
@@ -12,6 +13,7 @@ describe('Prose.ts Component - Actual CSS Generation', () => {
   afterEach(() => {
     document.body.removeChild(container);
     container.innerHTML = '';
+    _resetJITCSS();
   });
 
   const getComponentCSS = (element: HTMLElement): string => {

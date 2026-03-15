@@ -9,6 +9,8 @@ export {
   useOnAttributeChanged,
   useOnError,
   useStyle,
+  useDesignTokens,
+  useGlobalStyle,
   useProps,
   // Two-way model binding (Vue-style defineModel)
   defineModel,
@@ -24,7 +26,7 @@ export {
   // Internal: for advanced consumers and library authors
   getCurrentComponentContext,
 } from './runtime/hooks';
-export type { ModelRef } from './runtime/hooks';
+export type { ModelRef, JITCSSOptions, DesignTokens } from './runtime/hooks';
 
 // Reactive system
 export {
@@ -40,7 +42,9 @@ export { ReactiveState } from './runtime/reactive';
 
 // Template and styling
 export { html } from './runtime/template-compiler';
-export { css } from './runtime/style';
+// css template tag — imported from its own lightweight module so the JIT engine
+// is not pulled in for consumers who only need the css tag.
+export { css } from './runtime/css-utils';
 export { unsafeHTML, decodeEntities } from './runtime/helpers';
 
 // Virtual DOM types

@@ -1,100 +1,90 @@
-# 🛠️ Troubleshooting Deep Dive
+# 🛠️ Troubleshooting
 
-A guide to diagnosing and resolving common issues in the custom elements runtime. Find solutions for rendering, ref, style, events, and more—with friendly tips and best practices.
+A guide to diagnosing and resolving common issues with the custom elements runtime.
 
 ## 🚦 Rendering Issues
 
 - **Blank output:**
-  - Check that your `render` function returns a valid VNode or array.
-  - Ensure the component is registered and tag name matches usage.
+  - Check that your render function returns a valid VNode or array.
+  - Ensure the component is registered and the tag name matches usage.
 - **Async render never resolves:**
   - Confirm your async function returns a VNode, not just data.
 
 ## 🧬 State & Props Problems
 
 - **State not updating:**
-  - Mutate state only via reactive proxies (avoid direct assignment).
-  - For arrays/objects, use supported mutating methods.
+  - Mutate state only via reactive refs (avoid direct assignment to the object — set `.value`).
+  - For arrays/objects, use supported mutating methods or replace the value entirely.
 - **Props not received:**
-  - Check attribute spelling and casing (use kebab-case in HTML).
-  - Ensure your component function parameters have proper default values.
+  - Check attribute spelling and casing (use kebab-case in HTML, e.g. `my-prop="value"`).
+  - Ensure your `useProps()` call includes the correct default values.
 
 ## 🎨 Style Issues
 
-- Use the `useStyle()` hook to provide component-scoped styles or rely on the runtime's JIT CSS (the renderer runs `jitCSS` on the rendered HTML).
-- Handle loading/error state inside your component (for example use a `ref` for loading, or use `switchOnPromise` / the async-aware directives) and render conditional templates for feedback.
+- Use the `useStyle()` hook to provide component-scoped styles, or opt in to JIT CSS with `useJITCSS()`.
 - **Unsafe CSS warning:**
   - Avoid `url(javascript:...)`, `<script>`, or `expression()` in styles.
 
 ## 🔗 Event & Binding Problems
 
 - **Events not firing:**
-- Check that the handler is correctly bound and accessible in the component scope (no accidental shadowing or missing closure capture).
-- Ensure the element is mounted before wiring listeners when using imperative `addEventListener`.
-- Use `@event` syntax in templates (e.g., `@click`) or attach listeners via refs + `addEventListener` for cross-framework compatibility.
-- Ensure the event handler is a function and not accidentally undefined.
+  - Check that the handler is correctly bound and accessible in the component scope (no accidental shadowing or missing closure capture).
+  - Ensure the element is mounted before wiring listeners when using imperative `addEventListener`.
+  - Use `@event` syntax in templates (e.g., `@click`) or attach listeners via refs + `addEventListener` for cross-framework compatibility.
+  - Ensure the event handler is a function and not accidentally `undefined`.
 - **Two-way binding not working:**
-  - Check that state property exists and is reactive.
-  - Use the provided hook helpers inside your component render: `useOnConnected`, `useOnDisconnected`, `useOnAttributeChanged`, `useOnError`, and `useStyle` (see `src/lib/runtime/hooks.ts`).
-  - For the component config object (legacy API) lifecycle callbacks are named `onConnected`, `onDisconnected`, etc., but inside functional components prefer the `use*` hook helpers.
+  - Check that the bound state is a reactive ref.
+  - Verify the child component uses `defineModel` and dispatches `update:<propName>` events.
+  - See the [Bindings guide](./bindings.md) for a full walkthrough.
 
 ## 🧩 Lifecycle & Watchers
 
 - **Lifecycle hooks not called:**
-  - Use correct hook names (`useOnConnected`, `useOnDisconnected`, `useOnAttributeChanged`, `useOnError`) inside functional components.
-  - For the functional `watch()` helper, provide the correct source function (e.g., `() => user.profile.age`) to observe nested values.
-  - Use `watch(source, cb, { deep: true })` to observe nested object/array mutations. The callback will fire whenever any property at any depth changes, with deep-cloned before/after snapshots provided to the callback.
-  - Use `watchEffect/watch` for side effects, never mutate state directly during render.
-  - Use `watch(source, cb, { deep: true })` to observe nested object/array mutations. The callback receives deep-cloned before/after snapshots. Without `deep: true`, only top-level `.value` reassignment is detected.
-  - Ensure hooks are properly destructured from the second parameter.
+  - Use the correct hook names inside functional components: `useOnConnected`, `useOnDisconnected`, `useOnAttributeChanged`, `useOnError`.
+  - Hooks must be called during the synchronous execution of the component render function, not inside callbacks or async code.
 - **Watchers not triggering:**
-  - Use correct path for nested state (e.g., `user.profile.age`).
+  - For nested state, provide the correct source function (e.g., `() => user.profile.age`).
+  - Use `watch(source, cb, { deep: true })` to observe nested object/array mutations. Without `{ deep: true }`, only top-level `.value` reassignment is detected.
+  - Never mutate state directly during render — use `watchEffect` or `watch` for side effects.
 
 ## 🧱 Template & Directives
 
-- Use supported built-in directives and helpers such as `when`, `each`, `match`, `model`, `bind`, `show`, `class`, `style`, and `ref` as well as enhanced helpers like `switchOnPromise` and the collection helpers in `src/lib/directive-enhancements.ts`.
-- Ensure directive syntax matches documentation and remember that some async/collection helpers return anchor blocks (stable boundaries) which affect keying and patch behavior.
-
-- Use supported directives (`when`, `each`, `match`).
-- Handle loading and error state in your component (for example using `ref` or `switchOnPromise`), and log errors in async code.
+- Use supported directives: `when`, `each`, `match` (from `directives`), and enhanced helpers like `switchOnPromise`, `eachWhere`, and others (from `directive-enhancements`). See the [Directives guide](./directives.md) and [Directive Enhancements guide](./directive-enhancements.md).
+- Some async/collection helpers return anchor blocks (stable boundaries) that affect keying and patch behavior — keep this in mind when nesting directives.
 - **Template errors:**
-  - Use error boundaries with a `slot="fallback"` attribute for robust handling.
+  - Use `<cer-error-boundary>` with a `slot="fallback"` attribute for robust error handling.
 
 ## 🔥 HMR & SSR
 
 - **HMR not updating:**
-  - Ensure development mode and `import.meta.hot` is available.
-  - Check that configs are updated in the runtime (internal) registry. In
-    browser dev you can inspect the registry via the Symbol slot Symbol.for('cer.registry')
-    for debugging, but do not rely on it in
-    production code.
+  - Ensure you are in development mode and that `import.meta.hot` is available.
+  - See the [HMR guide](./hmr.md) for setup details.
 - **SSR output incorrect:**
   - Avoid browser-only APIs in SSR mode.
-  - Use pure functions for render and style.
+  - Use pure functions for rendering and style generation.
 
 ## 🧪 Debugging Tips
 
-- Use browser dev tools to inspect shadow DOM and state.
-- Add `console.log` in render, hooks, and watchers for insight.
-- Use error boundaries to catch and display runtime errors.
-- Test with minimal configs to isolate issues.
+- Use browser dev tools to inspect the shadow DOM and component state.
+- Add `console.log` calls in render functions, hooks, and watchers to trace execution.
+- Use `<cer-error-boundary>` to catch and display runtime errors.
+- Enable dev-mode logging with `setDevMode(true)` for additional runtime warnings.
+- Test with minimal configurations to isolate issues.
 
 ## ❓ FAQ
 
 **Q: Why is my component not rendering?**
-A: Check registration, tag name, and that `render` returns a valid VNode.
+A: Check that the component is registered, the tag name matches, and the render function returns a valid VNode.
 
 **Q: Why are my styles missing?**
-A: Confirm style config; check for unsafe CSS.
+A: Confirm that `useStyle()` or `useJITCSS()` is called in the component, and check for unsafe CSS warnings in the console.
 
 **Q: Why aren't events firing?**
-A: Use `@event` syntax and ensure handler is a function.
+A: Use `@event` syntax in templates and ensure the handler is a function. For cross-framework use, prefer `addEventListener` on a ref.
 
 **Q: How do I debug async templates?**
-A: Log errors in async code.
+A: Use `try/catch` in async code and log errors. Consider using `switchOnPromise` to handle loading and error states declaratively.
 
 ## 🏁 Summary
 
-Troubleshooting is easier with clear configs, error boundaries, and dev tools. Use this guide to quickly resolve issues and build robust custom elements.
-
-For more help, see the documentation for each feature and inspect the source code in `src/lib/runtime/`.
+Troubleshooting is easier with error boundaries, dev-mode logging, and browser dev tools. Consult the feature-specific documentation for deeper guidance on each topic.

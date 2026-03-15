@@ -12,6 +12,47 @@ import { devError, devWarn } from '../logger';
 import { registry, initGlobalRegistryIfNeeded } from './registry';
 import { createElementClass } from './element-class';
 
+/** Shape of the internal component context object used during rendering. */
+type InternalContext = Record<string, unknown> & {
+  _componentId?: string;
+  _hookCallbacks?: Record<string, unknown> & {
+    onConnected?: Array<() => void>;
+    onDisconnected?: Array<() => void>;
+    onAttributeChanged?: Array<
+      (
+        name: string,
+        oldValue: string | null,
+        newValue: string | null,
+      ) => void
+    >;
+    onError?: Array<(err: unknown) => void>;
+    style?: (el: HTMLElement) => void;
+    props?: Record<string, unknown>;
+  };
+};
+
+/**
+ * Invoke a lifecycle callback array, logging any errors in dev mode.
+ * Errors are caught so one failing callback does not block the others.
+ */
+function invokeCallbacks(
+  tag: string,
+  hookName: string,
+  cbs: Array<(...args: unknown[]) => void>,
+  args: unknown[],
+): void {
+  for (const cb of cbs) {
+    try {
+      cb(...args);
+    } catch (err) {
+      devError(
+        `[${tag}] Error in ${hookName} lifecycle hook:`,
+        err,
+      );
+    }
+  }
+}
+
 /**
  * Streamlined functional component API with automatic reactive props and lifecycle hooks.
  *
@@ -96,8 +137,8 @@ export function component(
       if (lifecycleHooks.onConnected) {
         try {
           lifecycleHooks.onConnected(context);
-        } catch {
-          // swallow user errors in lifecycle hooks
+        } catch (err) {
+          devError(`[${normalizedTag}] Error in onConnected lifecycle hook:`, err);
         }
       }
     },
@@ -106,8 +147,8 @@ export function component(
       if (lifecycleHooks.onDisconnected) {
         try {
           lifecycleHooks.onDisconnected(context);
-        } catch {
-          /* swallow */
+        } catch (err) {
+          devError(`[${normalizedTag}] Error in onDisconnected lifecycle hook:`, err);
         }
       }
     },
@@ -116,8 +157,8 @@ export function component(
       if (lifecycleHooks.onAttributeChanged) {
         try {
           lifecycleHooks.onAttributeChanged(name, oldValue, newValue, context);
-        } catch {
-          /* swallow */
+        } catch (err) {
+          devError(`[${normalizedTag}] Error in onAttributeChanged lifecycle hook:`, err);
         }
       }
     },
@@ -126,8 +167,8 @@ export function component(
       if (lifecycleHooks.onError && error) {
         try {
           lifecycleHooks.onError(error, context);
-        } catch {
-          /* swallow */
+        } catch (err) {
+          devError(`[${normalizedTag}] Error in onError handler (the error handler itself threw):`, err);
         }
       }
     },
@@ -135,23 +176,6 @@ export function component(
     render: (context) => {
       // Track dependencies for rendering
       // Use stable component ID from context if available, otherwise generate new one
-      type InternalContext = Record<string, unknown> & {
-        _componentId?: string;
-        _hookCallbacks?: Record<string, unknown> & {
-          onConnected?: Array<() => void>;
-          onDisconnected?: Array<() => void>;
-          onAttributeChanged?: Array<
-            (
-              name: string,
-              oldValue: string | null,
-              newValue: string | null,
-            ) => void
-          >;
-          onError?: Array<(err: unknown) => void>;
-          style?: (el: HTMLElement) => void;
-          props?: Record<string, unknown>;
-        };
-      };
 
       const ictx = context as InternalContext;
       const componentId =
@@ -175,6 +199,15 @@ export function component(
         // proxy, call scheduleDOMUpdate, and trigger an infinite re-render loop.
         Object.defineProperty(context, '_hookCallbacks', {
           value: {},
+          writable: true,
+          enumerable: false,
+          configurable: true,
+        });
+        // Reset computed style so useDesignTokens doesn't accumulate duplicate
+        // :host blocks across re-renders. Uses defineProperty for the same reason
+        // as _hookCallbacks: bypass the reactive proxy set-trap.
+        Object.defineProperty(context, '_computedStyle', {
+          value: undefined,
           writable: true,
           enumerable: false,
           configurable: true,
@@ -258,13 +291,7 @@ export function component(
               (context?: unknown) => void
             >;
             lifecycleHooks.onConnected = (context?: unknown) => {
-              for (const cb of cbs) {
-                try {
-                  cb(context);
-                } catch {
-                  /* swallow */
-                }
-              }
+              invokeCallbacks(normalizedTag, 'useOnConnected', cbs as Array<(...args: unknown[]) => void>, [context]);
             };
           }
           if (hookCallbacks.onDisconnected) {
@@ -272,13 +299,7 @@ export function component(
               (context?: unknown) => void
             >;
             lifecycleHooks.onDisconnected = (context?: unknown) => {
-              for (const cb of cbs) {
-                try {
-                  cb(context);
-                } catch {
-                  /* swallow */
-                }
-              }
+              invokeCallbacks(normalizedTag, 'useOnDisconnected', cbs as Array<(...args: unknown[]) => void>, [context]);
             };
           }
           if (hookCallbacks.onAttributeChanged) {
@@ -296,32 +317,23 @@ export function component(
               newValue: string | null,
               context?: unknown,
             ) => {
-              for (const cb of cbs) {
-                try {
-                  cb(name, oldValue, newValue, context);
-                } catch {
-                  /* swallow */
-                }
-              }
+              invokeCallbacks(normalizedTag, 'useOnAttributeChanged', cbs as Array<(...args: unknown[]) => void>, [name, oldValue, newValue, context]);
             };
           }
           if (hookCallbacks.onError) {
             const cbs = hookCallbacks.onError as Array<(err: Error) => void>;
             lifecycleHooks.onError = (err: Error) => {
-              for (const cb of cbs) {
-                try {
-                  cb(err);
-                } catch {
-                  /* swallow */
-                }
-              }
+              invokeCallbacks(normalizedTag, 'useOnError', cbs as Array<(...args: unknown[]) => void>, [err]);
             };
           }
           // `useStyle()` stores a computed style string directly on the
           // current context as `_computedStyle`. The runtime reads
           // `_computedStyle` in `applyStyle`.
-          // If useProps() was called, update config.props with the defaults
-          if (hookCallbacks.props) {
+          // If useProps() was called, update config.props with the defaults.
+          // Only update props if not already set (idempotent after discovery render)
+          // so that subsequent re-renders don't overwrite with a fresh object,
+          // avoiding ordering-sensitive behaviour across multiple instances.
+          if (hookCallbacks.props && !Object.keys(config.props ?? {}).length) {
             const propsDefaults = hookCallbacks.props as Record<
               string,
               unknown
@@ -424,12 +436,13 @@ export function component(
         } catch {
           /* best-effort */
         }
+        throw err;
+      } finally {
+        // Always restore state regardless of success or failure so that
+        // isDiscoveryRender() never stays permanently true after an error.
         endDiscoveryRender();
         clearCurrentComponentContext();
-        throw err;
       }
-      endDiscoveryRender();
-      clearCurrentComponentContext();
 
       if (discoveryContext._hookCallbacks?.props) {
         const propsDefaults = discoveryContext._hookCallbacks.props;

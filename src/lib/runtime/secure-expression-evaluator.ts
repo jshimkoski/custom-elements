@@ -5,6 +5,22 @@
 
 import { devWarn } from './logger';
 import { getNestedValue } from './helpers';
+import { LRUCache } from './template-compiler/lru-cache';
+
+// JavaScript language keywords that must never be treated as context identifiers.
+const JS_KEYWORDS = new Set([
+  'true', 'false', 'null', 'undefined',
+  'typeof', 'instanceof', 'in', 'of',
+  'new', 'delete', 'void', 'throw',
+  'return', 'this', 'class', 'extends',
+  'import', 'export', 'from', 'as',
+  'async', 'await', 'yield',
+  'if', 'else', 'for', 'while', 'do',
+  'switch', 'case', 'break', 'continue',
+  'try', 'catch', 'finally',
+  'let', 'const', 'var', 'function',
+  'NaN', 'Infinity',
+]);
 
 interface ExpressionCache {
   evaluator: (context: Record<string, unknown>) => unknown;
@@ -18,15 +34,16 @@ type Token = { type: TokenType; value: string };
  * Secure expression evaluator with caching and AST validation
  */
 class SecureExpressionEvaluator {
-  private static cache = new Map<string, ExpressionCache>();
-  private static maxCacheSize = 1000;
+  // Reuse the LRUCache class (Map-insertion-order O(1) eviction) rather than
+  // maintaining a parallel ad-hoc implementation with Map delete+re-insert.
+  private static cache = new LRUCache<string, ExpressionCache>(1000);
 
   // Dangerous patterns to block
   private static dangerousPatterns = [
     /constructor/i,
     /prototype/i,
     /__proto__/i,
-    /function/i,
+    /\bfunction\b/i,
     /eval/i,
     /import/i,
     /require/i,
@@ -44,35 +61,18 @@ class SecureExpressionEvaluator {
     expression: string,
     context: Record<string, unknown>,
   ): unknown {
-    // Check cache first
+    // Check cache first (LRUCache.get() handles MRU promotion automatically).
     const cached = this.cache.get(expression);
     if (cached) {
       if (!cached.isSecure) {
         devWarn('Blocked cached dangerous expression:', expression);
         return undefined;
       }
-      // Move accessed entry to the end of the Map to implement LRU behavior
-      // (Map preserves insertion order; deleting and re-setting moves it to the end).
-      try {
-        this.cache.delete(expression);
-        this.cache.set(expression, cached);
-      } catch {
-        // ignore any cache mutations errors and continue
-      }
       return cached.evaluator(context);
     }
 
-    // Create and cache evaluator
+    // Create and cache evaluator (LRUCache handles size limits and eviction).
     const evaluator = this.createEvaluator(expression);
-
-    // Manage cache size (LRU-style)
-    if (this.cache.size >= this.maxCacheSize) {
-      const firstKey = this.cache.keys().next().value;
-      if (firstKey) {
-        this.cache.delete(firstKey);
-      }
-    }
-
     this.cache.set(expression, evaluator);
 
     if (!evaluator.isSecure) {
@@ -170,10 +170,51 @@ class SecureExpressionEvaluator {
     content: string,
   ): Array<{ key: string; value: string }> {
     const properties: Array<{ key: string; value: string }> = [];
-    const parts = content.split(',');
+
+    // Split on commas that are not inside string literals or nested brackets.
+    const parts: string[] = [];
+    let depth = 0;
+    let inStr: string | null = null;
+    let start = 0;
+    for (let i = 0; i < content.length; i++) {
+      const ch = content[i];
+      if (inStr) {
+        if (ch === '\\') { i++; continue; }
+        if (ch === inStr) inStr = null;
+      } else if (ch === '"' || ch === "'") {
+        inStr = ch;
+      } else if (ch === '(' || ch === '[' || ch === '{') {
+        depth++;
+      } else if (ch === ')' || ch === ']' || ch === '}') {
+        depth--;
+      } else if (ch === ',' && depth === 0) {
+        parts.push(content.slice(start, i));
+        start = i + 1;
+      }
+    }
+    parts.push(content.slice(start));
 
     for (const part of parts) {
-      const colonIndex = part.indexOf(':');
+      // Find the first colon that is not inside a string or brackets
+      let colonIndex = -1;
+      let d = 0;
+      let s: string | null = null;
+      for (let i = 0; i < part.length; i++) {
+        const ch = part[i];
+        if (s) {
+          if (ch === '\\') { i++; continue; }
+          if (ch === s) s = null;
+        } else if (ch === '"' || ch === "'") {
+          s = ch;
+        } else if (ch === '(' || ch === '[' || ch === '{') {
+          d++;
+        } else if (ch === ')' || ch === ']' || ch === '}') {
+          d--;
+        } else if (ch === ':' && d === 0) {
+          colonIndex = i;
+          break;
+        }
+      }
       if (colonIndex === -1) continue;
 
       const key = part.slice(0, colonIndex).trim();
@@ -218,10 +259,11 @@ class SecureExpressionEvaluator {
           if (value === undefined) return undefined; // unknown ctx property => undefined result
           const placeholderIndex =
             stringLiterals.push(JSON.stringify(value)) - 1;
-          processedExpression = processedExpression.replace(
-            new RegExp(match.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
-            `<<#${placeholderIndex}#>>`,
-          );
+          // Use split/join for literal string replacement — avoids allocating a
+          // new RegExp object per iteration (match is already a plain string).
+          processedExpression = processedExpression
+            .split(match)
+            .join(`<<#${placeholderIndex}#>>`);
         }
 
         // Replace dotted plain identifiers (e.g. user.age) before single-token identifiers.
@@ -237,10 +279,10 @@ class SecureExpressionEvaluator {
           if (value === undefined) return undefined;
           const placeholderIndex =
             stringLiterals.push(JSON.stringify(value)) - 1;
-          processedExpression = processedExpression.replace(
-            new RegExp(match.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
-            `<<#${placeholderIndex}#>>`,
-          );
+          // Use split/join for literal string replacement.
+          processedExpression = processedExpression
+            .split(match)
+            .join(`<<#${placeholderIndex}#>>`);
         }
 
         // Also support plain identifiers (root-level variables like `a`) when present.
@@ -251,7 +293,9 @@ class SecureExpressionEvaluator {
         const seen: Set<string> = new Set();
         while ((m = identRegex.exec(processedExpression)) !== null) {
           const ident = m[1];
-          if (['true', 'false', 'null', 'undefined'].includes(ident)) continue;
+          // Skip JS language keywords and built-in literals so expressions like
+          // `typeof x === 'string'` or `x instanceof Date` work correctly.
+          if (JS_KEYWORDS.has(ident)) continue;
           // skip numeric-like (though regex shouldn't match numbers)
           if (/^[0-9]+$/.test(ident)) continue;
           // skip 'ctx' itself
@@ -268,12 +312,14 @@ class SecureExpressionEvaluator {
           const repl = JSON.stringify(value);
           const placeholderIndex = stringLiterals.push(repl) - 1;
           if (ident.includes('.')) {
-            // dotted identifiers contain '.' which is non-word; do a plain replace
-            processedExpression = processedExpression.replace(
-              new RegExp(ident.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
-              `<<#${placeholderIndex}#>>`,
-            );
+            // dotted identifiers — plain literal replacement via split/join
+            processedExpression = processedExpression
+              .split(ident)
+              .join(`<<#${placeholderIndex}#>>`);
           } else {
+            // single-token identifiers — need word-boundary matching to avoid
+            // partial replacements; a RegExp is required here but is built once
+            // per unique identifier (guarded by the `seen` Set above).
             processedExpression = processedExpression.replace(
               new RegExp(
                 '\\b' + ident.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b',
@@ -282,6 +328,10 @@ class SecureExpressionEvaluator {
               `<<#${placeholderIndex}#>>`,
             );
           }
+          // Mutation changed the string length, so identRegex.lastIndex now
+          // points at the wrong position in the new string. Reset to 0 and let
+          // the `seen` Set prevent re-processing already-handled identifiers.
+          identRegex.lastIndex = 0;
         }
 
         // Restore string literals
@@ -643,6 +693,7 @@ class SecureExpressionEvaluator {
   static getCacheSize(): number {
     return this.cache.size;
   }
+
 }
 
 export { SecureExpressionEvaluator };

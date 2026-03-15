@@ -20,12 +20,12 @@ import {
   SVG_NS,
 } from './namespace-helpers';
 import { EventManager } from './event-manager';
-import { isReactiveState } from './reactive';
+import { isReactiveState, ReactiveState } from './reactive';
 import {
   performEnterTransition,
   performLeaveTransition,
 } from './transition-utils';
-import { devError } from './logger';
+import { devError, devWarn } from './logger';
 import {
   getNodeKey,
   setNodeKey,
@@ -46,6 +46,16 @@ import {
   type VNodePropBag,
 } from './vdom-helpers';
 import { processDirectives } from './vdom-directives';
+
+/**
+ * Tracks the most-recently-registered directive event listeners for each
+ * element so `patchProps` can remove the old set before adding the new one.
+ * Keyed by element so entries are automatically GC'd with the element.
+ */
+const directiveListenerCache = new WeakMap<
+  Element,
+  Record<string, EventListener>
+>();
 
 /** @internal Minimal transition metadata alias used by the renderer. */
 type Transition = TransitionMetadata;
@@ -141,6 +151,8 @@ export function assignKeysDeep(
 ): VNode | VNode[] {
   if (Array.isArray(nodeOrNodes)) {
     const usedKeys = new Set<string>();
+    // Per-base-key counters so uniqueness search is O(1) instead of O(n).
+    const keyCounters = new Map<string, number>();
 
     return nodeOrNodes.map((child) => {
       if (!child || typeof child !== 'object') return child;
@@ -173,12 +185,14 @@ export function assignKeysDeep(
           : `${baseKey}:${tagPart}`;
       }
 
-      // Ensure uniqueness among siblings
-      let uniqueKey = key;
-      let counter = 1;
-      while (usedKeys.has(uniqueKey)) {
-        uniqueKey = `${key}#${counter++}`;
+      // Ensure uniqueness among siblings using a per-base-key counter (O(1)).
+      let uniqueKey = key as string;
+      if (usedKeys.has(uniqueKey)) {
+        const next = (keyCounters.get(uniqueKey) ?? 1) + 1;
+        keyCounters.set(uniqueKey, next);
+        uniqueKey = `${key}#${next}`;
       }
+      keyCounters.set(key as string, (keyCounters.get(key as string) ?? 0) + 1);
       usedKeys.add(uniqueKey);
 
       // Recurse into children with this node's unique key
@@ -258,7 +272,11 @@ export function patchProps(
     newProps?.isCustomElement ?? oldProps?.isCustomElement ?? false,
   );
   let anyChange = false;
-  for (const key in { ...oldPropProps, ...newPropProps }) {
+  // Collect keys from both old and new without allocating a merged object.
+  const visitedPropKeys = new Set<string>();
+  for (const k in oldPropProps) visitedPropKeys.add(k);
+  for (const k in newPropProps) visitedPropKeys.add(k);
+  for (const key of visitedPropKeys) {
     const oldVal = oldPropProps[key];
     const newVal = newPropProps[key];
 
@@ -269,13 +287,13 @@ export function patchProps(
     let newUnwrapped: unknown = newVal;
     safe(() => {
       if (isReactiveState(oldVal))
-        oldUnwrapped = (oldVal as { value: unknown }).value;
+        oldUnwrapped = (oldVal as ReactiveState<unknown>).peek();
       else if (hasValueProp(oldVal))
         oldUnwrapped = (oldVal as { value: unknown }).value;
     });
     safe(() => {
       if (isReactiveState(newVal))
-        newUnwrapped = (newVal as { value: unknown }).value;
+        newUnwrapped = (newVal as ReactiveState<unknown>).peek();
       else if (hasValueProp(newVal))
         newUnwrapped = (newVal as { value: unknown }).value;
     });
@@ -425,23 +443,21 @@ export function patchProps(
     }
   }
 
-  // Handle directive event listeners
-  for (const [eventType, listener] of Object.entries(
-    processedDirectives.listeners || {},
-  )) {
-    EventManager.addListener(el, eventType, listener as EventListener);
-    try {
-      const parentEl = el && (el.parentElement as HTMLElement | null);
-      if (parentEl && parentEl !== el) {
-        EventManager.addListener(
-          parentEl,
-          eventType,
-          listener as EventListener,
-        );
-      }
-    } catch {
-      void 0;
-    }
+  // Handle directive event listeners.
+  // Remove listeners registered by the previous render before adding the new
+  // set so that each event type has exactly one active handler at all times.
+  const newDirectiveListeners = processedDirectives.listeners ?? {};
+  const oldDirectiveListeners = directiveListenerCache.get(el) ?? {};
+  for (const [eventType, oldListener] of Object.entries(oldDirectiveListeners)) {
+    EventManager.removeListener(el, eventType, oldListener);
+  }
+  for (const [eventType, newListener] of Object.entries(newDirectiveListeners)) {
+    EventManager.addListener(el, eventType, newListener as EventListener);
+  }
+  if (Object.keys(newDirectiveListeners).length > 0) {
+    directiveListenerCache.set(el, newDirectiveListeners as Record<string, EventListener>);
+  } else {
+    directiveListenerCache.delete(el);
   }
 
   // Use a copy of oldProps.attrs as the authoritative prior-state for
@@ -543,10 +559,10 @@ export function patchProps(
     let newUnwrapped = newVal;
 
     if (isReactiveState(oldVal)) {
-      oldUnwrapped = (oldVal as { value?: unknown }).value; // This triggers dependency tracking
+      oldUnwrapped = (oldVal as ReactiveState<unknown>).peek();
     }
     if (isReactiveState(newVal)) {
-      newUnwrapped = (newVal as { value?: unknown }).value; // This triggers dependency tracking
+      newUnwrapped = (newVal as ReactiveState<unknown>).peek();
     }
 
     if (oldUnwrapped !== newUnwrapped) {
@@ -864,6 +880,10 @@ export function createElement(
   // Raw HTML vnode - insert provided HTML as nodes (unsafe: caller must opt-in)
   if (vnode.tag === '#raw') {
     const html = typeof vnode.children === 'string' ? vnode.children : '';
+    devWarn(
+      '[#raw] Inserting unsanitized HTML. Ensure the content is trusted or ' +
+        'sanitized before use — unsanitized input can lead to XSS vulnerabilities.',
+    );
     const range = document.createRange();
     // createContextualFragment is broadly supported and safe when used with
     // controlled input. We intentionally call it for opt-in raw HTML insertion.
@@ -1330,11 +1350,16 @@ export function createElement(
     }
   }
 
-  // Handle directive event listeners
-  for (const [eventType, listener] of Object.entries(
-    processedDirectives.listeners || {},
-  )) {
+  // Handle directive event listeners.
+  // This is a fresh element so there are no old listeners to remove; just
+  // register them and seed the cache so a subsequent patchProps call can
+  // correctly remove this initial set before adding its updated listeners.
+  const initialDirectiveListeners = processedDirectives.listeners ?? {};
+  for (const [eventType, listener] of Object.entries(initialDirectiveListeners)) {
     EventManager.addListener(el, eventType, listener as EventListener);
+  }
+  if (Object.keys(initialDirectiveListeners).length > 0) {
+    directiveListenerCache.set(el, initialDirectiveListeners as Record<string, EventListener>);
   }
 
   // Assign ref if present - create a vnode with processed props for ref assignment

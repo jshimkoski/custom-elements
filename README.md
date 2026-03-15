@@ -6,7 +6,10 @@
 
 Build modern components with strict TypeScript, zero dependencies, and a clean functional API. Designed for speed, standards compliance, and productivity.
 
-🕹️ Try it on [Codepen.io](https://codepen.io/jshimkoski/pen/JoYmpxm).
+- Try it on [Codepen.io](https://codepen.io/jshimkoski/pen/JoYmpxm).
+- Check out the [Material Design 3 Components](https://github.com/jshimkoski/cer-material) built with this runtime.
+- Play a game of [Solatro](https://solatro.netlify.app) built with this runtime in 100% Web Components.
+- Learn more about the author at [jasonshimmy.com](https://jasonshimmy.com).
 
 ## ✨ Why You'll Love It
 
@@ -30,8 +33,11 @@ import {
   defineModel,
   html,
 } from '@jasonshimmy/custom-elements-runtime';
+import { useJITCSS } from '@jasonshimmy/custom-elements-runtime/jit-css';
 
 component('my-counter', () => {
+  useJITCSS();
+
   const count = defineModel('count', 0);
 
   const handleClick = () => {
@@ -74,47 +80,49 @@ Below is the **complete list of public symbols** exported by the runtime and its
 
 **Package:** `@jasonshimmy/custom-elements-runtime`
 
-| Export                       | Description                                                                                                                             |
-| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `component`                  | Define a custom element with the functional component API.                                                                              |
-| `html`                       | Template tag function producing runtime VNodes from template literals.                                                                  |
-| `css`                        | Define component-scoped/JIT styles or register stylesheets.                                                                             |
-| `ref`                        | Create a reactive reference object with a `.value` property.                                                                            |
-| `computed`                   | Create a memoized, derived read-only value from other reactive sources.                                                                 |
-| `watch`                      | Register watchers reacting to changes in reactive values.                                                                               |
-| `watchEffect`                | Auto-track reactive reads and re-run a side-effect whenever dependencies change.                                                        |
-| `nextTick`                   | Returns a Promise resolving after all pending DOM updates are flushed.                                                                  |
-| `flushDOMUpdates`            | Synchronously flush all pending DOM update tasks (useful in tests).                                                                     |
-| `scheduleWithPriority`       | Schedule a callback at a given `UpdatePriority` level.                                                                                  |
-| `provide`                    | Store a value on the current component for descendant injection.                                                                        |
-| `inject`                     | Retrieve a value provided by an ancestor component.                                                                                     |
-| `createComposable`           | Package reusable stateful logic (hooks, reactive state) into a composable.                                                              |
-| `getCurrentComponentContext` | Access the active component context from within a composable or render function.                                                        |
-| `useProps`                   | Hook to declare/consume typed component props with defaults.                                                                            |
-| `defineModel`                | Declare a two-way model binding prop; combines `useProps` + `useEmit` in one ergonomic hook.                                            |
-| `useEmit`                    | Hook returning an emit function for dispatching custom events.                                                                          |
-| `useOnConnected`             | Hook that runs a callback when the component connects.                                                                                  |
-| `useOnDisconnected`          | Hook that runs a callback when the component disconnects.                                                                               |
-| `useOnAttributeChanged`      | Hook observing host attribute changes.                                                                                                  |
-| `useOnError`                 | Hook to register a component-level error handler.                                                                                       |
-| `useStyle`                   | Hook to register or compute component styles at runtime.                                                                                |
-| `useExpose`                  | Publish methods and properties onto the host element as an imperative public API.                                                       |
-| `useSlots`                   | Inspect which named slots have been filled by the component consumer.                                                                   |
-| `useTeleport`                | Render virtual DOM content into any DOM node outside the shadow root.                                                                   |
-| `registerKeepAlive`          | Register `<cer-keep-alive>` to preserve component state across DOM removals.                                                            |
-| `registerSuspense`           | Register the `<cer-suspense>` built-in component.                                                                                       |
-| `registerErrorBoundary`      | Register the `<cer-error-boundary>` built-in component.                                                                                 |
-| `registerBuiltinComponents`  | Register `<cer-keep-alive>`, `<cer-suspense>` and `<cer-error-boundary>` in one call.                                                   |
-| `unsafeHTML`                 | Insert raw HTML into a template (**unsafe; use carefully**).                                                                            |
-| `decodeEntities`             | Utility to decode HTML entities in strings.                                                                                             |
-| `setDevMode`                 | Toggle dev-mode logging on or off at runtime.                                                                                           |
-| `devLog`                     | Log a message to the console in dev mode only (no-op in production).                                                                    |
-| `isReactiveState`            | Type-guard returning `true` when a value is a `ReactiveState` instance.                                                                 |
-| `createHealthMonitor`        | Create a new health monitor instance (factory; each call returns an independent instance).                                              |
-| `getHealthMonitor`           | Return the global singleton health monitor instance (lazily created).                                                                   |
-| `updateHealthMetric`         | Update a named metric on the global singleton health monitor.                                                                           |
-| `getHealthStatus`            | Return the current `HealthReport` from the global singleton health monitor.                                                             |
-| **Types**                    | `ModelRef`, `DefineModelOptions`, `HealthMonitorInstance`, `HealthReport`, `UpdatePriority`, `TeleportHandle`, `ReactiveState`, `VNode` |
+| Export                       | Description                                                                                                                                        |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `component`                  | Define a custom element with the functional component API.                                                                                         |
+| `html`                       | Template tag function producing runtime VNodes from template literals.                                                                             |
+| `css`                        | Define component-scoped/JIT styles or register stylesheets.                                                                                        |
+| `ref`                        | Create a reactive reference object with a `.value` property.                                                                                       |
+| `computed`                   | Create a memoized, derived read-only value from other reactive sources.                                                                            |
+| `watch`                      | Register watchers reacting to changes in reactive values.                                                                                          |
+| `watchEffect`                | Auto-track reactive reads and re-run a side-effect whenever dependencies change.                                                                   |
+| `nextTick`                   | Returns a Promise resolving after all pending DOM updates are flushed.                                                                             |
+| `flushDOMUpdates`            | Synchronously flush all pending DOM update tasks (useful in tests).                                                                                |
+| `scheduleWithPriority`       | Schedule a callback at a given `UpdatePriority` level.                                                                                             |
+| `provide`                    | Store a value on the current component for descendant injection.                                                                                   |
+| `inject`                     | Retrieve a value provided by an ancestor component.                                                                                                |
+| `createComposable`           | Package reusable stateful logic (hooks, reactive state) into a composable.                                                                         |
+| `getCurrentComponentContext` | Access the active component context from within a composable or render function.                                                                   |
+| `useProps`                   | Hook to declare/consume typed component props with defaults.                                                                                       |
+| `defineModel`                | Declare a two-way model binding prop; combines `useProps` + `useEmit` in one ergonomic hook.                                                       |
+| `useEmit`                    | Hook returning an emit function for dispatching custom events.                                                                                     |
+| `useOnConnected`             | Hook that runs a callback when the component connects.                                                                                             |
+| `useOnDisconnected`          | Hook that runs a callback when the component disconnects.                                                                                          |
+| `useOnAttributeChanged`      | Hook observing host attribute changes.                                                                                                             |
+| `useOnError`                 | Hook to register a component-level error handler.                                                                                                  |
+| `useStyle`                   | Hook to register or compute component styles at runtime.                                                                                           |
+| `useDesignTokens`            | Apply typed design token overrides to `:host` as CSS custom properties.                                                                            |
+| `useGlobalStyle`             | Inject CSS into `document.adoptedStyleSheets`, escaping Shadow DOM encapsulation. Use sparingly.                                                   |
+| `useExpose`                  | Publish methods and properties onto the host element as an imperative public API.                                                                  |
+| `useSlots`                   | Inspect which named slots have been filled by the component consumer.                                                                              |
+| `useTeleport`                | Render virtual DOM content into any DOM node outside the shadow root.                                                                              |
+| `registerKeepAlive`          | Register `<cer-keep-alive>` to preserve component state across DOM removals.                                                                       |
+| `registerSuspense`           | Register the `<cer-suspense>` built-in component.                                                                                                  |
+| `registerErrorBoundary`      | Register the `<cer-error-boundary>` built-in component.                                                                                            |
+| `registerBuiltinComponents`  | Register `<cer-keep-alive>`, `<cer-suspense>` and `<cer-error-boundary>` in one call.                                                              |
+| `unsafeHTML`                 | Insert raw HTML into a template (**unsafe; use carefully**).                                                                                       |
+| `decodeEntities`             | Utility to decode HTML entities in strings.                                                                                                        |
+| `setDevMode`                 | Toggle dev-mode logging on or off at runtime.                                                                                                      |
+| `devLog`                     | Log a message to the console in dev mode only (no-op in production).                                                                               |
+| `isReactiveState`            | Type-guard returning `true` when a value is a `ReactiveState` instance.                                                                            |
+| `createHealthMonitor`        | Create a new health monitor instance (factory; each call returns an independent instance).                                                         |
+| `getHealthMonitor`           | Return the global singleton health monitor instance (lazily created).                                                                              |
+| `updateHealthMetric`         | Update a named metric on the global singleton health monitor.                                                                                      |
+| `getHealthStatus`            | Return the current `HealthReport` from the global singleton health monitor.                                                                        |
+| **Types**                    | `ModelRef`, `HealthMonitorInstance`, `HealthReport`, `UpdatePriority`, `TeleportHandle`, `ReactiveState`, `VNode`, `JITCSSOptions`, `DesignTokens` |
 
 ---
 
@@ -231,11 +239,13 @@ Below is the **complete list of public symbols** exported by the runtime and its
 | Export                     | Description                                                                                                            |
 | -------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
 | `renderToString`           | Render a VNode tree to HTML for server-side rendering.                                                                 |
+| `renderToStringWithJITCSS` | Render a VNode tree to HTML and simultaneously pre-generate JIT CSS for all utility classes, eliminating FOUC.         |
 | `registerEntityMap`        | Register a custom named-entity map for SSR `decodeEntities`.                                                           |
 | `loadEntityMap`            | Async loader that dynamically imports the full HTML5 named-entity map; returns the map to pass to `registerEntityMap`. |
 | `clearRegisteredEntityMap` | Reset the registered entity map back to the built-in minimal set.                                                      |
 | `VNode` (type)             | The runtime VNode shape used by renderers and SSR.                                                                     |
 | `RenderOptions` (type)     | Options for `renderToString` (`injectSvgNamespace`, `injectKnownNamespaces`).                                          |
+| `SSRJITResult` (type)      | Result of `renderToStringWithJITCSS`: `{ html, css, htmlWithStyles }`.                                                 |
 
 ### Global Styles (CSS)
 
@@ -291,6 +301,91 @@ component('branded-card', () => {
 | `extendedColors` | Full extended palette — `Record<string, Record<string, string>>` (name → shade → hex). |
 | `ColorScale`     | Type: single color scale with shade keys `50`–`950`.                                   |
 
+---
+
+### JIT CSS Engine
+
+**Package:** `@jasonshimmy/custom-elements-runtime/jit-css`
+
+Opt-in JIT CSS engine with hooks, global control, and the `cls()` helper for IDE tooling.
+
+| Export                   | Description                                                                                                         |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| `useJITCSS`              | Enable JIT CSS for the current component (per-component opt-in). Pass `JITCSSOptions` to configure colors/variants. |
+| `useDesignTokens`        | Apply typed design token overrides to `:host` as CSS custom properties.                                             |
+| `useGlobalStyle`         | Inject CSS into `document.adoptedStyleSheets`, escaping Shadow DOM encapsulation.                                   |
+| `enableJITCSS`           | Enable JIT CSS globally for all components.                                                                         |
+| `disableJITCSS`          | Disable JIT CSS globally.                                                                                           |
+| `isJITCSSEnabled`        | Returns `true` when JIT CSS is globally active.                                                                     |
+| `isJITCSSEnabledFor`     | Returns `true` when JIT CSS is active for a specific `ShadowRoot`.                                                  |
+| `jitCSS`                 | Generate CSS from an HTML string (low-level engine).                                                                |
+| `extractClassesFromHTML` | Extract unique class names from an HTML string.                                                                     |
+| `cls`                    | Identity function that signals JIT class names to IDE tooling and static scanners (no-op at runtime).               |
+| `parseColorClass`        | Parse a color utility class name to its CSS declaration.                                                            |
+| `parseColorWithOpacity`  | Parse a color class with an optional `/opacity` modifier into its CSS declaration.                                  |
+| `parseGradientColorStop` | Parse a gradient color stop utility (`from-*`, `via-*`, `to-*`) to its CSS declaration.                             |
+| `parseSpacing`           | Parse a spacing utility class name to its CSS declaration.                                                          |
+| `parseArbitrary`         | Parse an arbitrary value utility class name.                                                                        |
+| `utilityMap`             | Complete mapping of all static utility class names to their CSS declarations.                                       |
+| `selectorVariants`       | State and pseudo-class variant selector map (`hover:`, `focus:`, `disabled:`, `inert:`, etc.).                      |
+| `mediaVariants`          | Responsive breakpoint media query map (`sm:`, `md:`, `lg:`, `xl:`, `2xl:`, `dark:`).                                |
+| `containerVariants`      | Container query breakpoint map (`@sm:`, `@md:`, `@lg:`, `@xl:`, `@2xl:`).                                           |
+| `colors`                 | Semantic color palette object (`neutral`, `primary`, `secondary`, `success`, `info`, `warning`, `error`).           |
+| **Types**                | `JITCSSOptions`, `DesignTokens`                                                                                     |
+
+---
+
+### DOM JIT CSS
+
+**Package:** `@jasonshimmy/custom-elements-runtime/dom-jit-css`
+
+Runtime DOM scanner for non-Shadow DOM contexts (React, Svelte, Vue, plain HTML).
+
+```ts
+import { createDOMJITCSS } from '@jasonshimmy/custom-elements-runtime/dom-jit-css';
+
+const jit = createDOMJITCSS({ extendedColors: true });
+jit.mount(); // start watching
+jit.destroy(); // tear down
+```
+
+| Export            | Description                                                                                         |
+| ----------------- | --------------------------------------------------------------------------------------------------- |
+| `createDOMJITCSS` | Create a DOM JIT CSS instance that watches class changes and injects utility CSS into the document. |
+| **Types**         | `DOMJITCSSOptions`, `DOMJITCSSHandle`                                                               |
+
+---
+
+### Vite Plugin
+
+**Package:** `@jasonshimmy/custom-elements-runtime/vite-plugin`
+
+Build-time static analysis plugin that emits pre-generated CSS, eliminating runtime parsing cost entirely.
+
+_Please note:_ This plugin generates light-DOM JIT CSS. For Shadow DOM contexts, you must still use `useJITCSS` per component, or `enableJITCSS` for all components.
+
+```ts
+// vite.config.ts
+import { cerJITCSS } from '@jasonshimmy/custom-elements-runtime/vite-plugin';
+
+export default defineConfig({
+  plugins: [
+    cerJITCSS({
+      content: ['./src/**/*.{ts,tsx,html}'],
+      output: 'src/generated-jit.css',
+      extendedColors: true,
+    }),
+  ],
+});
+```
+
+| Export      | Description                                                                        |
+| ----------- | ---------------------------------------------------------------------------------- |
+| `cerJITCSS` | Vite plugin that scans source files at build time and emits pre-generated JIT CSS. |
+| **Types**   | `CerJITCSSPluginOptions`                                                           |
+
+---
+
 ## 📖 Documentation Index
 
 Explore the complete documentation for every runtime feature:
@@ -319,7 +414,9 @@ Explore the complete documentation for every runtime feature:
 
 ### 🎨 **Styling**
 
-- [🎨 JIT CSS](./docs/jit-css.md) - On-demand utility-first styling system
+- [🎨 JIT CSS](./docs/jit-css.md) - On-demand utility-first styling system (opt-in architecture, all utilities, `useJITCSS`, `useDesignTokens`, `useGlobalStyle`, `cls`)
+- [⚡ DOM JIT CSS](./docs/dom-jit-css.md) - Runtime DOM scanner for non-Shadow DOM contexts (React, Svelte, Vue, plain HTML)
+- [🔧 Vite Plugin](./docs/vite-plugin.md) - Build-time static analysis that eliminates runtime JIT parsing cost
 - [📏 Space Utilities](./docs/space-utilities.md) - Tailwind-style `space-x-*` and `space-y-*` spacing utilities
 - [📝 Prose Typography](./docs/prose.md) - Beautiful typography for long-form content
 - [🎨 Colors](./docs/colors.md) - Extended Tailwind-compatible color palette (`/css/colors` subpath)
@@ -340,7 +437,7 @@ Explore the complete documentation for every runtime feature:
 - [♻️ Keep-Alive](./docs/keep-alive.md) - Preserve component state across DOM removals with `<cer-keep-alive>`
 - [🩺 Health Monitor](./docs/health-monitor.md) - Track runtime metrics and receive periodic health reports with `createHealthMonitor()`
 - [🔮 Virtual DOM](./docs/virtual-dom.md) - VDOM implementation and performance details
-- [🌐 SSR](./docs/ssr.md) - Server-side rendering support
+- [🌐 SSR](./docs/ssr.md) - Server-side rendering support, including `renderToStringWithJITCSS` for FOUC-free hydration
 - [♻️ HMR](./docs/hmr.md) - Hot module replacement
 - [🛡️ Infinite Loop Protection](./docs/infinite-loop-protection.md) - Runtime safeguards against infinite loops
 - [🔒 Secure Expression Evaluator](./docs/secure-expression-evaluator.md) - Safe evaluation of dynamic expressions in templates
@@ -352,9 +449,20 @@ Explore the complete documentation for every runtime feature:
 - [🅰️ Angular Integration](./docs/angular-integration.md) - Using components in Angular apps
 - [🔥 Svelte Integration](./docs/svelte-integration.md) - Using components in Svelte apps
 
-### 🛠️ **Troubleshooting**
+### 🛡️ **Security & Quality**
 
+- [🔒 Security](./docs/security.md) - XSS prevention, `unsafeHTML`, CSP guidance, and safe input handling
+- [🧪 Testing](./docs/testing.md) - Testing components with Vitest + happy-dom, reactive state, events, and async components
+- [⚡ Performance](./docs/performance.md) - Update scheduler, `computed` memoization, avoiding re-renders, profiling
 - [🔧 Troubleshooting](./docs/troubleshooting.md) - Common issues and solutions
+
+### 🔄 **Upgrading**
+
+- [📦 Migration Guide](./docs/migration.md) - Upgrade instructions, including the v3.0 JIT CSS opt-in change
+
+### 📖 **Reference**
+
+- [📚 Glossary](./docs/glossary.md) - Definitions for library-specific and web-components terms
 
 For examples and implementation details, explore the source code in `src/lib/`.
 
@@ -372,8 +480,13 @@ For examples and implementation details, explore the source code in `src/lib/`.
 - **Contribute:** We welcome PRs for docs, features, and examples.
 - ❤️ Like what you see? [Support ongoing development on Patreon](https://patreon.com/jshimkoski)
 
+### Community Gallery
+
+- [Material Design 3 Components](https://github.com/jshimkoski/cer-material) built with this runtime.
+- [Solatro](https://solatro.netlify.app) is a RTS card-based game built with this runtime.
+
 ## 💖 Support This Project
 
-Custom Elements Runtime is a labor of love built to make modern web development faster and more expressive. If it's helping you build better components, consider [supporting me on Patreon](https://patreon.com/jshimkoski) to help keep the momentum going.
+Custom Elements Runtime is a labor of love built to make modern web development faster and more expressive. If it's helping you build better components, [learn more about me](https://jasonshimmy.com) or consider [supporting me on Patreon](https://patreon.com/jshimkoski) to help keep the momentum going.
 
 Your support helps fund continued development, documentation, and community engagement. Every bit helps—thank you!

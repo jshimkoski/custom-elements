@@ -51,8 +51,8 @@ export interface Route {
   /** Guard that runs right before navigation commits — can cancel or redirect */
   onEnter?: (to: RouteState, from: RouteState) => GuardResult;
 
-  /** Hook that runs after navigation completes — cannot cancel */
-  afterEnter?: (to: RouteState, from: RouteState) => void;
+  /** Hook that runs after navigation completes — cannot cancel. May return a Promise. */
+  afterEnter?: (to: RouteState, from: RouteState) => void | Promise<void>;
 }
 
 /**
@@ -146,6 +146,8 @@ export interface Router {
   base: string;
   /** Scroll to a fragment/hash element */
   scrollToFragment: (frag?: string) => Promise<boolean>;
+  /** Destroy the router instance, removing event listeners. Call before reinitializing. */
+  destroy: () => void;
   /** Internal scroll state cleanup (optional) */
   _cleanupScrollState?: () => void;
 }

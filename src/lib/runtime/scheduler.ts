@@ -131,7 +131,6 @@ class UpdateScheduler {
 
   /**
    * Execute all pending updates with priority ordering
-   * Execute all pending updates with priority ordering
    */
   private flush(): void {
     // Prevent reentrant flushes
@@ -234,19 +233,22 @@ class UpdateScheduler {
   }
 
   /**
-   * Emergency cleanup when pending updates exceed safe limits
+   * Emergency cleanup when pending updates exceed safe limits.
+   * @param queue - The specific map to trim; defaults to the normal queue.
    */
-  private performEmergencyCleanup(): void {
+  private performEmergencyCleanup(
+    queue: Map<string | (() => void), ScheduledUpdate> = this.pendingUpdates,
+  ): void {
     devWarn(
       'Scheduler emergency cleanup: too many pending updates, clearing oldest entries',
     );
 
-    // Clear half of the pending updates (oldest first by insertion order)
-    const entries = Array.from(this.pendingUpdates.entries());
+    // Clear half of the queue (oldest first by insertion order)
+    const entries = Array.from(queue.entries());
     const toRemove = Math.floor(entries.length / 2);
 
     for (let i = 0; i < toRemove; i++) {
-      this.pendingUpdates.delete(entries[i][0]);
+      queue.delete(entries[i][0]);
     }
   }
 
@@ -282,7 +284,7 @@ class UpdateScheduler {
     if (priority === 'idle') {
       const key = componentId ?? update;
       if (this.pendingIdleUpdates.size >= this.MAX_PENDING_SIZE) {
-        this.performEmergencyCleanup();
+        this.performEmergencyCleanup(this.pendingIdleUpdates);
       }
       this.pendingIdleUpdates.set(key, update);
       this.scheduleIdleFlush();
@@ -381,8 +383,7 @@ class UpdateScheduler {
 export const updateScheduler = new UpdateScheduler();
 
 /**
- * Schedule a DOM update to be batched with optional component identity and priority
- * Schedule a DOM update to be batched with optional component identity and priority
+ * Schedule a DOM update to be batched with optional component identity and priority.
  */
 export function scheduleDOMUpdate(
   update: () => void,
@@ -436,13 +437,23 @@ export function flushDOMUpdates(): void {
  * ```
  */
 export function nextTick(): Promise<void> {
-  // If there are pending updates, flush them and wait for the microtask queue to drain.
-  // Otherwise, just wait one microtask so callers always get post-render timing.
+  // Flush all pending updates, including any new work enqueued during a flush
+  // (e.g. watcher-triggered re-renders), before resolving. Looping ensures
+  // callers always observe fully-settled DOM state rather than a partial flush.
   return new Promise<void>((resolve) => {
-    if (updateScheduler.hasPendingUpdates) {
+    const MAX_FLUSH_ITERATIONS = 100;
+    let iterations = 0;
+    while (updateScheduler.hasPendingUpdates && iterations < MAX_FLUSH_ITERATIONS) {
       updateScheduler.flushImmediately();
+      iterations++;
     }
-    // Queue resolution after any pending microtasks (including the scheduler's queueMicrotask flush)
+    if (iterations >= MAX_FLUSH_ITERATIONS) {
+      devWarn(
+        '[nextTick] Maximum flush iterations reached — possible circular update loop. ' +
+          'Check for watchers or computed values that unconditionally mutate reactive state.',
+      );
+    }
+    // Resolve after all synchronous flushes have completed.
     queueMicrotask(resolve);
   });
 }

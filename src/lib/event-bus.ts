@@ -21,6 +21,8 @@ export class GlobalEventBus extends EventTarget {
   private static instance: GlobalEventBus;
   private eventCounters: Map<string, { count: number; window: number }> =
     new Map();
+  private nativeUnsubscribers: Map<() => void, true> = new Map();
+  private readonly MAX_EVENT_COUNTERS = 1000;
 
   /**
    * Returns the singleton instance of GlobalEventBus
@@ -43,16 +45,27 @@ export class GlobalEventBus extends EventTarget {
     const counter = this.eventCounters.get(eventName);
 
     if (!counter || now - counter.window > 1000) {
+      // Evict oldest entry if the map is at capacity to prevent unbounded growth.
+      if (!counter && this.eventCounters.size >= this.MAX_EVENT_COUNTERS) {
+        const firstKey = this.eventCounters.keys().next().value;
+        if (firstKey !== undefined) this.eventCounters.delete(firstKey);
+      }
       // Reset counter every second
       this.eventCounters.set(eventName, { count: 1, window: now });
     } else {
       counter.count++;
 
-      if (counter.count > 50) {
-        // Throttle excessive events to avoid event storms (silent in runtime)
-        if (counter.count > 100) {
-          return;
-        }
+      if (counter.count === 51) {
+        // Warn once at the throttle threshold so developers know emissions are being dropped.
+        devError(
+          `[EventBus] Event "${eventName}" is firing too frequently (>${counter.count - 1}/s). ` +
+            'Emissions above 50/s are throttled and above 100/s are dropped to prevent event storms. ' +
+            'Consider debouncing the emitter.',
+        );
+      }
+      if (counter.count > 100) {
+        // Drop the event to protect against runaway event storms.
+        return;
       }
     }
 
@@ -100,6 +113,11 @@ export class GlobalEventBus extends EventTarget {
     const eventHandlers = this.handlers[eventName];
     if (eventHandlers) {
       eventHandlers.delete(handler as EventHandler<unknown>);
+      // Remove the entry entirely once it is empty so stale keys don't
+      // accumulate indefinitely in long-lived apps.
+      if (eventHandlers.size === 0) {
+        delete this.handlers[eventName];
+      }
     }
   }
 
@@ -123,7 +141,14 @@ export class GlobalEventBus extends EventTarget {
     options?: AddEventListenerOptions,
   ): () => void {
     this.addEventListener(eventName, handler as EventListener, options);
-    return () => this.removeEventListener(eventName, handler as EventListener);
+    // Use a wrapper so calling unsubscribe also removes it from nativeUnsubscribers,
+    // preventing indefinite accumulation in long-lived apps.
+    const unsubscribe: () => void = () => {
+      this.removeEventListener(eventName, handler as EventListener);
+      this.nativeUnsubscribers.delete(unsubscribe);
+    };
+    this.nativeUnsubscribers.set(unsubscribe, true);
+    return unsubscribe;
   }
 
   /**
@@ -171,11 +196,15 @@ export class GlobalEventBus extends EventTarget {
   }
 
   /**
-   * Clear all event handlers (useful for testing or cleanup).
+   * Clear all event handlers and native EventTarget listeners (useful for testing or cleanup).
    */
   clear(): void {
     this.handlers = {};
-    // Note: This doesn't clear native event listeners, use removeAllListeners if needed
+    const toCleanup = Array.from(this.nativeUnsubscribers.keys());
+    this.nativeUnsubscribers.clear();
+    for (const unsubscribe of toCleanup) {
+      unsubscribe();
+    }
   }
 
   /**

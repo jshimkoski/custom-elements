@@ -112,9 +112,7 @@ get a reference to the element and add/remove listeners using `addEventListener`
 
 ### Example: prefer semantic event names (recommended)
 
-```html
-<!-- child component (emit a semantic event) -->
-```
+Child component (emits a semantic event):
 
 ```ts
 component('item-list', () => {
@@ -136,21 +134,21 @@ component('item-list', () => {
 });
 ```
 
-<!-- parent (runtime template) -->
+Parent template (listens for the semantic event):
 
-<cer-button @open="${ctx.handleOpen}" />
-
-````
+```html
+<item-list @item-selected="${ctx.handleItemSelected}"></item-list>
+```
 
 ```ts
 // parent handler
-function handleOpen(ev: Event) {
+function handleItemSelected(ev: Event) {
   // CustomEvent payload is in ev.detail
-  if ('detail' in ev) console.log('opened', (ev as CustomEvent).detail);
+  if ('detail' in ev) console.log('item selected', (ev as CustomEvent).detail);
 }
-````
+```
 
-Recommendation: avoid reusing native event names (like `click`) for semantic payload events; use descriptive names such as `open`, `save`, or `activate`.
+Recommendation: avoid reusing native event names (like `click`) for semantic payload events; use descriptive names such as `open`, `save`, or `activate`. Reusing native event names can cause ambiguity about whether the native browser event or a custom event is firing.
 
 ## Interoperability guidance
 

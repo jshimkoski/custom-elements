@@ -1,12 +1,12 @@
 import {
   parseArbitrary,
   parseArbitraryVariant,
-  escapeClassName,
   extractClassesFromHTML,
   jitCSS,
   jitCssCache,
   JIT_CSS_THROTTLE_MS,
 } from '../src/lib/runtime/style';
+import { escapeClassName } from '../src/lib/runtime/css-utils';
 import { describe, it, expect } from 'vitest';
 
 // --- parseArbitrary ---
@@ -17,6 +17,10 @@ describe('parseArbitrary', () => {
   });
   it('returns correct CSS for unknown prop', () => {
     expect(parseArbitrary('foo-[bar]')).toBe('foo:bar;');
+  });
+  it('returns null when value is empty', () => {
+    // Covers the `cssProp && value ? ... : null` false arm
+    expect(parseArbitrary('foo-[]')).toBeNull();
   });
   it('returns null for invalid syntax', () => {
     expect(parseArbitrary('foo-bar')).toBeNull();
@@ -31,8 +35,17 @@ describe('parseArbitraryVariant', () => {
       '[aria-selected=true]',
     );
   });
+  it('returns inner selector when [&...] contains &', () => {
+    // Covers the true arm of `inner.includes('&') ? inner : token`
+    expect(parseArbitraryVariant('[&:hover]')).toBe('&:hover');
+    expect(parseArbitraryVariant('[&.active]')).toBe('&.active');
+  });
   it('returns token for foo-[bar] syntax', () => {
     expect(parseArbitraryVariant('foo-[bar]')).toBe('foo-[bar]');
+  });
+  it('returns inner with underscores-to-dashes when prop-[&...] contains &', () => {
+    // Covers the true arm of the second branch ternary
+    expect(parseArbitraryVariant('foo-[&.class]')).toBe('&.class');
   });
   it('returns null for invalid syntax', () => {
     expect(parseArbitraryVariant('foo-bar')).toBeNull();

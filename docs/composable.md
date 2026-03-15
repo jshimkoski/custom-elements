@@ -152,6 +152,28 @@ factory(existingContext);
 
 ---
 
+## Module-Scope `ref()` vs. Composable-Scoped `ref()`
+
+When you declare a `ref()` **inside** the function passed to `createComposable()`, every component that calls the composable factory gets its **own independent** reactive state — because the factory function runs once per invocation.
+
+If you declare a `ref()` **outside** the composable (at module scope), that state is **shared across all component instances** that import the composable. This is intentional when you want a singleton store, but can be a surprising source of bugs when isolation is expected.
+
+```typescript
+// ❌ Shared state — count is the same for all components that call useCounter()
+const count = ref(0);
+const useCounter = createComposable(() => {
+  return { count };
+});
+
+// ✅ Isolated state — each component gets its own count
+const useCounter = createComposable(() => {
+  const count = ref(0); // created fresh per invocation
+  return { count };
+});
+```
+
+---
+
 ## Rules
 
 - Call the composable factory **inside a component render function**.

@@ -47,7 +47,6 @@ class EventManager {
 
     const list = this.cleanupFunctions.get(element)!;
     list.push(meta);
-    (list as Array<unknown> & { __metaList?: unknown }).__metaList = list;
   }
 
   /**

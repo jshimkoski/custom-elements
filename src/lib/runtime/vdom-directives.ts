@@ -115,11 +115,11 @@ export function processModelDirective(
     // For multiple selects we also schedule option selection; otherwise set prop
     if (el && el.hasAttribute('multiple') && el instanceof HTMLSelectElement) {
       const arr = Array.isArray(currentValue) ? currentValue.map(String) : [];
-      setTimeout(() => {
+      queueMicrotask(() => {
         Array.from((el as HTMLSelectElement).options).forEach((option) => {
           option.selected = arr.includes(option.value);
         });
-      }, 0);
+      });
       props[propName] = Array.isArray(currentValue) ? currentValue : [];
     } else {
       props[propName] = currentValue;
@@ -232,12 +232,11 @@ export function processModelDirective(
           emitUpdateEvents(target, propName, newValue);
         }
       } finally {
-        setTimeout(
+        queueMicrotask(
           () =>
             ((
               target as HTMLElement & { _modelUpdating?: boolean }
             )._modelUpdating = false),
-          0,
         );
       }
     }
@@ -331,14 +330,35 @@ export function processModelDirective(
           !String(k).startsWith('_') &&
           k !== 'constructor',
       );
+      // Build the set of nested event names for the current object shape,
+      // then remove any stale nested update listeners whose keys are gone.
+      const newNestedKebabKeys = new Set(
+        (userKeys as string[]).map((k) => `update:${toKebab(k)}`),
+      );
+      for (const existingKey of Object.keys(listeners)) {
+        if (
+          existingKey.startsWith('update:') &&
+          existingKey !== eventNameKebab &&
+          existingKey !== eventNameCamel &&
+          !newNestedKebabKeys.has(existingKey)
+        ) {
+          if (el) EventManager.removeListener(el, existingKey, listeners[existingKey]);
+          delete listeners[existingKey];
+        }
+      }
+
       // preparing nested listeners
       for (const nestedKey of userKeys) {
         const nestedKeyStr = String(nestedKey);
         const nestedKebab = `update:${toKebab(nestedKeyStr)}`;
         const nestedCamel = `update:${nestedKeyStr}`;
         // Avoid overwriting the primary handler for the main prop
-        // and avoid registering internal keys
-        if (listeners[nestedKebab]) continue;
+        if (nestedKebab === eventNameKebab) continue;
+        // Remove existing handler before replacing so EventManager stays in sync
+        if (listeners[nestedKebab] && el) {
+          EventManager.removeListener(el, nestedKebab, listeners[nestedKebab]);
+          delete listeners[nestedKebab];
+        }
         listeners[nestedKebab] = (event: Event) => {
           const newVal =
             (event as CustomEvent).detail !== undefined
@@ -420,7 +440,7 @@ export function processModelDirective(
         | HTMLTextAreaElement
         | null;
       if (!target) return;
-      setTimeout(() => {
+      queueMicrotask(() => {
         const val = target.value;
         const actualState =
           ((context as { _state?: unknown } | undefined)?._state as Record<
@@ -443,16 +463,15 @@ export function processModelDirective(
             setNestedValue(actualState, value as string, newVal);
             triggerStateUpdate(context, isReactiveState(value), value, newVal);
           } finally {
-            setTimeout(
+            queueMicrotask(
               () =>
                 ((
                   target as HTMLElement & { _modelUpdating?: boolean }
                 )._modelUpdating = false),
-              0,
             );
           }
         }
-      }, 0);
+      });
     };
   }
   // processModelDirective listeners prepared
@@ -946,22 +965,8 @@ export function processDirectives(
       }
       // If it's NOT reactive/wrapper, prefer attrs to avoid accidental truthiness
       if (!isWrapper && !isReactiveVal) {
-        try {
-          attrs['disabled'] = candidate;
-          delete props['disabled'];
-          const w = globalThis as VDomGlobal;
-          if (!w.__VDOM_DISABLED_PROMOTIONS) w.__VDOM_DISABLED_PROMOTIONS = [];
-          (w.__VDOM_DISABLED_PROMOTIONS as unknown[]).push({
-            phase: 'bind-directive:postfix-move',
-            location: 'attrs',
-            key: 'disabled',
-            value: candidate,
-            time: Date.now(),
-            stack: new Error().stack,
-          });
-        } catch {
-          // ignore
-        }
+        attrs['disabled'] = candidate;
+        delete props['disabled'];
       }
     }
   } catch {

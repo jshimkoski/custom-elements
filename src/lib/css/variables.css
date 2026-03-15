@@ -126,4 +126,303 @@
   --cer-color-error-800: #991b1b;
   --cer-color-error-900: #7f1d1d;
   --cer-color-error-950: #450a0a;
+
+  /* Extended Tailwind palette — override to theme these colors */
+  /* slate */
+  --cer-color-slate-50: #f8fafc;
+  --cer-color-slate-100: #f1f5f9;
+  --cer-color-slate-200: #e2e8f0;
+  --cer-color-slate-300: #cbd5e1;
+  --cer-color-slate-400: #94a3b8;
+  --cer-color-slate-500: #64748b;
+  --cer-color-slate-600: #475569;
+  --cer-color-slate-700: #334155;
+  --cer-color-slate-800: #1e293b;
+  --cer-color-slate-900: #0f172a;
+  --cer-color-slate-950: #020617;
+  /* gray */
+  --cer-color-gray-50: #f9fafb;
+  --cer-color-gray-100: #f3f4f6;
+  --cer-color-gray-200: #e5e7eb;
+  --cer-color-gray-300: #d1d5db;
+  --cer-color-gray-400: #9ca3af;
+  --cer-color-gray-500: #6b7280;
+  --cer-color-gray-600: #4b5563;
+  --cer-color-gray-700: #374151;
+  --cer-color-gray-800: #1f2937;
+  --cer-color-gray-900: #111827;
+  --cer-color-gray-950: #030712;
+  /* zinc */
+  --cer-color-zinc-50: #fafafa;
+  --cer-color-zinc-100: #f4f4f5;
+  --cer-color-zinc-200: #e4e4e7;
+  --cer-color-zinc-300: #d4d4d8;
+  --cer-color-zinc-400: #a1a1aa;
+  --cer-color-zinc-500: #71717a;
+  --cer-color-zinc-600: #52525b;
+  --cer-color-zinc-700: #3f3f46;
+  --cer-color-zinc-800: #27272a;
+  --cer-color-zinc-900: #18181b;
+  --cer-color-zinc-950: #09090b;
+  /* stone */
+  --cer-color-stone-50: #fafaf9;
+  --cer-color-stone-100: #f5f5f4;
+  --cer-color-stone-200: #e7e5e4;
+  --cer-color-stone-300: #d6d3d1;
+  --cer-color-stone-400: #a8a29e;
+  --cer-color-stone-500: #78716c;
+  --cer-color-stone-600: #57534e;
+  --cer-color-stone-700: #44403c;
+  --cer-color-stone-800: #292524;
+  --cer-color-stone-900: #1c1917;
+  --cer-color-stone-950: #0c0a09;
+  /* red */
+  --cer-color-red-50: #fef2f2;
+  --cer-color-red-100: #fee2e2;
+  --cer-color-red-200: #fecaca;
+  --cer-color-red-300: #fca5a5;
+  --cer-color-red-400: #f87171;
+  --cer-color-red-500: #ef4444;
+  --cer-color-red-600: #dc2626;
+  --cer-color-red-700: #b91c1c;
+  --cer-color-red-800: #991b1b;
+  --cer-color-red-900: #7f1d1d;
+  --cer-color-red-950: #450a0a;
+  /* orange */
+  --cer-color-orange-50: #fff7ed;
+  --cer-color-orange-100: #ffedd5;
+  --cer-color-orange-200: #fed7aa;
+  --cer-color-orange-300: #fdba74;
+  --cer-color-orange-400: #fb923c;
+  --cer-color-orange-500: #f97316;
+  --cer-color-orange-600: #ea580c;
+  --cer-color-orange-700: #c2410c;
+  --cer-color-orange-800: #9a3412;
+  --cer-color-orange-900: #7c2d12;
+  --cer-color-orange-950: #431407;
+  /* amber */
+  --cer-color-amber-50: #fffbeb;
+  --cer-color-amber-100: #fef3c7;
+  --cer-color-amber-200: #fde68a;
+  --cer-color-amber-300: #fcd34d;
+  --cer-color-amber-400: #fbbf24;
+  --cer-color-amber-500: #f59e0b;
+  --cer-color-amber-600: #d97706;
+  --cer-color-amber-700: #b45309;
+  --cer-color-amber-800: #92400e;
+  --cer-color-amber-900: #78350f;
+  --cer-color-amber-950: #451a03;
+  /* yellow */
+  --cer-color-yellow-50: #fefce8;
+  --cer-color-yellow-100: #fef9c3;
+  --cer-color-yellow-200: #fef08a;
+  --cer-color-yellow-300: #fde047;
+  --cer-color-yellow-400: #facc15;
+  --cer-color-yellow-500: #eab308;
+  --cer-color-yellow-600: #ca8a04;
+  --cer-color-yellow-700: #a16207;
+  --cer-color-yellow-800: #854d0e;
+  --cer-color-yellow-900: #713f12;
+  --cer-color-yellow-950: #422006;
+  /* lime */
+  --cer-color-lime-50: #f7fee7;
+  --cer-color-lime-100: #ecfccb;
+  --cer-color-lime-200: #d9f99d;
+  --cer-color-lime-300: #bef264;
+  --cer-color-lime-400: #a3e635;
+  --cer-color-lime-500: #84cc16;
+  --cer-color-lime-600: #65a30d;
+  --cer-color-lime-700: #4d7c0f;
+  --cer-color-lime-800: #3f6212;
+  --cer-color-lime-900: #365314;
+  --cer-color-lime-950: #1a2e05;
+  /* green */
+  --cer-color-green-50: #f0fdf4;
+  --cer-color-green-100: #dcfce7;
+  --cer-color-green-200: #bbf7d0;
+  --cer-color-green-300: #86efac;
+  --cer-color-green-400: #4ade80;
+  --cer-color-green-500: #22c55e;
+  --cer-color-green-600: #16a34a;
+  --cer-color-green-700: #15803d;
+  --cer-color-green-800: #166534;
+  --cer-color-green-900: #14532d;
+  --cer-color-green-950: #052e16;
+  /* emerald */
+  --cer-color-emerald-50: #ecfdf5;
+  --cer-color-emerald-100: #d1fae5;
+  --cer-color-emerald-200: #a7f3d0;
+  --cer-color-emerald-300: #6ee7b7;
+  --cer-color-emerald-400: #34d399;
+  --cer-color-emerald-500: #10b981;
+  --cer-color-emerald-600: #059669;
+  --cer-color-emerald-700: #047857;
+  --cer-color-emerald-800: #065f46;
+  --cer-color-emerald-900: #064e3b;
+  --cer-color-emerald-950: #022c22;
+  /* teal */
+  --cer-color-teal-50: #f0fdfa;
+  --cer-color-teal-100: #ccfbf1;
+  --cer-color-teal-200: #99f6e4;
+  --cer-color-teal-300: #5eead4;
+  --cer-color-teal-400: #2dd4bf;
+  --cer-color-teal-500: #14b8a6;
+  --cer-color-teal-600: #0d9488;
+  --cer-color-teal-700: #0f766e;
+  --cer-color-teal-800: #115e59;
+  --cer-color-teal-900: #134e4a;
+  --cer-color-teal-950: #042f2e;
+  /* cyan */
+  --cer-color-cyan-50: #ecfeff;
+  --cer-color-cyan-100: #cffafe;
+  --cer-color-cyan-200: #a5f3fc;
+  --cer-color-cyan-300: #67e8f9;
+  --cer-color-cyan-400: #22d3ee;
+  --cer-color-cyan-500: #06b6d4;
+  --cer-color-cyan-600: #0891b2;
+  --cer-color-cyan-700: #0e7490;
+  --cer-color-cyan-800: #155e75;
+  --cer-color-cyan-900: #164e63;
+  --cer-color-cyan-950: #083344;
+  /* sky */
+  --cer-color-sky-50: #f0f9ff;
+  --cer-color-sky-100: #e0f2fe;
+  --cer-color-sky-200: #bae6fd;
+  --cer-color-sky-300: #7dd3fc;
+  --cer-color-sky-400: #38bdf8;
+  --cer-color-sky-500: #0ea5e9;
+  --cer-color-sky-600: #0284c7;
+  --cer-color-sky-700: #0369a1;
+  --cer-color-sky-800: #075985;
+  --cer-color-sky-900: #0c4a6e;
+  --cer-color-sky-950: #082f49;
+  /* blue */
+  --cer-color-blue-50: #eff6ff;
+  --cer-color-blue-100: #dbeafe;
+  --cer-color-blue-200: #bfdbfe;
+  --cer-color-blue-300: #93c5fd;
+  --cer-color-blue-400: #60a5fa;
+  --cer-color-blue-500: #3b82f6;
+  --cer-color-blue-600: #2563eb;
+  --cer-color-blue-700: #1d4ed8;
+  --cer-color-blue-800: #1e40af;
+  --cer-color-blue-900: #1e3a8a;
+  --cer-color-blue-950: #172554;
+  /* indigo */
+  --cer-color-indigo-50: #eef2ff;
+  --cer-color-indigo-100: #e0e7ff;
+  --cer-color-indigo-200: #c7d2fe;
+  --cer-color-indigo-300: #a5b4fc;
+  --cer-color-indigo-400: #818cf8;
+  --cer-color-indigo-500: #6366f1;
+  --cer-color-indigo-600: #4f46e5;
+  --cer-color-indigo-700: #4338ca;
+  --cer-color-indigo-800: #3730a3;
+  --cer-color-indigo-900: #312e81;
+  --cer-color-indigo-950: #1e1b4b;
+  /* violet */
+  --cer-color-violet-50: #f5f3ff;
+  --cer-color-violet-100: #ede9fe;
+  --cer-color-violet-200: #ddd6fe;
+  --cer-color-violet-300: #c4b5fd;
+  --cer-color-violet-400: #a78bfa;
+  --cer-color-violet-500: #8b5cf6;
+  --cer-color-violet-600: #7c3aed;
+  --cer-color-violet-700: #6d28d9;
+  --cer-color-violet-800: #5b21b6;
+  --cer-color-violet-900: #4c1d95;
+  --cer-color-violet-950: #2e1065;
+  /* purple */
+  --cer-color-purple-50: #faf5ff;
+  --cer-color-purple-100: #f3e8ff;
+  --cer-color-purple-200: #e9d5ff;
+  --cer-color-purple-300: #d8b4fe;
+  --cer-color-purple-400: #c084fc;
+  --cer-color-purple-500: #a855f7;
+  --cer-color-purple-600: #9333ea;
+  --cer-color-purple-700: #7e22ce;
+  --cer-color-purple-800: #6b21a8;
+  --cer-color-purple-900: #581c87;
+  --cer-color-purple-950: #3b0764;
+  /* fuchsia */
+  --cer-color-fuchsia-50: #fdf4ff;
+  --cer-color-fuchsia-100: #fae8ff;
+  --cer-color-fuchsia-200: #f5d0fe;
+  --cer-color-fuchsia-300: #f0abfc;
+  --cer-color-fuchsia-400: #e879f9;
+  --cer-color-fuchsia-500: #d946ef;
+  --cer-color-fuchsia-600: #c026d3;
+  --cer-color-fuchsia-700: #a21caf;
+  --cer-color-fuchsia-800: #86198f;
+  --cer-color-fuchsia-900: #701a75;
+  --cer-color-fuchsia-950: #4a044e;
+  /* pink */
+  --cer-color-pink-50: #fdf2f8;
+  --cer-color-pink-100: #fce7f3;
+  --cer-color-pink-200: #fbcfe8;
+  --cer-color-pink-300: #f9a8d4;
+  --cer-color-pink-400: #f472b6;
+  --cer-color-pink-500: #ec4899;
+  --cer-color-pink-600: #db2777;
+  --cer-color-pink-700: #be185d;
+  --cer-color-pink-800: #9d174d;
+  --cer-color-pink-900: #831843;
+  --cer-color-pink-950: #500724;
+  /* rose */
+  --cer-color-rose-50: #fff1f2;
+  --cer-color-rose-100: #ffe4e6;
+  --cer-color-rose-200: #fecdd3;
+  --cer-color-rose-300: #fda4af;
+  --cer-color-rose-400: #fb7185;
+  --cer-color-rose-500: #f43f5e;
+  --cer-color-rose-600: #e11d48;
+  --cer-color-rose-700: #be123c;
+  --cer-color-rose-800: #9f1239;
+  --cer-color-rose-900: #881337;
+  --cer-color-rose-950: #4c0519;
+}
+
+/* @property registrations for CSS transition composability */
+@property --cer-rotate {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+@property --cer-translate-x {
+  syntax: '<length>';
+  initial-value: 0px;
+  inherits: false;
+}
+@property --cer-translate-y {
+  syntax: '<length>';
+  initial-value: 0px;
+  inherits: false;
+}
+@property --cer-skew-x {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+@property --cer-skew-y {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+@property --cer-scale-x {
+  syntax: '<number>';
+  initial-value: 1;
+  inherits: false;
+}
+@property --cer-scale-y {
+  syntax: '<number>';
+  initial-value: 1;
+  inherits: false;
+}
+/* Filter composition variables (--cer-blur, --cer-brightness, etc.) intentionally
+   omit @property registration because their "no-op" value is empty string (''),
+   which is not a valid CSS initial-value. They compose correctly without Houdini. */
+@property --cer-opacity {
+  syntax: '<number>';
+  initial-value: 1;
+  inherits: false;
 }

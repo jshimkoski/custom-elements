@@ -1,61 +1,47 @@
 import { generateProseCSS, generateProseElementModifier } from './prose';
+import { extendedColors } from '../css/colors';
+import {
+  minifyCSS,
+  cssEscape,
+  escapeClassName,
+  escapeRegExp,
+  _resetBaseResetSheet,
+  spacing,
+} from './css-utils';
+import { _registerRenderBridge } from './render-bridge';
 
 /**
  * Optimized JIT CSS implementation with reduced bloat and enhanced utilities
  */
 
-/**
- * CSS template literal
- */
-export function css(
-  strings: TemplateStringsArray,
-  ...values: unknown[]
-): string {
-  let result = '';
-  for (let i = 0; i < strings.length; i++) {
-    result += strings[i];
-    if (i < values.length) result += values[i];
-  }
-  return result;
-}
-
-/**
- * CSS minification utility (basic)
- */
-export function minifyCSS(css: string): string {
-  return css
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/\s+/g, ' ')
-    .replace(/\s*([{}:;,>~])\s*/g, '$1')
-    .replace(/;}/g, '}')
-    .trim();
-}
-
-// --- Shared baseReset stylesheet ---
-let baseResetSheet: CSSStyleSheet | null = null;
-export function getBaseResetSheet(): CSSStyleSheet {
-  if (!baseResetSheet) {
-    if (typeof CSSStyleSheet === 'undefined') {
-      // SSR / older browsers: provide a safe stub that won't throw when
-      // consumed by runtime paths that expect a CSSStyleSheet-like object.
-      baseResetSheet = {
-        cssRules: [],
-        replaceSync: () => {},
-        toString: () => minifyCSS(baseReset),
-      } as unknown as CSSStyleSheet;
-    } else {
-      baseResetSheet = new CSSStyleSheet();
-      baseResetSheet.replaceSync(minifyCSS(baseReset));
-    }
-  }
-
-  return baseResetSheet;
-}
-
 // --- Shared prose stylesheet (singleton like baseReset) ---
 let proseSheet: CSSStyleSheet | null = null;
 const detectedProseSizes = new Set<string>();
 let proseCSSCache = ''; // Cache the actual CSS text for environments where cssRules doesn't work
+// Track the set of sizes that were used to build the current proseCSSCache so
+// we only regenerate when the set actually changes.
+let proseSizesSnapshot = '';
+
+function buildProseCSS(): void {
+  const snapshot = Array.from(detectedProseSizes).sort().join(',');
+  if (snapshot === proseSizesSnapshot) return; // nothing changed
+  proseSizesSnapshot = snapshot;
+
+  let combinedProseCSS = '';
+  for (const size of detectedProseSizes) {
+    const css = generateProseCSS(size);
+    if (css) combinedProseCSS += css;
+  }
+  proseCSSCache = minifyCSS(combinedProseCSS);
+
+  if (proseSheet && typeof proseSheet.replaceSync === 'function' && combinedProseCSS) {
+    try {
+      proseSheet.replaceSync(proseCSSCache);
+    } catch {
+      // Ignore errors in environments that don't support replaceSync
+    }
+  }
+}
 
 export function getProseSheet(): CSSStyleSheet | null {
   if (detectedProseSizes.size === 0) return null;
@@ -74,29 +60,11 @@ export function getProseSheet(): CSSStyleSheet | null {
       (proseSheet as { toString?: () => string }).toString = () =>
         proseCSSCache;
     }
+    // Force a build now that the sheet exists
+    proseSizesSnapshot = '';
   }
 
-  // Regenerate prose CSS for all detected sizes
-  let combinedProseCSS = '';
-  for (const size of detectedProseSizes) {
-    // Import happens at top of file - tree-shaken if prose never used
-    const css = generateProseCSS(size);
-    if (css) {
-      combinedProseCSS += css;
-    }
-  }
-
-  // Cache the CSS text
-  proseCSSCache = minifyCSS(combinedProseCSS);
-
-  if (typeof proseSheet.replaceSync === 'function' && combinedProseCSS) {
-    try {
-      proseSheet.replaceSync(proseCSSCache);
-    } catch {
-      // Ignore errors in environments that don't support replaceSync
-    }
-  }
-
+  buildProseCSS();
   return proseSheet;
 }
 
@@ -107,169 +75,38 @@ export function registerProseSize(size: string): void {
   // If new size detected, regenerate prose sheet (if it exists)
   // Note: If proseSheet is null, it will be generated fresh when getProseSheet() is called
   if (sizesChanged && proseSheet) {
-    getProseSheet();
+    buildProseCSS();
   }
 }
-
-export function sanitizeCSS(css: string): string {
-  return css
-    .replace(/url\s*\(\s*['"]?javascript:[^)]*\)/gi, '')
-    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
-    .replace(/expression\s*\([^)]*\)/gi, '');
-}
-
-import variables from '../css/variables.css?raw';
-
-export const baseReset = css`
-  ${variables}
-  :host,
-  *,
-  ::before,
-  ::after {
-    all: isolate;
-    box-sizing: border-box;
-    border: 0 solid currentColor;
-    margin: 0;
-    padding: 0;
-    font: inherit;
-    vertical-align: baseline;
-    background: transparent;
-    color: inherit;
-    -webkit-tap-highlight-color: transparent;
-    /* Transform composition variables (reset per-element for composability) */
-    --cer-translate-x: 0px;
-    --cer-translate-y: 0px;
-    --cer-rotate: 0deg;
-    --cer-skew-x: 0deg;
-    --cer-skew-y: 0deg;
-    --cer-scale-x: 1;
-    --cer-scale-y: 1;
-    /* Ring variables */
-    --cer-ring-color: rgb(59 130 246 / 0.5);
-    /* Filter composition variables (empty = no-op in filter chain) */
-    --cer-blur: ;
-    --cer-brightness: ;
-    --cer-contrast: ;
-    --cer-grayscale: ;
-    --cer-hue-rotate: ;
-    --cer-invert: ;
-    --cer-saturate: ;
-    --cer-sepia: ;
-    --cer-drop-shadow: ;
-    --cer-backdrop-blur: ;
-    --cer-backdrop-brightness: ;
-    --cer-backdrop-contrast: ;
-    --cer-backdrop-grayscale: ;
-    --cer-backdrop-hue-rotate: ;
-    --cer-backdrop-invert: ;
-    --cer-backdrop-saturate: ;
-    --cer-backdrop-sepia: ;
-  }
-  :host {
-    display: contents;
-    font: 16px/1.5 var(--cer-font-sans, ui-sans-serif, system-ui, sans-serif);
-    /* Default CE line-height variable so leading-* can reliably override */
-    --cer-line-height: 1.5;
-    -webkit-text-size-adjust: 100%;
-    text-size-adjust: 100%;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    /* Default gradient variables to avoid undefined var() usage in generated utilities */
-    --cer-gradient-from-position: 0%;
-    --cer-gradient-to-position: 100%;
-    --cer-gradient-via-position: 50%;
-    --cer-gradient-from: rgba(255, 255, 255, 0);
-    --cer-gradient-to: rgba(255, 255, 255, 0);
-    --cer-gradient-stops: var(--cer-gradient-from), var(--cer-gradient-to);
-    /* Default outline style variable */
-    --cer-outline-style: solid;
-  }
-  button,
-  input,
-  select,
-  textarea {
-    background: transparent;
-    outline: none;
-  }
-  textarea {
-    resize: vertical;
-  }
-  progress {
-    vertical-align: baseline;
-  }
-  button,
-  textarea {
-    overflow: visible;
-  }
-  img,
-  svg,
-  video,
-  canvas,
-  audio,
-  iframe,
-  embed,
-  object {
-    display: block;
-    max-width: 100%;
-    height: auto;
-  }
-  svg {
-    fill: currentColor;
-    stroke: none;
-  }
-  a {
-    text-decoration: inherit;
-    cursor: pointer;
-  }
-  button,
-  [type='button'],
-  [type='reset'],
-  [type='submit'] {
-    cursor: pointer;
-    appearance: button;
-    background: none;
-    -webkit-user-select: none;
-    user-select: none;
-  }
-  ::-webkit-input-placeholder,
-  ::placeholder {
-    color: inherit;
-    opacity: 0.5;
-  }
-  *:focus-visible {
-    outline: 2px solid var(--cer-color-primary-500, #3b82f6);
-    outline-offset: 2px;
-  }
-  ol,
-  ul {
-    list-style: none;
-  }
-  table {
-    border-collapse: collapse;
-  }
-  sub,
-  sup {
-    font-size: 0.75em;
-    line-height: 0;
-    position: relative;
-  }
-  sub {
-    bottom: -0.25em;
-  }
-  sup {
-    top: -0.5em;
-  }
-  [disabled],
-  [aria-disabled='true'] {
-    cursor: not-allowed;
-  }
-  [hidden] {
-    display: none;
-  }
-`;
 
 // Types
 export type CSSMap = Record<string, string>;
+
+/**
+ * Options for configuring the JIT CSS engine.
+ *
+ * @example
+ * ```ts
+ * import { enableJITCSS } from '@jasonshimmy/custom-elements-runtime';
+ * enableJITCSS({ extendedColors: true });
+ * ```
+ */
+export interface JITCSSOptions {
+  /**
+   * Include the extended Tailwind color palette (slate, gray, red, orange, blue, violet, rose, etc.).
+   * Pass `true` to include all 21 color families, or an array of specific family names to include only
+   * those (e.g. `['slate', 'blue', 'red']`). A targeted list reduces `_activeColors` size and improves
+   * JIT match performance when only a few extended families are needed.
+   */
+  extendedColors?: boolean | string[];
+  /** Custom color palette entries to add to the JIT engine */
+  customColors?: Record<string, Record<string, string>>;
+  /** Disable specific variant groups for smaller output */
+  disableVariants?: Array<
+    'responsive' | 'dark' | 'motion' | 'print' | 'container'
+  >;
+}
+
 type SelectorVariantMap = Record<
   string,
   (selector: string, body: string) => string
@@ -396,7 +233,177 @@ export const colors: Record<
   ]),
 );
 
-export const spacing = '0.25rem';
+// Module-level active color map. Starts with semantic colors; extended colors
+// are added on demand when enableJITCSS({ extendedColors }) is called.
+// Initialized here as a plain data assignment (no function call side effect)
+// so bundlers can tree-shake this module when JIT is not used.
+let _activeColors: Record<string, Record<string, string>> = { ...colors };
+
+function rebuildActiveColors(options: JITCSSOptions): void {
+  _activeColors = { ...colors };
+  if (options.extendedColors) {
+    const families = Array.isArray(options.extendedColors)
+      ? options.extendedColors
+      : Object.keys(extendedColors);
+    for (const name of families) {
+      const shades = extendedColors[name as keyof typeof extendedColors];
+      if (!shades || _activeColors[name]) continue;
+      _activeColors[name] = Object.fromEntries(
+        Object.entries(shades).map(([shade, hex]) => [
+          shade,
+          `var(--cer-color-${name}-${shade}, ${hex})`,
+        ]),
+      );
+    }
+  }
+  if (options.customColors) {
+    for (const [name, shades] of Object.entries(options.customColors)) {
+      _activeColors[name] = shades;
+    }
+  }
+}
+
+let _globalJITCSSOptions: JITCSSOptions = {};
+
+// Lazy render-bridge registration — avoids a module-level side effect.
+// Called the first time enableJITCSS() or registerJITCSSComponent() runs.
+let _bridgeRegistered = false;
+function _ensureBridgeRegistered(): void {
+  if (_bridgeRegistered) return;
+  _registerRenderBridge(isJITCSSEnabledFor, jitCSS, getProseSheet);
+  _bridgeRegistered = true;
+}
+
+/**
+ * Whether the JIT CSS engine is active. Defaults to `true` for v2 backwards
+ * compatibility. In v3 this will default to `false` — components must opt in
+ * via `useJITCSS()` or call `enableJITCSS()` once at app startup.
+ *
+ * @internal — use `isJITCSSEnabled()` to read, `enableJITCSS()` to set.
+ */
+let _jitCSSEnabled = false;
+
+/**
+ * Per-component opt-in set. Populated by `registerJITCSSComponent()` when a
+ * component calls `useJITCSS()` inside its render function.
+ * @internal
+ */
+let _jitCSSEnabledComponents = new WeakSet<ShadowRoot>();
+
+/**
+ * Returns `true` when the JIT CSS engine is globally active.
+ * The render engine uses this to skip the JIT pass for projects that do not
+ * use utility classes.
+ */
+export function isJITCSSEnabled(): boolean {
+  return _jitCSSEnabled;
+}
+
+/**
+ * Returns `true` when JIT CSS should run for the given shadow root.
+ * JIT CSS is active if the global flag is set (`enableJITCSS()`) OR if the
+ * specific shadow root was registered via `registerJITCSSComponent()`
+ * (i.e. the component called `useJITCSS()` in its render function).
+ * @internal — used by render.ts
+ */
+export function isJITCSSEnabledFor(root: ShadowRoot): boolean {
+  return _jitCSSEnabled || _jitCSSEnabledComponents.has(root);
+}
+
+/**
+ * Register a shadow root for per-component JIT CSS opt-in.
+ * Called by `useJITCSS()` when invoked inside a component render function.
+ * Optionally processes colour / variant options for this render pass.
+ * @internal
+ */
+export function registerJITCSSComponent(
+  root: ShadowRoot,
+  options?: JITCSSOptions,
+): void {
+  _jitCSSEnabledComponents.add(root);
+  if (options) {
+    const merged = { ..._globalJITCSSOptions, ...options };
+    // Only rebuild colors and clear the cache when the merged options actually
+    // differ from the current state. Without this guard, components that pass
+    // options inline (e.g. useJITCSS({ extendedColors: true })) would thrash
+    // the cache on every re-render, effectively disabling caching.
+    if (JSON.stringify(merged) !== JSON.stringify(_globalJITCSSOptions)) {
+      _globalJITCSSOptions = merged;
+      rebuildActiveColors(_globalJITCSSOptions);
+      jitCssCache.clear();
+    }
+  }
+  // Lazy registration so render.ts can call back into the JIT engine.
+  _ensureBridgeRegistered();
+}
+
+/**
+ * Configure the JIT CSS engine globally.
+ * Call once at app startup to set options that apply to all components.
+ *
+ * Calling this function also activates the JIT CSS engine if it has been
+ * disabled (e.g. by `disableJITCSS()`).
+ *
+ * @example
+ * ```ts
+ * import { enableJITCSS } from '@jasonshimmy/custom-elements-runtime';
+ *
+ * // Enable extended Tailwind color palette (bg-blue-500, text-violet-700, etc.)
+ * enableJITCSS({ extendedColors: true });
+ *
+ * // Add custom colors
+ * enableJITCSS({ customColors: { brand: { '500': '#e63946', '600': '#c1121f' } } });
+ * ```
+ */
+export function enableJITCSS(options?: JITCSSOptions): void {
+  _jitCSSEnabled = true;
+  if (options) {
+    _globalJITCSSOptions = { ..._globalJITCSSOptions, ...options };
+  }
+  rebuildActiveColors(_globalJITCSSOptions);
+  // Lazy registration so render.ts can call back into the JIT engine.
+  _ensureBridgeRegistered();
+  // Invalidate cache so new colors take effect on the next render.
+  jitCssCache.clear();
+}
+
+/**
+ * Disable the JIT CSS engine globally. Útil for projects that use only
+ * `useStyle()` and want to avoid any JIT parsing overhead.
+ *
+ * @example
+ * ```ts
+ * import { disableJITCSS } from '@jasonshimmy/custom-elements-runtime';
+ * disableJITCSS(); // JIT CSS will not run for any component
+ * ```
+ */
+export function disableJITCSS(): void {
+  _jitCSSEnabled = false;
+  // Also clear per-component opt-ins so components that called useJITCSS()
+  // don't continue processing JIT CSS after the global flag is disabled.
+  _jitCSSEnabledComponents = new WeakSet<ShadowRoot>();
+}
+
+/**
+ * Get the current global JIT CSS options.
+ * @internal
+ */
+export function getJITCSSOptions(): JITCSSOptions {
+  return { ..._globalJITCSSOptions };
+}
+
+/**
+ * Reset JIT CSS to default state (semantic colors only). Intended for tests.
+ * @internal
+ */
+export function _resetJITCSS(): void {
+  _globalJITCSSOptions = {};
+  _jitCSSEnabled = false;
+  _jitCSSEnabledComponents = new WeakSet<ShadowRoot>();
+  _bridgeRegistered = false;
+  _activeColors = { ...colors };
+  jitCssCache.clear();
+}
 
 const semanticSizes: Record<string, number> = {
   '3xs': 64,
@@ -448,6 +455,17 @@ export const spacingProps: Record<string, string[]> = {
   'gap-y': ['row-gap'],
   // size-* sets both width and height simultaneously (Tailwind v3+)
   size: ['width', 'height'],
+  // Logical (flow-relative) properties — RTL / vertical writing mode support
+  ms: ['margin-inline-start'],
+  me: ['margin-inline-end'],
+  ps: ['padding-inline-start'],
+  pe: ['padding-inline-end'],
+  bs: ['margin-block-start'],
+  be: ['margin-block-end'],
+  start: ['inset-inline-start'],
+  end: ['inset-inline-end'],
+  'inset-s': ['inset-inline-start'],
+  'inset-e': ['inset-inline-end'],
 };
 
 // Utility generators for reduced code bloat
@@ -1499,6 +1517,168 @@ const generateUtilities = (): CSSMap => {
     `.replace(/\s+/g, ''),
   });
 
+  // --- Tailwind CSS 4 parity additions ---
+
+  // flow-root display
+  utils['flow-root'] = 'display:flow-root;';
+
+  // Logical text alignment
+  utils['text-start'] = 'text-align:start;';
+  utils['text-end'] = 'text-align:end;';
+
+  // Grid subgrid (broad browser support since 2023)
+  utils['grid-cols-subgrid'] = 'grid-template-columns:subgrid;';
+  utils['grid-rows-subgrid'] = 'grid-template-rows:subgrid;';
+
+  // text-shadow utilities
+  Object.assign(utils, {
+    'text-shadow-xs':
+      '--cer-text-shadow-color:rgb(0 0 0 / 0.05);text-shadow:0 1px 1px var(--cer-text-shadow-color, rgb(0 0 0 / 0.05));',
+    'text-shadow-sm':
+      '--cer-text-shadow-color:rgb(0 0 0 / 0.15);text-shadow:0 1px 2px var(--cer-text-shadow-color, rgb(0 0 0 / 0.15));',
+    'text-shadow':
+      '--cer-text-shadow-color:rgb(0 0 0 / 0.3);text-shadow:0 1px 3px var(--cer-text-shadow-color, rgb(0 0 0 / 0.3));',
+    'text-shadow-md':
+      '--cer-text-shadow-color:rgb(0 0 0 / 0.3);text-shadow:0 2px 4px var(--cer-text-shadow-color, rgb(0 0 0 / 0.3));',
+    'text-shadow-lg':
+      '--cer-text-shadow-color:rgb(0 0 0 / 0.3);text-shadow:0 4px 8px var(--cer-text-shadow-color, rgb(0 0 0 / 0.3));',
+    'text-shadow-xl':
+      '--cer-text-shadow-color:rgb(0 0 0 / 0.3);text-shadow:0 6px 16px var(--cer-text-shadow-color, rgb(0 0 0 / 0.3));',
+    'text-shadow-2xl':
+      '--cer-text-shadow-color:rgb(0 0 0 / 0.3);text-shadow:0 8px 24px var(--cer-text-shadow-color, rgb(0 0 0 / 0.3));',
+    'text-shadow-none': 'text-shadow:none;',
+  });
+
+  // mask utilities
+  Object.assign(utils, {
+    'mask-none': 'mask-image:none;',
+    'mask-linear-to-t': 'mask-image:linear-gradient(to top,black,transparent);',
+    'mask-linear-to-tr':
+      'mask-image:linear-gradient(to top right,black,transparent);',
+    'mask-linear-to-r':
+      'mask-image:linear-gradient(to right,black,transparent);',
+    'mask-linear-to-br':
+      'mask-image:linear-gradient(to bottom right,black,transparent);',
+    'mask-linear-to-b':
+      'mask-image:linear-gradient(to bottom,black,transparent);',
+    'mask-linear-to-bl':
+      'mask-image:linear-gradient(to bottom left,black,transparent);',
+    'mask-linear-to-l':
+      'mask-image:linear-gradient(to left,black,transparent);',
+    'mask-linear-to-tl':
+      'mask-image:linear-gradient(to top left,black,transparent);',
+    'mask-radial':
+      'mask-image:radial-gradient(ellipse at center,black,transparent);',
+    'mask-radial-from-center':
+      'mask-image:radial-gradient(ellipse at center,black 0%,transparent 100%);',
+    'mask-size-contain': 'mask-size:contain;',
+    'mask-size-cover': 'mask-size:cover;',
+    'mask-no-repeat': 'mask-repeat:no-repeat;',
+    'mask-repeat': 'mask-repeat:repeat;',
+    'mask-alpha': 'mask-mode:alpha;',
+    'mask-luminance': 'mask-mode:luminance;',
+  });
+
+  // field-sizing utilities (auto-resizing inputs/textareas)
+  utils['field-sizing-content'] = 'field-sizing:content;';
+  utils['field-sizing-fixed'] = 'field-sizing:fixed;';
+
+  // color-scheme utilities
+  Object.assign(utils, {
+    'scheme-light': 'color-scheme:light;',
+    'scheme-dark': 'color-scheme:dark;',
+    'scheme-both': 'color-scheme:light dark;',
+    'scheme-only-light': 'color-scheme:only light;',
+    'scheme-only-dark': 'color-scheme:only dark;',
+    'scheme-normal': 'color-scheme:normal;',
+  });
+
+  // font-stretch utilities
+  Object.assign(utils, {
+    'font-stretch-ultra-condensed': 'font-stretch:ultra-condensed;',
+    'font-stretch-extra-condensed': 'font-stretch:extra-condensed;',
+    'font-stretch-condensed': 'font-stretch:condensed;',
+    'font-stretch-semi-condensed': 'font-stretch:semi-condensed;',
+    'font-stretch-normal': 'font-stretch:normal;',
+    'font-stretch-semi-expanded': 'font-stretch:semi-expanded;',
+    'font-stretch-expanded': 'font-stretch:expanded;',
+    'font-stretch-extra-expanded': 'font-stretch:extra-expanded;',
+    'font-stretch-ultra-expanded': 'font-stretch:ultra-expanded;',
+  });
+
+  // Extended cursor utilities (Tailwind 4)
+  Object.assign(utils, {
+    'cursor-zoom-in': 'cursor:zoom-in;',
+    'cursor-zoom-out': 'cursor:zoom-out;',
+    'cursor-cell': 'cursor:cell;',
+    'cursor-crosshair': 'cursor:crosshair;',
+    'cursor-copy': 'cursor:copy;',
+    'cursor-alias': 'cursor:alias;',
+    'cursor-context-menu': 'cursor:context-menu;',
+    'cursor-vertical-text': 'cursor:vertical-text;',
+    'cursor-no-drop': 'cursor:no-drop;',
+    'cursor-progress': 'cursor:progress;',
+    'cursor-col-resize': 'cursor:col-resize;',
+    'cursor-row-resize': 'cursor:row-resize;',
+    'cursor-ew-resize': 'cursor:ew-resize;',
+    'cursor-ns-resize': 'cursor:ns-resize;',
+    'cursor-nesw-resize': 'cursor:nesw-resize;',
+    'cursor-nwse-resize': 'cursor:nwse-resize;',
+    'cursor-all-scroll': 'cursor:all-scroll;',
+  });
+
+  // Logical border utilities
+  Object.assign(utils, {
+    // border-inline-start / border-inline-end widths
+    'border-s': 'border-inline-start-width:1px;',
+    'border-e': 'border-inline-end-width:1px;',
+    'border-s-0': 'border-inline-start-width:0px;',
+    'border-e-0': 'border-inline-end-width:0px;',
+    'border-s-2': 'border-inline-start-width:2px;',
+    'border-e-2': 'border-inline-end-width:2px;',
+    'border-s-4': 'border-inline-start-width:4px;',
+    'border-e-4': 'border-inline-end-width:4px;',
+    'border-s-8': 'border-inline-start-width:8px;',
+    'border-e-8': 'border-inline-end-width:8px;',
+  });
+
+  // Logical border-radius utilities
+  Object.assign(utils, {
+    'rounded-s-none': 'border-start-start-radius:0;border-end-start-radius:0;',
+    'rounded-e-none': 'border-start-end-radius:0;border-end-end-radius:0;',
+    'rounded-s-sm':
+      'border-start-start-radius:0.125rem;border-end-start-radius:0.125rem;',
+    'rounded-e-sm':
+      'border-start-end-radius:0.125rem;border-end-end-radius:0.125rem;',
+    'rounded-s':
+      'border-start-start-radius:0.25rem;border-end-start-radius:0.25rem;',
+    'rounded-e':
+      'border-start-end-radius:0.25rem;border-end-end-radius:0.25rem;',
+    'rounded-s-md':
+      'border-start-start-radius:0.375rem;border-end-start-radius:0.375rem;',
+    'rounded-e-md':
+      'border-start-end-radius:0.375rem;border-end-end-radius:0.375rem;',
+    'rounded-s-lg':
+      'border-start-start-radius:0.5rem;border-end-start-radius:0.5rem;',
+    'rounded-e-lg':
+      'border-start-end-radius:0.5rem;border-end-end-radius:0.5rem;',
+    'rounded-s-xl':
+      'border-start-start-radius:0.75rem;border-end-start-radius:0.75rem;',
+    'rounded-e-xl':
+      'border-start-end-radius:0.75rem;border-end-end-radius:0.75rem;',
+    'rounded-s-2xl':
+      'border-start-start-radius:1rem;border-end-start-radius:1rem;',
+    'rounded-e-2xl': 'border-start-end-radius:1rem;border-end-end-radius:1rem;',
+    'rounded-s-3xl':
+      'border-start-start-radius:1.5rem;border-end-start-radius:1.5rem;',
+    'rounded-e-3xl':
+      'border-start-end-radius:1.5rem;border-end-end-radius:1.5rem;',
+    'rounded-s-full':
+      'border-start-start-radius:9999px;border-end-start-radius:9999px;',
+    'rounded-e-full':
+      'border-start-end-radius:9999px;border-end-end-radius:9999px;',
+  });
+
   return utils;
 };
 
@@ -1606,6 +1786,8 @@ export const selectorVariants: SelectorVariantMap = {
   // State variants
   open: (sel, body) =>
     `${insertPseudoBeforeCombinator(sel, '[open]')}{${body}}`,
+  inert: (sel, body) =>
+    `${insertPseudoBeforeCombinator(sel, '[inert]')}{${body}}`,
 };
 
 export const mediaVariants: MediaVariantMap = {
@@ -1768,7 +1950,7 @@ export function hexToRgb(hex: string): string {
 
 // Optimized color parsing with lookup tables
 const colorRegex =
-  /^(bg|text|border|decoration|shadow|outline|caret|accent|fill|stroke|ring|divide)-([a-z]+)-?(\d{2,3}|DEFAULT)?$/;
+  /^(text-shadow|bg|text|border|decoration|shadow|outline|caret|accent|fill|stroke|ring|divide)-([a-z]+)-?(\d{2,3}|DEFAULT)?$/;
 const propMap: Record<string, string> = {
   bg: 'background-color',
   decoration: 'text-decoration-color',
@@ -1786,12 +1968,13 @@ export function parseColorClass(className: string): string | null {
   if (!match) return null;
 
   const [, type, colorName, shade = 'DEFAULT'] = match;
-  const colorValue = colors[colorName]?.[shade];
+  const colorValue = _activeColors[colorName]?.[shade];
   if (!colorValue) return null;
 
   if (type === 'shadow') return `--cer-shadow-color:${colorValue};`;
   if (type === 'ring') return `--cer-ring-color:${colorValue};`;
   if (type === 'divide') return `border-color:${colorValue};`;
+  if (type === 'text-shadow') return `--cer-text-shadow-color:${colorValue};`;
   const prop = propMap[type];
   return prop ? `${prop}:${colorValue};` : null;
 }
@@ -1924,7 +2107,7 @@ export function parseGradientColorStop(className: string): string | null {
   if (!match) return null;
 
   const [, position, colorName, shade = 'DEFAULT'] = match;
-  const colorValue = colors[colorName]?.[shade];
+  const colorValue = _activeColors[colorName]?.[shade];
   if (!colorValue) return null;
 
   switch (position) {
@@ -2054,88 +2237,14 @@ export function parseArbitraryVariant(token: string): string | null {
   return null;
 }
 
-/**
- * Polyfill for CSS.escape() for SSR environments
- * Based on https://drafts.csswg.org/cssom/#serialize-an-identifier
- */
-export function cssEscape(value: string): string {
-  // Use native CSS.escape if available (browser)
-  if (typeof CSS !== 'undefined' && CSS.escape) {
-    return CSS.escape(value);
-  }
-
-  // SSR fallback: Manual implementation
-  const str = String(value);
-  const length = str.length;
-  let result = '';
-  let i = 0;
-
-  while (i < length) {
-    const char = str.charAt(i);
-    const code = str.charCodeAt(i);
-
-    if (code === 0x0000) {
-      result += '\uFFFD';
-    } else if (
-      // If the character is in the range [\1-\1f] (U+0001 to U+001F) or is U+007F
-      (code >= 0x0001 && code <= 0x001f) ||
-      code === 0x007f ||
-      // If the character is the first character and is in the range [0-9] (U+0030 to U+0039)
-      (i === 0 && code >= 0x0030 && code <= 0x0039) ||
-      // If the character is the second character and is in the range [0-9] (U+0030 to U+0039) and the first character is a "-" (U+002D)
-      (i === 1 &&
-        code >= 0x0030 &&
-        code <= 0x0039 &&
-        str.charCodeAt(0) === 0x002d)
-    ) {
-      result += '\\' + code.toString(16) + ' ';
-    } else if (
-      // If the character is the first character and is a "-" (U+002D), and there is no second character
-      i === 0 &&
-      length === 1 &&
-      code === 0x002d
-    ) {
-      result += '\\' + char;
-    } else if (
-      // If the character is not handled by one of the above rules and is one of the following
-      code >= 0x0080 ||
-      code === 0x002d || // -
-      code === 0x005f || // _
-      (code >= 0x0030 && code <= 0x0039) || // 0-9
-      (code >= 0x0041 && code <= 0x005a) || // A-Z
-      (code >= 0x0061 && code <= 0x007a) // a-z
-    ) {
-      result += char;
-    } else {
-      // Otherwise, escape it
-      result += '\\' + char;
-    }
-
-    i++;
-  }
-
-  return result;
-}
-
-export function escapeClassName(name: string): string {
-  // Use CSS.escape() API which properly handles all special characters including:
-  // - Leading digits (e.g., "2xl" -> "\32 xl")
-  // - Colons (e.g., ":" -> "\:")
-  // This works in CSSStyleSheet.replaceSync() unlike manual backslash escaping
-  return '.' + cssEscape(name);
-}
-export function escapeRegExp(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
 // Optimized HTML class extraction
 export function extractClassesFromHTML(html: string): string[] {
-  // Use [\s\S] instead of . to match newlines in class attributes
-  const classAttrRegex = /class\s*=\s*(['"])([\s\S]*?)\1/g;
   const classList: string[] = [];
   let match: RegExpExecArray | null;
+  // Reset the shared regex before use (required because of the `g` flag)
+  _classAttrRegex.lastIndex = 0;
 
-  while ((match = classAttrRegex.exec(html))) {
+  while ((match = _classAttrRegex.exec(html))) {
     const tokens = match[2].split(/\s+/).filter(Boolean);
     if (tokens.length) classList.push(...tokens);
   }
@@ -2143,11 +2252,60 @@ export function extractClassesFromHTML(html: string): string[] {
   return classList;
 }
 
+// Module-level regex for extracting class attributes from HTML strings.
+// Defined here so the regex object is compiled once, not on every call to
+// extractClassesFromHTML(). lastIndex must be reset before each use.
+const _classAttrRegex = /class\s*=\s*(['"])([\s\S]*?)\1/g;
+
+// Module-level lookup tables used by the sort-by-breakpoint comparator.
+// Defined here so they are allocated once, not recreated on every comparison.
+const _responsiveSizePx: Record<string, number> = {
+  sm: 640,
+  md: 768,
+  lg: 1024,
+  xl: 1280,
+  '2xl': 1536,
+};
+const _containerSizePx: Record<string, number> = {
+  xs: 320,
+  sm: 384,
+  md: 448,
+  lg: 512,
+  xl: 576,
+  '2xl': 672,
+  '3xl': 768,
+  '4xl': 896,
+  '5xl': 1024,
+  '6xl': 1152,
+  '7xl': 1280,
+};
+
+function _getResponsivePixels(rule: string): number {
+  for (const [key, px] of Object.entries(_responsiveSizePx)) {
+    if (rule.includes(`@media ${mediaVariants[key]}`)) return px;
+  }
+  return -1;
+}
+
+function _getContainerPixels(rule: string): number {
+  for (const [key, px] of Object.entries(_containerSizePx)) {
+    if (rule.includes(`@container ${containerVariants[key]}`)) return px;
+  }
+  if (rule.includes('@container (min-width:')) {
+    const match = /@container \(min-width:(\d+(?:\.\d+)?)(px|rem|em)/.exec(
+      rule,
+    );
+    if (match) {
+      const value = parseFloat(match[1]);
+      const unit = match[2];
+      return unit === 'rem' || unit === 'em' ? value * 16 : value;
+    }
+  }
+  return -1;
+}
+
 // Enhanced JIT CSS generation with better performance
-export const jitCssCache = new Map<
-  string,
-  { css: string; timestamp: number }
->();
+export const jitCssCache = new Map<string, string>();
 export const JIT_CSS_THROTTLE_MS = 16;
 const MAX_CACHE_SIZE = 1000;
 
@@ -2159,7 +2317,8 @@ if (typeof import.meta !== 'undefined' && import.meta.hot) {
     detectedProseSizes.clear();
     proseSheet = null;
     proseCSSCache = '';
-    baseResetSheet = null;
+    _resetBaseResetSheet();
+    _bridgeRegistered = false;
   });
 
   // Also clear on accept to force regeneration
@@ -2172,17 +2331,35 @@ if (typeof import.meta !== 'undefined' && import.meta.hot) {
 }
 
 export function jitCSS(html: string): string {
-  // Check cache first - use exact HTML as key for proper cache invalidation
-  const cached = jitCssCache.get(html);
-  if (cached) {
-    return cached.css;
-  }
-
+  // Extract classes first so we can derive a stable, compact cache key.
   const classes = extractClassesFromHTML(html);
   if (!classes.length) return '';
 
+  // Use sorted unique class names as cache key instead of the full HTML string.
+  // This way, non-class content changes (text nodes, ARIA attributes, data
+  // attributes) don't cause cache misses when the set of utility classes is
+  // identical — a significant performance win for reactive components.
   const seen = new Set(classes);
-  const buckets: string[][] = [[], [], [], []];
+  const cacheKey = Array.from(seen).sort().join('\x00');
+  const cached = jitCssCache.get(cacheKey);
+  if (cached !== undefined) {
+    // Maintain LRU order: delete + re-insert moves this entry to the end of
+    // the Map so the eviction path (which removes from the front) always
+    // evicts the least-recently-used entry.
+    jitCssCache.delete(cacheKey);
+    jitCssCache.set(cacheKey, cached);
+    return cached;
+  }
+  // Bucket layout:
+  //   0 — base (no variants)
+  //   1 — pseudo / structural variants (hover:, focus:, group-*, etc.)
+  //   2 — responsive / container queries without dark (sm:, @lg:, …)
+  //   3 — dark: only (@media prefers-color-scheme: dark, no breakpoint)
+  //   4 — dark: combined with responsive / container (dark:sm:, dark:@lg:, …)
+  // Keeping dark-only in its own bucket (3) ensures it always comes after all
+  // responsive rules (bucket 2) so dark-mode overrides are deterministic
+  // regardless of the order classes appear in the HTML.
+  const buckets: string[][] = [[], [], [], [], []];
   const ruleCache: Record<string, string | null> = {};
 
   const generateRuleCached = (
@@ -2206,7 +2383,8 @@ export function jitCSS(html: string): string {
     const hasDark = variants.includes('dark');
     if (!variants.length) return 0;
     if (!hasResponsive && !hasDark && !hasContainer) return 1;
-    if (hasDark && (hasResponsive || hasContainer)) return 3;
+    if (hasDark && (hasResponsive || hasContainer)) return 4;
+    if (hasDark) return 3; // dark-only — comes after responsive, before dark+responsive
     return 2;
   };
 
@@ -2541,6 +2719,23 @@ export function jitCSS(html: string): string {
       ? containerTokens[containerTokens.length - 1]
       : null;
     const hasDark = variants.includes('dark');
+
+    // Respect disableVariants option — skip rules that use disabled variant groups
+    const _disabledGroups = _globalJITCSSOptions.disableVariants ?? [];
+    if (_disabledGroups.length > 0) {
+      if (_disabledGroups.includes('dark') && hasDark) return null;
+      if (_disabledGroups.includes('responsive') && responsiveTokens.length > 0)
+        return null;
+      if (_disabledGroups.includes('container') && containerTokens.length > 0)
+        return null;
+      if (
+        _disabledGroups.includes('motion') &&
+        variants.some((v) => v === 'motion-reduce' || v === 'motion-safe')
+      )
+        return null;
+      if (_disabledGroups.includes('print') && variants.includes('print'))
+        return null;
+    }
 
     // Handle media queries and container queries
     let mediaQuery = '';
@@ -2885,106 +3080,59 @@ export function jitCSS(html: string): string {
   // testable we generate standalone rules for any from-*/via-*/to-*
   // classes so their selectors are present in the CSS output.
   const gradientStopRegex = /^(from|via|to)-[a-z]+-?\d{2,3}?$/;
+  // Snapshot the generated CSS once before iterating — avoids calling
+  // buckets.flat().join('') O(N) times inside the loop.
+  const preGradientCSS = buckets.flat().join('');
   for (const cls of seen) {
     if (gradientStopRegex.test(cls)) {
-      // If we already generated a rule for this class, skip. Evaluate
-      // current generated output from buckets instead of `css` var.
-      const generatedBuckets = buckets.flat().join('');
-      if (generatedBuckets.includes(escapeClassName(cls))) continue;
+      if (preGradientCSS.includes(escapeClassName(cls))) continue;
       const generated = generateRuleCached(cls);
       if (generated) buckets[0].push(generated);
     }
   }
 
-  // Sort rules within buckets to ensure proper CSS cascade order
-  // Larger breakpoints must come after smaller ones for correct precedence
+  // Sort rules within buckets to ensure proper CSS cascade order.
+  // Larger breakpoints must come after smaller ones for correct precedence.
+  // Uses module-level _getResponsivePixels / _getContainerPixels helpers so
+  // the lookup tables are not re-allocated on every sort comparison.
   const sortRulesByBreakpoint = (rules: string[]): string[] => {
     return rules.sort((a, b) => {
-      // Extract responsive breakpoint from media query and return pixel value
-      const getResponsivePixels = (rule: string): number => {
-        const responsiveSizes: Record<string, number> = {
-          sm: 640,
-          md: 768,
-          lg: 1024,
-          xl: 1280,
-          '2xl': 1536,
-        };
-        for (const [key, px] of Object.entries(responsiveSizes)) {
-          if (rule.includes(`@media ${mediaVariants[key]}`)) return px;
-        }
-        return -1;
-      };
+      const aRespPx = _getResponsivePixels(a);
+      const bRespPx = _getResponsivePixels(b);
+      const aContPx = _getContainerPixels(a);
+      const bContPx = _getContainerPixels(b);
 
-      // Extract container breakpoint and return pixel value
-      const getContainerPixels = (rule: string): number => {
-        const containerSizes: Record<string, number> = {
-          xs: 320, // 20rem
-          sm: 384, // 24rem
-          md: 448, // 28rem
-          lg: 512, // 32rem
-          xl: 576, // 36rem
-          '2xl': 672, // 42rem
-          '3xl': 768, // 48rem
-          '4xl': 896, // 56rem
-          '5xl': 1024, // 64rem
-          '6xl': 1152, // 72rem
-          '7xl': 1280, // 80rem
-        };
-
-        // Check for named container breakpoints
-        for (const [key, px] of Object.entries(containerSizes)) {
-          if (rule.includes(`@container ${containerVariants[key]}`)) return px;
-        }
-
-        // Check for arbitrary container queries like @container (min-width:300px)
-        if (rule.includes('@container (min-width:')) {
-          const match =
-            /@container \(min-width:(\d+(?:\.\d+)?)(px|rem|em)/.exec(rule);
-          if (match) {
-            const value = parseFloat(match[1]);
-            const unit = match[2];
-            // Convert to pixels for comparison
-            return unit === 'rem' || unit === 'em' ? value * 16 : value;
-          }
-        }
-        return -1;
-      };
-
-      const aRespPx = getResponsivePixels(a);
-      const bRespPx = getResponsivePixels(b);
-      const aContPx = getContainerPixels(a);
-      const bContPx = getContainerPixels(b);
-
-      // Sort by responsive breakpoint if both have responsive queries
       if (aRespPx >= 0 && bRespPx >= 0 && aRespPx !== bRespPx)
         return aRespPx - bRespPx;
 
-      // Sort by container breakpoint if both have container queries
       if (aContPx >= 0 && bContPx >= 0 && aContPx !== bContPx)
         return aContPx - bContPx;
 
-      // Keep original order for same breakpoint or no breakpoint
       return 0;
     });
   };
 
-  // Sort buckets 2 and 3 which contain responsive/container queries
+  // Sort buckets 2 and 4 which contain responsive/container queries.
+  // Bucket 3 (dark-only) needs no sort — all its rules share the same
+  // @media (prefers-color-scheme: dark) wrapper with no breakpoint dimension.
   buckets[2] = sortRulesByBreakpoint(buckets[2]);
-  buckets[3] = sortRulesByBreakpoint(buckets[3]);
+  buckets[4] = sortRulesByBreakpoint(buckets[4]);
 
   const css = buckets.flat().join('');
 
-  // Cache size management to prevent memory leaks
+  // Cache size management: evict the LRU half when the cache is full.
+  // Map preserves insertion order and the hit path (delete + re-insert)
+  // promotes accessed entries to the end, so entries at the front are
+  // always the least-recently-used ones. Iterate keys directly to avoid
+  // allocating an intermediate array.
   if (jitCssCache.size >= MAX_CACHE_SIZE) {
-    // Remove oldest entries (simple FIFO cleanup)
-    const keysToDelete = Array.from(jitCssCache.keys()).slice(
-      0,
-      Math.floor(MAX_CACHE_SIZE / 2),
-    );
-    keysToDelete.forEach((key) => jitCssCache.delete(key));
+    let evictCount = Math.floor(MAX_CACHE_SIZE / 2);
+    for (const key of jitCssCache.keys()) {
+      if (evictCount-- === 0) break;
+      jitCssCache.delete(key);
+    }
   }
 
-  // Store generated CSS with current timestamp
-  jitCssCache.set(html, { css, timestamp: Date.now() });
+  jitCssCache.set(cacheKey, css);
   return css;
 }

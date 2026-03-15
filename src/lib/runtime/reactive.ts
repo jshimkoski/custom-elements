@@ -4,6 +4,13 @@ import { devWarn } from './logger';
 import { isDiscoveryRender } from './discovery-state';
 import type { WatchOptions } from './types';
 
+// Monotonic counter used to generate deterministic hook IDs.
+// Cheaper than crypto.randomUUID() and produces stable, debuggable identifiers.
+let _hookIdCounter = 0;
+function nextHookId(prefix: string): string {
+  return `${prefix}-${++_hookIdCounter}`;
+}
+
 /**
  * Global reactive system for tracking dependencies and triggering updates
  */
@@ -426,7 +433,7 @@ export function computed<T>(fn: () => T): { readonly value: T } {
   // Unique identifier used ONLY to track which reactive states this computed depends
   // on (for cache invalidation). It does NOT serve as a "current component" for
   // downstream notification — that is handled by running fn() in the outer context.
-  const computedId = `computed-${crypto.randomUUID()}`;
+  const computedId = nextHookId('computed');
 
   // invalidate() only marks the cache stale. It does NOT call triggerUpdate because
   // the calling component is notified directly via the outer fn() call (see get value()).
@@ -492,7 +499,7 @@ export function watchEffect(fn: () => void): () => void {
   // (API calls, mutations) that should only run in real render contexts.
   if (isDiscoveryRender()) return () => {};
 
-  const effectId = `effect-${crypto.randomUUID()}`;
+  const effectId = nextHookId('effect');
 
   // Register under the current component for automatic cleanup on re-render/destroy.
   try {
@@ -534,10 +541,24 @@ export function watchEffect(fn: () => void): () => void {
  *
  * @internal — used by deep watchers to capture before/after state snapshots.
  */
-function deepClone<T>(value: T, seen = new WeakMap<object, unknown>()): T {
+const DEEP_CLONE_MAX_DEPTH = 50;
+
+function deepClone<T>(
+  value: T,
+  seen = new WeakMap<object, unknown>(),
+  depth = 0,
+): T {
   if (value === null || typeof value !== 'object') return value;
   const obj = value as object;
   if (seen.has(obj)) return seen.get(obj) as T;
+  if (depth > DEEP_CLONE_MAX_DEPTH) {
+    devWarn(
+      `[watch] Deep clone exceeded ${DEEP_CLONE_MAX_DEPTH} nesting levels. ` +
+        'Returning a reference at this depth instead of cloning further. ' +
+        'Consider restructuring your state or switching to a shallow watch.',
+    );
+    return value;
+  }
   // Do not attempt to clone DOM nodes
   if (typeof Node !== 'undefined' && obj instanceof Node) return value;
   // Clone Date
@@ -547,7 +568,7 @@ function deepClone<T>(value: T, seen = new WeakMap<object, unknown>()): T {
     const arr: unknown[] = [];
     seen.set(obj, arr);
     for (let i = 0; i < (obj as unknown[]).length; i++) {
-      arr.push(deepClone((obj as unknown[])[i], seen));
+      arr.push(deepClone((obj as unknown[])[i], seen, depth + 1));
     }
     return arr as unknown as T;
   }
@@ -556,7 +577,11 @@ function deepClone<T>(value: T, seen = new WeakMap<object, unknown>()): T {
   seen.set(obj, copy);
   for (const key of Object.keys(obj)) {
     try {
-      copy[key] = deepClone((obj as Record<string, unknown>)[key], seen);
+      copy[key] = deepClone(
+        (obj as Record<string, unknown>)[key],
+        seen,
+        depth + 1,
+      );
     } catch {
       // skip inaccessible or throwing properties
     }
@@ -610,7 +635,7 @@ export function watch<T>(
   })();
 
   // Create a dummy component to track dependencies
-  const watcherId = `watch-${crypto.randomUUID()}`;
+  const watcherId = nextHookId('watch');
 
   // If called during a component render, register this watcher under that
   // component so watchers created in render are cleaned up on re-render.

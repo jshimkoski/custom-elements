@@ -10,6 +10,8 @@
  * `isDiscoveryRender()` and return early / return no-ops when it is true.
  */
 
+import { devWarn } from './logger';
+
 let _discoveryRender = false;
 
 /**
@@ -25,9 +27,19 @@ export function isDiscoveryRender(): boolean {
  * Mark the start of a discovery render pass.
  * Call this immediately before invoking the render function for the first time
  * (before `useProps` prop-name collection).
+ *
+ * Emits a dev warning when called while a discovery render is already active
+ * so that nested or mismatched begin/end pairs are surfaced during development.
  * @internal
  */
 export function beginDiscoveryRender(): void {
+  if (_discoveryRender) {
+    devWarn(
+      '[CER] beginDiscoveryRender() called while a discovery render is already active. ' +
+        "This usually means a component was registered inside another component's render function. " +
+        'Ensure component() calls are at module top-level.',
+    );
+  }
   _discoveryRender = true;
 }
 

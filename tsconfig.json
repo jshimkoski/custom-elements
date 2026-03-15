@@ -26,5 +26,13 @@
     "types": ["vite/client"]
   },
   "include": ["src/lib"],
-  "exclude": ["src/components", "test", "cypress", "docs", "public", "coverage"]
+  "exclude": [
+    "src/components",
+    "src/lib/vite-plugin.ts",
+    "test",
+    "cypress",
+    "docs",
+    "public",
+    "coverage"
+  ]
 }
