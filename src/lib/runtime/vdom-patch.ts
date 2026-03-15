@@ -47,6 +47,16 @@ import {
 } from './vdom-helpers';
 import { processDirectives } from './vdom-directives';
 
+/**
+ * Tracks the most-recently-registered directive event listeners for each
+ * element so `patchProps` can remove the old set before adding the new one.
+ * Keyed by element so entries are automatically GC'd with the element.
+ */
+const directiveListenerCache = new WeakMap<
+  Element,
+  Record<string, EventListener>
+>();
+
 /** @internal Minimal transition metadata alias used by the renderer. */
 type Transition = TransitionMetadata;
 
@@ -277,13 +287,13 @@ export function patchProps(
     let newUnwrapped: unknown = newVal;
     safe(() => {
       if (isReactiveState(oldVal))
-        oldUnwrapped = (oldVal as { value: unknown }).value;
+        oldUnwrapped = (oldVal as ReactiveState<unknown>).peek();
       else if (hasValueProp(oldVal))
         oldUnwrapped = (oldVal as { value: unknown }).value;
     });
     safe(() => {
       if (isReactiveState(newVal))
-        newUnwrapped = (newVal as { value: unknown }).value;
+        newUnwrapped = (newVal as ReactiveState<unknown>).peek();
       else if (hasValueProp(newVal))
         newUnwrapped = (newVal as { value: unknown }).value;
     });
@@ -433,11 +443,21 @@ export function patchProps(
     }
   }
 
-  // Handle directive event listeners
-  for (const [eventType, listener] of Object.entries(
-    processedDirectives.listeners || {},
-  )) {
-    EventManager.addListener(el, eventType, listener as EventListener);
+  // Handle directive event listeners.
+  // Remove listeners registered by the previous render before adding the new
+  // set so that each event type has exactly one active handler at all times.
+  const newDirectiveListeners = processedDirectives.listeners ?? {};
+  const oldDirectiveListeners = directiveListenerCache.get(el) ?? {};
+  for (const [eventType, oldListener] of Object.entries(oldDirectiveListeners)) {
+    EventManager.removeListener(el, eventType, oldListener);
+  }
+  for (const [eventType, newListener] of Object.entries(newDirectiveListeners)) {
+    EventManager.addListener(el, eventType, newListener as EventListener);
+  }
+  if (Object.keys(newDirectiveListeners).length > 0) {
+    directiveListenerCache.set(el, newDirectiveListeners as Record<string, EventListener>);
+  } else {
+    directiveListenerCache.delete(el);
   }
 
   // Use a copy of oldProps.attrs as the authoritative prior-state for
@@ -1330,11 +1350,16 @@ export function createElement(
     }
   }
 
-  // Handle directive event listeners
-  for (const [eventType, listener] of Object.entries(
-    processedDirectives.listeners || {},
-  )) {
+  // Handle directive event listeners.
+  // This is a fresh element so there are no old listeners to remove; just
+  // register them and seed the cache so a subsequent patchProps call can
+  // correctly remove this initial set before adding its updated listeners.
+  const initialDirectiveListeners = processedDirectives.listeners ?? {};
+  for (const [eventType, listener] of Object.entries(initialDirectiveListeners)) {
     EventManager.addListener(el, eventType, listener as EventListener);
+  }
+  if (Object.keys(initialDirectiveListeners).length > 0) {
+    directiveListenerCache.set(el, initialDirectiveListeners as Record<string, EventListener>);
   }
 
   // Assign ref if present - create a vnode with processed props for ref assignment
