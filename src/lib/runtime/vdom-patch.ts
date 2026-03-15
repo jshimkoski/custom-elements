@@ -20,7 +20,7 @@ import {
   SVG_NS,
 } from './namespace-helpers';
 import { EventManager } from './event-manager';
-import { isReactiveState } from './reactive';
+import { isReactiveState, ReactiveState } from './reactive';
 import {
   performEnterTransition,
   performLeaveTransition,
@@ -539,10 +539,10 @@ export function patchProps(
     let newUnwrapped = newVal;
 
     if (isReactiveState(oldVal)) {
-      oldUnwrapped = (oldVal as { value?: unknown }).value; // This triggers dependency tracking
+      oldUnwrapped = (oldVal as ReactiveState<unknown>).peek();
     }
     if (isReactiveState(newVal)) {
-      newUnwrapped = (newVal as { value?: unknown }).value; // This triggers dependency tracking
+      newUnwrapped = (newVal as ReactiveState<unknown>).peek();
     }
 
     if (oldUnwrapped !== newUnwrapped) {

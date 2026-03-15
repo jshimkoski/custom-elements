@@ -105,10 +105,18 @@ export function renderComponent<
       // subsequent render triggered after reconnection. If the host was never
       // connected (e.g. in unit tests), wasConnected stays false and the guard
       // is never triggered so test expectations are unaffected.
+      //
+      // Additionally, track a monotonic render token on the shadowRoot so that
+      // if the component is disconnected and then reconnected (triggering a new
+      // async render) before this promise resolves, the stale result is discarded.
       const wasConnected = shadowRoot.host.isConnected;
+      type TokenHost = { _asyncRenderToken?: number };
+      const sr = shadowRoot as unknown as TokenHost;
+      const renderToken = (sr._asyncRenderToken = (sr._asyncRenderToken ?? 0) + 1);
       outputOrPromise
         .then((output) => {
           if (wasConnected && !shadowRoot.host.isConnected) return;
+          if (sr._asyncRenderToken !== renderToken) return;
           setLoading(false);
           setError(null);
           renderOutput(shadowRoot, output, context, refs, setHtmlString);
@@ -116,6 +124,7 @@ export function renderComponent<
         })
         .catch((error) => {
           if (wasConnected && !shadowRoot.host.isConnected) return;
+          if (sr._asyncRenderToken !== renderToken) return;
           setLoading(false);
           setError(error instanceof Error ? error : new Error(String(error)));
         });

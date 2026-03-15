@@ -232,12 +232,11 @@ export function processModelDirective(
           emitUpdateEvents(target, propName, newValue);
         }
       } finally {
-        setTimeout(
+        queueMicrotask(
           () =>
             ((
               target as HTMLElement & { _modelUpdating?: boolean }
             )._modelUpdating = false),
-          0,
         );
       }
     }
@@ -441,7 +440,7 @@ export function processModelDirective(
         | HTMLTextAreaElement
         | null;
       if (!target) return;
-      setTimeout(() => {
+      queueMicrotask(() => {
         const val = target.value;
         const actualState =
           ((context as { _state?: unknown } | undefined)?._state as Record<
@@ -464,16 +463,15 @@ export function processModelDirective(
             setNestedValue(actualState, value as string, newVal);
             triggerStateUpdate(context, isReactiveState(value), value, newVal);
           } finally {
-            setTimeout(
+            queueMicrotask(
               () =>
                 ((
                   target as HTMLElement & { _modelUpdating?: boolean }
                 )._modelUpdating = false),
-              0,
             );
           }
         }
-      }, 0);
+      });
     };
   }
   // processModelDirective listeners prepared
