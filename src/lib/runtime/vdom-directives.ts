@@ -115,11 +115,11 @@ export function processModelDirective(
     // For multiple selects we also schedule option selection; otherwise set prop
     if (el && el.hasAttribute('multiple') && el instanceof HTMLSelectElement) {
       const arr = Array.isArray(currentValue) ? currentValue.map(String) : [];
-      setTimeout(() => {
+      queueMicrotask(() => {
         Array.from((el as HTMLSelectElement).options).forEach((option) => {
           option.selected = arr.includes(option.value);
         });
-      }, 0);
+      });
       props[propName] = Array.isArray(currentValue) ? currentValue : [];
     } else {
       props[propName] = currentValue;
