@@ -1,6 +1,25 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v3.0.0] - 2026-03-15
+
+- feat(vdom-patch): implement directive listener cache for improved event handling (23a1723)
+- fix(render): implement monotonic render token to prevent stale async renders fix(vdom-directives): replace setTimeout with queueMicrotask for improved performance refactor(vdom-patch): update reactive state handling to use peek method (c2707f2)
+- docs: update various documentation pages for clarity and improved guidance (1896172)
+- docs: update README with additional resources and clarify JIT CSS usage (0028970)
+- refactor(transitions): replace jitCSS with processJITCSS for improved JIT CSS handling (75c6083)
+- fix(vdom-directives): replace setTimeout with queueMicrotask for improved performance in processModelDirective (4704629)
+- fix(render): prevent unnecessary renders when host is disconnected during async operations (5800ce9)
+- feat: enhance deepClone and nextTick functions with depth checks and warnings (f12021e)
+- feat(router): add destroy method to clean up event listeners and prevent accumulation (e7134c0)
+- fix(store): update subscription pattern for reactivity in components documentation (22c0e89)
+- feat(event-bus): implement event throttling and cleanup for native listeners (ccc9ce2)
+- fix: improve dev logging fix: avoid accumulating indefinite keys in event bus docs: enhance testing documentation and performance guide (60e3154)
+- feat: Implement JIT CSS enhancements and optimizations (e21ddcc)
+- fix: add typesVersions to package.json to resolve types for subpath imports (76f82d8)
+- feat!: treeshake JITCSS (b78d704)
+- feat!: make jit css opt-in feat: add additional Tailwind CSS 4 classes for parity feat: add jit css light dom capabilities feat: add jit css vite plugin (4f1e543)
+
 ## [v2.8.2] - 2026-03-13
 
 - fix: ensure sibling order is preserved when handling nested anchor blocks in patchChildrenBetween (590658d)
