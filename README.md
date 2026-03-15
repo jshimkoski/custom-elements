@@ -6,9 +6,10 @@
 
 Build modern components with strict TypeScript, zero dependencies, and a clean functional API. Designed for speed, standards compliance, and productivity.
 
-🕹️ Try it on [Codepen.io](https://codepen.io/jshimkoski/pen/JoYmpxm).
-
-Learn more about the author at [jasonshimmy.com](https://jasonshimmy.com) and check out the [changelog](./CHANGELOG.md) for recent updates.
+- Try it on [Codepen.io](https://codepen.io/jshimkoski/pen/JoYmpxm).
+- Check out the [Material Design 3 Components](https://github.com/jshimkoski/cer-material) built with this runtime.
+- Play a game of [Solatro](https://solatro.netlify.app) built with this runtime in 100% Web Components.
+- Learn more about the author at [jasonshimmy.com](https://jasonshimmy.com).
 
 ## ✨ Why You'll Love It
 
@@ -36,6 +37,7 @@ import { useJITCSS } from '@jasonshimmy/custom-elements-runtime/jit-css';
 
 component('my-counter', () => {
   useJITCSS();
+
   const count = defineModel('count', 0);
 
   const handleClick = () => {
@@ -360,6 +362,8 @@ jit.destroy(); // tear down
 
 Build-time static analysis plugin that emits pre-generated CSS, eliminating runtime parsing cost entirely.
 
+_Please note:_ This plugin is generates light-DOM JIT CSS. For Shadow DOM contexts, you must still use `useJITCSS` per component, or `enableJITCSS` for all components.
+
 ```ts
 // vite.config.ts
 import { cerJITCSS } from '@jasonshimmy/custom-elements-runtime/vite-plugin';
@@ -454,7 +458,7 @@ Explore the complete documentation for every runtime feature:
 
 ### 🔄 **Upgrading**
 
-- [📦 Migration Guide](./docs/migration.md) - Upgrade instructions, including the v2.8 JIT CSS opt-in change
+- [📦 Migration Guide](./docs/migration.md) - Upgrade instructions, including the v3.0 JIT CSS opt-in change
 
 ### 📖 **Reference**
 
@@ -476,8 +480,13 @@ For examples and implementation details, explore the source code in `src/lib/`.
 - **Contribute:** We welcome PRs for docs, features, and examples.
 - ❤️ Like what you see? [Support ongoing development on Patreon](https://patreon.com/jshimkoski)
 
+### Community Gallery
+
+- [Material Design 3 Components](https://github.com/jshimkoski/cer-material) built with this runtime.
+- [Solatro](https://solatro.netlify.app) is a RTS card-based game built with this runtime.
+
 ## 💖 Support This Project
 
-Custom Elements Runtime is a labor of love built to make modern web development faster and more expressive. If it's helping you build better components, consider [supporting me on Patreon](https://patreon.com/jshimkoski) to help keep the momentum going.
+Custom Elements Runtime is a labor of love built to make modern web development faster and more expressive. If it's helping you build better components, [learn more about me](https://jasonshimmy.com) or consider [supporting me on Patreon](https://patreon.com/jshimkoski) to help keep the momentum going.
 
 Your support helps fund continued development, documentation, and community engagement. Every bit helps—thank you!
