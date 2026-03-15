@@ -182,7 +182,7 @@ import { getHealthMonitor } from '@jasonshimmy/custom-elements-runtime';
 
 const monitor = getHealthMonitor();
 setInterval(() => {
-  const report = monitor.getReport();
+  const report = monitor.getHealthReport();
   console.table(report.metrics);
 }, 5000);
 ```

@@ -362,7 +362,7 @@ jit.destroy(); // tear down
 
 Build-time static analysis plugin that emits pre-generated CSS, eliminating runtime parsing cost entirely.
 
-_Please note:_ This plugin is generates light-DOM JIT CSS. For Shadow DOM contexts, you must still use `useJITCSS` per component, or `enableJITCSS` for all components.
+_Please note:_ This plugin generates light-DOM JIT CSS. For Shadow DOM contexts, you must still use `useJITCSS` per component, or `enableJITCSS` for all components.
 
 ```ts
 // vite.config.ts

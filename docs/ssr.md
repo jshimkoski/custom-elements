@@ -46,7 +46,7 @@ component('ssr-demo', () => {
 
 Rendering to string with `renderToString`
 
-The runtime provides `renderToString` for SSR. The small SSR entrypoint is `src/lib/ssr.ts` (it re-exports the internal `runtime/vdom-ssr` helper) — import `renderToString` from the SSR entry so bundlers don't pull server-only code into the client bundle. Use `html` to build VNodes on the server and `renderToString` to produce markup.
+The runtime provides `renderToString` for SSR. Import it from the dedicated SSR entry (`@jasonshimmy/custom-elements-runtime/ssr`) so bundlers don't pull server-only code into the client bundle. Use `html` to build VNodes on the server and `renderToString` to produce markup.
 
 Basic usage
 
@@ -389,4 +389,4 @@ A: Yes, the runtime escapes HTML and sanitizes styles to prevent XSS and injecti
 
 SSR support in the custom elements runtime enables fast, SEO-friendly, and universal web components. By leveraging VNode trees and pure functions, you can build components that work seamlessly on both server and client.
 
-For more details, see the SSR entrypoint and helper in `src/lib/ssr.ts` (which re-exports the runtime SSR helpers) and inspect the SSR fallback logic in `src/lib/runtime/component.ts`.
+For more details, see the [JIT CSS guide](./jit-css.md) for styling in SSR contexts and the [Security guide](./security.md) for XSS prevention.

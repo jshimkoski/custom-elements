@@ -175,4 +175,4 @@ The bus automatically throttles events that fire more than 50 times per second p
 - Payload can be any type: object, string, number, etc.
 - Event bus works across all components in the same app ctx.
 
-For more, see the [API Reference](../src/lib/event-bus.ts) and [examples](../src/components/examples/).
+For more, see the [Cross-Component Communication guide](./cross-component-communication.md).

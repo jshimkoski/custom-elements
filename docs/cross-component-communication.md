@@ -135,4 +135,4 @@ A: Yes, for direct communication or integration with other libraries.
 
 Cross-component communication is easy and flexible with the runtime. Use the event bus, props, store, and DOM events to build robust, maintainable UIs.
 
-For more details, see the event bus, store, and component config in `src/lib/`.
+For more details, see the [Event Bus guide](./event-bus.md), [Store guide](./store.md), and [Provide / Inject guide](./provide-inject.md).

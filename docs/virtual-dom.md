@@ -184,4 +184,4 @@ A: Error boundaries in the runtime catch and handle rendering errors gracefully.
 
 The Virtual DOM is the backbone of efficient, declarative UI updates in the custom elements runtime. It enables fast rendering, minimal DOM changes, and a developer-friendly API for building modern web components.
 
-For more details, see the source code in `src/lib/runtime/vdom.ts` and explore the examples in the documentation.
+For more details, see the [Performance guide](./performance.md) and [Functional API guide](./functional-api.md) for practical usage patterns.

@@ -96,25 +96,38 @@ store.subscribe((state) => {
 
 ## 🧩 Sharing Store Across Components
 
-Import and use the same store instance in any component or module.
+Export your store from a module and import it in any component.
 
 ```ts
 // store.ts
 export const store = createStore({ count: 0 });
+```
 
+```ts
 // my-counter.ts
 import { store } from './store';
 
 component('my-counter', () => {
+  const count = ref(store.getState().count);
+
+  // Subscribe so the component re-renders when the store updates.
+  const unsubscribe = store.subscribe((state) => {
+    count.value = state.count;
+  });
+
+  useOnDisconnected(unsubscribe);
+
   return html`
     <button
       @click="${() => store.setState((prev) => ({ count: prev.count + 1 }))}"
     >
-      ${store.getState().count}
+      ${count.value}
     </button>
   `;
 });
 ```
+
+> **Note:** Do not read `store.getState()` directly in the template — it is a snapshot and will not cause a re-render when the store updates. Always use `subscribe` to bridge store changes into reactive refs.
 
 ## 💡 Tips
 
@@ -122,5 +135,3 @@ component('my-counter', () => {
 - Store is shallowly reactive; always use `setState()` for updates.
 - Works with all directives and templates.
 - TypeScript infers types from your initial state.
-
-For more, see the [API Reference](../src/lib/store.ts).
