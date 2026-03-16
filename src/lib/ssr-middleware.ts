@@ -233,31 +233,34 @@ export function createStreamingSSRHandler<
 
       const stream = renderToStream(vnode, renderOptions);
       const reader = stream.getReader();
-      const chunks: string[] = [];
-      let done = false;
-
-      while (!done) {
-        const { value, done: d } = await reader.read();
-        if (value) chunks.push(value);
-        done = d;
-      }
-
-      const content = chunks.join('');
 
       if (res.write) {
-        // Streaming path: set chunked encoding and write incrementally.
+        // Streaming path: pipe chunks directly to the response as they arrive.
         res.setHeader('Transfer-Encoding', 'chunked');
         if (wrapDocument) {
           res.write(`<!DOCTYPE html><html><head>${head ?? ''}</head><body>`);
         }
-        res.write(content);
+        let done = false;
+        while (!done) {
+          const { value, done: d } = await reader.read();
+          if (value) res.write(value);
+          done = d;
+        }
         if (wrapDocument) {
           res.end('</body></html>');
         } else {
           res.end();
         }
       } else {
-        // Buffered fallback: framework does not expose write(); send as one response.
+        // Buffered fallback: framework does not expose write(); collect and send as one response.
+        const chunks: string[] = [];
+        let done = false;
+        while (!done) {
+          const { value, done: d } = await reader.read();
+          if (value) chunks.push(value);
+          done = d;
+        }
+        const content = chunks.join('');
         const body = wrapDocument
           ? `<!DOCTYPE html><html><head>${head ?? ''}</head><body>${content}</body></html>`
           : content;

@@ -35,6 +35,13 @@ let _ssrGlobalStyleCollector: string[] | null = null;
 
 /** Start collecting useGlobalStyle() output from the current render pass. */
 export function beginSSRGlobalStyleCollection(): void {
+  if (_ssrGlobalStyleCollector !== null) {
+    throw new Error(
+      '[CER] Concurrent SSR render detected: beginSSRGlobalStyleCollection() called ' +
+      'while a collection is already active. For concurrent request handling, use ' +
+      'worker threads or multiple Node.js processes.',
+    );
+  }
   _ssrGlobalStyleCollector = [];
 }
 
@@ -68,6 +75,8 @@ export interface SSRRenderResult {
   shadowVNode: VNode | VNode[] | null;
   /** CSS string captured from useStyle() calls during this render. */
   useStyleCSS: string;
+  /** Present when the component's render function returned a Promise. */
+  asyncPromise?: Promise<VNode | VNode[]>;
 }
 
 /**
@@ -83,7 +92,7 @@ export interface SSRRenderResult {
  * We only need to build a context object that satisfies the hooks' expectations.
  */
 export function runComponentSSRRender(
-  config: ComponentConfig<object, object, object>,
+  config: ComponentConfig<object, object, object, object>,
   attrs: Record<string, string | number | boolean | null | undefined>,
   tag = 'unknown',
 ): SSRRenderResult {
@@ -142,18 +151,16 @@ export function runComponentSSRRender(
   setCurrentComponentContext(ssrContext);
 
   let shadowVNode: VNode | VNode[] | null = null;
+  let asyncPromise: Promise<VNode | VNode[]> | undefined;
   try {
     const result = config.render(
-      ssrContext as ComponentContext<object, object, object>,
+      ssrContext as ComponentContext<object, object, object, object>,
     );
     // Async render functions cannot be awaited in the synchronous SSR pass.
-    // The shell will be rendered without shadow content; the client hydrates it.
+    // The DSD renderer will emit a streaming placeholder if active; otherwise
+    // the shadow DOM will be empty. The caller emits the appropriate warning.
     if (result instanceof Promise) {
-      devWarn(
-        `[SSR] Component "${tag}" has an async render function. ` +
-          `Async renders are not supported in the synchronous SSR pass — ` +
-          `the shadow DOM will be empty and hydrated on the client instead.`,
-      );
+      asyncPromise = result;
     } else {
       shadowVNode = result as VNode | VNode[];
     }
@@ -175,5 +182,5 @@ export function runComponentSSRRender(
     (ssrContext as { _computedStyle?: string })._computedStyle ?? '',
   );
 
-  return { shadowVNode, useStyleCSS };
+  return { shadowVNode, useStyleCSS, asyncPromise };
 }

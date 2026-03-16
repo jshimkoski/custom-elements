@@ -25,13 +25,14 @@
  */
 
 import type { VNode } from './types';
-import { renderToString, type RenderOptions } from './vdom-ssr';
+import { renderToString } from './vdom-ssr';
+import { VOID_ELEMENTS, buildAttrs, buildRawAttrs, type RenderOptions } from './ssr-utils';
 import { registry } from './component/registry';
 import { runComponentSSRRender } from './ssr-context';
 import { jitCSS } from './style';
 import { baseReset, minifyCSS } from './css-utils';
 import { escapeHTML } from './helpers';
-import { TAG_NAMESPACE_MAP, SVG_NS } from './namespace-helpers';
+import { devWarn } from './logger';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -58,24 +59,8 @@ export type DSDRenderOptions = RenderOptions & {
 // Constants
 // ---------------------------------------------------------------------------
 
-const VOID_ELEMENTS = new Set([
-  'area',
-  'base',
-  'br',
-  'col',
-  'embed',
-  'hr',
-  'img',
-  'input',
-  'link',
-  'meta',
-  'param',
-  'source',
-  'track',
-  'wbr',
-]);
-
 /**
+ * @internal
  * Minified DSD polyfill for browsers without native Declarative Shadow DOM.
  * Processes all `<template shadowrootmode>` elements synchronously.
  */
@@ -97,30 +82,6 @@ function isRegisteredCustomElement(tag: string): boolean {
   return tag.includes('-') && registry.has(tag);
 }
 
-function buildAttrsString(
-  attrs: Record<string, unknown>,
-  opts: DSDRenderOptions,
-): string {
-  const inject = opts.injectSvgNamespace ?? true;
-  const injectKnown = opts.injectKnownNamespaces ?? inject;
-
-  const merged = { ...attrs };
-
-  // Mirror namespace injection logic from renderToString
-  const tag = (merged as { _tag?: string })._tag;
-  if (tag) delete merged._tag;
-
-  if (inject && tag === 'svg' && !('xmlns' in merged)) {
-    merged['xmlns'] = SVG_NS;
-  } else if (injectKnown && tag && tag in TAG_NAMESPACE_MAP && !('xmlns' in merged)) {
-    merged['xmlns'] = TAG_NAMESPACE_MAP[tag];
-  }
-
-  return Object.entries(merged)
-    .map(([k, v]) => ` ${k}="${escapeHTML(String(v))}"`)
-    .join('');
-}
-
 /**
  * Build the combined `<style>` block for a shadow root.
  *
@@ -129,7 +90,7 @@ function buildAttrsString(
  *   2. useStyle() output — component-defined rules (:host, ::slotted, etc.)
  *   3. JIT CSS — utility classes extracted from the shadow HTML
  */
-function buildShadowStyleBlock(
+export function buildShadowStyleBlock(
   useStyleCSS: string,
   shadowHTML: string,
 ): string {
@@ -146,6 +107,35 @@ function buildShadowStyleBlock(
 
   const combined = minifyCSS(parts.join('\n'));
   return combined ? `<style>${combined}</style>` : '';
+}
+
+// ---------------------------------------------------------------------------
+// Streaming async component collector
+// ---------------------------------------------------------------------------
+
+export interface AsyncStreamEntry {
+  id: string;
+  tag: string;
+  attrsString: string;
+  hydrateAttr: string;
+  useStyleCSS: string;
+  lightDOM: string;
+  opts: DSDRenderOptions;
+  promise: Promise<VNode | VNode[]>;
+}
+
+let _streamingCollector: AsyncStreamEntry[] | null = null;
+let _streamingCounter = 0;
+
+/** @internal Called by renderToStream() before the sync render pass. */
+export function beginStreamingCollection(collector: AsyncStreamEntry[]): void {
+  _streamingCollector = collector;
+  _streamingCounter = 0;
+}
+
+/** @internal Called by renderToStream() after the sync render pass. */
+export function endStreamingCollection(): void {
+  _streamingCollector = null;
 }
 
 // ---------------------------------------------------------------------------
@@ -180,10 +170,10 @@ export function renderToDSD(vnode: VNode, opts: DSDRenderOptions): string {
 
   // Regular element — recurse with DSD mode on
   const attrsObj: Record<string, unknown> = vnode.props?.attrs
-    ? { ...vnode.props.attrs, _tag: tag }
-    : { _tag: tag };
+    ? { ...vnode.props.attrs }
+    : {};
 
-  const attrsString = buildAttrsString(attrsObj, opts);
+  const attrsString = buildAttrs(attrsObj, tag, opts);
 
   if (VOID_ELEMENTS.has(tag)) {
     return `<${tag}${attrsString}>`;
@@ -199,28 +189,57 @@ function renderCustomElementDSD(vnode: VNode, opts: DSDRenderOptions): string {
 
   // Build the plain attribute string (no namespace injection for custom elements)
   const rawAttrs = vnode.props?.attrs ?? {};
-  const attrsString = Object.entries(rawAttrs)
-    .map(([k, v]) => ` ${k}="${escapeHTML(String(v))}"`)
-    .join('');
+  const attrsString = buildRawAttrs(rawAttrs);
+
+  // Move the null check BEFORE reading config.* properties for clarity.
+  if (!config) {
+    // Component not in registry on server (e.g. dynamic import not yet run).
+    // Emit a shell with an empty DSD template so the client hydrates normally.
+    const lightDOM = renderChildrenDSD(vnode.children, opts);
+    return `<${tag}${attrsString}><template shadowrootmode="open"></template>${lightDOM}</${tag}>`;
+  }
 
   // Emit data-cer-hydrate when a non-default strategy is configured.
   // 'load' is the default and doesn't need to be serialised.
-  const hydrateStrategy = config?.hydrate;
+  const hydrateStrategy = config.hydrate;
   const hydrateAttr =
     hydrateStrategy && hydrateStrategy !== 'load'
       ? ` data-cer-hydrate="${hydrateStrategy}"`
       : '';
 
-  if (!config) {
-    // Component not in registry on server (e.g. dynamic import not yet run).
-    // Emit a shell with an empty DSD template so the client hydrates normally.
-    const lightDOM = renderChildrenDSD(vnode.children, opts);
-    return `<${tag}${attrsString}${hydrateAttr}><template shadowrootmode="open"></template>${lightDOM}</${tag}>`;
-  }
-
   // Run the component's render function in a minimal SSR context to get the
   // shadow DOM VNode tree and capture any useStyle() output.
-  const { shadowVNode, useStyleCSS } = runComponentSSRRender(config, rawAttrs, tag);
+  const { shadowVNode, useStyleCSS, asyncPromise } = runComponentSSRRender(config, rawAttrs, tag);
+
+  // When streaming and this component has an async render, emit a placeholder
+  // and register the promise for later resolution.
+  if (asyncPromise && _streamingCollector === null) {
+    devWarn(
+      `[SSR] Component "${tag}" has an async render function. ` +
+        `In standard SSR the shadow DOM will be empty. ` +
+        `Use renderToStream() for incremental async component streaming.`,
+    );
+  }
+  if (asyncPromise && _streamingCollector !== null) {
+    const id = `cer-stream-${_streamingCounter++}`;
+    const lightDOM = renderChildrenDSD(vnode.children, opts);
+    _streamingCollector.push({
+      id,
+      tag,
+      attrsString,
+      hydrateAttr,
+      useStyleCSS,
+      lightDOM,
+      opts,
+      promise: asyncPromise,
+    });
+    return (
+      `<${tag} id="${id}"${attrsString}${hydrateAttr}>` +
+      `<template shadowrootmode="open"></template>` +
+      `${lightDOM}` +
+      `</${tag}>`
+    );
+  }
 
   // Render the shadow DOM VNode tree to HTML (DSD-recursive for nested elements)
   let shadowHTML = '';

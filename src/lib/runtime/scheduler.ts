@@ -22,7 +22,7 @@ export type UpdatePriority = 'immediate' | 'normal' | 'idle';
 /**
  * Environment detection utilities
  */
-interface TestEnvironment {
+export interface TestEnvironment {
   isTest: boolean;
   isVitest: boolean;
   isCypress: boolean;
@@ -31,7 +31,7 @@ interface TestEnvironment {
 /**
  * Detect test environment with improved reliability
  */
-function detectTestEnvironment(): TestEnvironment {
+export function detectTestEnvironment(): TestEnvironment {
   // Check Node.js environment first
   const nodeEnv = (() => {
     try {

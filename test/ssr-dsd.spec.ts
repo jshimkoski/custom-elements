@@ -56,7 +56,11 @@ describe('renderToStringDSD()', () => {
     registry.set(TAG, {
       props: {},
       render: () =>
-        ({ tag: 'div', props: { attrs: { class: 'card' } }, children: [] }) as never,
+        ({
+          tag: 'div',
+          props: { attrs: { class: 'card' } },
+          children: [],
+        }) as never,
     });
   });
 
@@ -173,9 +177,10 @@ describe('renderToStringDSD() — useStyle CSS extraction', () => {
     const result = renderToStringDSD(vnode as never, { dsdPolyfill: false });
     expect(result).toContain('display:block');
     // background should appear inside the template, not outside
-    const templateContent = result.match(
-      /<template shadowrootmode="open">([\s\S]*?)<\/template>/,
-    )?.[1] ?? '';
+    const templateContent =
+      result.match(
+        /<template shadowrootmode="open">([\s\S]*?)<\/template>/,
+      )?.[1] ?? '';
     expect(templateContent).toContain('background');
   });
 });
@@ -202,7 +207,11 @@ describe('renderToStringDSD() — useProps integration', () => {
   });
 
   it('uses prop values from attrs in useStyle output', () => {
-    const vnode = { tag: TAG, props: { attrs: { theme: 'dark' } }, children: [] };
+    const vnode = {
+      tag: TAG,
+      props: { attrs: { theme: 'dark' } },
+      children: [],
+    };
     const result = renderToStringDSD(vnode as never, { dsdPolyfill: false });
     expect(result).toContain('--test-bg:black');
   });
@@ -220,7 +229,11 @@ describe('renderToStringDSD() — useProps integration', () => {
 
 describe('renderToStringWithJITCSSDSD()', () => {
   it('returns SSRJITResult shape', () => {
-    const vnode = { tag: 'div', props: { attrs: { class: 'flex' } }, children: [] };
+    const vnode = {
+      tag: 'div',
+      props: { attrs: { class: 'flex' } },
+      children: [],
+    };
     const result: SSRJITResult = renderToStringWithJITCSSDSD(vnode as never);
     expect(typeof result.html).toBe('string');
     expect(typeof result.css).toBe('string');
@@ -281,7 +294,10 @@ describe('renderToStringWithJITCSS() — globalStyles field', () => {
     registry.set(TAG, {
       props: {},
       render: () => {
-        useGlobalStyle(() => '@font-face { font-family: "TestFont"; src: local("TestFont"); }');
+        useGlobalStyle(
+          () =>
+            '@font-face { font-family: "TestFont"; src: local("TestFont"); }',
+        );
         return { tag: 'div', props: {}, children: [] } as never;
       },
     });
@@ -306,9 +322,11 @@ describe('renderToStringWithJITCSS() — globalStyles field', () => {
     // Render two instances of the same component
     const vnode1 = { tag: TAG, props: { attrs: {} }, children: [] };
     const vnode2 = { tag: TAG, props: { attrs: {} }, children: [] };
-    const result = renderToStringWithJITCSSDSD(
-      { tag: 'div', props: {}, children: [vnode1 as never, vnode2 as never] } as never,
-    );
+    const result = renderToStringWithJITCSSDSD({
+      tag: 'div',
+      props: {},
+      children: [vnode1 as never, vnode2 as never],
+    } as never);
     // CSS should appear only once in globalStyles
     const count = (result.globalStyles.match(/--test-dedup/g) ?? []).length;
     expect(count).toBe(1);
@@ -380,8 +398,7 @@ describe('renderToStringDSD() — nested custom elements', () => {
 
     registry.set(INNER, {
       props: {},
-      render: () =>
-        ({ tag: 'span', props: {}, children: ['inner'] }) as never,
+      render: () => ({ tag: 'span', props: {}, children: ['inner'] }) as never,
     });
 
     registry.set(OUTER, {
@@ -400,7 +417,9 @@ describe('renderToStringDSD() — nested custom elements', () => {
     // Outer element has DSD wrapper
     expect(result).toContain(`<${OUTER}`);
     // Inner element should also be DSD-wrapped inside outer's shadow
-    expect(result.match(/<template shadowrootmode="open">/g)?.length).toBeGreaterThanOrEqual(2);
+    expect(
+      result.match(/<template shadowrootmode="open">/g)?.length,
+    ).toBeGreaterThanOrEqual(2);
   });
 });
 
@@ -477,12 +496,158 @@ describe('renderToStringDSD() — async render functions', () => {
 });
 
 // ---------------------------------------------------------------------------
+// renderToStream — incremental async streaming
+// ---------------------------------------------------------------------------
+
+describe('renderToStream() — incremental async component streaming', () => {
+  async function drainStream(
+    stream: ReadableStream<string>,
+  ): Promise<string[]> {
+    const reader = stream.getReader();
+    const chunks: string[] = [];
+    let done = false;
+    while (!done) {
+      const { value, done: d } = await reader.read();
+      if (value) chunks.push(value);
+      done = d;
+    }
+    return chunks;
+  }
+
+  it('produces a single chunk for all-sync components', async () => {
+    const TAG = 'cer-stream-sync';
+    registry.set(TAG, {
+      props: {},
+      render: () => ({ tag: 'span', props: {}, children: ['sync'] }) as never,
+    });
+    const vnode = { tag: TAG, props: { attrs: {} }, children: [] };
+    const chunks = await drainStream(
+      renderToStream(vnode as never, { dsd: true }),
+    );
+    expect(chunks.length).toBe(1);
+    expect(chunks[0]).toContain('shadowrootmode="open"');
+    expect(chunks[0]).toContain('sync');
+  });
+
+  it('produces ≥ 2 chunks when a component has an async render function', async () => {
+    const TAG = 'cer-stream-async';
+    registry.set(TAG, {
+      props: {},
+      render: async () =>
+        ({ tag: 'div', props: {}, children: ['resolved'] }) as never,
+    });
+    const vnode = { tag: TAG, props: { attrs: {} }, children: [] };
+    const chunks = await drainStream(
+      renderToStream(vnode as never, { dsd: true }),
+    );
+    expect(chunks.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('chunk 1 contains placeholder with unique cer-stream-* id', async () => {
+    const TAG = 'cer-stream-placeholder';
+    registry.set(TAG, {
+      props: {},
+      render: async () =>
+        ({ tag: 'div', props: {}, children: ['content'] }) as never,
+    });
+    const vnode = { tag: TAG, props: { attrs: {} }, children: [] };
+    const chunks = await drainStream(
+      renderToStream(vnode as never, { dsd: true }),
+    );
+    expect(chunks[0]).toMatch(/id="cer-stream-\d+"/);
+    expect(chunks[0]).toContain('<template shadowrootmode="open"></template>');
+  });
+
+  it('swap chunk uses shadowRoot.innerHTML (not outerHTML)', async () => {
+    const TAG = 'cer-stream-swap';
+    registry.set(TAG, {
+      props: {},
+      render: async () =>
+        ({ tag: 'div', props: {}, children: ['swapped'] }) as never,
+    });
+    const vnode = { tag: TAG, props: { attrs: {} }, children: [] };
+    const chunks = await drainStream(
+      renderToStream(vnode as never, { dsd: true }),
+    );
+    const swapChunks = chunks.slice(1).join('');
+    // Uses shadowRoot.innerHTML for reliable cross-browser shadow root filling
+    expect(swapChunks).toContain('s.innerHTML');
+    // Does NOT rely on outerHTML DSD processing (unreliable for script-injected HTML)
+    expect(swapChunks).not.toContain('e.outerHTML');
+  });
+
+  it('swap chunk carries the resolved shadow content', async () => {
+    const TAG = 'cer-stream-content';
+    registry.set(TAG, {
+      props: {},
+      render: async () =>
+        ({
+          tag: 'div',
+          props: { attrs: { class: 'resolved-card' } },
+          children: ['resolved content'],
+        }) as never,
+    });
+    const vnode = { tag: TAG, props: { attrs: {} }, children: [] };
+    const chunks = await drainStream(
+      renderToStream(vnode as never, { dsd: true }),
+    );
+    const swapChunks = chunks.slice(1).join('');
+    expect(swapChunks).toContain('resolved content');
+    expect(swapChunks).toContain('resolved-card');
+  });
+
+  it('swap chunk targets the same placeholder id as chunk 1', async () => {
+    const TAG = 'cer-stream-id-match';
+    registry.set(TAG, {
+      props: {},
+      render: async () =>
+        ({ tag: 'p', props: {}, children: ['matched'] }) as never,
+    });
+    const vnode = { tag: TAG, props: { attrs: {} }, children: [] };
+    const chunks = await drainStream(
+      renderToStream(vnode as never, { dsd: true }),
+    );
+    const placeholderId = chunks[0].match(/id="(cer-stream-\d+)"/)?.[1];
+    expect(placeholderId).toBeTruthy();
+    const swapChunks = chunks.slice(1).join('');
+    expect(swapChunks).toContain(placeholderId);
+  });
+
+  it('swap chunk includes style block inside the shadow content', async () => {
+    const TAG = 'cer-stream-styles';
+    registry.set(TAG, {
+      props: {},
+      render: async () =>
+        ({
+          tag: 'div',
+          props: { attrs: { class: 'p-4' } },
+          children: [],
+        }) as never,
+    });
+    const vnode = { tag: TAG, props: { attrs: {} }, children: [] };
+    const chunks = await drainStream(
+      renderToStream(vnode as never, {
+        dsd: true,
+        jit: { extendedColors: false },
+      }),
+    );
+    const swapChunks = chunks.slice(1).join('');
+    // baseReset is always included in the shadow style block
+    expect(swapChunks).toContain('box-sizing');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Backwards-compatibility: renderToStringWithJITCSS without dsd
 // ---------------------------------------------------------------------------
 
 describe('renderToStringWithJITCSS() backwards-compat', () => {
   it('result has css and htmlWithStyles (original fields)', () => {
-    const vnode = { tag: 'div', props: { attrs: { class: 'flex' } }, children: [] };
+    const vnode = {
+      tag: 'div',
+      props: { attrs: { class: 'flex' } },
+      children: [],
+    };
     const result = renderToStringWithJITCSS(vnode as never);
     expect(typeof result.html).toBe('string');
     expect(typeof result.css).toBe('string');
@@ -524,9 +689,11 @@ describe('renderToStringWithJITCSS() — exception safety', () => {
         return { tag: 'div', props: {}, children: [] } as never;
       },
     });
-    const result = renderToStringWithJITCSSDSD(
-      { tag: TAG, props: { attrs: {} }, children: [] } as never,
-    );
+    const result = renderToStringWithJITCSSDSD({
+      tag: TAG,
+      props: { attrs: {} },
+      children: [],
+    } as never);
     // globalStyles must be captured correctly in the subsequent render
     expect(result.globalStyles).toContain('--after-throw');
   });
@@ -556,12 +723,16 @@ describe('renderToStringWithJITCSSDSD() — sequential render isolation', () => 
       },
     });
 
-    const result1 = renderToStringWithJITCSSDSD(
-      { tag: TAG_A, props: { attrs: {} }, children: [] } as never,
-    );
-    const result2 = renderToStringWithJITCSSDSD(
-      { tag: TAG_B, props: { attrs: {} }, children: [] } as never,
-    );
+    const result1 = renderToStringWithJITCSSDSD({
+      tag: TAG_A,
+      props: { attrs: {} },
+      children: [],
+    } as never);
+    const result2 = renderToStringWithJITCSSDSD({
+      tag: TAG_B,
+      props: { attrs: {} },
+      children: [],
+    } as never);
 
     // Each render captures only its own globalStyles
     expect(result1.globalStyles).toContain('--seq-a');
@@ -616,7 +787,10 @@ describe('cer-suspense in SSR', () => {
       props: { attrs: {}, isCustomElement: true },
       children: [{ tag: 'p', props: {}, children: ['content'] }],
     };
-    const html = renderToStringDSD(vnode as never, { dsd: true, dsdPolyfill: false });
+    const html = renderToStringDSD(vnode as never, {
+      dsd: true,
+      dsdPolyfill: false,
+    });
     expect(html).toContain('<cer-suspense');
     expect(html).toContain('<template shadowrootmode="open">');
   });
@@ -627,7 +801,10 @@ describe('cer-suspense in SSR', () => {
       props: { attrs: {}, isCustomElement: true },
       children: [{ tag: 'p', props: {}, children: ['content'] }],
     };
-    const html = renderToStringDSD(vnode as never, { dsd: true, dsdPolyfill: false });
+    const html = renderToStringDSD(vnode as never, {
+      dsd: true,
+      dsdPolyfill: false,
+    });
     // Shadow root should contain <slot> (default slot, not fallback)
     expect(html).toContain('<slot>');
     expect(html).not.toContain('name="fallback"');
@@ -639,10 +816,17 @@ describe('cer-suspense in SSR', () => {
       props: { attrs: { pending: 'true' }, isCustomElement: true },
       children: [
         { tag: 'p', props: {}, children: ['content'] },
-        { tag: 'div', props: { attrs: { slot: 'fallback' } }, children: ['Loading…'] },
+        {
+          tag: 'div',
+          props: { attrs: { slot: 'fallback' } },
+          children: ['Loading…'],
+        },
       ],
     };
-    const html = renderToStringDSD(vnode as never, { dsd: true, dsdPolyfill: false });
+    const html = renderToStringDSD(vnode as never, {
+      dsd: true,
+      dsdPolyfill: false,
+    });
     expect(html).toContain('name="fallback"');
     expect(html).not.toContain('<slot>');
   });
@@ -651,9 +835,14 @@ describe('cer-suspense in SSR', () => {
     const vnode = {
       tag: 'cer-suspense',
       props: { attrs: {}, isCustomElement: true },
-      children: [{ tag: 'p', props: { attrs: { id: 'slotted' } }, children: ['hello'] }],
+      children: [
+        { tag: 'p', props: { attrs: { id: 'slotted' } }, children: ['hello'] },
+      ],
     };
-    const html = renderToStringDSD(vnode as never, { dsd: true, dsdPolyfill: false });
+    const html = renderToStringDSD(vnode as never, {
+      dsd: true,
+      dsdPolyfill: false,
+    });
     // Slotted children should be in light DOM, after </template>
     const templateEnd = html.indexOf('</template>');
     const slottedPos = html.indexOf('id="slotted"');
@@ -673,7 +862,10 @@ describe('cer-error-boundary in SSR', () => {
       props: { attrs: {}, isCustomElement: true },
       children: [{ tag: 'p', props: {}, children: ['content'] }],
     };
-    const html = renderToStringDSD(vnode as never, { dsd: true, dsdPolyfill: false });
+    const html = renderToStringDSD(vnode as never, {
+      dsd: true,
+      dsdPolyfill: false,
+    });
     expect(html).toContain('<cer-error-boundary');
     expect(html).toContain('<template shadowrootmode="open">');
   });
@@ -682,9 +874,14 @@ describe('cer-error-boundary in SSR', () => {
     const vnode = {
       tag: 'cer-error-boundary',
       props: { attrs: {}, isCustomElement: true },
-      children: [{ tag: 'p', props: { attrs: { id: 'guarded' } }, children: ['safe'] }],
+      children: [
+        { tag: 'p', props: { attrs: { id: 'guarded' } }, children: ['safe'] },
+      ],
     };
-    const html = renderToStringDSD(vnode as never, { dsd: true, dsdPolyfill: false });
+    const html = renderToStringDSD(vnode as never, {
+      dsd: true,
+      dsdPolyfill: false,
+    });
     // Shadow root should contain <slot> (default, not error fallback)
     expect(html).toContain('<slot>');
     expect(html).not.toContain('Something went wrong');
@@ -694,9 +891,14 @@ describe('cer-error-boundary in SSR', () => {
     const vnode = {
       tag: 'cer-error-boundary',
       props: { attrs: {}, isCustomElement: true },
-      children: [{ tag: 'span', props: { attrs: { id: 'child' } }, children: ['ok'] }],
+      children: [
+        { tag: 'span', props: { attrs: { id: 'child' } }, children: ['ok'] },
+      ],
     };
-    const html = renderToStringDSD(vnode as never, { dsd: true, dsdPolyfill: false });
+    const html = renderToStringDSD(vnode as never, {
+      dsd: true,
+      dsdPolyfill: false,
+    });
     const templateEnd = html.indexOf('</template>');
     const childPos = html.indexOf('id="child"');
     expect(templateEnd).toBeGreaterThan(-1);
@@ -723,7 +925,10 @@ describe('cer-keep-alive in SSR', () => {
       props: { attrs: {}, isCustomElement: true },
       children: [{ tag: 'p', props: {}, children: ['preserved'] }],
     };
-    const html = renderToStringDSD(vnode as never, { dsd: true, dsdPolyfill: false });
+    const html = renderToStringDSD(vnode as never, {
+      dsd: true,
+      dsdPolyfill: false,
+    });
     // No DSD template — not in registry
     expect(html).not.toContain('<template shadowrootmode="open">');
     // Light DOM children are still serialized
@@ -740,7 +945,11 @@ describe('nested custom elements in DSD SSR', () => {
     registry.set(INNER, {
       props: {},
       render: () =>
-        ({ tag: 'span', props: { attrs: { id: 'inner-content' } }, children: ['inner'] }) as never,
+        ({
+          tag: 'span',
+          props: { attrs: { id: 'inner-content' } },
+          children: ['inner'],
+        }) as never,
     });
     registry.set(OUTER, {
       props: {},
@@ -759,9 +968,14 @@ describe('nested custom elements in DSD SSR', () => {
       props: { attrs: {}, isCustomElement: true },
       children: [],
     };
-    const html = renderToStringDSD(vnode as never, { dsd: true, dsdPolyfill: false });
+    const html = renderToStringDSD(vnode as never, {
+      dsd: true,
+      dsdPolyfill: false,
+    });
     // Both outer and inner should have shadow roots
-    expect((html.match(/<template shadowrootmode="open">/g) ?? []).length).toBe(2);
+    expect((html.match(/<template shadowrootmode="open">/g) ?? []).length).toBe(
+      2,
+    );
     expect(html).toContain(`<${OUTER}`);
     expect(html).toContain(`<${INNER}`);
     expect(html).toContain('id="inner-content"');
