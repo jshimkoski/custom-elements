@@ -9,6 +9,7 @@ import { devWarn, devError } from './logger';
 import { isDiscoveryRender as _isDiscoveryRenderFn } from './discovery-state';
 import { sanitizeCSS, minifyCSS } from './css-utils';
 import type { JITCSSOptions } from './style';
+import { captureGlobalStyleForSSR } from './ssr-context';
 
 // Re-export JITCSSOptions as a type-only re-export so consumers can still
 // import it from './runtime/hooks' without creating a runtime dependency on style.ts.
@@ -669,15 +670,29 @@ const _globalStyleSheets = new Map<string, CSSStyleSheet>();
  * ```
  */
 export function useGlobalStyle(styleFactory: () => string): void {
+  let raw: string;
+  try {
+    raw = styleFactory();
+  } catch {
+    return;
+  }
+
+  // SSR collection pass: when an active collector exists (set up by
+  // beginSSRGlobalStyleCollection in ssr.ts), capture here and skip DOM
+  // injection regardless of whether document is available. This correctly
+  // handles both Node.js SSR (no document) and test environments (document
+  // present via happy-dom/jsdom) that call renderToStringWithJITCSS.
+  if (captureGlobalStyleForSSR(raw)) return;
+
   if (typeof document === 'undefined' || typeof CSSStyleSheet === 'undefined') {
-    return; // SSR / no-DOM environment — skip silently
+    // SSR without an active collector — nothing to do.
+    return;
   }
   devWarn(
     '[useGlobalStyle] Injecting global styles from a component. ' +
       'This escapes Shadow DOM encapsulation — use sparingly.',
   );
-  const raw = styleFactory();
-  const style = minifyCSS(sanitizeCSS(raw));
+  const style = minifyCSS(sanitizeCSS(raw!));
   if (!style || _globalStyleSheets.has(style)) return;
   try {
     const sheet = new CSSStyleSheet();

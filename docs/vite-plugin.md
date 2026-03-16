@@ -1,15 +1,115 @@
-# 🔧 Vite Plugin (Build-time JIT CSS)
+# 🔧 Vite Plugin (Build-time JIT CSS + SSR Config)
 
-The `cerJITCSS` Vite plugin performs **build-time static analysis** of your source files and emits pre-generated CSS — eliminating all runtime JIT parsing cost for projects with static class lists.
+Two plugins are exported from `@jasonshimmy/custom-elements-runtime/vite-plugin`:
 
-This is the optimal approach for frameworks like React, Svelte, Vue, or Lit where templates live in `.tsx`, `.svelte`, or `.vue` files rather than Web Component shadow roots.
+- **`cerJITCSS`** — Build-time static analysis: scans source files and emits pre-generated CSS, eliminating all runtime JIT parsing cost (light DOM, not Shadow DOM).
+- **`cerPlugin`** — All-in-one: combines `cerJITCSS` with SSR configuration. Registers a `virtual:cer-ssr-config` module so server entry files can import the resolved render options.
 
 ## 📦 Import
 
 ```ts
 // vite.config.ts
-import { cerJITCSS } from '@jasonshimmy/custom-elements-runtime/vite-plugin';
+import {
+  cerJITCSS,
+  cerPlugin,
+} from '@jasonshimmy/custom-elements-runtime/vite-plugin';
 ```
+
+---
+
+## `cerPlugin` — Recommended for SSR Apps
+
+Use `cerPlugin` when your app uses both build-time JIT CSS and server-side rendering. It combines both capabilities and exposes render options via a virtual module.
+
+### Quick Start
+
+```ts
+// vite.config.ts
+import { defineConfig } from 'vite';
+import { cerPlugin } from '@jasonshimmy/custom-elements-runtime/vite-plugin';
+
+export default defineConfig({
+  plugins: [
+    cerPlugin({
+      // JIT CSS options (optional)
+      content: ['./src/**/*.{ts,html}'],
+      output: 'src/generated-jit.css',
+
+      // SSR config (optional)
+      ssr: {
+        dsd: true, // Enable Declarative Shadow DOM
+        dsdPolyfill: true, // Append DSD polyfill for Firefox < 123
+        jit: { extendedColors: true }, // JIT CSS options for SSR
+      },
+    }),
+  ],
+});
+```
+
+### Using the SSR config virtual module
+
+When `ssr` is provided, the plugin registers `virtual:cer-ssr-config`, which exports the resolved SSR render options:
+
+```ts
+// server.ts
+import ssrConfig from 'virtual:cer-ssr-config';
+import { renderToStringWithJITCSS } from '@jasonshimmy/custom-elements-runtime/ssr';
+
+// ssrConfig = { dsd: true, dsdPolyfill: true, jit: { extendedColors: true } }
+const { htmlWithStyles } = renderToStringWithJITCSS(appVNode, ssrConfig);
+```
+
+Add the TypeScript declaration if your IDE reports an import error:
+
+```ts
+// vite-env.d.ts
+declare module 'virtual:cer-ssr-config' {
+  const config: import('@jasonshimmy/custom-elements-runtime/ssr').DSDRenderOptions & {
+    jit?: import('@jasonshimmy/custom-elements-runtime/jit-css').JITCSSOptions;
+  };
+  export default config;
+}
+```
+
+### `CerPluginOptions`
+
+```ts
+interface CerPluginOptions {
+  // JIT CSS options — same as CerJITCSSPluginOptions, all optional
+  content?: string[];
+  output?: string;
+  virtualModule?: boolean;
+  extendedColors?: boolean;
+  customColors?: Record<string, Record<string, string>>;
+  disableVariants?: Array<
+    'responsive' | 'dark' | 'motion' | 'print' | 'container'
+  >;
+
+  // SSR config
+  ssr?: {
+    dsd?: boolean; // default: true
+    dsdPolyfill?: boolean; // default: true
+    jit?: JITCSSOptions;
+  };
+}
+```
+
+### `cerPlugin` returns an array of Vite plugins
+
+`cerPlugin()` returns a `Plugin[]` array so it composes naturally:
+
+```ts
+// Two plugins in one call — spread syntax not needed
+plugins: [cerPlugin({ content: ['./src/**/*.ts'], ssr: { dsd: true } })];
+```
+
+---
+
+## `cerJITCSS` — JIT CSS Only
+
+Use `cerJITCSS` when you need build-time JIT CSS without SSR configuration.
+
+This is the optimal approach for frameworks like React, Svelte, Vue, or Lit where templates live in `.tsx`, `.svelte`, or `.vue` files rather than Web Component shadow roots.
 
 ## 🚀 Quick Start
 
@@ -201,4 +301,5 @@ export default defineConfig({
 
 - [JIT CSS deep dive](./jit-css.md) — full utility reference
 - [DOM JIT CSS](./dom-jit-css.md) — runtime DOM scanner for non-build scenarios
-- [SSR](./ssr.md) — server-side rendering with JIT CSS pre-generation
+- [SSR](./ssr.md) — server-side rendering with DSD output and JIT CSS pre-generation
+- [SSR Middleware](./ssr-middleware.md) — Express/Fastify/Hono handler factories

@@ -96,7 +96,13 @@ export function createElementClass<
 
     constructor() {
       super();
-      this.attachShadow({ mode: 'open' });
+      // When a Declarative Shadow DOM template was parsed by the browser
+      // (i.e. the server rendered with dsd: true), this.shadowRoot is already
+      // set. Calling attachShadow() on an element that already has a shadow
+      // root throws a DOMException, so we only attach when one doesn't exist.
+      if (!this.shadowRoot) {
+        this.attachShadow({ mode: 'open' });
+      }
       // Always read the latest config from the registry so re-registration
       // (HMR / tests) updates future instances.
       this._cfg = (registry.get(tag) as ComponentConfig<S, C, P, T>) || config;
@@ -262,12 +268,51 @@ export function createElementClass<
           registerChildComponent(parentHost as ShadowRoot, this);
         }
 
-        // Ensure props reflect attributes set by the parent renderer before
-        // invoking lifecycle hooks.
+        // Partial hydration: honour data-cer-hydrate if present.
+        const hydrateStrategy = this.getAttribute('data-cer-hydrate');
+        if (hydrateStrategy === 'none') {
+          // Static element — never hydrate. Keep the DSD content as-is.
+          return;
+        }
+        if (hydrateStrategy === 'idle') {
+          const cb = () => this._hydrateNow(config);
+          if (typeof requestIdleCallback !== 'undefined') {
+            requestIdleCallback(cb);
+          } else {
+            // Fallback for environments without requestIdleCallback (e.g. Safari < 16)
+            setTimeout(cb, 200);
+          }
+          return;
+        }
+        if (hydrateStrategy === 'visible') {
+          const observer = new IntersectionObserver(
+            (entries, obs) => {
+              if (entries.some((e) => e.isIntersecting)) {
+                obs.disconnect();
+                this._hydrateNow(config);
+              }
+            },
+            { rootMargin: '0px', threshold: 0 },
+          );
+          observer.observe(this);
+          return;
+        }
+
+        // Default ('load' or no attribute): hydrate immediately.
         this._applyProps(config);
-        // Re-render after applying props to ensure component shows updated values
         this._requestRender();
         handleConnected(config, this.context, this._mounted, (val) => {
+          this._mounted = val;
+        });
+      });
+    }
+
+    /** Execute the standard hydration sequence (used by deferred strategies). */
+    private _hydrateNow(cfg: ComponentConfig<S, C, P, T>): void {
+      this._runLogicWithinErrorBoundary(cfg, () => {
+        this._applyProps(cfg);
+        this._requestRender();
+        handleConnected(cfg, this.context, this._mounted, (val) => {
           this._mounted = val;
         });
       });

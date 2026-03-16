@@ -55,7 +55,7 @@ import { registerKeepAlive } from '../keep-alive';
  * ```
  */
 export function registerSuspense(): void {
-  if (customElements.get('cer-suspense')) return;
+  if (typeof customElements !== 'undefined' && customElements.get('cer-suspense')) return;
 
   component('cer-suspense', () => {
     const { pending } = useProps({ pending: false });
@@ -91,7 +91,7 @@ export function registerSuspense(): void {
  * ```
  */
 export function registerErrorBoundary(): void {
-  if (customElements.get('cer-error-boundary')) return;
+  if (typeof customElements !== 'undefined' && customElements.get('cer-error-boundary')) return;
 
   component('cer-error-boundary', () => {
     const hasError = ref(false);

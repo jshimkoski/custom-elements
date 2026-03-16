@@ -1,5 +1,10 @@
 // Core functional API
 export { component } from './runtime/component';
+export type { ComponentOptions } from './runtime/component/factory';
+
+// Hydration
+export { hydrateApp } from './runtime/hydration';
+export type { HydrateStrategy } from './runtime/types';
 
 // Context-based hooks (React-style)
 export {

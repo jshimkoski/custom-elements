@@ -1,4 +1,4 @@
-import type { ComponentConfig, VNode } from '../types';
+import type { ComponentConfig, HydrateStrategy, VNode } from '../types';
 import { reactiveSystem } from '../reactive';
 import { toKebab } from '../helpers';
 import {
@@ -91,16 +91,33 @@ function invokeCallbacks(
  * ```
  */
 
+/** Options for `component()`. */
+export interface ComponentOptions {
+  /**
+   * Partial-hydration strategy when this component is server-rendered with
+   * Declarative Shadow DOM (`dsd: true`). Emitted as `data-cer-hydrate` on the
+   * host element so the client runtime can schedule hydration appropriately.
+   *
+   * - `'load'`    — hydrate immediately on connection (default)
+   * - `'idle'`    — defer to `requestIdleCallback`
+   * - `'visible'` — defer until the element enters the viewport
+   * - `'none'`    — never hydrate (purely static, no JS runtime for this element)
+   */
+  hydrate?: HydrateStrategy;
+}
+
 // Overload: No parameters - use useProps() hook for props access
 export function component(
   tag: string,
   renderFn: () => VNode | VNode[] | Promise<VNode | VNode[]>,
+  options?: ComponentOptions,
 ): void;
 
 // Implementation
 export function component(
   tag: string,
   renderFn: () => VNode | VNode[] | Promise<VNode | VNode[]>,
+  options?: ComponentOptions,
 ): void {
   // Ensure the global registry is exposed when running in a browser. This is
   // performed lazily to avoid module-load side-effects that prevent
@@ -131,6 +148,7 @@ export function component(
   const config: ComponentConfig<object, object, object, object> = {
     // Props are accessed via useProps() hook
     props: {},
+    hydrate: options?.hydrate,
 
     // Add lifecycle hooks from the stored functions
     onConnected: (context) => {
@@ -468,7 +486,7 @@ export function component(
       // Discovery render failed - props will be discovered on first real render
     }
 
-    if (!customElements.get(normalizedTag)) {
+    if (typeof customElements !== 'undefined' && !customElements.get(normalizedTag)) {
       customElements.define(
         normalizedTag,
         createElementClass(normalizedTag, config) as CustomElementConstructor,

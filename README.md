@@ -80,49 +80,50 @@ Below is the **complete list of public symbols** exported by the runtime and its
 
 **Package:** `@jasonshimmy/custom-elements-runtime`
 
-| Export                       | Description                                                                                                                                        |
-| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `component`                  | Define a custom element with the functional component API.                                                                                         |
-| `html`                       | Template tag function producing runtime VNodes from template literals.                                                                             |
-| `css`                        | Define component-scoped/JIT styles or register stylesheets.                                                                                        |
-| `ref`                        | Create a reactive reference object with a `.value` property.                                                                                       |
-| `computed`                   | Create a memoized, derived read-only value from other reactive sources.                                                                            |
-| `watch`                      | Register watchers reacting to changes in reactive values.                                                                                          |
-| `watchEffect`                | Auto-track reactive reads and re-run a side-effect whenever dependencies change.                                                                   |
-| `nextTick`                   | Returns a Promise resolving after all pending DOM updates are flushed.                                                                             |
-| `flushDOMUpdates`            | Synchronously flush all pending DOM update tasks (useful in tests).                                                                                |
-| `scheduleWithPriority`       | Schedule a callback at a given `UpdatePriority` level.                                                                                             |
-| `provide`                    | Store a value on the current component for descendant injection.                                                                                   |
-| `inject`                     | Retrieve a value provided by an ancestor component.                                                                                                |
-| `createComposable`           | Package reusable stateful logic (hooks, reactive state) into a composable.                                                                         |
-| `getCurrentComponentContext` | Access the active component context from within a composable or render function.                                                                   |
-| `useProps`                   | Hook to declare/consume typed component props with defaults.                                                                                       |
-| `defineModel`                | Declare a two-way model binding prop; combines `useProps` + `useEmit` in one ergonomic hook.                                                       |
-| `useEmit`                    | Hook returning an emit function for dispatching custom events.                                                                                     |
-| `useOnConnected`             | Hook that runs a callback when the component connects.                                                                                             |
-| `useOnDisconnected`          | Hook that runs a callback when the component disconnects.                                                                                          |
-| `useOnAttributeChanged`      | Hook observing host attribute changes.                                                                                                             |
-| `useOnError`                 | Hook to register a component-level error handler.                                                                                                  |
-| `useStyle`                   | Hook to register or compute component styles at runtime.                                                                                           |
-| `useDesignTokens`            | Apply typed design token overrides to `:host` as CSS custom properties.                                                                            |
-| `useGlobalStyle`             | Inject CSS into `document.adoptedStyleSheets`, escaping Shadow DOM encapsulation. Use sparingly.                                                   |
-| `useExpose`                  | Publish methods and properties onto the host element as an imperative public API.                                                                  |
-| `useSlots`                   | Inspect which named slots have been filled by the component consumer.                                                                              |
-| `useTeleport`                | Render virtual DOM content into any DOM node outside the shadow root.                                                                              |
-| `registerKeepAlive`          | Register `<cer-keep-alive>` to preserve component state across DOM removals.                                                                       |
-| `registerSuspense`           | Register the `<cer-suspense>` built-in component.                                                                                                  |
-| `registerErrorBoundary`      | Register the `<cer-error-boundary>` built-in component.                                                                                            |
-| `registerBuiltinComponents`  | Register `<cer-keep-alive>`, `<cer-suspense>` and `<cer-error-boundary>` in one call.                                                              |
-| `unsafeHTML`                 | Insert raw HTML into a template (**unsafe; use carefully**).                                                                                       |
-| `decodeEntities`             | Utility to decode HTML entities in strings.                                                                                                        |
-| `setDevMode`                 | Toggle dev-mode logging on or off at runtime.                                                                                                      |
-| `devLog`                     | Log a message to the console in dev mode only (no-op in production).                                                                               |
-| `isReactiveState`            | Type-guard returning `true` when a value is a `ReactiveState` instance.                                                                            |
-| `createHealthMonitor`        | Create a new health monitor instance (factory; each call returns an independent instance).                                                         |
-| `getHealthMonitor`           | Return the global singleton health monitor instance (lazily created).                                                                              |
-| `updateHealthMetric`         | Update a named metric on the global singleton health monitor.                                                                                      |
-| `getHealthStatus`            | Return the current `HealthReport` from the global singleton health monitor.                                                                        |
-| **Types**                    | `ModelRef`, `HealthMonitorInstance`, `HealthReport`, `UpdatePriority`, `TeleportHandle`, `ReactiveState`, `VNode`, `JITCSSOptions`, `DesignTokens` |
+| Export                       | Description                                                                                                                                                                               |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `component`                  | Define a custom element with the functional component API.                                                                                                                                |
+| `html`                       | Template tag function producing runtime VNodes from template literals.                                                                                                                    |
+| `css`                        | Define component-scoped/JIT styles or register stylesheets.                                                                                                                               |
+| `ref`                        | Create a reactive reference object with a `.value` property.                                                                                                                              |
+| `computed`                   | Create a memoized, derived read-only value from other reactive sources.                                                                                                                   |
+| `watch`                      | Register watchers reacting to changes in reactive values.                                                                                                                                 |
+| `watchEffect`                | Auto-track reactive reads and re-run a side-effect whenever dependencies change.                                                                                                          |
+| `nextTick`                   | Returns a Promise resolving after all pending DOM updates are flushed.                                                                                                                    |
+| `flushDOMUpdates`            | Synchronously flush all pending DOM update tasks (useful in tests).                                                                                                                       |
+| `scheduleWithPriority`       | Schedule a callback at a given `UpdatePriority` level.                                                                                                                                    |
+| `provide`                    | Store a value on the current component for descendant injection.                                                                                                                          |
+| `inject`                     | Retrieve a value provided by an ancestor component.                                                                                                                                       |
+| `createComposable`           | Package reusable stateful logic (hooks, reactive state) into a composable.                                                                                                                |
+| `getCurrentComponentContext` | Access the active component context from within a composable or render function.                                                                                                          |
+| `useProps`                   | Hook to declare/consume typed component props with defaults.                                                                                                                              |
+| `defineModel`                | Declare a two-way model binding prop; combines `useProps` + `useEmit` in one ergonomic hook.                                                                                              |
+| `useEmit`                    | Hook returning an emit function for dispatching custom events.                                                                                                                            |
+| `useOnConnected`             | Hook that runs a callback when the component connects.                                                                                                                                    |
+| `useOnDisconnected`          | Hook that runs a callback when the component disconnects.                                                                                                                                 |
+| `useOnAttributeChanged`      | Hook observing host attribute changes.                                                                                                                                                    |
+| `useOnError`                 | Hook to register a component-level error handler.                                                                                                                                         |
+| `useStyle`                   | Hook to register or compute component styles at runtime.                                                                                                                                  |
+| `useDesignTokens`            | Apply typed design token overrides to `:host` as CSS custom properties.                                                                                                                   |
+| `useGlobalStyle`             | Inject CSS into `document.adoptedStyleSheets`, escaping Shadow DOM encapsulation. Use sparingly.                                                                                          |
+| `useExpose`                  | Publish methods and properties onto the host element as an imperative public API.                                                                                                         |
+| `useSlots`                   | Inspect which named slots have been filled by the component consumer.                                                                                                                     |
+| `useTeleport`                | Render virtual DOM content into any DOM node outside the shadow root.                                                                                                                     |
+| `registerKeepAlive`          | Register `<cer-keep-alive>` to preserve component state across DOM removals.                                                                                                              |
+| `registerSuspense`           | Register the `<cer-suspense>` built-in component.                                                                                                                                         |
+| `registerErrorBoundary`      | Register the `<cer-error-boundary>` built-in component.                                                                                                                                   |
+| `registerBuiltinComponents`  | Register `<cer-keep-alive>`, `<cer-suspense>` and `<cer-error-boundary>` in one call.                                                                                                     |
+| `unsafeHTML`                 | Insert raw HTML into a template (**unsafe; use carefully**).                                                                                                                              |
+| `decodeEntities`             | Utility to decode HTML entities in strings.                                                                                                                                               |
+| `setDevMode`                 | Toggle dev-mode logging on or off at runtime.                                                                                                                                             |
+| `devLog`                     | Log a message to the console in dev mode only (no-op in production).                                                                                                                      |
+| `isReactiveState`            | Type-guard returning `true` when a value is a `ReactiveState` instance.                                                                                                                   |
+| `createHealthMonitor`        | Create a new health monitor instance (factory; each call returns an independent instance).                                                                                                |
+| `getHealthMonitor`           | Return the global singleton health monitor instance (lazily created).                                                                                                                     |
+| `updateHealthMetric`         | Update a named metric on the global singleton health monitor.                                                                                                                             |
+| `getHealthStatus`            | Return the current `HealthReport` from the global singleton health monitor.                                                                                                               |
+| `hydrateApp`                 | Trigger hydration of all DSD-rendered custom elements within a root (call after registering all components on the client).                                                                |
+| **Types**                    | `ModelRef`, `HealthMonitorInstance`, `HealthReport`, `UpdatePriority`, `TeleportHandle`, `ReactiveState`, `VNode`, `JITCSSOptions`, `DesignTokens`, `ComponentOptions`, `HydrateStrategy` |
 
 ---
 
@@ -210,25 +211,25 @@ Below is the **complete list of public symbols** exported by the runtime and its
 
 **Package:** `@jasonshimmy/custom-elements-runtime/router`
 
-| Export                  | Description                                                                                                               |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `useRouter`             | Create and use a router instance configured with routes (client & SSR).                                                   |
-| `initRouter`            | Initialize the router and register `router-view` / `router-link`.                                                         |
-| `matchRoute`            | Match a path against configured routes and extract params.                                                                |
-| `matchRouteSSR`         | SSR-friendly wrapper for route matching.                                                                                  |
-| `findMatchedRoute`      | Find the first matching route entry from an array of routes (lower-level helper).                                         |
-| `parseQuery`            | Parse a query string into a key/value map.                                                                                |
-| `serializeQuery`        | Serialize a key/value map into a query string (e.g. `?a=b`).                                                              |
-| `normalizePathForRoute` | Normalize a path string for consistent route matching (strips trailing slashes, etc.).                                    |
-| `DEFAULT_SCROLL_CONFIG` | Default scroll-to-fragment configuration object used by the router.                                                       |
-| `isDangerousScheme`     | Returns `true` for dangerous URL schemes (e.g. `javascript:`).                                                            |
-| `isAbsoluteUrl`         | Returns `true` when a URL string is absolute (has a protocol).                                                            |
-| `safeDecode`            | Decode a URI component, returning the original string on error.                                                           |
-| `canonicalizeBase`      | Normalize a router base path string (strips trailing slashes, ensures leading slash).                                     |
-| `resolveRouteComponent` | Resolve/load a route's component (supports async loaders + caching).                                                      |
-| `clearComponentCache`   | Clear the resolved route component cache (useful for testing and HMR).                                                    |
-| `activeRouterProxy`     | Stable proxy to the currently active router; forwards subscriptions and method calls (advanced/testing use).              |
-| **Types**               | `Route`, `RouteState`, `RouteComponent`, `GuardResult`, `RouterLinkProps`, `RouterLinkComputed`, `RouterConfig`, `Router` |
+| Export                  | Description                                                                                                                                         |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `useRouter`             | Create and use a router instance configured with routes (client & SSR).                                                                             |
+| `initRouter`            | Initialize the router and register `router-view` / `router-link`.                                                                                   |
+| `matchRoute`            | Match a path against configured routes and extract params.                                                                                          |
+| `matchRouteSSR`         | SSR-friendly wrapper for route matching. Automatically strips query strings and URL fragments before matching, so `req.url` can be passed directly. |
+| `findMatchedRoute`      | Find the first matching route entry from an array of routes (lower-level helper).                                                                   |
+| `parseQuery`            | Parse a query string into a key/value map.                                                                                                          |
+| `serializeQuery`        | Serialize a key/value map into a query string (e.g. `?a=b`).                                                                                        |
+| `normalizePathForRoute` | Normalize a path string for consistent route matching (strips trailing slashes, etc.).                                                              |
+| `DEFAULT_SCROLL_CONFIG` | Default scroll-to-fragment configuration object used by the router.                                                                                 |
+| `isDangerousScheme`     | Returns `true` for dangerous URL schemes (e.g. `javascript:`).                                                                                      |
+| `isAbsoluteUrl`         | Returns `true` when a URL string is absolute (has a protocol).                                                                                      |
+| `safeDecode`            | Decode a URI component, returning the original string on error.                                                                                     |
+| `canonicalizeBase`      | Normalize a router base path string (strips trailing slashes, ensures leading slash).                                                               |
+| `resolveRouteComponent` | Resolve/load a route's component (supports async loaders + caching).                                                                                |
+| `clearComponentCache`   | Clear the resolved route component cache (useful for testing and HMR).                                                                              |
+| `activeRouterProxy`     | Stable proxy to the currently active router; forwards subscriptions and method calls (advanced/testing use).                                        |
+| **Types**               | `Route`, `RouteState`, `RouteComponent`, `GuardResult`, `RouterLinkProps`, `RouterLinkComputed`, `RouterConfig`, `Router`                           |
 
 ---
 
@@ -236,16 +237,35 @@ Below is the **complete list of public symbols** exported by the runtime and its
 
 **Package:** `@jasonshimmy/custom-elements-runtime/ssr`
 
-| Export                     | Description                                                                                                            |
-| -------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `renderToString`           | Render a VNode tree to HTML for server-side rendering.                                                                 |
-| `renderToStringWithJITCSS` | Render a VNode tree to HTML and simultaneously pre-generate JIT CSS for all utility classes, eliminating FOUC.         |
-| `registerEntityMap`        | Register a custom named-entity map for SSR `decodeEntities`.                                                           |
-| `loadEntityMap`            | Async loader that dynamically imports the full HTML5 named-entity map; returns the map to pass to `registerEntityMap`. |
-| `clearRegisteredEntityMap` | Reset the registered entity map back to the built-in minimal set.                                                      |
-| `VNode` (type)             | The runtime VNode shape used by renderers and SSR.                                                                     |
-| `RenderOptions` (type)     | Options for `renderToString` (`injectSvgNamespace`, `injectKnownNamespaces`).                                          |
-| `SSRJITResult` (type)      | Result of `renderToStringWithJITCSS`: `{ html, css, htmlWithStyles }`.                                                 |
+| Export                        | Description                                                                                                                                                                                                               |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `renderToString`              | Render a VNode tree to HTML for server-side rendering (backwards-compatible baseline).                                                                                                                                    |
+| `renderToStringWithJITCSS`    | Render to HTML + pre-generate JIT CSS. Pass `dsd: true` for Declarative Shadow DOM output with full per-shadow-root CSS stack.                                                                                            |
+| `renderToStringWithJITCSSDSD` | **Recommended.** Convenience alias: `renderToStringWithJITCSS(vnode, { dsd: true, ... })`. Full DSD output, hydration-ready, zero FOUC. Requires a **single root VNode** — wrap multi-element templates in one container. |
+| `renderToStringDSD`           | Render to DSD HTML string (no JIT CSS pipeline). Appends DSD polyfill by default.                                                                                                                                         |
+| `renderToStream`              | Render to a `ReadableStream<string>` for streaming SSR / chunked transfer encoding.                                                                                                                                       |
+| `DSD_POLYFILL_SCRIPT`         | Minified inline `<script>` that implements DSD for Firefox < 123. Injected automatically; export it for manual placement.                                                                                                 |
+| `registerEntityMap`           | Register a custom named-entity map for SSR `decodeEntities`.                                                                                                                                                              |
+| `loadEntityMap`               | Async loader for the full HTML5 named-entity map.                                                                                                                                                                         |
+| `clearRegisteredEntityMap`    | Reset the entity map to the built-in minimal set.                                                                                                                                                                         |
+| `VNode` (type)                | The runtime VNode shape used by renderers and SSR.                                                                                                                                                                        |
+| `RenderOptions` (type)        | Options for `renderToString` (`injectSvgNamespace`, `injectKnownNamespaces`).                                                                                                                                             |
+| `DSDRenderOptions` (type)     | Options for DSD rendering (`dsd`, `dsdPolyfill`, plus all `RenderOptions`).                                                                                                                                               |
+| `SSRJITResult` (type)         | Result of `renderToStringWithJITCSS`: `{ html, css, globalStyles, htmlWithStyles }`.                                                                                                                                      |
+
+### SSR Middleware
+
+**Package:** `@jasonshimmy/custom-elements-runtime/ssr-middleware`
+
+Framework-agnostic handler factories for Express, Fastify, Hono, and raw Node.js.
+
+| Export                        | Description                                                                                               |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `createSSRHandler`            | Returns an `async (req, res)` handler that SSR-renders a VNode and sends the full HTML document response. |
+| `createStreamingSSRHandler`   | Returns an `async (req, res)` handler that streams the rendered HTML using chunked transfer encoding.     |
+| `MinimalRequest` (type)       | Minimal `{ url?, method?, headers? }` interface compatible with all major Node.js HTTP frameworks.        |
+| `MinimalResponse` (type)      | Minimal `{ setHeader, write?, end }` interface compatible with all major Node.js HTTP frameworks.         |
+| `SSRMiddlewareOptions` (type) | Options for `createSSRHandler` and `createStreamingSSRHandler`.                                           |
 
 ### Global Styles (CSS)
 
@@ -360,12 +380,27 @@ jit.destroy(); // tear down
 
 **Package:** `@jasonshimmy/custom-elements-runtime/vite-plugin`
 
-Build-time static analysis plugin that emits pre-generated CSS, eliminating runtime parsing cost entirely.
+Build-time static analysis plugin that emits pre-generated CSS, eliminating runtime parsing cost entirely. Two exports are available:
 
-_Please note:_ This plugin generates light-DOM JIT CSS. For Shadow DOM contexts, you must still use `useJITCSS` per component, or `enableJITCSS` for all components.
+- **`cerPlugin`** — All-in-one: JIT CSS + SSR configuration. Recommended for SSR apps.
+- **`cerJITCSS`** — JIT CSS only.
 
 ```ts
-// vite.config.ts
+// vite.config.ts — SSR app (recommended)
+import { cerPlugin } from '@jasonshimmy/custom-elements-runtime/vite-plugin';
+
+export default defineConfig({
+  plugins: [
+    cerPlugin({
+      content: ['./src/**/*.{ts,tsx,html}'],
+      ssr: { dsd: true, jit: { extendedColors: true } },
+    }),
+  ],
+});
+```
+
+```ts
+// vite.config.ts — JIT CSS only
 import { cerJITCSS } from '@jasonshimmy/custom-elements-runtime/vite-plugin';
 
 export default defineConfig({
@@ -379,10 +414,11 @@ export default defineConfig({
 });
 ```
 
-| Export      | Description                                                                        |
-| ----------- | ---------------------------------------------------------------------------------- |
-| `cerJITCSS` | Vite plugin that scans source files at build time and emits pre-generated JIT CSS. |
-| **Types**   | `CerJITCSSPluginOptions`                                                           |
+| Export      | Description                                                                                   |
+| ----------- | --------------------------------------------------------------------------------------------- |
+| `cerPlugin` | Combined plugin: JIT CSS + SSR config (`virtual:cer-ssr-config`). Returns a `Plugin[]` array. |
+| `cerJITCSS` | JIT CSS-only Vite plugin that scans source files at build time and emits pre-generated CSS.   |
+| **Types**   | `CerPluginOptions`, `CerSSROptions`, `CerJITCSSPluginOptions`                                 |
 
 ---
 
@@ -416,7 +452,7 @@ Explore the complete documentation for every runtime feature:
 
 - [🎨 JIT CSS](./docs/jit-css.md) - On-demand utility-first styling system (opt-in architecture, all utilities, `useJITCSS`, `useDesignTokens`, `useGlobalStyle`, `cls`)
 - [⚡ DOM JIT CSS](./docs/dom-jit-css.md) - Runtime DOM scanner for non-Shadow DOM contexts (React, Svelte, Vue, plain HTML)
-- [🔧 Vite Plugin](./docs/vite-plugin.md) - Build-time static analysis that eliminates runtime JIT parsing cost
+- [🔧 Vite Plugin](./docs/vite-plugin.md) - `cerPlugin` (JIT CSS + SSR config) and `cerJITCSS` (JIT CSS only) build-time plugins
 - [📏 Space Utilities](./docs/space-utilities.md) - Tailwind-style `space-x-*` and `space-y-*` spacing utilities
 - [📝 Prose Typography](./docs/prose.md) - Beautiful typography for long-form content
 - [🎨 Colors](./docs/colors.md) - Extended Tailwind-compatible color palette (`/css/colors` subpath)
@@ -437,7 +473,8 @@ Explore the complete documentation for every runtime feature:
 - [♻️ Keep-Alive](./docs/keep-alive.md) - Preserve component state across DOM removals with `<cer-keep-alive>`
 - [🩺 Health Monitor](./docs/health-monitor.md) - Track runtime metrics and receive periodic health reports with `createHealthMonitor()`
 - [🔮 Virtual DOM](./docs/virtual-dom.md) - VDOM implementation and performance details
-- [🌐 SSR](./docs/ssr.md) - Server-side rendering support, including `renderToStringWithJITCSS` for FOUC-free hydration
+- [🌐 SSR](./docs/ssr.md) - Complete SSR guide: Declarative Shadow DOM output, hydration, streaming, partial hydration (island architecture), `useStyle` in SSR, routing with SSR, and framework integration
+- [🌐 SSR Middleware](./docs/ssr-middleware.md) - `createSSRHandler` and `createStreamingSSRHandler` for Express, Fastify, Hono, raw Node.js, and router integration
 - [♻️ HMR](./docs/hmr.md) - Hot module replacement
 - [🛡️ Infinite Loop Protection](./docs/infinite-loop-protection.md) - Runtime safeguards against infinite loops
 - [🔒 Secure Expression Evaluator](./docs/secure-expression-evaluator.md) - Safe evaluation of dynamic expressions in templates

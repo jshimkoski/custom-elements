@@ -134,7 +134,22 @@ export function findMatchedRoute(routes: Route[], path: string): Route | null {
   return null;
 }
 
-// SSR/static site support: match route for a given path
+/**
+ * Match routes during server-side rendering.
+ *
+ * Automatically strips any query string and URL fragment from `path` before
+ * matching, so callers can safely pass `req.url` (which may include `?key=val`
+ * or `#hash`) without causing a missed match.
+ *
+ * @example
+ * ```ts
+ * // Both of these correctly match '/blog/:slug'
+ * matchRouteSSR(routes, '/blog/hello');
+ * matchRouteSSR(routes, '/blog/hello?ref=email#comments');
+ * ```
+ */
 export function matchRouteSSR(routes: Route[], path: string) {
-  return matchRoute(routes, path);
+  // Strip query string and fragment so callers can pass req.url directly.
+  const pathname = path.split('?')[0].split('#')[0];
+  return matchRoute(routes, pathname);
 }

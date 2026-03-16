@@ -1,10 +1,18 @@
 /**
- * Vite plugin for build-time JIT CSS generation.
+ * Vite plugins for build-time JIT CSS generation and SSR configuration.
  *
- * Scans source files for utility class names and emits pre-generated CSS,
- * eliminating all runtime parsing cost for projects with static class lists.
+ * Two plugins are exported:
  *
- * @example
+ * - **`cerJITCSS`** — Scans source files for utility class names and emits
+ *   pre-generated CSS, eliminating all runtime parsing cost for projects with
+ *   static class lists.
+ *
+ * - **`cerPlugin`** — All-in-one plugin combining `cerJITCSS` with SSR
+ *   configuration. Exposes a `virtual:cer-ssr-config` module containing the
+ *   resolved SSR render options so server entry files can import and use them
+ *   without duplication.
+ *
+ * @example cerJITCSS only
  * ```ts
  * // vite.config.ts
  * import { defineConfig } from 'vite';
@@ -19,6 +27,33 @@
  *     }),
  *   ],
  * });
+ * ```
+ *
+ * @example cerPlugin with SSR
+ * ```ts
+ * // vite.config.ts
+ * import { defineConfig } from 'vite';
+ * import { cerPlugin } from '@jasonshimmy/custom-elements-runtime/vite-plugin';
+ *
+ * export default defineConfig({
+ *   plugins: [
+ *     cerPlugin({
+ *       content: ['./src/**\/*.{ts,tsx,html}'],
+ *       ssr: {
+ *         dsd: true,
+ *         jit: { extendedColors: true },
+ *       },
+ *     }),
+ *   ],
+ * });
+ * ```
+ *
+ * Then in your server entry:
+ * ```ts
+ * import ssrConfig from 'virtual:cer-ssr-config';
+ * import { renderToStringWithJITCSS } from '@jasonshimmy/custom-elements-runtime/ssr';
+ *
+ * const { htmlWithStyles } = renderToStringWithJITCSS(appVNode, ssrConfig);
  * ```
  */
 
@@ -99,6 +134,117 @@ function generateFromFiles(
   const fakeHTML = `<div class="${[...allClasses].join(' ')}"></div>`;
   return jitCSS(fakeHTML);
 }
+
+// ---------------------------------------------------------------------------
+// cerPlugin — combined JIT CSS + SSR configuration plugin
+// ---------------------------------------------------------------------------
+
+/**
+ * SSR render options exposed via `virtual:cer-ssr-config`.
+ */
+export interface CerSSROptions {
+  /**
+   * Emit Declarative Shadow DOM output for registered custom elements.
+   * @default true
+   */
+  dsd?: boolean;
+  /**
+   * Append the DSD polyfill `<script>` for browsers without native support.
+   * @default true
+   */
+  dsdPolyfill?: boolean;
+  /**
+   * JIT CSS options forwarded to the SSR render pass.
+   */
+  jit?: JITCSSOptions;
+}
+
+/**
+ * Options for the combined {@link cerPlugin}.
+ */
+export interface CerPluginOptions extends Partial<CerJITCSSPluginOptions> {
+  /**
+   * SSR configuration. When provided, a `virtual:cer-ssr-config` module is
+   * registered so server entry files can import the resolved render options:
+   *
+   * ```ts
+   * import ssrConfig from 'virtual:cer-ssr-config';
+   * import { renderToStringWithJITCSS } from '@jasonshimmy/custom-elements-runtime/ssr';
+   *
+   * const { htmlWithStyles } = renderToStringWithJITCSS(appVNode, ssrConfig);
+   * ```
+   */
+  ssr?: CerSSROptions;
+}
+
+const VIRTUAL_SSR_ID = 'virtual:cer-ssr-config';
+const RESOLVED_VIRTUAL_SSR_ID = '\0virtual:cer-ssr-config';
+
+/**
+ * All-in-one Vite plugin combining build-time JIT CSS generation with SSR
+ * configuration. Returns an array of plugins so it can be spread directly
+ * into the `plugins` array without nesting.
+ *
+ * @example
+ * ```ts
+ * // vite.config.ts
+ * export default defineConfig({
+ *   plugins: [
+ *     cerPlugin({
+ *       content: ['./src/**\/*.{ts,html}'],
+ *       ssr: { dsd: true, jit: { extendedColors: true } },
+ *     }),
+ *   ],
+ * });
+ * ```
+ */
+export function cerPlugin(options: CerPluginOptions): Plugin[] {
+  const plugins: Plugin[] = [];
+
+  // JIT CSS plugin — only added when a `content` glob is provided
+  if (options.content && options.content.length > 0) {
+    plugins.push(
+      cerJITCSS({
+        content: options.content,
+        output: options.output,
+        virtualModule: options.virtualModule,
+        extendedColors: options.extendedColors,
+        customColors: options.customColors,
+        disableVariants: options.disableVariants,
+      }),
+    );
+  }
+
+  // SSR config virtual module — registered whenever `ssr` is provided
+  if (options.ssr) {
+    const ssrConfig = options.ssr;
+    const resolvedConfig = {
+      dsd: ssrConfig.dsd ?? true,
+      dsdPolyfill: ssrConfig.dsdPolyfill ?? true,
+      ...(ssrConfig.jit ? { jit: ssrConfig.jit } : {}),
+    };
+
+    plugins.push({
+      name: 'cer-ssr-config',
+      resolveId(id: string) {
+        if (id === VIRTUAL_SSR_ID) return RESOLVED_VIRTUAL_SSR_ID;
+        return undefined;
+      },
+      load(id: string) {
+        if (id === RESOLVED_VIRTUAL_SSR_ID) {
+          return `export default ${JSON.stringify(resolvedConfig)};`;
+        }
+        return undefined;
+      },
+    });
+  }
+
+  return plugins;
+}
+
+// ---------------------------------------------------------------------------
+// cerJITCSS — build-time JIT CSS plugin
+// ---------------------------------------------------------------------------
 
 /**
  * Vite plugin that performs a build-time scan of source files and emits
