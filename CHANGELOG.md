@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v3.1.0] - 2026-03-16
+
+- fix(ssr): fix SSR crashes, enhance SSR documentation, and add manual verification scripts (41d2ef0)
+- docs(ssr): simplify SSR component registration with a convenience helper (5d29b20)
+- feat(ssr): greatly enhance SSR capabilities and add comprehensive tests for SSR middleware, router integration, and Vite plugin functionality (d494310)
+
 ## [v3.0.0] - 2026-03-15
 
 - feat(vdom-patch): implement directive listener cache for improved event handling (23a1723)
