@@ -1,6 +1,10 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v3.1.1] - 2026-03-16
+
+- fix: enhance streaming support (116efe2)
+
 ## [v3.1.0] - 2026-03-16
 
 - fix(ssr): fix SSR crashes, enhance SSR documentation, and add manual verification scripts (41d2ef0)
