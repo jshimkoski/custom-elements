@@ -164,6 +164,11 @@
       "types": "./dist/vite-plugin.d.ts",
       "import": "./dist/custom-elements-runtime.vite-plugin.es.js",
       "require": "./dist/custom-elements-runtime.vite-plugin.cjs.js"
+    },
+    "./ssr-middleware": {
+      "types": "./dist/ssr-middleware.d.ts",
+      "import": "./dist/custom-elements-runtime.ssr-middleware.es.js",
+      "require": "./dist/custom-elements-runtime.ssr-middleware.cjs.js"
     }
   },
   "publishConfig": {

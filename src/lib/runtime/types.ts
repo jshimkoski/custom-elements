@@ -138,6 +138,19 @@ export type ComponentContext<
     [key: string]: unknown;
   };
 
+/**
+ * Controls when (and whether) a server-rendered custom element is hydrated
+ * on the client after the JavaScript bundle loads.
+ *
+ * | Value     | Behaviour |
+ * |-----------|-----------|
+ * | `'load'`  | Hydrate immediately when the element connects (default). |
+ * | `'idle'`  | Defer until `requestIdleCallback` fires. |
+ * | `'visible'` | Defer until the element enters the viewport (`IntersectionObserver`). |
+ * | `'none'`  | Never hydrate — element stays as static server-rendered HTML. |
+ */
+export type HydrateStrategy = 'load' | 'idle' | 'visible' | 'none';
+
 export type ComponentConfig<
   S extends object,
   C extends object = object,
@@ -155,6 +168,12 @@ export type ComponentConfig<
       default?: string | number | boolean;
     }
   >;
+  /**
+   * Partial-hydration strategy for this component when SSR DSD output is used.
+   * Emitted as `data-cer-hydrate` on the host element in DSD HTML.
+   * @default 'load'
+   */
+  hydrate?: HydrateStrategy;
   render: (
     context: ComponentContext<S, C, P, T>,
   ) => VNode | VNode[] | Promise<VNode | VNode[]>;

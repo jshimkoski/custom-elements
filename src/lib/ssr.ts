@@ -1,106 +1,252 @@
 /**
- * SSR entrypoint — small re-export so consumers can import SSR-only helpers
- * without pulling them into the main client runtime bundle.
+ * SSR entry point — import from `@jasonshimmy/custom-elements-runtime/ssr`.
  *
- * renderToString accepts an optional second argument to control SSR behavior:
+ * Provides four rendering modes:
  *
- *   renderToString(vnode, { injectSvgNamespace?: boolean })
+ * 1. **renderToString** — baseline HTML serialisation (no shadow DOM content).
+ *    Backwards-compatible with the original API.
  *
- * - injectSvgNamespace (default: true): when true, the SSR renderer will
- *   inject the standard SVG namespace attribute (xmlns="http://www.w3.org/2000/svg")
- *   onto `<svg>` elements that do not already provide an explicit `xmlns`.
- *   This matches the client runtime behavior (createElementNS) and avoids
- *   hydration/namespace mismatches. Set to `false` to opt out and keep SSR
- *   output minimal.
+ * 2. **renderToStringWithJITCSS** — HTML + pre-generated JIT CSS injected into
+ *    `<head>` to prevent FOUC. Supports `dsd: true` for DSD output.
  *
- * Examples
+ * 3. **renderToStringWithJITCSSDSD** — convenience alias for DSD mode.
+ *    Full Declarative Shadow DOM output with per-shadow-root CSS layer stack
+ *    (baseReset + useStyle() + JIT CSS). Enables true hydration, zero FOUC.
  *
- *   // Default (injects xmlns for <svg> if missing)
- *   import { renderToString } from '@jasonshimmy/custom-elements-runtime/ssr';
- *   const html = renderToString(vnodeTree);
+ * 4. **renderToStream** — ReadableStream variant for streaming SSR.
  *
- *   // Opt-out
- *   const htmlNoNs = renderToString(vnodeTree, { injectSvgNamespace: false });
+ * Entity map utilities are also exported for full HTML5 named-entity support.
+ *
+ * @example DSD usage (recommended)
+ * ```ts
+ * import { renderToStringWithJITCSSDSD } from '@jasonshimmy/custom-elements-runtime/ssr';
+ *
+ * const { htmlWithStyles } = renderToStringWithJITCSSDSD(appVNode, {
+ *   jit: { extendedColors: true },
+ * });
+ * res.send(`<!DOCTYPE html><html><head>${head}</head><body>${htmlWithStyles}</body></html>`);
+ * ```
  */
+
+// ---------------------------------------------------------------------------
+// Re-exports — backwards-compatible
+// ---------------------------------------------------------------------------
+
 export { renderToString } from './runtime/vdom-ssr';
 export type { VNode } from './runtime/types';
 export type { RenderOptions } from './runtime/vdom-ssr';
 
-// Entity map utilities for SSR — register the full HTML5 named-entity map at
-// server startup so decodeEntities uses the complete mapping. Kept out of the
-// main client bundle to reduce client-side payload.
 export {
   registerEntityMap,
   loadEntityMap,
   clearRegisteredEntityMap,
 } from './runtime/helpers';
 
-// ---- SSR JIT CSS pre-generation (§5.8) ----
+export {
+  renderToStringDSD,
+  DSD_POLYFILL_SCRIPT,
+} from './runtime/vdom-ssr-dsd';
+export type { DSDRenderOptions } from './runtime/vdom-ssr-dsd';
+
+// ---------------------------------------------------------------------------
+// Internal imports
+// ---------------------------------------------------------------------------
 
 import { renderToString as _render } from './runtime/vdom-ssr';
+import {
+  renderToStringDSD as _renderToStringDSD,
+  DSD_POLYFILL_SCRIPT,
+} from './runtime/vdom-ssr-dsd';
 import { jitCSS, enableJITCSS, type JITCSSOptions } from './runtime/style';
 import type { VNode } from './runtime/types';
 import type { RenderOptions } from './runtime/vdom-ssr';
+import type { DSDRenderOptions } from './runtime/vdom-ssr-dsd';
+import {
+  beginSSRGlobalStyleCollection,
+  endSSRGlobalStyleCollection,
+} from './runtime/ssr-context';
+
+// ---------------------------------------------------------------------------
+// Result type
+// ---------------------------------------------------------------------------
 
 /**
- * Result of `renderToStringWithJITCSS()`.
+ * Result of `renderToStringWithJITCSS()` and `renderToStringWithJITCSSDSD()`.
  */
 export interface SSRJITResult {
-  /** The rendered HTML string. */
+  /** The rendered HTML string (styles not yet injected). */
   html: string;
   /**
-   * Pre-generated JIT CSS extracted from the rendered HTML.
-   * Embed this in a `<style>` element in your document `<head>` to eliminate
-   * Flash of Unstyled Content (FOUC) on hydration.
+   * Global JIT CSS extracted from the rendered HTML.
+   * For DSD renders, each shadow root embeds its own scoped styles; this field
+   * holds any residual light-DOM utility CSS.
    */
   css: string;
   /**
-   * Convenience: the HTML with a `<style>` element injected before `</head>`.
-   * If no `</head>` tag is found, the `<style>` is prepended to the HTML.
+   * CSS captured from `useGlobalStyle()` calls during this render pass
+   * (e.g. `@font-face`, `:root` custom properties).
+   * Inject in a `<style id="cer-ssr-global">` in `<head>`.
+   */
+  globalStyles: string;
+  /**
+   * Convenience: `html` with both `<style>` tags injected before `</head>`.
+   * If no `</head>` is found, the styles are prepended.
    */
   htmlWithStyles: string;
 }
 
+// ---------------------------------------------------------------------------
+// renderToStringWithJITCSS — primary API, supports both modes
+// ---------------------------------------------------------------------------
+
 /**
- * Server-side render a VNode tree and simultaneously pre-generate JIT CSS for
- * all utility classes present in the rendered output.
+ * Server-side render a VNode tree and simultaneously pre-generate JIT CSS.
  *
- * Embed the returned `css` in a `<style>` element in your document `<head>`
- * to ensure correct styles are present before the client runtime hydrates,
- * eliminating Flash of Unstyled Content (FOUC).
+ * Pass `dsd: true` to enable Declarative Shadow DOM output with full per-shadow-
+ * root CSS layer extraction (recommended for new apps).
  *
- * @example
+ * @example Standard (no DSD)
  * ```ts
- * import { renderToStringWithJITCSS } from '@jasonshimmy/custom-elements-runtime/ssr';
+ * const { htmlWithStyles } = renderToStringWithJITCSS(appVNode);
+ * ```
  *
- * const { htmlWithStyles } = await renderToStringWithJITCSS(appVNode, {
+ * @example With DSD
+ * ```ts
+ * const { htmlWithStyles } = renderToStringWithJITCSS(appVNode, {
+ *   dsd: true,
  *   jit: { extendedColors: true },
  * });
- * res.send(`<!DOCTYPE html><html><head>${headTags}</head><body>${htmlWithStyles}</body></html>`);
  * ```
  */
 export function renderToStringWithJITCSS(
   vnode: VNode,
-  options?: RenderOptions & { jit?: JITCSSOptions },
+  options?: RenderOptions & DSDRenderOptions & { jit?: JITCSSOptions },
 ): SSRJITResult {
-  const { jit, ...renderOptions } = options ?? {};
+  const { jit, dsd, dsdPolyfill, ...renderOptions } = options ?? {};
 
   if (jit) enableJITCSS(jit);
 
-  const html = _render(vnode, renderOptions);
-  const css = jitCSS(html);
+  beginSSRGlobalStyleCollection();
 
-  let htmlWithStyles: string;
-  if (css) {
-    const styleTag = `<style id="cer-ssr-jit">${css}</style>`;
-    if (html.includes('</head>')) {
-      htmlWithStyles = html.replace('</head>', `${styleTag}</head>`);
+  let html!: string;
+  let globalStylesCaptured!: string[];
+  try {
+    if (dsd) {
+      // renderToStringDSD handles DSD wrapping but skips the polyfill so we can
+      // place it correctly relative to other injected style tags below.
+      html = _renderToStringDSD(vnode, {
+        ...renderOptions,
+        dsd: true,
+        dsdPolyfill: false,
+      });
     } else {
-      htmlWithStyles = `${styleTag}${html}`;
+      html = _render(vnode, renderOptions);
     }
-  } else {
-    htmlWithStyles = html;
+  } finally {
+    // Always end collection — even when the render throws — so the collector
+    // is never left non-null, which would cause subsequent non-SSR
+    // useGlobalStyle() calls to silently skip DOM injection.
+    globalStylesCaptured = endSSRGlobalStyleCollection();
   }
 
-  return { html, css, htmlWithStyles };
+  const css = jitCSS(html);
+  const globalStyles = globalStylesCaptured.join('\n');
+
+  const styleTags: string[] = [];
+  if (css) styleTags.push(`<style id="cer-ssr-jit">${css}</style>`);
+  if (globalStyles.trim())
+    styleTags.push(`<style id="cer-ssr-global">${globalStyles}</style>`);
+
+  let htmlWithStyles = html;
+  if (styleTags.length) {
+    const injection = styleTags.join('');
+    htmlWithStyles = html.includes('</head>')
+      ? html.replace('</head>', `${injection}</head>`)
+      : `${injection}${html}`;
+  }
+
+  // Append DSD polyfill script inside </body> when in DSD mode
+  if (dsd && dsdPolyfill !== false) {
+    htmlWithStyles = htmlWithStyles.includes('</body>')
+      ? htmlWithStyles.replace('</body>', `${DSD_POLYFILL_SCRIPT}</body>`)
+      : htmlWithStyles + DSD_POLYFILL_SCRIPT;
+  }
+
+  return { html, css, globalStyles, htmlWithStyles };
+}
+
+// ---------------------------------------------------------------------------
+// renderToStringWithJITCSSDSD — convenience alias
+// ---------------------------------------------------------------------------
+
+/**
+ * Convenience alias: `renderToStringWithJITCSS(vnode, { dsd: true, ...options })`.
+ *
+ * Renders with Declarative Shadow DOM output, full per-shadow-root CSS layer
+ * extraction, and the DSD browser polyfill. This is the recommended function
+ * for all new server-rendered applications.
+ *
+ * @example
+ * ```ts
+ * import { renderToStringWithJITCSSDSD } from '@jasonshimmy/custom-elements-runtime/ssr';
+ *
+ * const { htmlWithStyles } = renderToStringWithJITCSSDSD(appVNode, {
+ *   jit: { extendedColors: true },
+ * });
+ * ```
+ */
+export function renderToStringWithJITCSSDSD(
+  vnode: VNode,
+  options?: Omit<
+    RenderOptions & DSDRenderOptions & { jit?: JITCSSOptions },
+    'dsd'
+  >,
+): SSRJITResult {
+  return renderToStringWithJITCSS(vnode, { ...options, dsd: true });
+}
+
+// ---------------------------------------------------------------------------
+// renderToStream — streaming SSR
+// ---------------------------------------------------------------------------
+
+/**
+ * Render a VNode tree to a `ReadableStream<string>`.
+ *
+ * The current implementation flushes the complete rendered output as a single
+ * chunk, providing the streaming API surface for framework adapters. True
+ * incremental streaming (flush shell immediately, resolve async components
+ * progressively) is planned for a future release.
+ *
+ * @example Node.js
+ * ```ts
+ * import { renderToStream } from '@jasonshimmy/custom-elements-runtime/ssr';
+ *
+ * app.get('/', (req, res) => {
+ *   const stream = renderToStream(appVNode, { dsd: true });
+ *   const reader = stream.getReader();
+ *   const pump = () =>
+ *     reader.read().then(({ value, done }) => {
+ *       if (done) { res.end(); return; }
+ *       res.write(value);
+ *       pump();
+ *     });
+ *   pump();
+ * });
+ * ```
+ */
+export function renderToStream(
+  vnode: VNode,
+  options?: RenderOptions & DSDRenderOptions & { jit?: JITCSSOptions },
+): ReadableStream<string> {
+  return new ReadableStream<string>({
+    start(controller) {
+      try {
+        const { htmlWithStyles } = renderToStringWithJITCSS(vnode, options);
+        controller.enqueue(htmlWithStyles);
+        controller.close();
+      } catch (err) {
+        controller.error(err);
+      }
+    },
+  });
 }

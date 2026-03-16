@@ -122,7 +122,8 @@ Below is the **complete list of public symbols** exported by the runtime and its
 | `getHealthMonitor`           | Return the global singleton health monitor instance (lazily created).                                                                              |
 | `updateHealthMetric`         | Update a named metric on the global singleton health monitor.                                                                                      |
 | `getHealthStatus`            | Return the current `HealthReport` from the global singleton health monitor.                                                                        |
-| **Types**                    | `ModelRef`, `HealthMonitorInstance`, `HealthReport`, `UpdatePriority`, `TeleportHandle`, `ReactiveState`, `VNode`, `JITCSSOptions`, `DesignTokens` |
+| `hydrateApp`                 | Trigger hydration of all DSD-rendered custom elements within a root (call after registering all components on the client).                         |
+| **Types**                    | `ModelRef`, `HealthMonitorInstance`, `HealthReport`, `UpdatePriority`, `TeleportHandle`, `ReactiveState`, `VNode`, `JITCSSOptions`, `DesignTokens`, `ComponentOptions`, `HydrateStrategy` |
 
 ---
 
@@ -236,16 +237,35 @@ Below is the **complete list of public symbols** exported by the runtime and its
 
 **Package:** `@jasonshimmy/custom-elements-runtime/ssr`
 
-| Export                     | Description                                                                                                            |
-| -------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `renderToString`           | Render a VNode tree to HTML for server-side rendering.                                                                 |
-| `renderToStringWithJITCSS` | Render a VNode tree to HTML and simultaneously pre-generate JIT CSS for all utility classes, eliminating FOUC.         |
-| `registerEntityMap`        | Register a custom named-entity map for SSR `decodeEntities`.                                                           |
-| `loadEntityMap`            | Async loader that dynamically imports the full HTML5 named-entity map; returns the map to pass to `registerEntityMap`. |
-| `clearRegisteredEntityMap` | Reset the registered entity map back to the built-in minimal set.                                                      |
-| `VNode` (type)             | The runtime VNode shape used by renderers and SSR.                                                                     |
-| `RenderOptions` (type)     | Options for `renderToString` (`injectSvgNamespace`, `injectKnownNamespaces`).                                          |
-| `SSRJITResult` (type)      | Result of `renderToStringWithJITCSS`: `{ html, css, htmlWithStyles }`.                                                 |
+| Export                          | Description                                                                                                                                        |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `renderToString`                | Render a VNode tree to HTML for server-side rendering (backwards-compatible baseline).                                                             |
+| `renderToStringWithJITCSS`      | Render to HTML + pre-generate JIT CSS. Pass `dsd: true` for Declarative Shadow DOM output with full per-shadow-root CSS stack.                     |
+| `renderToStringWithJITCSSDSD`   | **Recommended.** Convenience alias: `renderToStringWithJITCSS(vnode, { dsd: true, ... })`. Full DSD output, hydration-ready, zero FOUC.            |
+| `renderToStringDSD`             | Render to DSD HTML string (no JIT CSS pipeline). Appends DSD polyfill by default.                                                                  |
+| `renderToStream`                | Render to a `ReadableStream<string>` for streaming SSR / chunked transfer encoding.                                                                |
+| `DSD_POLYFILL_SCRIPT`           | Minified inline `<script>` that implements DSD for Firefox < 123. Injected automatically; export it for manual placement.                          |
+| `registerEntityMap`             | Register a custom named-entity map for SSR `decodeEntities`.                                                                                       |
+| `loadEntityMap`                 | Async loader for the full HTML5 named-entity map.                                                                                                  |
+| `clearRegisteredEntityMap`      | Reset the entity map to the built-in minimal set.                                                                                                  |
+| `VNode` (type)                  | The runtime VNode shape used by renderers and SSR.                                                                                                 |
+| `RenderOptions` (type)          | Options for `renderToString` (`injectSvgNamespace`, `injectKnownNamespaces`).                                                                      |
+| `DSDRenderOptions` (type)       | Options for DSD rendering (`dsd`, `dsdPolyfill`, plus all `RenderOptions`).                                                                        |
+| `SSRJITResult` (type)           | Result of `renderToStringWithJITCSS`: `{ html, css, globalStyles, htmlWithStyles }`.                                                               |
+
+### SSR Middleware
+
+**Package:** `@jasonshimmy/custom-elements-runtime/ssr-middleware`
+
+Framework-agnostic handler factories for Express, Fastify, Hono, and raw Node.js.
+
+| Export                       | Description                                                                                                     |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `createSSRHandler`           | Returns an `async (req, res)` handler that SSR-renders a VNode and sends the full HTML document response.       |
+| `createStreamingSSRHandler`  | Returns an `async (req, res)` handler that streams the rendered HTML using chunked transfer encoding.           |
+| `MinimalRequest` (type)      | Minimal `{ url?, method?, headers? }` interface compatible with all major Node.js HTTP frameworks.             |
+| `MinimalResponse` (type)     | Minimal `{ setHeader, write?, end }` interface compatible with all major Node.js HTTP frameworks.              |
+| `SSRMiddlewareOptions` (type)| Options for `createSSRHandler` and `createStreamingSSRHandler`.                                                 |
 
 ### Global Styles (CSS)
 
@@ -360,12 +380,27 @@ jit.destroy(); // tear down
 
 **Package:** `@jasonshimmy/custom-elements-runtime/vite-plugin`
 
-Build-time static analysis plugin that emits pre-generated CSS, eliminating runtime parsing cost entirely.
+Build-time static analysis plugin that emits pre-generated CSS, eliminating runtime parsing cost entirely. Two exports are available:
 
-_Please note:_ This plugin generates light-DOM JIT CSS. For Shadow DOM contexts, you must still use `useJITCSS` per component, or `enableJITCSS` for all components.
+- **`cerPlugin`** — All-in-one: JIT CSS + SSR configuration. Recommended for SSR apps.
+- **`cerJITCSS`** — JIT CSS only.
 
 ```ts
-// vite.config.ts
+// vite.config.ts — SSR app (recommended)
+import { cerPlugin } from '@jasonshimmy/custom-elements-runtime/vite-plugin';
+
+export default defineConfig({
+  plugins: [
+    cerPlugin({
+      content: ['./src/**/*.{ts,tsx,html}'],
+      ssr: { dsd: true, jit: { extendedColors: true } },
+    }),
+  ],
+});
+```
+
+```ts
+// vite.config.ts — JIT CSS only
 import { cerJITCSS } from '@jasonshimmy/custom-elements-runtime/vite-plugin';
 
 export default defineConfig({
@@ -379,10 +414,11 @@ export default defineConfig({
 });
 ```
 
-| Export      | Description                                                                        |
-| ----------- | ---------------------------------------------------------------------------------- |
-| `cerJITCSS` | Vite plugin that scans source files at build time and emits pre-generated JIT CSS. |
-| **Types**   | `CerJITCSSPluginOptions`                                                           |
+| Export          | Description                                                                                    |
+| --------------- | ---------------------------------------------------------------------------------------------- |
+| `cerPlugin`     | Combined plugin: JIT CSS + SSR config (`virtual:cer-ssr-config`). Returns a `Plugin[]` array. |
+| `cerJITCSS`     | JIT CSS-only Vite plugin that scans source files at build time and emits pre-generated CSS.    |
+| **Types**       | `CerPluginOptions`, `CerSSROptions`, `CerJITCSSPluginOptions`                                 |
 
 ---
 
@@ -416,7 +452,7 @@ Explore the complete documentation for every runtime feature:
 
 - [🎨 JIT CSS](./docs/jit-css.md) - On-demand utility-first styling system (opt-in architecture, all utilities, `useJITCSS`, `useDesignTokens`, `useGlobalStyle`, `cls`)
 - [⚡ DOM JIT CSS](./docs/dom-jit-css.md) - Runtime DOM scanner for non-Shadow DOM contexts (React, Svelte, Vue, plain HTML)
-- [🔧 Vite Plugin](./docs/vite-plugin.md) - Build-time static analysis that eliminates runtime JIT parsing cost
+- [🔧 Vite Plugin](./docs/vite-plugin.md) - `cerPlugin` (JIT CSS + SSR config) and `cerJITCSS` (JIT CSS only) build-time plugins
 - [📏 Space Utilities](./docs/space-utilities.md) - Tailwind-style `space-x-*` and `space-y-*` spacing utilities
 - [📝 Prose Typography](./docs/prose.md) - Beautiful typography for long-form content
 - [🎨 Colors](./docs/colors.md) - Extended Tailwind-compatible color palette (`/css/colors` subpath)
@@ -437,7 +473,8 @@ Explore the complete documentation for every runtime feature:
 - [♻️ Keep-Alive](./docs/keep-alive.md) - Preserve component state across DOM removals with `<cer-keep-alive>`
 - [🩺 Health Monitor](./docs/health-monitor.md) - Track runtime metrics and receive periodic health reports with `createHealthMonitor()`
 - [🔮 Virtual DOM](./docs/virtual-dom.md) - VDOM implementation and performance details
-- [🌐 SSR](./docs/ssr.md) - Server-side rendering support, including `renderToStringWithJITCSS` for FOUC-free hydration
+- [🌐 SSR](./docs/ssr.md) - Complete SSR guide: Declarative Shadow DOM output, hydration, streaming, partial hydration (island architecture), `useStyle` in SSR, routing with SSR, and framework integration
+- [🌐 SSR Middleware](./docs/ssr-middleware.md) - `createSSRHandler` and `createStreamingSSRHandler` for Express, Fastify, Hono, raw Node.js, and router integration
 - [♻️ HMR](./docs/hmr.md) - Hot module replacement
 - [🛡️ Infinite Loop Protection](./docs/infinite-loop-protection.md) - Runtime safeguards against infinite loops
 - [🔒 Secure Expression Evaluator](./docs/secure-expression-evaluator.md) - Safe evaluation of dynamic expressions in templates

@@ -30,6 +30,8 @@ export default defineConfig({
         'dom-jit-css': resolve(__dirname, 'src/lib/dom-jit-css.ts'),
         // Vite build-time plugin
         'vite-plugin': resolve(__dirname, 'src/lib/vite-plugin.ts'),
+        // SSR middleware helpers for Express / Fastify / Hono
+        'ssr-middleware': resolve(__dirname, 'src/lib/ssr-middleware.ts'),
       },
       name: 'CustomElementsRuntime',
       fileName: (format, entryName) =>

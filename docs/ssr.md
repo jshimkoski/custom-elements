@@ -1,392 +1,827 @@
-# 🖥️ Server-Side Rendering (SSR) Deep Dive
+# 🖥️ Server-Side Rendering (SSR)
 
-A comprehensive guide to SSR support in the custom elements runtime. Learn how SSR works, how to use it, and best practices for building universal web components.
+A complete guide to SSR in the custom elements runtime. Covers Declarative Shadow DOM output, hydration, streaming, partial hydration (island architecture), and framework integration.
 
-## 🌐 What is SSR?
+## Overview
 
-Server-Side Rendering (SSR) is the process of generating HTML on the server and sending it to the client, where the runtime performs a fresh client render to attach event listeners, bindings, and styles. SSR improves performance, SEO, and user experience by delivering ready-to-display content.
+The runtime provides first-class SSR that goes beyond what Vue, React, or Svelte offer: **Declarative Shadow DOM (DSD) serialization**. Where those frameworks can't serialize shadow DOM at all, this runtime captures every CSS layer — `baseReset`, `useStyle()` output, and JIT utility classes — and injects them directly inside each `<template shadowrootmode="open">` element. The result is a complete, styled, hydration-ready HTML document at first byte.
 
-- **Purpose:** Faster initial load, better SEO, improved accessibility.
-- **Benefits:** Universal rendering, progressive enhancement, reduced time-to-interactive.
+| Feature                 | This library              | Vue 3             | React 18               | Svelte 5       |
+| ----------------------- | ------------------------- | ----------------- | ---------------------- | -------------- |
+| `renderToString`        | ✅                        | ✅                | ✅                     | ✅             |
+| Shadow DOM SSR (DSD)    | ✅ **Unique**             | ❌ N/A            | ❌ N/A                 | ❌ N/A         |
+| `useStyle` CSS in SSR   | ✅                        | N/A               | N/A                    | N/A            |
+| `useGlobalStyle` in SSR | ✅                        | ✅ (scoped CSS)   | ✅ (styled-components) | ✅ (`<style>`) |
+| JIT CSS pre-generation  | ✅                        | ❌                | ❌                     | ❌             |
+| Hydration               | ✅                        | ✅                | ✅                     | ✅             |
+| Partial hydration       | ✅ `hydrate:` option      | ✅ (Nuxt islands) | ✅ (Server Components) | ✅ (SvelteKit) |
+| Streaming SSR           | ✅                        | ✅                | ✅                     | ✅             |
+| Framework middleware    | ✅ (Express/Fastify/Hono) | ✅ (Nuxt)         | ✅ (Next.js)           | ✅ (SvelteKit) |
 
-## 🏗️ SSR Architecture in the Runtime
+---
 
-- **Functional API:** Components are defined as pure functions/configs, making them easy to render on the server.
-- **No DOM Dependency:** SSR mode avoids direct DOM APIs, using VNode trees for output.
-- **Client render:** The client runtime performs a fresh render that replaces server-generated markup and attaches event listeners, bindings, and styles.
-- **Error Boundaries:** SSR gracefully handles errors and fallback rendering.
+## Rendering Modes
 
-## ⚡ How SSR Works
+### 1. `renderToString` — Basic SSR (backwards-compatible)
 
-1. **Component registration:** Components are registered as usual.
-2. **SSR detection:** If `window` is undefined, the runtime switches to SSR mode.
-3. **VNode rendering:** The `render` function returns VNode trees, which are serialized to HTML.
-4. **No DOM/lifecycle:** In SSR, no DOM APIs or lifecycle hooks are called.
-5. **Client render:** On the client, the runtime performs a fresh render that replaces the server-rendered markup and attaches event listeners, bindings, and styles. There is no incremental DOM-preserving hydration — the client render starts fresh inside the shadow root.
-
-## 🧩 SSR-Friendly Component Example
-
-```typescript
-import {
-  component,
-  ref,
-  html,
-  useProps,
-} from '@jasonshimmy/custom-elements-runtime';
-
-component('ssr-demo', () => {
-  const props = useProps({ message: 'Hello SSR!' });
-  const msg = ref(props.message);
-  return html`<div>${msg.value}</div>`;
-});
-```
-
-- On the server: `render` returns a VNode, which is converted to HTML.
-- On the client: The runtime performs a fresh render, replacing the server markup and enabling interactivity.
-
-Rendering to string with `renderToString`
-
-The runtime provides `renderToString` for SSR. Import it from the dedicated SSR entry (`@jasonshimmy/custom-elements-runtime/ssr`) so bundlers don't pull server-only code into the client bundle. Use `html` to build VNodes on the server and `renderToString` to produce markup.
-
-Basic usage
-
-```typescript
-import { html } from '@jasonshimmy/custom-elements-runtime';
-import { renderToString } from '@jasonshimmy/custom-elements-runtime/ssr';
-
-const vnode = html`<div>Hello ${'world'}</div>`;
-const htmlString = renderToString(vnode);
-// -> '<div>Hello world</div>'
-```
-
-Rendering a component render function
-
-```typescript
-// components/hello.ts
-export function renderHello(ctx: { name: string }) {
-  return html`<div>Hello ${ctx.name}</div>`;
-}
-
-// server.js
-import { renderToString } from '@jasonshimmy/custom-elements-runtime/ssr';
-import { renderHello } from './components/hello';
-
-const vnode = renderHello({ name: 'Alice' });
-const renderedHtml = renderToString(vnode);
-```
-
-Async renders
-
-If `render` returns a Promise, await it before stringifying:
-
-```ts
-const vnode = await maybeAsyncRender(ctx);
-const renderedHtml = renderToString(vnode);
-```
-
-Minimal server example
-
-```js
-import http from 'node:http';
-import { renderToString } from '@jasonshimmy/custom-elements-runtime/ssr';
-import { renderHello } from './components/hello';
-
-http
-  .createServer((req, res) => {
-    const vnode = renderHello({ name: 'Server' });
-    const body = renderToString(vnode);
-    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-    res.end(`<!doctype html><html><head></head><body>${body}</body></html>`);
-  })
-  .listen(3000);
-```
-
-Client-side render example
-
-Register the same component on the client. When the custom element upgrades, the runtime performs a fresh client-side render inside the shadow root — it does not preserve the server-rendered markup. Keep server and client render output identical to avoid a visible content shift on upgrade.
-
-```html
-<!doctype html>
-<html>
-  <head></head>
-  <body>
-    <!-- server rendered -->
-    <ssr-demo><div>Hello SSR!</div></ssr-demo>
-    <script type="module">
-      import {
-        component,
-        ref,
-        html,
-        useProps,
-      } from '@jasonshimmy/custom-elements-runtime';
-
-      component('ssr-demo', () => {
-        const props = useProps({ message: 'Hello SSR!' });
-        const msg = ref(props.message);
-        return html`<div>${msg.value}</div>`;
-      });
-
-      // Runtime will re-render <ssr-demo> client-side, replacing the server HTML.
-    </script>
-  </body>
-</html>
-```
-
-Notes
-
-- `renderToString` serializes VNode attributes from the `props.attrs` bag only; runtime-only values (functions, reactive state objects, directive metadata) are intentionally excluded from serialization.
-  - Supports two rendering options:
-    - `injectSvgNamespace?: boolean` (default: `true`) — when true, the SSR renderer will inject the standard SVG namespace attribute (`xmlns=\"http://www.w3.org/2000/svg\"`) onto `<svg>` elements that do not already provide an explicit `xmlns`.
-    - `injectKnownNamespaces?: boolean` (default: follows `injectSvgNamespace`) — when true, the renderer will also inject known non-HTML namespaces for well-known top-level tags (for example `<math>` will receive the MathML namespace) when the vnode doesn't provide an explicit `xmlns`.
-- Server rendering does not execute client lifecycle hooks.
-- Ensure server and client render shapes match to avoid a visible content shift on first render.
-
-## 🖼️ SVG namespace behavior
-
-When rendering SVGs on the server you can encounter subtle differences between
-server-produced markup and the client DOM unless namespaces are handled
-explicitly. The client runtime creates SVG elements using the SVG namespace
-internally (equivalent to `document.createElementNS('http://www.w3.org/2000/svg', ...)`).
-To avoid namespace mismatches between the server-rendered string and the client DOM, the SSR renderer injects the standard SVG namespace attribute on `<svg>` elements by default.
-
-Key points:
-
-- By default, `renderToString(vnode)` will add `xmlns="http://www.w3.org/2000/svg"`
-  to any `<svg>` vnode that doesn't already include an explicit `xmlns` attribute.
-  This mirrors client-side behavior and makes the server output portable across
-  parsers (HTML/XML).
-- If a vnode already provides an `xmlns` on the `<svg>` or any child element,
-  the renderer preserves that value verbatim (child overrides parent).
-- You can opt out of the automatic injection when you need minimal markup by
-  passing the `injectSvgNamespace: false` option.
-
-API and examples
+Serializes a VNode tree to HTML. Shadow DOM content is not serialized — custom elements render as opaque shells. Use this for simple pages that don't use custom elements or where DSD output is not required.
 
 ```ts
 import { renderToString } from '@jasonshimmy/custom-elements-runtime/ssr';
 
-// Default: injects xmlns on <svg> if missing
-const htmlDefault = renderToString(vnodeTree);
-
-// Opt-out: do not auto-insert the SVG namespace
-const htmlNoNs = renderToString(vnodeTree, { injectSvgNamespace: false });
+const html = renderToString(vnode);
 ```
 
-When to keep the default (recommended)
+### 2. `renderToStringWithJITCSS` — SSR + JIT CSS
 
-- If the client runtime will render the same component tree, leave the default enabled so SVG namespaces match between server HTML and the fresh client render.
-- If your server output may be parsed by an XML/XHTML consumer or re-used in contexts where the HTML parser isn't available, an explicit xmlns is safer.
-
-When to opt out
-
-- If you intentionally need the smallest possible HTML output and you control the client parsing context, you can set `injectSvgNamespace: false`.
-
-## 🛠️ SSR Fallback Logic
-
-- In SSR mode, `createElementClass` returns a minimal class with no DOM or lifecycle logic.
-- Only the `render` function is used to generate output.
-- No `this` ctx or browser APIs are accessed.
-
-**Example:**
-
-```typescript
-if (typeof window === 'undefined') {
-  // SSR fallback: minimal class, no DOM, no lifecycle
-  return class {
-    constructor() {}
-  };
-}
-```
-
-## 🔄 Client Render (Not Hydration)
-
-> **Important:** This runtime does **not** implement DOM-preserving hydration. The client performs a full fresh render inside each component's shadow root, replacing whatever the server placed there.
-
-- **Server:** Renders HTML from VNode trees, which is sent to the browser
-- **Client:** Runs a fresh render pass, discarding server HTML and building new DOM nodes from VNodes
-- **Match output:** Because the client replaces server HTML, ensure that server and client render functions produce visually identical output to avoid a flash of content change on first render
-- **Error handling:** Render errors are caught by error boundaries
-
-## 🚀 SSR Best Practices
-
-- **Avoid direct DOM manipulation:** Use VNode trees and pure functions
-- **Keep logic stateless:** SSR should not depend on browser-only APIs
-- **Use error boundaries:** Provide fallback UI for rendering errors
-- **Match server and client output:** Ensure both render functions produce identical markup to avoid a visible content shift on upgrade
-
-## 📚 Example: Universal Component
-
-```typescript
-component('universal-greeting', () => {
-  const props = useProps({ name: 'World' });
-  const greeting = ref(props.name);
-  return html`<h1>Hello, ${greeting.value}!</h1>`;
-});
-```
-
-- Works in SSR and client environments
-- Client re-renders seamlessly for interactivity
-
-## 🎨 SSR with JIT CSS Pre-generation (`renderToStringWithJITCSS`)
-
-Use `renderToStringWithJITCSS()` to server-render a VNode tree **and** simultaneously pre-generate the JIT CSS for every utility class in the output. Embedding this CSS in `<head>` eliminates the Flash of Unstyled Content (FOUC) that occurs when the client runtime applies styles on the first client render.
+Same as `renderToString` but also pre-generates JIT CSS from the rendered HTML. The `htmlWithStyles` result has the CSS injected before `</head>`.
 
 ```ts
-import { html } from '@jasonshimmy/custom-elements-runtime';
 import { renderToStringWithJITCSS } from '@jasonshimmy/custom-elements-runtime/ssr';
 
-const appVNode = html`<div
-  class="flex items-center gap-4 bg-primary-500 text-white p-4 rounded-lg"
->
-  <h1 class="text-2xl font-bold">Hello from SSR</h1>
-</div>`;
-
-const {
-  html: bodyHTML,
-  css,
-  htmlWithStyles,
-} = renderToStringWithJITCSS(appVNode);
-
-// Option A: use htmlWithStyles (pre-injects a <style> before </head>)
-res.send(
-  `<!DOCTYPE html><html><head>${headTags}</head><body>${htmlWithStyles}</body></html>`,
-);
-
-// Option B: use html + css separately
-res.send(`<!DOCTYPE html><html>
-  <head>${headTags}<style id="cer-ssr-jit">${css}</style></head>
-  <body>${bodyHTML}</body>
-</html>`);
-```
-
-### Options
-
-```ts
-renderToStringWithJITCSS(
-  vnode: VNode,
-  options?: RenderOptions & {
-    jit?: JITCSSOptions; // extendedColors, customColors, disableVariants
-  }
-): SSRJITResult
-```
-
-### `SSRJITResult`
-
-| Property         | Description                                                                              |
-| ---------------- | ---------------------------------------------------------------------------------------- |
-| `html`           | The rendered HTML string (no styles injected)                                            |
-| `css`            | Pre-generated JIT CSS for all utility classes found in `html`                            |
-| `htmlWithStyles` | `html` with `<style id="cer-ssr-jit">…</style>` injected before `</head>` (or prepended) |
-
-### With extended colors
-
-```ts
 const { htmlWithStyles } = renderToStringWithJITCSS(appVNode, {
   jit: { extendedColors: true },
 });
+res.send(
+  `<!DOCTYPE html><html><head>${head}</head><body>${htmlWithStyles}</body></html>`,
+);
 ```
 
-### Express example
+### 3. `renderToStringWithJITCSSDSD` — Recommended for all new apps
+
+Full Declarative Shadow DOM output with per-shadow-root CSS (baseReset + useStyle + JIT CSS), DSD polyfill for Firefox < 123, and JIT CSS pre-generation. This is the recommended rendering mode.
+
+```ts
+import { renderToStringWithJITCSSDSD } from '@jasonshimmy/custom-elements-runtime/ssr';
+
+const { htmlWithStyles } = renderToStringWithJITCSSDSD(appVNode, {
+  jit: { extendedColors: true },
+});
+res.send(
+  `<!DOCTYPE html><html><head>${head}</head><body>${htmlWithStyles}</body></html>`,
+);
+```
+
+### 4. `renderToStringDSD` — DSD only (no JIT CSS)
+
+Emits DSD HTML and the browser polyfill, without running the JIT CSS pipeline. Useful when you don't use utility classes.
+
+```ts
+import { renderToStringDSD } from '@jasonshimmy/custom-elements-runtime/ssr';
+
+const html = renderToStringDSD(appVNode);
+```
+
+### 5. `renderToStream` — Streaming SSR
+
+Returns a `ReadableStream<string>` for chunked transfer encoding. Integrates with any framework that can consume a `ReadableStream` or `res.write()`.
+
+```ts
+import { renderToStream } from '@jasonshimmy/custom-elements-runtime/ssr';
+
+const stream = renderToStream(appVNode, { dsd: true });
+```
+
+---
+
+## Declarative Shadow DOM (DSD) SSR
+
+### What is DSD?
+
+[Declarative Shadow DOM](https://developer.chrome.com/docs/css-ui/declarative-shadow-dom) is a W3C standard that lets browsers create shadow roots from HTML before any JavaScript runs:
+
+```html
+<my-card>
+  <template shadowrootmode="open">
+    <style>
+      /* all CSS layers */
+    </style>
+    <div class="card"><slot></slot></div>
+  </template>
+  <!-- light DOM / slotted children here -->
+</my-card>
+```
+
+The browser parses `<template shadowrootmode="open">` and attaches a real shadow root during HTML parsing. Before any JavaScript, the component is:
+
+- Fully rendered with its shadow DOM content
+- Completely styled (no FOUC, no layout shift)
+- Visible to screen readers and search crawlers
+- Ready for hydration when JS loads
+
+**Browser support:** Chrome 90+, Safari 16.4+, Firefox 123+. The runtime automatically appends a polyfill for older browsers.
+
+### CSS Layer Stack in DSD Output
+
+The runtime injects all CSS layers into a single `<style>` block inside each `<template shadowrootmode="open">`:
+
+```html
+<my-card>
+  <template shadowrootmode="open">
+    <style>
+      /* 1. Base reset + CSS custom properties (static) */
+      :host,
+      *,
+      ::before,
+      ::after {
+        box-sizing: border-box;
+      }
+      :host {
+        --cer-spacing-1: 0.25rem; /* … */
+      }
+
+      /* 2. useStyle() output (props-driven, from SSR render pass) */
+      :host {
+        background: white;
+        padding: 1rem;
+      }
+      :host([theme='dark']) {
+        background: #111;
+      }
+
+      /* 3. JIT utility CSS (extracted from shadow HTML) */
+      .flex {
+        display: flex;
+      }
+      .gap-4 {
+        gap: 1rem;
+      }
+    </style>
+    <!-- shadow DOM rendered by the component's render function -->
+    <div class="flex gap-4"><slot></slot></div>
+  </template>
+  <!-- slotted light DOM children -->
+</my-card>
+```
+
+This means every shadow root has its complete, scoped stylesheet present at parse time — eliminating both FOUC and layout shift entirely.
+
+### `useStyle` in SSR
+
+`useStyle()` callbacks are **executed on the server** during the DSD SSR render pass. The SSR context:
+
+- Populates props from the element's serialized attributes
+- Runs `useStyle` callbacks synchronously
+- Captures the CSS output into the shadow root's `<style>` block
+- Catches and ignores render errors (component renders as empty shell, not a crash)
+
+```ts
+component('themed-card', () => {
+  const props = useProps({ theme: 'light' });
+  useStyle(
+    () => css`
+      :host {
+        background: ${props.theme === 'dark' ? '#111' : '#fff'};
+        color: ${props.theme === 'dark' ? '#fff' : '#111'};
+      }
+    `,
+  );
+  return html`<div class="p-4"><slot></slot></div>`;
+});
+```
+
+When rendered server-side with `theme="dark"`:
+
+```html
+<themed-card theme="dark">
+  <template shadowrootmode="open">
+    <style>
+      :host {
+        background: #111;
+        color: #fff;
+      }
+      .p-4 {
+        padding: 1rem;
+      }
+    </style>
+    <div class="p-4"><slot></slot></div>
+  </template>
+</themed-card>
+```
+
+The initial paint is correct and fully styled, with no JavaScript required.
+
+### `useGlobalStyle` in SSR
+
+`useGlobalStyle()` factories are captured during the SSR render pass and returned in `SSRJITResult.globalStyles`. Inject them in a `<style id="cer-ssr-global">` in `<head>`:
+
+```ts
+const { htmlWithStyles, globalStyles } = renderToStringWithJITCSSDSD(appVNode);
+
+// htmlWithStyles already injects globalStyles before </head>
+res.send(
+  `<!DOCTYPE html><html><head>${head}</head><body>${htmlWithStyles}</body></html>`,
+);
+
+// Or inject manually:
+const html = `
+  <!DOCTYPE html><html>
+  <head>
+    <style id="cer-ssr-global">${globalStyles}</style>
+    <style id="cer-ssr-jit">${css}</style>
+  </head>
+  <body>${html}</body>
+  </html>
+`;
+```
+
+---
+
+## `SSRJITResult`
+
+```ts
+interface SSRJITResult {
+  /** Rendered HTML (no styles injected) */
+  html: string;
+  /** Global JIT CSS for light-DOM utility classes */
+  css: string;
+  /** CSS from useGlobalStyle() calls — inject in <head> */
+  globalStyles: string;
+  /** html with <style> tags injected before </head> (or prepended) */
+  htmlWithStyles: string;
+}
+```
+
+---
+
+## Hydration
+
+When a page is served with DSD output, the browser parses the `<template shadowrootmode="open">` elements and creates shadow roots before JavaScript loads. When the JS bundle loads and custom element definitions are registered, the runtime detects the existing shadow root and hydrates it (attaches reactivity) instead of rebuilding the DOM.
+
+### How hydration works
+
+1. **HTML parsing:** The browser parses `<template shadowrootmode="open">` and attaches shadow roots with all CSS layers already present.
+2. **First paint:** The component is rendered and styled with zero JavaScript.
+3. **JS loads:** Custom element definitions are registered.
+4. **Element upgrade:** The constructor detects `this.shadowRoot !== null` (already set by DSD) and skips `attachShadow()`.
+5. **`connectedCallback`:** The runtime reads `data-cer-hydrate` (if present) and applies the hydration strategy.
+6. **Reactivity attached:** Reactive state, watchers, and event listeners are initialized. The component is fully interactive.
+
+### `hydrateApp()`
+
+Import and call `hydrateApp()` after registering all components to trigger activation:
+
+```ts
+import { component, hydrateApp } from '@jasonshimmy/custom-elements-runtime';
+import './components'; // registers all components via component()
+
+hydrateApp(); // activate all DSD-rendered components on the page
+```
+
+```ts
+// Optionally scope to a specific root element
+hydrateApp(document.getElementById('app')!);
+```
+
+---
+
+## Partial Hydration (Island Architecture)
+
+Control when each component hydrates using the `hydrate` option in `component()`. The strategy is serialized as a `data-cer-hydrate` attribute during DSD SSR and read by the client runtime on `connectedCallback`.
+
+### Hydration strategies
+
+| Strategy           | Behavior                                                              | Use case                                           |
+| ------------------ | --------------------------------------------------------------------- | -------------------------------------------------- |
+| `'load'` (default) | Hydrate immediately when the element connects                         | Interactive components visible on load             |
+| `'idle'`           | Defer to `requestIdleCallback` (or `setTimeout(cb, 200)`)             | Below-fold or low-priority components              |
+| `'visible'`        | Hydrate when the element enters the viewport (`IntersectionObserver`) | Lazy sections, infinite scroll, below-fold content |
+| `'none'`           | Never hydrate — keep DSD content as static HTML                       | Pure display components, server-only content       |
+
+```ts
+component(
+  'hero-banner',
+  () => {
+    // Large hero section — hydrate immediately
+    return html`<div class="hero">...</div>`;
+  },
+  { hydrate: 'load' },
+);
+
+component(
+  'product-grid',
+  () => {
+    // Hydrate when scrolled into view
+    return html`<div class="grid">...</div>`;
+  },
+  { hydrate: 'visible' },
+);
+
+component(
+  'footer-links',
+  () => {
+    // Hydrate during browser idle time
+    return html`<nav>...</nav>`;
+  },
+  { hydrate: 'idle' },
+);
+
+component(
+  'static-badge',
+  () => {
+    // Never hydrate — pure display, no JS needed
+    return html`<span class="badge">New</span>`;
+  },
+  { hydrate: 'none' },
+);
+```
+
+### SSR output with partial hydration
+
+```html
+<!-- hydrate: 'load' — no attribute emitted (default) -->
+<hero-banner>
+  <template shadowrootmode="open">...</template>
+</hero-banner>
+
+<!-- hydrate: 'visible' -->
+<product-grid data-cer-hydrate="visible">
+  <template shadowrootmode="open">...</template>
+</product-grid>
+
+<!-- hydrate: 'none' -->
+<static-badge data-cer-hydrate="none">
+  <template shadowrootmode="open">...</template>
+</static-badge>
+```
+
+---
+
+## Streaming SSR
+
+`renderToStream` returns a `ReadableStream<string>`. Currently the entire HTML is flushed as a single chunk; true incremental streaming (shell-first, async component placeholders) is planned for a future release.
+
+### Node.js example
+
+```ts
+import { renderToStream } from '@jasonshimmy/custom-elements-runtime/ssr';
+
+app.get('/', (req, res) => {
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.setHeader('Transfer-Encoding', 'chunked');
+
+  const stream = renderToStream(appVNode, { dsd: true });
+  const reader = stream.getReader();
+
+  const pump = () =>
+    reader.read().then(({ value, done }) => {
+      if (done) {
+        res.end();
+        return;
+      }
+      res.write(value);
+      pump();
+    });
+  pump();
+});
+```
+
+### Web Streams API (Deno / Cloudflare Workers / Bun)
+
+```ts
+import { renderToStream } from '@jasonshimmy/custom-elements-runtime/ssr';
+
+export default {
+  fetch(req: Request) {
+    const stream = renderToStream(appVNode, { dsd: true });
+    return new Response(stream, {
+      headers: { 'Content-Type': 'text/html; charset=utf-8' },
+    });
+  },
+};
+```
+
+---
+
+## Framework Integration
+
+### Express
 
 ```ts
 import express from 'express';
 import { html } from '@jasonshimmy/custom-elements-runtime';
-import { renderToStringWithJITCSS } from '@jasonshimmy/custom-elements-runtime/ssr';
+import { renderToStringWithJITCSSDSD } from '@jasonshimmy/custom-elements-runtime/ssr';
+import './components'; // register all components
 
 const app = express();
 
 app.get('*', (req, res) => {
-  const vnode = html`<div class="flex flex-col gap-6 p-8">
-    <h1 class="text-3xl font-bold text-primary-500">My App</h1>
-    <p class="text-neutral-700">Server rendered with JIT CSS.</p>
-  </div>`;
+  const vnode = html`<my-app url="${req.path}" />`;
 
-  const { htmlWithStyles } = renderToStringWithJITCSS(vnode, {
+  const { htmlWithStyles } = renderToStringWithJITCSSDSD(vnode, {
     jit: { extendedColors: true },
   });
 
-  res.send(`<!DOCTYPE html><html lang="en">
-    <head><meta charset="utf-8"><title>My App</title></head>
-    <body>${htmlWithStyles}</body>
-  </html>`);
+  res.send(`<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>My App</title>
+  </head>
+  <body>${htmlWithStyles}</body>
+</html>`);
 });
 
 app.listen(3000);
 ```
 
+### Fastify
+
+```ts
+import Fastify from 'fastify';
+import { renderToStringWithJITCSSDSD } from '@jasonshimmy/custom-elements-runtime/ssr';
+import './components';
+
+const app = Fastify();
+
+app.get('*', async (req, reply) => {
+  const vnode = html`<my-app url="${req.url}" />`;
+  const { htmlWithStyles } = renderToStringWithJITCSSDSD(vnode);
+  reply
+    .type('text/html')
+    .send(
+      `<!DOCTYPE html><html><head></head><body>${htmlWithStyles}</body></html>`,
+    );
+});
+
+app.listen({ port: 3000 });
+```
+
+### Hono (Edge / Cloudflare Workers)
+
+```ts
+import { Hono } from 'hono';
+import { renderToStringWithJITCSSDSD } from '@jasonshimmy/custom-elements-runtime/ssr';
+import './components';
+
+const app = new Hono();
+
+app.get('*', (c) => {
+  const vnode = html`<my-app url="${c.req.path}" />`;
+  const { htmlWithStyles } = renderToStringWithJITCSSDSD(vnode);
+  return c.html(
+    `<!DOCTYPE html><html><head></head><body>${htmlWithStyles}</body></html>`,
+  );
+});
+
+export default app;
+```
+
+### Using the Middleware Helpers
+
+For even less boilerplate, use `createSSRHandler` from the dedicated middleware package:
+
+```ts
+import { createSSRHandler } from '@jasonshimmy/custom-elements-runtime/ssr-middleware';
+import './components';
+
+app.get(
+  '*',
+  createSSRHandler((req) => html`<my-app url="${req.url}" />`, {
+    render: { dsd: true, jit: { extendedColors: true } },
+  }),
+);
+```
+
+See the [SSR Middleware guide](./ssr-middleware.md) for full details.
+
 ---
 
-## 🗺️ registerEntityMap (server-side entity map)
+## DSD Polyfill
 
-When performing server-side rendering you may want full HTML5 named-entity decoding (e.g. `&rsquo;`, `&hellip;`, etc.). The library keeps the client bundle small by not shipping the full entity map to the browser. If your SSR pipeline needs complete decoding, register a full entity map at server startup.
+The `DSD_POLYFILL_SCRIPT` constant is a minified inline `<script>` that implements DSD for browsers without native support (Firefox < 123). It is automatically appended when using `renderToStringDSD`, `renderToStringWithJITCSSDSD`, or `renderToStringWithJITCSS` with `dsd: true`.
 
-### Why register?
+```ts
+import { DSD_POLYFILL_SCRIPT } from '@jasonshimmy/custom-elements-runtime/ssr';
 
-- The full HTML5 entity map is large. Publishing it with the client bundle would bloat CDN and npm consumers.
-- This API lets server deployments opt in to the full map while keeping the library tiny for browsers.
+// The polyfill processes all <template shadowrootmode> elements synchronously.
+// It is a no-op on browsers with native DSD support.
+console.log(DSD_POLYFILL_SCRIPT);
+// <script>(function(){if(HTMLTemplateElement.prototype.hasOwnProperty('shadowRootMode'))return;...})()</script>
+```
 
-### API
+To suppress the polyfill (e.g., you target modern browsers only):
 
-- `registerEntityMap(map: Record<string,string>, options?: { overwrite?: boolean })` — register the full map before rendering. First registration wins by default.
-- `loadEntityMap(): Promise<Record<string,string>>` — dynamically load the full HTML5 named-entity map (useful in SSR pipelines that need complete entity support). Returns a promise that resolves to the map — the runtime tries the published package's `entities.json` first and falls back to a minimal inline map when the JSON cannot be loaded.
-- `clearRegisteredEntityMap()` — clear the registration (useful in tests).
+```ts
+renderToStringDSD(vnode, { dsdPolyfill: false });
+```
 
-All three are importable from `@jasonshimmy/custom-elements-runtime/ssr`.
+---
 
-### Example (Express)
+## SVG Namespace Injection
 
-```js
-// server.js
-import express from 'express';
-import { registerEntityMap } from '@jasonshimmy/custom-elements-runtime/ssr';
+By default, `renderToString` and all DSD render functions inject `xmlns="http://www.w3.org/2000/svg"` onto `<svg>` elements to match the client's namespace-aware DOM. Opt out with `injectSvgNamespace: false`.
+
+```ts
+renderToStringDSD(vnodeWithSVG, { injectSvgNamespace: false });
+```
+
+---
+
+## Entity Map
+
+For full HTML5 named-entity decoding in SSR (e.g. `&rsquo;`, `&hellip;`):
+
+```ts
+import {
+  registerEntityMap,
+  loadEntityMap,
+} from '@jasonshimmy/custom-elements-runtime/ssr';
 import entities from '@jasonshimmy/custom-elements-runtime/entities.json' assert { type: 'json' };
 
+// Register at server startup — do this before handling any requests
 registerEntityMap(entities);
+```
 
-const app = express();
+---
+
+## API Reference
+
+### `renderToString(vnode, options?)`
+
+| Option                  | Type      | Default                      | Description                             |
+| ----------------------- | --------- | ---------------------------- | --------------------------------------- |
+| `injectSvgNamespace`    | `boolean` | `true`                       | Inject `xmlns` on `<svg>` elements      |
+| `injectKnownNamespaces` | `boolean` | follows `injectSvgNamespace` | Inject known namespaces for MathML etc. |
+
+### `renderToStringWithJITCSS(vnode, options?)`
+
+All `renderToString` options, plus:
+
+| Option        | Type            | Default                   | Description                                                           |
+| ------------- | --------------- | ------------------------- | --------------------------------------------------------------------- |
+| `dsd`         | `boolean`       | `false`                   | Enable Declarative Shadow DOM output                                  |
+| `dsdPolyfill` | `boolean`       | `true` (when `dsd: true`) | Append DSD polyfill script                                            |
+| `jit`         | `JITCSSOptions` | —                         | JIT CSS options (`extendedColors`, `customColors`, `disableVariants`) |
+
+Returns `SSRJITResult`.
+
+### `renderToStringWithJITCSSDSD(vnode, options?)`
+
+Convenience alias: `renderToStringWithJITCSS(vnode, { ...options, dsd: true })`.
+
+### `renderToStringDSD(vnode, options?)`
+
+All `DSDRenderOptions` (same as `renderToStringWithJITCSS` options minus `jit`). Returns a plain HTML string.
+
+### `renderToStream(vnode, options?)`
+
+All `DSDRenderOptions` + `jit`. Returns `ReadableStream<string>`.
+
+### `hydrateApp(root?)`
+
+| Param  | Type                  | Default    | Description             |
+| ------ | --------------------- | ---------- | ----------------------- |
+| `root` | `Element \| Document` | `document` | Root element to hydrate |
+
+---
+
+## Routing with SSR
+
+The runtime's router has two integration points for SSR: a lightweight route-matching utility for framework-level decisions, and a full router initialization path so route-aware components produce correct output during the SSR pass.
+
+### Pattern 1 — Route-Based Component Selection (recommended)
+
+Use `matchRouteSSR` to decide which component to render for a given URL, then pass extracted params as props:
+
+```ts
+import { matchRouteSSR } from '@jasonshimmy/custom-elements-runtime/router';
+import { renderToStringWithJITCSSDSD } from '@jasonshimmy/custom-elements-runtime/ssr';
+import { html } from '@jasonshimmy/custom-elements-runtime';
+import './components'; // register components
+
+const routes = [
+  { path: '/', component: 'home-page' },
+  { path: '/about', component: 'about-page' },
+  { path: '/blog/:slug', component: 'blog-post' },
+];
+
 app.get('*', (req, res) => {
-  // render using your library; decodeEntities will now use the full map
+  const { route, params } = matchRouteSSR(routes, req.path);
+
+  if (!route) {
+    res.status(404).send('Not Found');
+    return;
+  }
+
+  const vnode = html`<${route.component} ...${params} />`;
+  const { htmlWithStyles } = renderToStringWithJITCSSDSD(vnode);
+
+  res.send(
+    `<!DOCTYPE html><html><head></head><body>${htmlWithStyles}</body></html>`,
+  );
 });
 ```
 
-### Example (Next.js custom server)
+### Pattern 2 — Full Router Initialization
 
-Place `registerEntityMap` call in your server start file (before handling requests) so the map is available for all renders.
+For apps that use route-aware components (components that read `activeRouterProxy` or call `useRouter`), initialize the router with `initialUrl` before rendering. This pre-compiles all routes and sets the active route state so components produce correct output:
 
-```js
-// next-server.js (or similar startup entry)
-import { registerEntityMap } from '@jasonshimmy/custom-elements-runtime/ssr';
-import entities from '@jasonshimmy/custom-elements-runtime/entities.json' assert { type: 'json' };
+```ts
+import { initRouter } from '@jasonshimmy/custom-elements-runtime/router';
+import { renderToStringWithJITCSSDSD } from '@jasonshimmy/custom-elements-runtime/ssr';
+import { html } from '@jasonshimmy/custom-elements-runtime';
 
-// register synchronously at startup — do this before handling any incoming requests
-registerEntityMap(entities);
+const routes = [
+  { path: '/', component: 'home-page' },
+  { path: '/about', component: 'about-page' },
+];
 
-// start server afterwards
-// app.listen(...)
+app.get('*', (req, res) => {
+  // Initialize the router with the request URL. Triggers SSR mode:
+  // no window/history access, push/replace call navigateSSR().
+  initRouter({ routes, initialUrl: req.url });
+
+  const { htmlWithStyles } = renderToStringWithJITCSSDSD(html`<my-app />`);
+
+  res.send(
+    `<!DOCTYPE html><html><head></head><body>${htmlWithStyles}</body></html>`,
+  );
+});
 ```
 
-### Notes
+> **Note:** `<router-view>` has an async render function and emits an empty shadow-root during SSR (content is hydrated on the client). Use Pattern 1 to render route-matched content directly in the SSR output.
 
-- If you don't register a map, the library falls back to a small inline map and numeric entity decoding — this keeps the runtime safe and compact.
-- For serverless deployments with strict memory or cold-start budgets, consider trimming the entity map to the subset your app uses.
-- Avoid importing the big JSON into client-side code — doing so will cause bundlers to include it in client bundles.
+### Client-Side Hydration Handoff
 
-## ❓ FAQ
+Re-initialize the router in your client entry **without** `initialUrl` so it switches to browser mode (reads `window.location`, listens for navigation events):
 
-**Q: How do I enable SSR?**
-A: SSR is automatic when `window` is undefined (e.g., in Node.js or serverless environments).
+```ts
+// entry-client.ts
+import { initRouter } from '@jasonshimmy/custom-elements-runtime/router';
+import { hydrateApp } from '@jasonshimmy/custom-elements-runtime/ssr';
+import { routes } from './routes';
 
-**Q: Can I use lifecycle hooks in SSR?**
-A: No, lifecycle hooks are ignored in SSR mode. Use them only for client-side logic.
+initRouter({ routes }); // no initialUrl → browser mode
+hydrateApp();
+```
 
-**Q: Does the runtime preserve server-rendered markup on the client?**
-A: No. The runtime performs a full fresh client render inside each shadow root, replacing the server HTML. To avoid a visible content shift, ensure server and client render functions produce identical output, and avoid browser-only side effects during server render.
+### 404 Handling
 
-**Q: Is SSR secure?**
-A: Yes, the runtime escapes HTML and sanitizes styles to prevent XSS and injection attacks.
+`matchRouteSSR` returns `{ route: null, params: {} }` when no route matches. Use this to set an HTTP 404 status or render a not-found component:
 
-## 🏁 Summary
+```ts
+const { route, params } = matchRouteSSR(routes, req.path);
 
-SSR support in the custom elements runtime enables fast, SEO-friendly, and universal web components. By leveraging VNode trees and pure functions, you can build components that work seamlessly on both server and client.
+if (!route) {
+  res.status(404);
+  const { htmlWithStyles } = renderToStringWithJITCSSDSD(
+    html`<not-found-page />`,
+  );
+  res.send(`<!DOCTYPE html>...<body>${htmlWithStyles}</body></html>`);
+  return;
+}
+```
 
-For more details, see the [JIT CSS guide](./jit-css.md) for styling in SSR contexts and the [Security guide](./security.md) for XSS prevention.
+### URL Normalization
+
+`matchRouteSSR` automatically strips query strings and URL fragments before matching, so you can pass `req.url` directly:
+
+```ts
+// ✅ Both of these match '/blog/:slug'
+const { route } = matchRouteSSR(routes, req.path); // '/blog/hello-world'
+const { route } = matchRouteSSR(routes, req.url); // '/blog/hello-world?ref=email#section'
+```
+
+> **Note:** The lower-level `matchRoute` function does NOT strip query strings. Always use `matchRouteSSR` in server-side code.
+
+### Sub-Path Base
+
+If your application is served from a sub-path (e.g. `/app`), pass `base` to `initRouter`. Route definitions still use root-relative paths — the base is stripped automatically during matching:
+
+```ts
+initRouter({ routes, base: '/app', initialUrl: req.url });
+```
+
+---
+
+## Built-in Components in SSR
+
+The runtime ships three built-in components. Their SSR behavior differs based on how they are registered.
+
+### Registration overview
+
+| Component            | Registration method       | In SSR registry | DSD output in SSR  |
+| -------------------- | ------------------------- | --------------- | ------------------ |
+| `cer-suspense`       | `component()` (runtime)   | ✅ Yes          | ✅ Yes             |
+| `cer-error-boundary` | `component()` (runtime)   | ✅ Yes          | ✅ Yes             |
+| `cer-keep-alive`     | `customElements.define()` | ❌ No           | ❌ No (shell only) |
+
+Call the register helpers at server startup before rendering:
+
+```ts
+import {
+  registerSuspense,
+  registerErrorBoundary,
+} from '@jasonshimmy/custom-elements-runtime/builtin-components';
+import { registerKeepAlive } from '@jasonshimmy/custom-elements-runtime/keep-alive';
+
+// register once at startup
+registerSuspense();
+registerErrorBoundary();
+registerKeepAlive(); // client-only guard is a no-op in Node.js
+```
+
+---
+
+### `cer-suspense`
+
+`cer-suspense` is registered via `component()` and appears in the SSR registry. The SSR renderer emits a full `<template shadowrootmode="open">` block whose shadow content depends on the `pending` attribute.
+
+| `pending` value | Shadow content rendered                          |
+| --------------- | ------------------------------------------------ |
+| `false` / unset | `<slot></slot>` — shows default content          |
+| `true`          | `<slot name="fallback"></slot>` — shows fallback |
+
+**SSR output (pending not set / false):**
+
+```html
+<cer-suspense>
+  <template shadowrootmode="open">
+    <slot></slot>
+  </template>
+  <!-- light DOM (slotted children) rendered here -->
+  <my-async-widget></my-async-widget>
+</cer-suspense>
+```
+
+**SSR output (pending="true"):**
+
+```html
+<cer-suspense pending="true">
+  <template shadowrootmode="open">
+    <slot name="fallback"></slot>
+  </template>
+  <span slot="fallback">Loading…</span>
+</cer-suspense>
+```
+
+> **Why this matters:** Server-side, all async work should be resolved before rendering. Set `pending` to `true` only when you deliberately want to show a loading placeholder in the initial HTML (rare).
+
+---
+
+### `cer-error-boundary`
+
+`cer-error-boundary` is registered via `component()` and emits a DSD `<template>` during SSR. There is no error state server-side — errors are a runtime concept that requires JavaScript. The shadow content is always a `<slot>` that projects the default children.
+
+**SSR output:**
+
+```html
+<cer-error-boundary>
+  <template shadowrootmode="open">
+    <slot></slot>
+  </template>
+  <!-- light DOM children projected into the default slot -->
+  <my-widget></my-widget>
+</cer-error-boundary>
+```
+
+On the client, if a child throws during hydration, the error boundary renders its `fallback` slot instead. The SSR output itself is always the happy path.
+
+---
+
+### `cer-keep-alive`
+
+`cer-keep-alive` uses `customElements.define()` with a `typeof window === 'undefined'` guard rather than `component()`. This means it is **not** in the SSR component registry.
+
+**SSR output (opaque shell — no DSD wrapping):**
+
+```html
+<cer-keep-alive>
+  <!-- light DOM children rendered as-is -->
+  <my-widget></my-widget>
+</cer-keep-alive>
+```
+
+No `<template shadowrootmode="open">` is emitted because the renderer does not know the element's shadow structure. This is intentional — `cer-keep-alive` is a purely client-side mechanism for preserving component state across route changes. It has no meaningful server-side representation.
+
+---
+
+## SSR Best Practices
+
+- **Use `renderToStringWithJITCSSDSD`** for all new applications — it is the zero-FOUC, DSD-enabled, hydration-ready path.
+- **Register components before rendering** — the DSD renderer consults the registry to know which tags need shadow DOM wrapping.
+- **Keep render functions synchronous** — async render functions return a Promise; the SSR pass cannot await them and renders an empty shell instead.
+- **Match prop values between server and client** — `useStyle` callbacks are executed with the same prop values on both server and client, producing identical CSS.
+- **Use `hydrate: 'none'` for static content** — display-only components that never need interactivity can opt out of JS entirely.
+- **Avoid DOM APIs in render** — render functions must be pure and safe to call in a Node.js environment without a DOM.
+
+---
+
+## FAQ
+
+**Q: Does DSD work with slots?**
+A: Yes. Slotted children in `vnode.children` are rendered outside the `<template>` element as light DOM siblings, exactly where the browser expects them.
+
+**Q: Does the runtime preserve server-rendered DOM during hydration?**
+A: The existing shadow DOM from DSD parsing is preserved at first paint and styled by the SSR-injected `<style>` block. When the component's first reactive render runs, it replaces the shadow DOM content. To avoid a visible transition, ensure `useStyle` output and class names are identical between server and client renders (they are, given the same props).
+
+**Q: What happens if a component isn't in the registry during SSR?**
+A: An empty `<template shadowrootmode="open"></template>` shell is emitted, and the client hydrates normally when JS loads.
+
+**Q: Can I use `watch`, `useOnConnected`, etc. during SSR?**
+A: These hooks register harmlessly to arrays that are never invoked in the SSR pass. They fire normally on the client after hydration.
+
+**Q: Is the DSD polyfill safe to include on modern browsers?**
+A: Yes. The polyfill's first line is a feature detection check that returns immediately on browsers with native DSD support.
