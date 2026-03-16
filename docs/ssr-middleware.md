@@ -40,6 +40,25 @@ Returns an async `(req, res) => Promise<void>` handler that:
 4. Sets `Content-Type: text/html; charset=utf-8`
 5. Calls `res.end(body)`
 
+> **Single root requirement:** The VNode passed (or returned by the factory) must have a single root element. The `html` tag produces an unrenderable fragment when given multiple top-level elements. Use a wrapping `<div>` or a top-level custom element:
+>
+> ```ts
+> // ❌ Fragment — crashes the renderer
+> createSSRHandler(
+>   html`<my-header />
+>     <main>…</main>`,
+> );
+>
+> // ✅ Single root
+> createSSRHandler(html`<my-app />`);
+> createSSRHandler(
+>   html`<div>
+>     <my-header />
+>     <main>…</main>
+>   </div>`,
+> );
+> ```
+
 ```ts
 import { createSSRHandler } from '@jasonshimmy/custom-elements-runtime/ssr-middleware';
 
@@ -326,14 +345,17 @@ const routes = [
 
 const app = express();
 
-app.get('*', createSSRHandler(
-  (req) => {
-    const { route, params } = matchRouteSSR(routes, req.url ?? '/');
-    if (!route) return html`<not-found-page />`;
-    return html`<${route.component} ...${params} />`;
-  },
-  { render: { dsd: true, jit: { extendedColors: true } } },
-));
+app.get(
+  '*',
+  createSSRHandler(
+    (req) => {
+      const { route, params } = matchRouteSSR(routes, req.url ?? '/');
+      if (!route) return html`<not-found-page />`;
+      return html`<${route.component} ...${params} />`;
+    },
+    { render: { dsd: true, jit: { extendedColors: true } } },
+  ),
+);
 
 app.listen(3000);
 ```
@@ -352,14 +374,17 @@ import './components';
 
 const app = express();
 
-app.get('*', createSSRHandler(
-  (req) => {
-    // Pre-compiles routes and sets active route state for this render.
-    initRouter({ routes, initialUrl: req.url });
-    return html`<my-app />`;
-  },
-  { render: { dsd: true } },
-));
+app.get(
+  '*',
+  createSSRHandler(
+    (req) => {
+      // Pre-compiles routes and sets active route state for this render.
+      initRouter({ routes, initialUrl: req.url });
+      return html`<my-app />`;
+    },
+    { render: { dsd: true } },
+  ),
+);
 
 app.listen(3000);
 ```

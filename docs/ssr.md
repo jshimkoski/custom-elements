@@ -804,6 +804,28 @@ No `<template shadowrootmode="open">` is emitted because the renderer does not k
 
 - **Use `renderToStringWithJITCSSDSD`** for all new applications — it is the zero-FOUC, DSD-enabled, hydration-ready path.
 - **Register components before rendering** — the DSD renderer consults the registry to know which tags need shadow DOM wrapping.
+- **Pass a single root VNode to all render functions** — `html` produces a fragment (undefined tag) when given multiple root elements, which the SSR renderer cannot process. Wrap multi-element output in a single container:
+
+  ```ts
+  // ❌ Multiple roots — produces an unrenderable fragment
+  renderToStringWithJITCSSDSD(
+    html`<my-header></my-header>
+      <main>…</main>`,
+  );
+
+  // ✅ Single root
+  renderToStringWithJITCSSDSD(
+    html`<div>
+      <my-header></my-header>
+      <main>…</main>
+    </div>`,
+  );
+
+  // ✅ Or use a top-level custom element as the root
+  renderToStringWithJITCSSDSD(html`<my-app url="${req.url}" />`);
+  ```
+
+- **`component()` is safe to call in bare Node.js** — it registers the component in the SSR registry without touching browser APIs. No DOM polyfill (`jsdom`, `happy-dom`) is required on your server.
 - **Keep render functions synchronous** — async render functions return a Promise; the SSR pass cannot await them and renders an empty shell instead.
 - **Match prop values between server and client** — `useStyle` callbacks are executed with the same prop values on both server and client, producing identical CSS.
 - **Use `hydrate: 'none'` for static content** — display-only components that never need interactivity can opt out of JS entirely.
@@ -827,3 +849,9 @@ A: These hooks register harmlessly to arrays that are never invoked in the SSR p
 
 **Q: Is the DSD polyfill safe to include on modern browsers?**
 A: Yes. The polyfill's first line is a feature detection check that returns immediately on browsers with native DSD support.
+
+**Q: Can I pass a VNode with multiple root elements to `renderToStringWithJITCSSDSD`?**
+A: No. The renderer requires a single root VNode. The `html` tag produces a fragment with an undefined tag when a template has multiple top-level elements, and the renderer cannot process an undefined tag. Always wrap in a single root — a `<div>`, a `<body>`, or a top-level custom element like `<my-app />`.
+
+**Q: Do I need `jsdom` or `happy-dom` on my Node.js SSR server?**
+A: No. `component()`, `registerBuiltinComponents()`, and all SSR render functions are safe to call in bare Node.js — they do not require browser globals. Only avoid calling DOM APIs (`document`, `window`, etc.) inside component render functions themselves.

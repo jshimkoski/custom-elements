@@ -237,21 +237,21 @@ Below is the **complete list of public symbols** exported by the runtime and its
 
 **Package:** `@jasonshimmy/custom-elements-runtime/ssr`
 
-| Export                        | Description                                                                                                                             |
-| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `renderToString`              | Render a VNode tree to HTML for server-side rendering (backwards-compatible baseline).                                                  |
-| `renderToStringWithJITCSS`    | Render to HTML + pre-generate JIT CSS. Pass `dsd: true` for Declarative Shadow DOM output with full per-shadow-root CSS stack.          |
-| `renderToStringWithJITCSSDSD` | **Recommended.** Convenience alias: `renderToStringWithJITCSS(vnode, { dsd: true, ... })`. Full DSD output, hydration-ready, zero FOUC. |
-| `renderToStringDSD`           | Render to DSD HTML string (no JIT CSS pipeline). Appends DSD polyfill by default.                                                       |
-| `renderToStream`              | Render to a `ReadableStream<string>` for streaming SSR / chunked transfer encoding.                                                     |
-| `DSD_POLYFILL_SCRIPT`         | Minified inline `<script>` that implements DSD for Firefox < 123. Injected automatically; export it for manual placement.               |
-| `registerEntityMap`           | Register a custom named-entity map for SSR `decodeEntities`.                                                                            |
-| `loadEntityMap`               | Async loader for the full HTML5 named-entity map.                                                                                       |
-| `clearRegisteredEntityMap`    | Reset the entity map to the built-in minimal set.                                                                                       |
-| `VNode` (type)                | The runtime VNode shape used by renderers and SSR.                                                                                      |
-| `RenderOptions` (type)        | Options for `renderToString` (`injectSvgNamespace`, `injectKnownNamespaces`).                                                           |
-| `DSDRenderOptions` (type)     | Options for DSD rendering (`dsd`, `dsdPolyfill`, plus all `RenderOptions`).                                                             |
-| `SSRJITResult` (type)         | Result of `renderToStringWithJITCSS`: `{ html, css, globalStyles, htmlWithStyles }`.                                                    |
+| Export                        | Description                                                                                                                                                                                                               |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `renderToString`              | Render a VNode tree to HTML for server-side rendering (backwards-compatible baseline).                                                                                                                                    |
+| `renderToStringWithJITCSS`    | Render to HTML + pre-generate JIT CSS. Pass `dsd: true` for Declarative Shadow DOM output with full per-shadow-root CSS stack.                                                                                            |
+| `renderToStringWithJITCSSDSD` | **Recommended.** Convenience alias: `renderToStringWithJITCSS(vnode, { dsd: true, ... })`. Full DSD output, hydration-ready, zero FOUC. Requires a **single root VNode** — wrap multi-element templates in one container. |
+| `renderToStringDSD`           | Render to DSD HTML string (no JIT CSS pipeline). Appends DSD polyfill by default.                                                                                                                                         |
+| `renderToStream`              | Render to a `ReadableStream<string>` for streaming SSR / chunked transfer encoding.                                                                                                                                       |
+| `DSD_POLYFILL_SCRIPT`         | Minified inline `<script>` that implements DSD for Firefox < 123. Injected automatically; export it for manual placement.                                                                                                 |
+| `registerEntityMap`           | Register a custom named-entity map for SSR `decodeEntities`.                                                                                                                                                              |
+| `loadEntityMap`               | Async loader for the full HTML5 named-entity map.                                                                                                                                                                         |
+| `clearRegisteredEntityMap`    | Reset the entity map to the built-in minimal set.                                                                                                                                                                         |
+| `VNode` (type)                | The runtime VNode shape used by renderers and SSR.                                                                                                                                                                        |
+| `RenderOptions` (type)        | Options for `renderToString` (`injectSvgNamespace`, `injectKnownNamespaces`).                                                                                                                                             |
+| `DSDRenderOptions` (type)     | Options for DSD rendering (`dsd`, `dsdPolyfill`, plus all `RenderOptions`).                                                                                                                                               |
+| `SSRJITResult` (type)         | Result of `renderToStringWithJITCSS`: `{ html, css, globalStyles, htmlWithStyles }`.                                                                                                                                      |
 
 ### SSR Middleware
 

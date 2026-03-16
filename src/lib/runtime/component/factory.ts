@@ -486,7 +486,7 @@ export function component(
       // Discovery render failed - props will be discovered on first real render
     }
 
-    if (!customElements.get(normalizedTag)) {
+    if (typeof customElements !== 'undefined' && !customElements.get(normalizedTag)) {
       customElements.define(
         normalizedTag,
         createElementClass(normalizedTag, config) as CustomElementConstructor,
