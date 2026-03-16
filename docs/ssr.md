@@ -714,13 +714,15 @@ Call the register helpers at server startup before rendering:
 import {
   registerSuspense,
   registerErrorBoundary,
-} from '@jasonshimmy/custom-elements-runtime/builtin-components';
-import { registerKeepAlive } from '@jasonshimmy/custom-elements-runtime/keep-alive';
+  registerBuiltinComponents, // registers all three in one call
+} from '@jasonshimmy/custom-elements-runtime';
 
-// register once at startup
-registerSuspense();
-registerErrorBoundary();
-registerKeepAlive(); // client-only guard is a no-op in Node.js
+// register once at startup (choose one approach)
+registerBuiltinComponents(); // convenience helper — registers all three
+
+// or register individually:
+// registerSuspense();
+// registerErrorBoundary();
 ```
 
 ---
