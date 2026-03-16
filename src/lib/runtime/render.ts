@@ -14,9 +14,15 @@ import {
 import { getTransitionStyleSheet } from '../transitions';
 import type { ComponentConfig, ComponentContext, VNode, Refs } from './types';
 import { devWarn, devError } from './logger';
+import { detectTestEnvironment } from './scheduler';
 
 // Module-level stack for context injection (scoped to render cycle, no global pollution)
 export const contextStack: unknown[] = [];
+
+/** @internal Elements created by createElementClass carry this property. */
+interface CERComponentElement extends HTMLElement {
+  lastHtmlStringForJitCSS: string;
+}
 
 // Optimized caches using symbols for private properties to avoid collisions
 
@@ -25,19 +31,6 @@ const aggregatedHtmlCache = new WeakMap<ShadowRoot, string>();
 
 // Cache for tracking child component elements per shadowRoot for faster aggregation
 const childComponentCache = new WeakMap<ShadowRoot, Set<HTMLElement>>();
-
-// Cache for style generation tracking to prevent unnecessary recalculations
-const styleGenerationCache = new WeakMap<ShadowRoot, number>();
-
-// Performance tracking for render loop detection
-interface RenderMetrics {
-  lastRenderTime: number;
-  renderCount: number;
-  warningTime: number;
-  isThrottled: boolean;
-}
-
-const renderMetrics = new WeakMap<ShadowRoot, RenderMetrics>();
 
 /**
  * Register a child component element for faster HTML aggregation
@@ -199,30 +192,10 @@ export function requestRender(
   //  - Vitest infinite-loop tests require a tight stop threshold (< 15 renders)
   //  - Cypress e2e tests simulate real user interactions with legitimate rapid
   //    renders and must NOT be stopped early.
-  const isCypressEnv = (() => {
-    try {
-      return (
-        typeof window !== 'undefined' &&
-        !!(window as { Cypress?: unknown }).Cypress
-      );
-    } catch {
-      return false;
-    }
-  })();
-
-  const isVitestEnv = (() => {
-    try {
-      const maybeProcess = (
-        globalThis as { process?: { env?: { NODE_ENV?: string } } }
-      ).process;
-      if (maybeProcess?.env?.NODE_ENV === 'test' && !isCypressEnv) return true;
-      return false;
-    } catch {
-      return false;
-    }
-  })();
-
-  const isTestEnv = isVitestEnv || isCypressEnv;
+  const { isVitest, isCypress: isCypressEnv, isTest: isTestEnv } = detectTestEnvironment();
+  // isVitestEnv: treat any non-Cypress test environment as Vitest for tight
+  // loop-detection thresholds. (Matches original NODE_ENV=test && !Cypress logic.)
+  const isVitestEnv = (isVitest || isTestEnv) && !isCypressEnv;
 
   // Enhanced loop detection with progressive throttling
   if (isRapidRender) {
@@ -323,8 +296,7 @@ function aggregateChildHtml(shadowRoot: ShadowRoot, baseHtml: string): string {
       // Fast path: iterate only registered child components
       for (const el of childComponents) {
         try {
-          const childHtml = (el as { lastHtmlStringForJitCSS?: string })
-            .lastHtmlStringForJitCSS;
+          const childHtml = (el as Partial<CERComponentElement>).lastHtmlStringForJitCSS;
           if (childHtml?.trim()) {
             aggregated += '\n' + childHtml;
           }
@@ -337,9 +309,7 @@ function aggregateChildHtml(shadowRoot: ShadowRoot, baseHtml: string): string {
       const elements = shadowRoot.querySelectorAll('*');
       for (const el of elements) {
         try {
-          const childHtml = (
-            el as HTMLElement & { lastHtmlStringForJitCSS?: string }
-          ).lastHtmlStringForJitCSS;
+          const childHtml = (el as Partial<CERComponentElement>).lastHtmlStringForJitCSS;
           if (childHtml?.trim()) {
             aggregated += '\n' + childHtml;
           }
@@ -427,32 +397,37 @@ export function applyStyle<
   const proseSheet = getProseStyleSheet();
   const computedStyle = (context as { _computedStyle?: string })._computedStyle;
 
+  // Hoist supportsAdoptedStyleSheets check — result cannot change within one call.
+  const supportsAdopted = supportsAdoptedStyleSheets(shadowRoot);
+
+  // Hoist transition CSS text extraction — used in both the early-return and
+  // fallback paths below, so compute it once here.
+  const transitionSheet = getTransitionStyleSheet();
+  let transitionText = '';
+  if (!supportsAdopted) {
+    try {
+      if (transitionSheet?.cssRules) {
+        transitionText = Array.from(transitionSheet.cssRules)
+          .map((r) => r.cssText)
+          .join('\n');
+      }
+    } catch {
+      transitionText = '';
+    }
+  }
+
   // Early return for empty styles
   if (!jitCss?.trim() && !computedStyle && !proseSheet) {
     setStyleSheet(null);
 
     // Apply base styles only
-    const supportsAdopted = supportsAdoptedStyleSheets(shadowRoot);
     if (supportsAdopted) {
       shadowRoot.adoptedStyleSheets = [
         getBaseResetSheet(),
-        getTransitionStyleSheet(),
+        transitionSheet,
       ];
     } else {
       const baseText = minifyCSS(baseReset);
-      const transitionSheet = getTransitionStyleSheet();
-      let transitionText = '';
-
-      try {
-        if (transitionSheet?.cssRules) {
-          transitionText = Array.from(transitionSheet.cssRules)
-            .map((r) => r.cssText)
-            .join('\n');
-        }
-      } catch {
-        transitionText = '';
-      }
-
       const combined = minifyCSS(`${baseText}\n${transitionText}`);
       createOrUpdateStyleElement(shadowRoot, combined);
 
@@ -460,7 +435,7 @@ export function applyStyle<
       try {
         (
           shadowRoot as { adoptedStyleSheets?: CSSStyleSheet[] }
-        ).adoptedStyleSheets = [getBaseResetSheet(), getTransitionStyleSheet()];
+        ).adoptedStyleSheets = [getBaseResetSheet(), transitionSheet];
       } catch {
         // Ignore if assignment fails
       }
@@ -481,7 +456,6 @@ export function applyStyle<
   finalStyle = minifyCSS(finalStyle);
 
   // Apply styles using constructable stylesheets when available
-  const supportsAdopted = supportsAdoptedStyleSheets(shadowRoot);
   if (supportsAdopted) {
     let sheet = styleSheet;
     if (!sheet) {
@@ -490,7 +464,7 @@ export function applyStyle<
 
     try {
       sheet.replaceSync(finalStyle);
-      const sheets = [getBaseResetSheet(), getTransitionStyleSheet()];
+      const sheets = [getBaseResetSheet(), transitionSheet];
       if (proseSheet) sheets.push(proseSheet);
       sheets.push(sheet);
       shadowRoot.adoptedStyleSheets = sheets;
@@ -503,20 +477,6 @@ export function applyStyle<
 
   // Fallback: combine all styles into a single style element
   const baseText = minifyCSS(baseReset);
-  const transitionSheet = getTransitionStyleSheet();
-
-  let transitionText = '';
-
-  try {
-    if (transitionSheet?.cssRules) {
-      transitionText = Array.from(transitionSheet.cssRules)
-        .map((r) => r.cssText)
-        .join('\n');
-    }
-  } catch {
-    transitionText = '';
-  }
-
   const combined = minifyCSS(`${baseText}\n${transitionText}\n${finalStyle}`);
   createOrUpdateStyleElement(shadowRoot, combined);
 
@@ -524,7 +484,7 @@ export function applyStyle<
   try {
     const fallbackSheets: CSSStyleSheet[] = [
       getBaseResetSheet(),
-      getTransitionStyleSheet(),
+      transitionSheet,
     ];
 
     if (proseSheet) fallbackSheets.push(proseSheet);
@@ -560,29 +520,4 @@ export function applyStyle<
 export function cleanupRenderCaches(shadowRoot: ShadowRoot): void {
   aggregatedHtmlCache.delete(shadowRoot);
   childComponentCache.delete(shadowRoot);
-  styleGenerationCache.delete(shadowRoot);
-  renderMetrics.delete(shadowRoot);
-}
-
-/**
- * Get render performance metrics for debugging
- * @internal
- */
-export function getRenderStats(shadowRoot: ShadowRoot): {
-  renderCount: number;
-  lastRenderTime: number;
-  isThrottled: boolean;
-  childComponentCount: number;
-  hasCachedHtml: boolean;
-} {
-  const metrics = renderMetrics.get(shadowRoot);
-  const childComponents = childComponentCache.get(shadowRoot);
-
-  return {
-    renderCount: metrics?.renderCount ?? 0,
-    lastRenderTime: metrics?.lastRenderTime ?? 0,
-    isThrottled: metrics?.isThrottled ?? false,
-    childComponentCount: childComponents?.size ?? 0,
-    hasCachedHtml: aggregatedHtmlCache.has(shadowRoot),
-  };
 }

@@ -349,7 +349,49 @@ component(
 
 ## Streaming SSR
 
-`renderToStream` returns a `ReadableStream<string>`. Currently the entire HTML is flushed as a single chunk; true incremental streaming (shell-first, async component placeholders) is planned for a future release.
+`renderToStream` returns a `ReadableStream<string>` and supports true incremental streaming:
+
+1. **Chunk 1 — sync shell:** All synchronous components are rendered immediately and flushed as the first chunk, giving the browser content to begin parsing right away (minimal TTFB).
+2. **Subsequent chunks — async swap scripts:** Components whose `render` function returns a `Promise` (async render) emit a lightweight placeholder in chunk 1. As each promise resolves, a small inline `<script>` swap block is streamed that fills the placeholder's shadow root with the fully-rendered DSD HTML.
+
+For most apps (all-synchronous render functions) the stream produces a single chunk, which is identical to `renderToStringWithJITCSS`. The streaming benefit kicks in automatically as soon as any component has an async `render`.
+
+### How async component swapping works
+
+When `renderToStream` encounters an async `render` function, it:
+
+1. Emits a placeholder element in chunk 1 with a unique `id` and an empty `<template shadowrootmode="open">`:
+
+   ```html
+   <my-async-card id="cer-stream-0">
+     <template shadowrootmode="open"></template>
+   </my-async-card>
+   ```
+
+   The DSD polyfill (or native browser support) attaches an empty shadow root to the placeholder immediately during HTML parse.
+
+2. Awaits the component's async render promise.
+
+3. Streams a swap `<script>` that fills the existing shadow root directly via `shadowRoot.innerHTML`:
+   ```html
+   <script>
+     (function () {
+       var e = document.getElementById('cer-stream-0');
+       if (!e) return;
+       var s = e.shadowRoot;
+       if (!s && e.attachShadow)
+         try {
+           s = e.attachShadow({ mode: 'open' });
+         } catch (_) {}
+       if (s)
+         s.innerHTML = '<style>/* CSS */</style><div>Resolved content</div>';
+       e.removeAttribute('id');
+     })();
+   </script>
+   ```
+   Using `shadowRoot.innerHTML` (rather than `outerHTML`) is critical — the shadow root was already attached at parse time, so filling it directly is reliable across all browsers without depending on declarative shadow DOM processing in dynamically-injected HTML.
+
+> **Dev-mode warning:** When a component with an async `render` function is encountered in non-streaming SSR (`renderToStringWithJITCSS` / `renderToStringWithJITCSSDSD`), a dev warning is logged recommending `renderToStream`. This warning is **suppressed automatically** when using `renderToStream` — you will not see it during incremental streaming.
 
 ### Node.js example
 
@@ -826,7 +868,7 @@ No `<template shadowrootmode="open">` is emitted because the renderer does not k
   ```
 
 - **`component()` is safe to call in bare Node.js** — it registers the component in the SSR registry without touching browser APIs. No DOM polyfill (`jsdom`, `happy-dom`) is required on your server.
-- **Keep render functions synchronous** — async render functions return a Promise; the SSR pass cannot await them and renders an empty shell instead.
+- **Use `renderToStream()` for async render functions** — `renderToStringWithJITCSS` / `renderToStringDSD` render async components as empty shells. `renderToStream` resolves them progressively and streams swap scripts. Keep render functions synchronous when streaming is not needed.
 - **Match prop values between server and client** — `useStyle` callbacks are executed with the same prop values on both server and client, producing identical CSS.
 - **Use `hydrate: 'none'` for static content** — display-only components that never need interactivity can opt out of JS entirely.
 - **Avoid DOM APIs in render** — render functions must be pure and safe to call in a Node.js environment without a DOM.

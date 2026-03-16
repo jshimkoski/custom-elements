@@ -55,7 +55,12 @@ export type { DSDRenderOptions } from './runtime/vdom-ssr-dsd';
 import { renderToString as _render } from './runtime/vdom-ssr';
 import {
   renderToStringDSD as _renderToStringDSD,
+  renderToDSD,
+  buildShadowStyleBlock,
+  beginStreamingCollection,
+  endStreamingCollection,
   DSD_POLYFILL_SCRIPT,
+  type AsyncStreamEntry,
 } from './runtime/vdom-ssr-dsd';
 import { jitCSS, enableJITCSS, type JITCSSOptions } from './runtime/style';
 import type { VNode } from './runtime/types';
@@ -239,14 +244,48 @@ export function renderToStream(
   options?: RenderOptions & DSDRenderOptions & { jit?: JITCSSOptions },
 ): ReadableStream<string> {
   return new ReadableStream<string>({
-    start(controller) {
+    async start(controller) {
+      const asyncEntries: AsyncStreamEntry[] = [];
+      beginStreamingCollection(asyncEntries);
+
       try {
         const { htmlWithStyles } = renderToStringWithJITCSS(vnode, options);
         controller.enqueue(htmlWithStyles);
-        controller.close();
       } catch (err) {
         controller.error(err);
+        return;
+      } finally {
+        endStreamingCollection();
       }
+
+      // Resolve async components and stream swap scripts as they settle.
+      // Each resolved component replaces its placeholder via an inline script.
+      for (const entry of asyncEntries) {
+        try {
+          const resolvedVNodes = await entry.promise;
+          const shadowHTML = Array.isArray(resolvedVNodes)
+            ? (resolvedVNodes as VNode[]).map((n) => renderToDSD(n, entry.opts)).join('')
+            : renderToDSD(resolvedVNodes as VNode, entry.opts);
+          const styleBlock = buildShadowStyleBlock(entry.useStyleCSS, shadowHTML);
+          const shadowContent = `${styleBlock}${shadowHTML}`;
+          controller.enqueue(
+            `<script>(function(){` +
+              `var e=document.getElementById(${JSON.stringify(entry.id)});` +
+              `if(!e)return;` +
+              // The placeholder already has an empty shadow root attached (native DSD or polyfill).
+              // If for some reason it doesn't, attach one now.
+              `var s=e.shadowRoot;` +
+              `if(!s&&e.attachShadow)try{s=e.attachShadow({mode:'open'});}catch(_){};` +
+              `if(s)s.innerHTML=${JSON.stringify(shadowContent)};` +
+              `e.removeAttribute('id');` +
+              `})();</script>`,
+          );
+        } catch {
+          // Async render failed — leave placeholder for client hydration.
+        }
+      }
+
+      controller.close();
     },
   });
 }

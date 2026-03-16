@@ -410,11 +410,11 @@ The window between initial paint and hydration completion is bridged by the SSR-
 
 ---
 
-### Phase 3: Streaming SSR ✅ COMPLETE (API-level; incremental streaming planned)
+### Phase 3: Streaming SSR ✅ COMPLETE
 
 **Goal:** Enable `renderToStream` for faster Time-to-First-Byte on large pages.
 
-**Implementation:** `src/lib/ssr.ts` — `renderToStream()` returns a `ReadableStream<string>`. The current implementation flushes the complete rendered output as a single chunk, providing the full streaming API surface for framework adapters. True incremental streaming (flush shell immediately, resolve async components progressively) is planned for a future release.
+**Implementation:** `src/lib/ssr.ts` — `renderToStream()` returns a `ReadableStream<string>` with true incremental streaming. Synchronous components are flushed immediately as chunk 1. Components whose `render` function returns a `Promise` emit a placeholder in chunk 1; as each promise resolves, an inline `<script>` swap block is streamed to replace the placeholder with the full DSD HTML. `createStreamingSSRHandler` pipes chunks directly to `res.write()` as they arrive.
 
 #### 3.1 — `renderToStream(vnode, options)`
 
@@ -433,23 +433,35 @@ This mirrors React 18's `renderToPipeableStream` behavior: the shell (synchronou
 
 #### 3.2 — Async Component Boundaries
 
-Mark async component holes with a comment-based placeholder:
+Async component holes emit a placeholder element with a unique `id` and an empty `<template shadowrootmode="open">`:
 
 ```html
-<!-- cer-async-start:my-data-table -->
-<div class="skeleton"></div>
-<!-- cer-async-end:my-data-table -->
+<my-async-card id="cer-stream-0">
+  <template shadowrootmode="open"></template>
+</my-async-card>
 ```
 
-When the async component resolves, a small inline script replaces the placeholder:
+The DSD polyfill (or native browser support) attaches an empty shadow root during HTML parse. When the component's async render resolves, a swap `<script>` fills the existing shadow root via `shadowRoot.innerHTML`:
 
 ```html
 <script>
-  document
-    .getElementById('cer-async-my-data-table')
-    .replaceWith(/* resolved HTML */);
+  (function () {
+    var e = document.getElementById('cer-stream-0');
+    if (!e) return;
+    var s = e.shadowRoot;
+    if (!s && e.attachShadow)
+      try {
+        s = e.attachShadow({ mode: 'open' });
+      } catch (_) {}
+    if (s)
+      s.innerHTML =
+        '<style>/* CSS layers */</style><div>Resolved content</div>';
+    e.removeAttribute('id');
+  })();
 </script>
 ```
+
+> **Why `shadowRoot.innerHTML` and not `outerHTML`:** The shadow root is already attached at parse time (native DSD or polyfill). Replacing via `outerHTML` would require the browser to re-process `<template shadowrootmode>` in script-injected HTML — which renders at zero height in Chrome. Filling the existing shadow root directly via `innerHTML` is reliable across all browsers.
 
 ---
 
@@ -747,25 +759,25 @@ The SSR renderer is intentionally stateless — it only serializes `props.attrs`
 
 ## Implementation Status
 
-| Phase | Feature                                                                          | Status                     |
-| ----- | -------------------------------------------------------------------------------- | -------------------------- |
-| 1     | DSD SSR Output (`renderToStringDSD`, `renderToStringWithJITCSSDSD`)              | ✅ Complete                |
-| 1.2   | Full CSS extraction (`baseReset` + `useStyle` + JIT CSS per shadow root)         | ✅ Complete                |
-| 1.3   | DSD polyfill injection (`DSD_POLYFILL_SCRIPT`)                                   | ✅ Complete                |
-| 2     | Hydration detection in constructor (skip `attachShadow` for DSD elements)        | ✅ Complete                |
-| 2.3   | `hydrateApp()` helper                                                            | ✅ Complete                |
-| 3     | `renderToStream()` — `ReadableStream<string>` API                                | ✅ Complete (single-chunk) |
-| 3     | True incremental streaming (shell-first, async component placeholders)           | ⏳ Future                  |
-| 4     | Partial hydration — `load`/`idle`/`visible`/`none` strategies                    | ✅ Complete                |
-| 4.2   | `data-cer-hydrate` attribute emitted during DSD SSR                              | ✅ Complete                |
-| 5.1   | Vite plugin SSR — `cerPlugin()` with `virtual:cer-ssr-config`                    | ✅ Complete                |
-| 5.2   | Node.js middleware — `createSSRHandler`, `createStreamingSSRHandler`             | ✅ Complete                |
-| 5.2.1 | Middleware error handling — factory/render errors close response, re-throw       | ✅ Complete                |
-| 5.3   | Astro integration adapter                                                        | ⏳ Future                  |
-| 5.4   | Routing with SSR — `matchRouteSSR` (query-string-safe), `initRouter`             | ✅ Complete                |
-| 5.5   | Built-in components SSR — `cer-suspense`, `cer-error-boundary`, `cer-keep-alive` | ✅ Complete                |
-| 6     | SSR test suite (DSD, middleware, vite-plugin, routing) — 119 tests               | ✅ Complete                |
-| 6.1   | Hydration mismatch detection (dev mode warnings)                                 | ⏳ Future                  |
+| Phase | Feature                                                                          | Status      |
+| ----- | -------------------------------------------------------------------------------- | ----------- |
+| 1     | DSD SSR Output (`renderToStringDSD`, `renderToStringWithJITCSSDSD`)              | ✅ Complete |
+| 1.2   | Full CSS extraction (`baseReset` + `useStyle` + JIT CSS per shadow root)         | ✅ Complete |
+| 1.3   | DSD polyfill injection (`DSD_POLYFILL_SCRIPT`)                                   | ✅ Complete |
+| 2     | Hydration detection in constructor (skip `attachShadow` for DSD elements)        | ✅ Complete |
+| 2.3   | `hydrateApp()` helper                                                            | ✅ Complete |
+| 3     | `renderToStream()` — `ReadableStream<string>` API                                | ✅ Complete |
+| 3     | True incremental streaming (shell-first, async component placeholders)           | ✅ Complete |
+| 4     | Partial hydration — `load`/`idle`/`visible`/`none` strategies                    | ✅ Complete |
+| 4.2   | `data-cer-hydrate` attribute emitted during DSD SSR                              | ✅ Complete |
+| 5.1   | Vite plugin SSR — `cerPlugin()` with `virtual:cer-ssr-config`                    | ✅ Complete |
+| 5.2   | Node.js middleware — `createSSRHandler`, `createStreamingSSRHandler`             | ✅ Complete |
+| 5.2.1 | Middleware error handling — factory/render errors close response, re-throw       | ✅ Complete |
+| 5.3   | Astro integration adapter                                                        | ⏳ Future   |
+| 5.4   | Routing with SSR — `matchRouteSSR` (query-string-safe), `initRouter`             | ✅ Complete |
+| 5.5   | Built-in components SSR — `cer-suspense`, `cer-error-boundary`, `cer-keep-alive` | ✅ Complete |
+| 6     | SSR test suite (DSD, middleware, vite-plugin, routing) — 119 tests               | ✅ Complete |
+| 6.1   | Hydration mismatch detection (dev mode warnings)                                 | ⏳ Future   |
 
 ---
 
