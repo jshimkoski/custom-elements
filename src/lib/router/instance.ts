@@ -861,9 +861,11 @@ export function initRouter(config: RouterConfig): Router {
         | HTMLElement
         | ((...args: unknown[]) => unknown)
         | undefined;
-      // String tag (custom element) -> render as VNode
+      // String tag (custom element) -> render as VNode, forwarding route params as attrs
+      // vnode.props is structured as { props, attrs, directives }; params go in attrs
+      // so the renderer passes them to the element via setAttributeSmart.
       if (typeof comp === 'string') {
-        return { tag: comp, props: {}, children: [] };
+        return { tag: comp, props: { attrs: { ...current.value.params } }, children: [] };
       }
 
       // Function component (sync or async) -> call and return its VNode(s)
