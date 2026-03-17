@@ -1,6 +1,10 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v3.1.3] - 2026-03-17
+
+- fix(router): forward route params as attrs (a7ecfb2)
+
 ## [v3.1.2] - 2026-03-17
 
 - fix(router): beforeEnter guards fire on the entry url. (0e09b8a)
