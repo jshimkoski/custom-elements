@@ -53,12 +53,6 @@ describe('runtime/node-metadata', () => {
     expect((el2 as any)._transitionGroup).toEqual(meta2);
   });
 });
-import { describe, it, expect } from 'vitest';
-import {
-  getNodeKey,
-  getElementTransition,
-  setElementTransition,
-} from '../src/lib/runtime/node-metadata';
 
 describe('node-metadata extra cases', () => {
   it('reads data-anchor-key attribute when WeakMap not set', () => {

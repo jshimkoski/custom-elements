@@ -6,25 +6,18 @@
 // Robust dev-mode detection across environments (Node tests, Vite dev server, browser)
 let isDev = false;
 try {
-  // Node environment (Vitest / Node.js) via globalThis.process to avoid TS node type dependency
   const maybeProcess = (
     globalThis as { process?: { env?: Record<string, string> } }
   ).process;
-  if (maybeProcess && maybeProcess.env) {
-    isDev = maybeProcess.env.NODE_ENV !== 'production';
-  } else if (typeof import.meta !== 'undefined') {
-    const maybeEnv = (import.meta as { env?: { MODE?: string } }).env;
-    if (maybeEnv) {
-      isDev = maybeEnv.MODE !== 'production';
-    } else {
-      isDev = typeof window !== 'undefined';
-    }
+
+  if (maybeProcess?.env) {
+    const env = maybeProcess.env.NODE_ENV ?? maybeProcess.env.MODE;
+    isDev = env !== 'production';
   } else {
-    // Fallback: assume dev when running in a browser-like environment without explicit MODE
-    isDev = typeof window !== 'undefined';
+    // Browser fallback
+    isDev = typeof window !== 'undefined' && typeof document !== 'undefined';
   }
 } catch {
-  // Be conservative: default to true to surface diagnostics during development
   isDev = true;
 }
 
