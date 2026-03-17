@@ -1,6 +1,11 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v3.1.2] - 2026-03-17
+
+- fix(router): beforeEnter guards fire on the entry url. (0e09b8a)
+- docs: remove dead file (eb5bc69)
+
 ## [v3.1.1] - 2026-03-16
 
 - fix: enhance streaming support (116efe2)
