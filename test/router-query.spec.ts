@@ -39,7 +39,10 @@ describe('router query parsing', () => {
     const link = document.createElement('router-link');
     link.setAttribute('to', '/page?y=2#section');
     document.body.appendChild(link);
-    await new Promise((r) => queueMicrotask(r));
+    // setTimeout (macrotask) ensures both the router-link shadow DOM render and
+    // the async initial navigation (triggered via queueMicrotask in initRouter)
+    // have fully settled before we simulate a click.
+    await new Promise((r) => setTimeout(r, 0));
 
     const anchor = link.shadowRoot?.querySelector(
       'a',

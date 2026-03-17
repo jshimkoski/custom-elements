@@ -563,6 +563,16 @@ export function useRouter(config: RouterConfig): Router {
     push = (path: string) => navigate(path, false);
     replaceFn = (path: string) => navigate(path, true);
     back = () => window.history.back();
+
+    // Run initial navigation through the guard pipeline so beforeEnter guards
+    // fire on the entry URL (e.g. protected routes redirect on hard refresh).
+    // queueMicrotask defers until after setActiveRouter()/rebindProxy() complete,
+    // ensuring subscribers are bound before the navigation state updates.
+    queueMicrotask(() => {
+      navigate(initial.path, true).catch((err) => {
+        devError('Initial navigation error:', err);
+      });
+    });
   } else {
     // SSR mode
     getLocation = () => {
