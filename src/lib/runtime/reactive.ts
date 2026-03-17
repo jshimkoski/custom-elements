@@ -354,11 +354,13 @@ export class ReactiveState<T> {
       return obj;
     }
 
-    // Skip reactivity for DOM nodes - they should not be made reactive
+    // Skip reactivity for DOM nodes - they should not be made reactive.
+    // Guard with typeof to avoid ReferenceError in SSR (Node.js) environments
+    // where browser globals like Node, Element, HTMLElement are not defined.
     if (
-      (obj as unknown) instanceof Node ||
-      (obj as unknown) instanceof Element ||
-      (obj as unknown) instanceof HTMLElement
+      (typeof Node !== 'undefined' && (obj as unknown) instanceof Node) ||
+      (typeof Element !== 'undefined' && (obj as unknown) instanceof Element) ||
+      (typeof HTMLElement !== 'undefined' && (obj as unknown) instanceof HTMLElement)
     ) {
       return obj;
     }

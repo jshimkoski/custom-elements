@@ -365,7 +365,7 @@ export function useProps<T extends Record<string, unknown>>(defaults: T): T {
                     fromHost &&
                     typeof fromHost === 'object' &&
                     'value' in fromHost &&
-                    !(fromHost instanceof Node)
+                    !(typeof Node !== 'undefined' && fromHost instanceof Node)
                   ) {
                     return (fromHost as { value?: unknown }).value;
                   }
@@ -429,7 +429,7 @@ export function useProps<T extends Record<string, unknown>>(defaults: T): T {
         if (host) {
           // Check attribute first (only if host is an actual HTMLElement)
           if (
-            host instanceof HTMLElement ||
+            (typeof HTMLElement !== 'undefined' && host instanceof HTMLElement) ||
             (typeof (host as { getAttribute?: (name: string) => string | null })
               .getAttribute === 'function' &&
               typeof (host as { hasAttribute?: (name: string) => boolean })
@@ -466,7 +466,7 @@ export function useProps<T extends Record<string, unknown>>(defaults: T): T {
               hostValue &&
               typeof hostValue === 'object' &&
               'value' in hostValue &&
-              !(hostValue instanceof Node);
+              !(typeof Node !== 'undefined' && hostValue instanceof Node);
             if (
               typeof def === 'string' &&
               hostValue &&
@@ -538,7 +538,7 @@ export function useProps<T extends Record<string, unknown>>(defaults: T): T {
         raw &&
         typeof raw === 'object' &&
         'value' in raw &&
-        !(raw instanceof Node)
+        !(typeof Node !== 'undefined' && raw instanceof Node)
       )
         return (raw as { value: unknown }).value;
       if (raw != null && raw !== '') {
@@ -881,7 +881,7 @@ export function inject<T>(
 
       while (node && depth < MAX_DEPTH) {
         depth++;
-        if (node instanceof ShadowRoot) {
+        if (typeof ShadowRoot !== 'undefined' && node instanceof ShadowRoot) {
           const shadowHost = node.host;
           const hostCtx = (
             shadowHost as unknown as {
@@ -902,7 +902,7 @@ export function inject<T>(
         } else {
           // Also check light-DOM ancestor elements that may be custom components
           // with provides (e.g. a consumer that is a slotted child of a provider).
-          if (node instanceof Element) {
+          if (typeof Element !== 'undefined' && node instanceof Element) {
             const elCtx = (
               node as unknown as {
                 context?: Record<string | symbol, unknown>;

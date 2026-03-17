@@ -206,7 +206,7 @@ The initial paint is correct and fully styled, with no JavaScript required.
 `useGlobalStyle()` factories are captured during the SSR render pass and returned in `SSRJITResult.globalStyles`. Inject them in a `<style id="cer-ssr-global">` in `<head>`:
 
 ```ts
-const { htmlWithStyles, globalStyles } = renderToStringWithJITCSSDSD(appVNode);
+const { htmlWithStyles, globalStyles, css } = renderToStringWithJITCSSDSD(appVNode);
 
 // htmlWithStyles already injects globalStyles before </head>
 res.send(
@@ -214,13 +214,13 @@ res.send(
 );
 
 // Or inject manually:
-const html = `
+const document = `
   <!DOCTYPE html><html>
   <head>
     <style id="cer-ssr-global">${globalStyles}</style>
     <style id="cer-ssr-jit">${css}</style>
   </head>
-  <body>${html}</body>
+  <body>${htmlWithStyles}</body>
   </html>
 `;
 ```
@@ -692,7 +692,7 @@ Re-initialize the router in your client entry **without** `initialUrl` so it swi
 ```ts
 // entry-client.ts
 import { initRouter } from '@jasonshimmy/custom-elements-runtime/router';
-import { hydrateApp } from '@jasonshimmy/custom-elements-runtime/ssr';
+import { hydrateApp } from '@jasonshimmy/custom-elements-runtime';
 import { routes } from './routes';
 
 initRouter({ routes }); // no initialUrl → browser mode

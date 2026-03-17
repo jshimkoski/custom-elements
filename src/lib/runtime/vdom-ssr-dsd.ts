@@ -53,6 +53,18 @@ export type DSDRenderOptions = RenderOptions & {
    * @default true
    */
   dsdPolyfill?: boolean;
+  /**
+   * Router instance to thread through each component's SSR context.
+   *
+   * When provided, `router-view` reads the current route from this instance
+   * instead of the module-level `activeRouterProxy` singleton, making
+   * concurrent SSR renders safe — each request carries its own router with
+   * its own URL state.
+   *
+   * In browser mode this option is ignored; components always use
+   * `activeRouterProxy` there.
+   */
+  router?: unknown;
 };
 
 // ---------------------------------------------------------------------------
@@ -122,6 +134,8 @@ export interface AsyncStreamEntry {
   lightDOM: string;
   opts: DSDRenderOptions;
   promise: Promise<VNode | VNode[]>;
+  /** Router threaded from the originating render pass — propagated to async re-renders. */
+  router?: unknown;
 }
 
 let _streamingCollector: AsyncStreamEntry[] | null = null;
@@ -209,7 +223,7 @@ function renderCustomElementDSD(vnode: VNode, opts: DSDRenderOptions): string {
 
   // Run the component's render function in a minimal SSR context to get the
   // shadow DOM VNode tree and capture any useStyle() output.
-  const { shadowVNode, useStyleCSS, asyncPromise } = runComponentSSRRender(config, rawAttrs, tag);
+  const { shadowVNode, useStyleCSS, asyncPromise } = runComponentSSRRender(config, rawAttrs, tag, opts.router);
 
   // When streaming and this component has an async render, emit a placeholder
   // and register the promise for later resolution.
@@ -232,6 +246,7 @@ function renderCustomElementDSD(vnode: VNode, opts: DSDRenderOptions): string {
       lightDOM,
       opts,
       promise: asyncPromise,
+      router: opts.router,
     });
     return (
       `<${tag} id="${id}"${attrsString}${hydrateAttr}>` +

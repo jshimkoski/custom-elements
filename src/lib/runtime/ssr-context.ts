@@ -91,10 +91,16 @@ export interface SSRRenderResult {
  *
  * We only need to build a context object that satisfies the hooks' expectations.
  */
+// Monotonic counter ensures each SSR render context gets a unique component ID,
+// preventing the reactive system's stateStorage from returning stale cached
+// ref/computed values from a previous request.
+let _ssrRenderCounter = 0;
+
 export function runComponentSSRRender(
   config: ComponentConfig<object, object, object, object>,
   attrs: Record<string, string | number | boolean | null | undefined>,
   tag = 'unknown',
+  ssrRouter?: unknown,
 ): SSRRenderResult {
   // Build camelCase prop map from serialised attribute names.
   const propsFromAttrs: Record<string, unknown> = {};
@@ -128,8 +134,11 @@ export function runComponentSSRRender(
   // and _computedStyle via Object.defineProperty before calling renderFn().
   const ssrContext: Record<string, unknown> = {
     ...propsFromAttrs,
-    // Stable component ID avoids crypto.randomUUID() in older Node versions.
-    _componentId: `cer-ssr-${Object.keys(propsFromAttrs).join('-') || 'root'}`,
+    // Unique ID per SSR render prevents the reactive system's stateStorage from
+    // returning cached ref/computed values from a previous request. Using a
+    // monotonic counter is cheaper than crypto.randomUUID() and avoids the
+    // Node.js version compatibility concern noted in the original comment.
+    _componentId: `cer-ssr-${Object.keys(propsFromAttrs).join('-') || 'root'}-${++_ssrRenderCounter}`,
     requestRender: () => undefined,
     _requestRender: () => undefined,
     emit: () => true,
@@ -143,6 +152,19 @@ export function runComponentSSRRender(
     enumerable: false,
     configurable: true,
   });
+
+  // Thread the per-request router instance so router-view (and any component
+  // that calls getCurrentComponentContext()._router) reads from the correct
+  // router rather than the module-level activeRouterProxy singleton.
+  // Non-enumerable keeps it out of prop serialisation / Object.keys iteration.
+  if (ssrRouter !== undefined) {
+    Object.defineProperty(ssrContext, '_router', {
+      value: ssrRouter,
+      writable: false,
+      enumerable: false,
+      configurable: true,
+    });
+  }
 
   // Pre-set the component context so hooks (useStyle, useProps, etc.) work even
   // when config.render is a raw function rather than the factory.ts wrapper.

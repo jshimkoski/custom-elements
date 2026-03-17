@@ -169,7 +169,7 @@ export function applyProps<
                   hostVal &&
                   typeof hostVal === 'object' &&
                   'value' in hostVal &&
-                  !(hostVal instanceof Node)
+                  !(typeof Node !== 'undefined' && hostVal instanceof Node)
                 )
                   ret = (hostVal as { value: unknown }).value;
                 else ret = hostVal;

@@ -5,6 +5,7 @@ import {
   useOnConnected,
   useOnDisconnected,
   useStyle,
+  getCurrentComponentContext,
 } from '../runtime/hooks';
 import { ref, computed } from '../runtime/reactive';
 import { flushDOMUpdates } from '../runtime/scheduler';
@@ -791,13 +792,19 @@ export function initRouter(config: RouterConfig): Router {
   }
 
   component('router-view', async () => {
-    // Prefer the latest initialized router (tests may re-init). Resolve the
-    // router lazily so components connect to whichever router is currently
-    // active instead of capturing a stale instance at definition time.
-    // Reactive current route so the component re-renders when router updates
-    if (!getActiveRouter()) return html`<div>Router not initialized.</div>`;
+    // In SSR, prefer the per-request router threaded through the component
+    // context over the module-level activeRouterProxy singleton. This enables
+    // concurrent SSR renders — each request carries its own router instance
+    // with its own URL state, so renders never cross-contaminate.
+    // In the browser there is no _router on the context; fall back to the
+    // global proxy as before.
+    const ctx = getCurrentComponentContext();
+    const ctxRouter = ctx?._router as Router | undefined;
+    const routerToUse = ctxRouter ?? activeRouterProxy;
 
-    const current = ref(activeRouterProxy.getCurrent());
+    if (!getActiveRouter() && !ctxRouter) return html`<div>Router not initialized.</div>`;
+
+    const current = ref(routerToUse.getCurrent());
     const isSSR = typeof window === 'undefined';
 
     // We'll capture the unsubscribe function when the component connects
@@ -809,8 +816,8 @@ export function initRouter(config: RouterConfig): Router {
     if (!isSSR) {
       useOnConnected(() => {
         try {
-          if (typeof activeRouterProxy.subscribe === 'function') {
-            unsubRouterView = activeRouterProxy.subscribe((s) => {
+          if (typeof routerToUse.subscribe === 'function') {
+            unsubRouterView = routerToUse.subscribe((s) => {
               try {
                 // Validate state before updating to prevent corruption
                 if (s && typeof s === 'object' && typeof s.path === 'string') {
@@ -848,12 +855,12 @@ export function initRouter(config: RouterConfig): Router {
       });
     }
 
-    const match = activeRouterProxy.matchRoute(current.value.path);
+    const match = routerToUse.matchRoute(current.value.path);
     if (!match || !match.route) return html`<div>Not found</div>`;
 
     // Resolve the component (supports cached async loaders)
     try {
-      const compRaw = await activeRouterProxy.resolveRouteComponent(
+      const compRaw = await routerToUse.resolveRouteComponent(
         match.route!,
       );
       const comp = compRaw as
@@ -1006,7 +1013,7 @@ export function initRouter(config: RouterConfig): Router {
         // from the host so only the inner element is styled.
         try {
           const host = (ctx as { _host?: HTMLElement } | undefined)?._host;
-          if (host instanceof HTMLElement) {
+          if (typeof HTMLElement !== 'undefined' && host instanceof HTMLElement) {
             const hc = host.getAttribute('class');
             const hs = host.getAttribute('style');
             if (hc) hostClassRef.value = hc;

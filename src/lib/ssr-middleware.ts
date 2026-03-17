@@ -40,6 +40,19 @@ import type { RenderOptions } from './runtime/vdom-ssr';
 import type { DSDRenderOptions } from './runtime/vdom-ssr-dsd';
 import type { JITCSSOptions } from './runtime/style';
 
+/**
+ * What a per-request factory may return.
+ *
+ * - Plain `VNode` — backward-compatible; no per-request router threading.
+ * - `{ vnode, router? }` — the router instance is threaded through the render
+ *   context, making concurrent SSR requests safe (each render reads from its
+ *   own router, not the module-level `activeRouterProxy` singleton).
+ * - `{ vnode, router?, head? }` — `head` is an HTML string injected into the
+ *   document `<head>` for this specific request (e.g. serialized loader data).
+ *   It is merged with the static `head` option passed to the handler factory.
+ */
+export type VnodeFactoryResult = VNode | { vnode: VNode; router?: unknown; head?: string };
+
 // ---------------------------------------------------------------------------
 // Minimal framework-agnostic HTTP types
 // ---------------------------------------------------------------------------
@@ -151,7 +164,9 @@ function wrapInDocument(
  * ```
  */
 export function createSSRHandler<Req extends MinimalRequest = MinimalRequest>(
-  vnodeOrFactory: VNode | ((req: Req) => VNode | Promise<VNode>),
+  vnodeOrFactory:
+    | VnodeFactoryResult
+    | ((req: Req) => VnodeFactoryResult | Promise<VnodeFactoryResult>),
   options?: SSRMiddlewareOptions,
 ): (req: Req, res: MinimalResponse) => Promise<void> {
   const renderOptions: RenderOptions &
@@ -163,14 +178,29 @@ export function createSSRHandler<Req extends MinimalRequest = MinimalRequest>(
 
   return async (req, res) => {
     try {
-      const vnode =
+      const rawResult =
         typeof vnodeOrFactory === 'function'
           ? await vnodeOrFactory(req)
           : vnodeOrFactory;
 
-      const { htmlWithStyles } = renderToStringWithJITCSS(vnode, renderOptions);
+      const isBundle =
+        rawResult !== null &&
+        typeof rawResult === 'object' &&
+        'vnode' in (rawResult as object);
+      const vnode = isBundle
+        ? (rawResult as { vnode: VNode }).vnode
+        : (rawResult as VNode);
+      const router = isBundle
+        ? (rawResult as { vnode: VNode; router?: unknown }).router
+        : undefined;
+      const perRequestHead = isBundle
+        ? (rawResult as { head?: string }).head
+        : undefined;
 
-      const body = wrapInDocument(htmlWithStyles, head, wrapDocument);
+      const { htmlWithStyles } = renderToStringWithJITCSS(vnode, { ...renderOptions, router });
+
+      const mergedHead = [head, perRequestHead].filter(Boolean).join('\n') || undefined;
+      const body = wrapInDocument(htmlWithStyles, mergedHead, wrapDocument);
 
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
       res.end(body);
@@ -212,7 +242,9 @@ export function createSSRHandler<Req extends MinimalRequest = MinimalRequest>(
 export function createStreamingSSRHandler<
   Req extends MinimalRequest = MinimalRequest,
 >(
-  vnodeOrFactory: VNode | ((req: Req) => VNode | Promise<VNode>),
+  vnodeOrFactory:
+    | VnodeFactoryResult
+    | ((req: Req) => VnodeFactoryResult | Promise<VnodeFactoryResult>),
   options?: SSRMiddlewareOptions,
 ): (req: Req, res: MinimalResponse) => Promise<void> {
   const renderOptions: RenderOptions &
@@ -224,21 +256,37 @@ export function createStreamingSSRHandler<
 
   return async (req, res) => {
     try {
-      const vnode =
+      const rawResult =
         typeof vnodeOrFactory === 'function'
           ? await vnodeOrFactory(req)
           : vnodeOrFactory;
 
+      const isBundle =
+        rawResult !== null &&
+        typeof rawResult === 'object' &&
+        'vnode' in (rawResult as object);
+      const vnode = isBundle
+        ? (rawResult as { vnode: VNode }).vnode
+        : (rawResult as VNode);
+      const router = isBundle
+        ? (rawResult as { vnode: VNode; router?: unknown }).router
+        : undefined;
+      const perRequestHead = isBundle
+        ? (rawResult as { head?: string }).head
+        : undefined;
+
+      const mergedHead = [head, perRequestHead].filter(Boolean).join('\n') || undefined;
+
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
 
-      const stream = renderToStream(vnode, renderOptions);
+      const stream = renderToStream(vnode, { ...renderOptions, router });
       const reader = stream.getReader();
 
       if (res.write) {
         // Streaming path: pipe chunks directly to the response as they arrive.
         res.setHeader('Transfer-Encoding', 'chunked');
         if (wrapDocument) {
-          res.write(`<!DOCTYPE html><html><head>${head ?? ''}</head><body>`);
+          res.write(`<!DOCTYPE html><html><head>${mergedHead ?? ''}</head><body>`);
         }
         let done = false;
         while (!done) {
@@ -262,7 +310,7 @@ export function createStreamingSSRHandler<
         }
         const content = chunks.join('');
         const body = wrapDocument
-          ? `<!DOCTYPE html><html><head>${head ?? ''}</head><body>${content}</body></html>`
+          ? `<!DOCTYPE html><html><head>${mergedHead ?? ''}</head><body>${content}</body></html>`
           : content;
         res.end(body);
       }

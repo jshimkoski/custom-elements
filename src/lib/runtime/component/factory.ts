@@ -287,7 +287,7 @@ export function component(
                 let next: Element | null = node.parentElement;
                 if (!next) {
                   const root = node.getRootNode();
-                  if (root instanceof ShadowRoot)
+                  if (typeof ShadowRoot !== 'undefined' && root instanceof ShadowRoot)
                     next = root.host.parentElement;
                 }
                 node = next;

@@ -303,3 +303,161 @@ describe('createStreamingSSRHandler()', () => {
     expect(mock.body).toBeTruthy();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Per-request head injection (VnodeFactoryResult.head)
+// ---------------------------------------------------------------------------
+
+describe('createSSRHandler() — per-request head from factory', () => {
+  it('injects head returned from factory into the document shell', async () => {
+    const factory = async () => ({
+      vnode: { tag: 'div', props: {}, children: [] } as never,
+      head: '<meta name="robots" content="noindex">',
+    });
+    const handler = createSSRHandler(factory);
+    const mock = makeRes();
+    await handler(makeReq(), mock.res);
+    expect(mock.body).toContain('<meta name="robots" content="noindex">');
+    expect(mock.body.indexOf('<meta')).toBeLessThan(mock.body.indexOf('</head>'));
+  });
+
+  it('merges per-request head with static options.head', async () => {
+    const factory = async () => ({
+      vnode: { tag: 'div', props: {}, children: [] } as never,
+      head: '<script>window.__CER_DATA__ = {"id":1}</script>',
+    });
+    const handler = createSSRHandler(factory, {
+      head: '<link rel="stylesheet" href="/app.css">',
+    });
+    const mock = makeRes();
+    await handler(makeReq(), mock.res);
+    expect(mock.body).toContain('<link rel="stylesheet" href="/app.css">');
+    expect(mock.body).toContain('<script>window.__CER_DATA__');
+    // Both appear before </head>
+    const headEnd = mock.body.indexOf('</head>');
+    expect(mock.body.indexOf('<link')).toBeLessThan(headEnd);
+    expect(mock.body.indexOf('<script>')).toBeLessThan(headEnd);
+  });
+
+  it('is backward-compatible: { vnode } without head works as before', async () => {
+    const factory = async () => ({
+      vnode: { tag: 'main', props: {}, children: ['content'] } as never,
+    });
+    const handler = createSSRHandler(factory, {
+      head: '<title>Test</title>',
+    });
+    const mock = makeRes();
+    await handler(makeReq(), mock.res);
+    expect(mock.body).toContain('<title>Test</title>');
+    expect(mock.body).toContain('<main>');
+  });
+
+  it('does not inject head when factory head is undefined', async () => {
+    const factory = async () => ({
+      vnode: { tag: 'span', props: {}, children: [] } as never,
+      head: undefined,
+    });
+    const handler = createSSRHandler(factory);
+    const mock = makeRes();
+    await handler(makeReq(), mock.res);
+    // head element is present but empty (no injected content)
+    expect(mock.body).toContain('<head>');
+    expect(mock.body).toContain('</head>');
+  });
+
+  it('still forwards the router when factory returns { vnode, router, head }', async () => {
+    const fakeRouter = { isFakeRouter: true };
+    const factory = async () => ({
+      vnode: { tag: 'div', props: {}, children: [] } as never,
+      router: fakeRouter,
+      head: '<meta charset="utf-8">',
+    });
+    const handler = createSSRHandler(factory);
+    const mock = makeRes();
+    // Should not throw — router is forwarded to renderToStringWithJITCSS
+    await handler(makeReq(), mock.res);
+    expect(mock.body).toContain('<meta charset="utf-8">');
+  });
+});
+
+describe('createStreamingSSRHandler() — per-request head from factory', () => {
+  it('injects factory head into the streaming preamble (write path)', async () => {
+    const factory = async () => ({
+      vnode: { tag: 'div', props: {}, children: [] } as never,
+      head: '<script>window.__CER_DATA__ = {}</script>',
+    });
+    const handler = createStreamingSSRHandler(factory);
+    const mock = makeRes();
+    await handler(makeReq(), mock.res);
+    // The preamble (first write) should contain the head
+    expect(mock.written[0]).toContain('<script>window.__CER_DATA__');
+    expect(mock.written[0]).toContain('</head>');
+  });
+
+  it('merges per-request head with static options.head in streaming mode', async () => {
+    const factory = async () => ({
+      vnode: { tag: 'div', props: {}, children: [] } as never,
+      head: '<script>window.__CER_DATA__ = {"x":1}</script>',
+    });
+    const handler = createStreamingSSRHandler(factory, {
+      head: '<link rel="stylesheet" href="/app.css">',
+    });
+    const mock = makeRes();
+    await handler(makeReq(), mock.res);
+    expect(mock.written[0]).toContain('<link rel="stylesheet"');
+    expect(mock.written[0]).toContain('window.__CER_DATA__');
+  });
+
+  it('injects factory head via res.end when res.write is absent (buffered path)', async () => {
+    const factory = async () => ({
+      vnode: { tag: 'p', props: {}, children: ['hi'] } as never,
+      head: '<meta name="description" content="test">',
+    });
+    const handler = createStreamingSSRHandler(factory);
+
+    let ended = '';
+    const res: MinimalResponse = {
+      setHeader: () => {},
+      end(data) { ended = data ?? '' },
+      // no write() — forces buffered path
+    };
+
+    await handler(makeReq(), res);
+    expect(ended).toContain('<meta name="description" content="test">');
+    expect(ended).toContain('<p>');
+    expect(ended.indexOf('<meta')).toBeLessThan(ended.indexOf('</head>'));
+  });
+
+  it('merges both heads in buffered path', async () => {
+    const factory = async () => ({
+      vnode: { tag: 'div', props: {}, children: [] } as never,
+      head: '<script>window.__CER_DATA__ = {}</script>',
+    });
+    const handler = createStreamingSSRHandler(factory, {
+      head: '<title>My App</title>',
+    });
+
+    let ended = '';
+    const res: MinimalResponse = {
+      setHeader: () => {},
+      end(data) { ended = data ?? '' },
+    };
+
+    await handler(makeReq(), res);
+    expect(ended).toContain('<title>My App</title>');
+    expect(ended).toContain('window.__CER_DATA__');
+  });
+
+  it('is backward-compatible: { vnode } without head works in streaming mode', async () => {
+    const factory = async () => ({
+      vnode: { tag: 'article', props: {}, children: ['ok'] } as never,
+    });
+    const handler = createStreamingSSRHandler(factory, {
+      head: '<title>Static</title>',
+    });
+    const mock = makeRes();
+    await handler(makeReq(), mock.res);
+    expect(mock.written[0]).toContain('<title>Static</title>');
+    expect(mock.body).toContain('<article>');
+  });
+});

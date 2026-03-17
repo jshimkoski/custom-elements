@@ -217,10 +217,9 @@ export function renderToStringWithJITCSSDSD(
 /**
  * Render a VNode tree to a `ReadableStream<string>`.
  *
- * The current implementation flushes the complete rendered output as a single
- * chunk, providing the streaming API surface for framework adapters. True
- * incremental streaming (flush shell immediately, resolve async components
- * progressively) is planned for a future release.
+ * Supports true incremental streaming: synchronous components are flushed as
+ * the first chunk, then each async component's resolved output is streamed as
+ * an inline swap `<script>` that fills the placeholder's shadow root.
  *
  * @example Node.js
  * ```ts
