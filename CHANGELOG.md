@@ -1,6 +1,10 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v3.2.0] - 2026-03-17
+
+- feat(ssr): implement per-request router instance threading for concurrent renders (c511e11)
+
 ## [v3.1.3] - 2026-03-17
 
 - fix(router): forward route params as attrs (a7ecfb2)
