@@ -1,6 +1,11 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v3.2.1] - 2026-03-21
+
+- fix(render): add error handling for missing return values in component render functions test: add tests for components with missing return values to ensure proper error handling (5fd9912)
+- chore: update dependencies and improve logger environment detection (62ee7d7)
+
 ## [v3.2.0] - 2026-03-17
 
 - feat(ssr): implement per-request router instance threading for concurrent renders (c511e11)
