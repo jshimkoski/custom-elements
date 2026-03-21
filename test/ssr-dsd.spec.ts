@@ -5,6 +5,7 @@
  *  - renderToStringDSD: DSD output for registered custom elements
  *  - renderToStringWithJITCSSDSD: DSD + CSS layer extraction
  *  - renderToStream: ReadableStream API
+ *  - renderToStreamWithJITCSSDSD: convenience streaming DSD alias
  *  - SSRJITResult.globalStyles: useGlobalStyle() capture
  *  - Partial hydration: data-cer-hydrate attribute emission
  *  - Backwards-compatibility: non-DSD path unchanged
@@ -15,6 +16,7 @@ import {
   renderToStringWithJITCSS,
   renderToStringWithJITCSSDSD,
   renderToStream,
+  renderToStreamWithJITCSSDSD,
   DSD_POLYFILL_SCRIPT,
   type SSRJITResult,
 } from '../src/lib/ssr';
@@ -979,5 +981,95 @@ describe('nested custom elements in DSD SSR', () => {
     expect(html).toContain(`<${OUTER}`);
     expect(html).toContain(`<${INNER}`);
     expect(html).toContain('id="inner-content"');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// renderToStreamWithJITCSSDSD — convenience alias
+// ---------------------------------------------------------------------------
+
+describe('renderToStreamWithJITCSSDSD()', () => {
+  async function drainStream(stream: ReadableStream<string>): Promise<string[]> {
+    const reader = stream.getReader();
+    const chunks: string[] = [];
+    let done = false;
+    while (!done) {
+      const { value, done: d } = await reader.read();
+      if (value) chunks.push(value);
+      done = d;
+    }
+    return chunks;
+  }
+
+  it('returns a ReadableStream', () => {
+    const vnode = { tag: 'div', props: {}, children: [] };
+    const stream = renderToStreamWithJITCSSDSD(vnode as never);
+    expect(stream).toBeInstanceOf(ReadableStream);
+  });
+
+  it('is equivalent to renderToStream with dsd: true', async () => {
+    const TAG = 'cer-stream-dsd-alias';
+    registry.set(TAG, {
+      props: {},
+      render: () => ({ tag: 'span', props: {}, children: ['alias'] }) as never,
+    });
+    const vnode = { tag: TAG, props: { attrs: {} }, children: [] };
+    const aliasChunks = await drainStream(renderToStreamWithJITCSSDSD(vnode as never));
+    const directChunks = await drainStream(renderToStream(vnode as never, { dsd: true }));
+    expect(aliasChunks.join('')).toBe(directChunks.join(''));
+  });
+
+  it('yields DSD output with shadowrootmode', async () => {
+    const TAG = 'cer-stream-dsd-alias-dsd';
+    registry.set(TAG, {
+      props: {},
+      render: () => ({ tag: 'div', props: {}, children: ['content'] }) as never,
+    });
+    const vnode = { tag: TAG, props: { attrs: {} }, children: [] };
+    const chunks = await drainStream(renderToStreamWithJITCSSDSD(vnode as never));
+    expect(chunks[0]).toContain('shadowrootmode="open"');
+  });
+
+  it('includes DSD polyfill by default', async () => {
+    const TAG = 'cer-stream-dsd-alias-polyfill';
+    registry.set(TAG, {
+      props: {},
+      render: () => ({ tag: 'div', props: {}, children: [] }) as never,
+    });
+    const vnode = { tag: TAG, props: { attrs: {} }, children: [] };
+    const chunks = await drainStream(renderToStreamWithJITCSSDSD(vnode as never));
+    expect(chunks.join('')).toContain('shadowRootMode');
+  });
+
+  it('omits DSD polyfill when dsdPolyfill: false', async () => {
+    const TAG = 'cer-stream-dsd-alias-nopolyfill';
+    registry.set(TAG, {
+      props: {},
+      render: () => ({ tag: 'div', props: {}, children: [] }) as never,
+    });
+    const vnode = { tag: TAG, props: { attrs: {} }, children: [] };
+    const chunks = await drainStream(
+      renderToStreamWithJITCSSDSD(vnode as never, { dsdPolyfill: false }),
+    );
+    expect(chunks.join('')).toContain('shadowrootmode');
+    expect(chunks.join('')).not.toContain('shadowRootMode');
+  });
+
+  it('streams async components as swap scripts', async () => {
+    const TAG = 'cer-stream-dsd-alias-async';
+    let resolve!: (v: unknown) => void;
+    registry.set(TAG, {
+      props: {},
+      render: () =>
+        new Promise((res) => {
+          resolve = res;
+        }) as never,
+    });
+    const vnode = { tag: TAG, props: { attrs: {} }, children: [] };
+    const streamPromise = drainStream(renderToStreamWithJITCSSDSD(vnode as never));
+    resolve({ tag: 'p', props: {}, children: ['streamed'] });
+    const chunks = await streamPromise;
+    expect(chunks.length).toBeGreaterThanOrEqual(2);
+    expect(chunks.slice(1).join('')).toContain('streamed');
   });
 });

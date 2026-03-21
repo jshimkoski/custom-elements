@@ -82,6 +82,16 @@ import { renderToStream } from '@jasonshimmy/custom-elements-runtime/ssr';
 const stream = renderToStream(appVNode, { dsd: true });
 ```
 
+### 6. `renderToStreamWithJITCSSDSD` — Recommended for all new apps
+
+Convenience alias for `renderToStream(vnode, { dsd: true, ...options })`. Combines streaming, Declarative Shadow DOM, and JIT CSS pre-generation. This is the recommended rendering mode for new server-rendered applications.
+
+```ts
+import { renderToStreamWithJITCSSDSD } from '@jasonshimmy/custom-elements-runtime/ssr';
+
+const stream = renderToStreamWithJITCSSDSD(appVNode, { jit: { extendedColors: true } });
+```
+
 ---
 
 ## Declarative Shadow DOM (DSD) SSR
@@ -532,7 +542,7 @@ See the [SSR Middleware guide](./ssr-middleware.md) for full details.
 
 ## DSD Polyfill
 
-The `DSD_POLYFILL_SCRIPT` constant is a minified inline `<script>` that implements DSD for browsers without native support (Firefox < 123). It is automatically appended when using `renderToStringDSD`, `renderToStringWithJITCSSDSD`, or `renderToStringWithJITCSS` with `dsd: true`.
+The `DSD_POLYFILL_SCRIPT` constant is a minified inline `<script>` that implements DSD for browsers without native support (Firefox < 123). It is automatically appended when using `renderToStringDSD`, `renderToStringWithJITCSSDSD`, `renderToStreamWithJITCSSDSD`, or `renderToStringWithJITCSS` with `dsd: true`.
 
 ```ts
 import { DSD_POLYFILL_SCRIPT } from '@jasonshimmy/custom-elements-runtime/ssr';
@@ -610,6 +620,10 @@ All `DSDRenderOptions` (same as `renderToStringWithJITCSS` options minus `jit`).
 ### `renderToStream(vnode, options?)`
 
 All `DSDRenderOptions` + `jit`. Returns `ReadableStream<string>`.
+
+### `renderToStreamWithJITCSSDSD(vnode, options?)`
+
+Convenience alias: `renderToStream(vnode, { ...options, dsd: true })`. Returns `ReadableStream<string>`.
 
 ### `hydrateApp(root?)`
 
@@ -844,7 +858,7 @@ No `<template shadowrootmode="open">` is emitted because the renderer does not k
 
 ## SSR Best Practices
 
-- **Use `renderToStringWithJITCSSDSD`** for all new applications — it is the zero-FOUC, DSD-enabled, hydration-ready path.
+- **Use `renderToStreamWithJITCSSDSD`** for all new applications — it is the zero-FOUC, DSD-enabled, hydration-ready, incrementally-streamed path. Use `renderToStringWithJITCSSDSD` only if your framework or deployment environment cannot consume a `ReadableStream`.
 - **Register components before rendering** — the DSD renderer consults the registry to know which tags need shadow DOM wrapping.
 - **Pass a single root VNode to all render functions** — `html` produces a fragment (undefined tag) when given multiple root elements, which the SSR renderer cannot process. Wrap multi-element output in a single container:
 
@@ -868,7 +882,7 @@ No `<template shadowrootmode="open">` is emitted because the renderer does not k
   ```
 
 - **`component()` is safe to call in bare Node.js** — it registers the component in the SSR registry without touching browser APIs. No DOM polyfill (`jsdom`, `happy-dom`) is required on your server.
-- **Use `renderToStream()` for async render functions** — `renderToStringWithJITCSS` / `renderToStringDSD` render async components as empty shells. `renderToStream` resolves them progressively and streams swap scripts. Keep render functions synchronous when streaming is not needed.
+- **Use `renderToStreamWithJITCSSDSD()` or `renderToStream()` for async render functions** — `renderToStringWithJITCSS` / `renderToStringDSD` render async components as empty shells. The streaming variants resolve them progressively and stream swap scripts. Keep render functions synchronous when streaming is not needed.
 - **Match prop values between server and client** — `useStyle` callbacks are executed with the same prop values on both server and client, producing identical CSS.
 - **Use `hydrate: 'none'` for static content** — display-only components that never need interactivity can opt out of JS entirely.
 - **Avoid DOM APIs in render** — render functions must be pure and safe to call in a Node.js environment without a DOM.

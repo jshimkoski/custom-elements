@@ -15,6 +15,11 @@
  *
  * 4. **renderToStream** — ReadableStream variant for streaming SSR.
  *
+ * 5. **renderToStreamWithJITCSSDSD** — convenience alias for streaming DSD mode.
+ *    Equivalent to `renderToStream(vnode, { dsd: true, ...options })`.
+ *    Recommended for new server-rendered applications that want true incremental
+ *    streaming with Declarative Shadow DOM and zero FOUC.
+ *
  * Entity map utilities are also exported for full HTML5 named-entity support.
  *
  * @example DSD usage (recommended)
@@ -287,4 +292,43 @@ export function renderToStream(
       controller.close();
     },
   });
+}
+
+// ---------------------------------------------------------------------------
+// renderToStreamWithJITCSSDSD — convenience alias
+// ---------------------------------------------------------------------------
+
+/**
+ * Convenience alias: `renderToStream(vnode, { dsd: true, ...options })`.
+ *
+ * Renders with Declarative Shadow DOM output and full JIT CSS extraction,
+ * streaming the synchronous render as the first chunk and each resolved async
+ * component as a subsequent inline-script swap. This is the recommended
+ * function for all new server-rendered applications.
+ *
+ * @example
+ * ```ts
+ * import { renderToStreamWithJITCSSDSD } from '@jasonshimmy/custom-elements-runtime/ssr';
+ *
+ * app.get('/', (req, res) => {
+ *   const stream = renderToStreamWithJITCSSDSD(appVNode, { router });
+ *   const reader = stream.getReader();
+ *   const pump = () =>
+ *     reader.read().then(({ value, done }) => {
+ *       if (done) { res.end(); return; }
+ *       res.write(value);
+ *       pump();
+ *     });
+ *   pump();
+ * });
+ * ```
+ */
+export function renderToStreamWithJITCSSDSD(
+  vnode: VNode,
+  options?: Omit<
+    RenderOptions & DSDRenderOptions & { jit?: JITCSSOptions },
+    'dsd'
+  >,
+): ReadableStream<string> {
+  return renderToStream(vnode, { ...options, dsd: true });
 }
