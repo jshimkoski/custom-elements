@@ -7,6 +7,7 @@
 Build modern components with strict TypeScript, zero dependencies, and a clean functional API. Designed for speed, standards compliance, and productivity.
 
 - Try it on [Codepen.io](https://codepen.io/jshimkoski/pen/JoYmpxm).
+- Build SPA, SSR, and SSG apps with the [CER App Framework](https://github.com/jshimkoski/vite-plugin-cer-app).
 - Check out the [Material Design 3 Components](https://github.com/jshimkoski/cer-material) built with this runtime.
 - Play a game of [Solatro](https://solatro.netlify.app) built with this runtime in 100% Web Components.
 - Learn more about the author at [jasonshimmy.com](https://jasonshimmy.com).
