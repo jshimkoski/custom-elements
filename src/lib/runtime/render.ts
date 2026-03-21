@@ -119,7 +119,10 @@ export function renderComponent<
           if (wasConnected && !shadowRoot.host.isConnected) return;
           if (sr._asyncRenderToken !== renderToken) return;
           setLoading(false);
-          setError(error instanceof Error ? error : new Error(String(error)));
+          const err = error instanceof Error ? error : new Error(String(error));
+          const tag = shadowRoot.host.tagName.toLowerCase();
+          devError(`[${tag}] Async render error:`, err);
+          setError(err);
         });
       return;
     }
@@ -127,7 +130,10 @@ export function renderComponent<
     renderOutput(shadowRoot, outputOrPromise, context, refs, setHtmlString);
     applyStyle(shadowRoot.innerHTML);
   } catch (error) {
-    setError(error instanceof Error ? error : new Error(String(error)));
+    const err = error instanceof Error ? error : new Error(String(error));
+    const tag = shadowRoot.host.tagName.toLowerCase();
+    devError(`[${tag}] Render error:`, err);
+    setError(err);
   } finally {
     // Always pop context from stack after rendering (ensures cleanup even on errors)
     contextStack.pop();
@@ -151,18 +157,13 @@ export function renderOutput<
 ): void {
   if (!shadowRoot) return;
 
-  try {
-    vdomRenderer(
-      shadowRoot,
-      Array.isArray(output) ? output : [output],
-      context,
-      refs,
-    );
-    setHtmlString(shadowRoot.innerHTML);
-  } catch (error) {
-    devError('Error during VDOM rendering:', error);
-    throw error;
-  }
+  vdomRenderer(
+    shadowRoot,
+    Array.isArray(output) ? output : [output],
+    context,
+    refs,
+  );
+  setHtmlString(shadowRoot.innerHTML);
 }
 
 /**

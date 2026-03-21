@@ -300,6 +300,16 @@ export function component(
           throw err;
         }
 
+        // Validate that the render function returned a value.
+        // A missing `return` is a common mistake that produces a cryptic error
+        // deep in the VDOM renderer; surface it early with a clear message.
+        if (result === undefined || result === null) {
+          throw new Error(
+            `[${normalizedTag}] Component render function did not return a value. ` +
+            `Make sure your component returns an html\`...\` template.`,
+          );
+        }
+
         // Process hook callbacks that were set during render.
         // Callbacks are stored as arrays to allow multiple registrations (composable pattern).
         if (ictx._hookCallbacks) {
@@ -482,8 +492,11 @@ export function component(
         );
         registry.set(normalizedTag, config);
       }
-    } catch {
-      // Discovery render failed - props will be discovered on first real render
+    } catch (err) {
+      // Discovery render failed - props will be discovered on first real render.
+      // Log in dev so the developer sees the error rather than just getting
+      // a blank/broken component with no console output.
+      devWarn(`[${normalizedTag}] Failed to register component. Check your component definition for errors.`, err);
     }
 
     if (typeof customElements !== 'undefined' && !customElements.get(normalizedTag)) {
