@@ -802,7 +802,8 @@ export function initRouter(config: RouterConfig): Router {
     const ctxRouter = ctx?._router as Router | undefined;
     const routerToUse = ctxRouter ?? activeRouterProxy;
 
-    if (!getActiveRouter() && !ctxRouter) return html`<div>Router not initialized.</div>`;
+    if (!getActiveRouter() && !ctxRouter)
+      return html`<div>Router not initialized.</div>`;
 
     const current = ref(routerToUse.getCurrent());
     const isSSR = typeof window === 'undefined';
@@ -860,9 +861,7 @@ export function initRouter(config: RouterConfig): Router {
 
     // Resolve the component (supports cached async loaders)
     try {
-      const compRaw = await routerToUse.resolveRouteComponent(
-        match.route!,
-      );
+      const compRaw = await routerToUse.resolveRouteComponent(match.route!);
       const comp = compRaw as
         | string
         | HTMLElement
@@ -872,7 +871,11 @@ export function initRouter(config: RouterConfig): Router {
       // vnode.props is structured as { props, attrs, directives }; params go in attrs
       // so the renderer passes them to the element via setAttributeSmart.
       if (typeof comp === 'string') {
-        return { tag: comp, props: { attrs: { ...current.value.params } }, children: [] };
+        return {
+          tag: comp,
+          props: { attrs: { ...current.value.params } },
+          children: [],
+        };
       }
 
       // Function component (sync or async) -> call and return its VNode(s)
@@ -949,9 +952,45 @@ export function initRouter(config: RouterConfig): Router {
 
     // Only set up DOM interactions in browser environment
     if (!isSSR) {
-      let syncCheckInterval: ReturnType<typeof setInterval> | null = null;
+      // Capture the host element and render context NOW, during the render
+      // phase while getCurrentComponentContext() is valid. useOnConnected
+      // callbacks receive no arguments — the only correct way to reference
+      // the host element inside a lifecycle callback is via this closure.
+      const renderCtx = getCurrentComponentContext() as {
+        _host?: HTMLElement;
+        _requestRender?: () => void;
+      } | null;
+      const hostEl: HTMLElement | null = renderCtx?._host ?? null;
 
-      useOnConnected((ctx?: unknown) => {
+      let syncCheckInterval: ReturnType<typeof setInterval> | null = null;
+      let prefetchHandler: (() => void) | null = null;
+
+      useOnConnected(() => {
+        // Prefetch the route chunk on mouseenter so the component-loader LRU
+        // cache is warm before the user clicks. Using mouseenter rather than
+        // IntersectionObserver because it fires reliably on the host element
+        // regardless of shadow-DOM nesting depth.
+        if (hostEl instanceof HTMLElement) {
+          prefetchHandler = () => {
+            const to = String(props.to || '');
+            if (to && !isAbsoluteUrl(to)) {
+              try {
+                const { route } = activeRouterProxy.matchRoute(to);
+                if (route?.load) {
+                  // Fire-and-forget: populate the cache silently.
+                  resolveRouteComponent(route).catch(() => {
+                    /* ignore prefetch errors */
+                  });
+                }
+              } catch {
+                /* ignore prefetch errors */
+              }
+            }
+          };
+          // once: true — remove the listener automatically after the first hover.
+          hostEl.addEventListener('mouseenter', prefetchHandler, { once: true });
+        }
+
         try {
           if (typeof activeRouterProxy.subscribe === 'function') {
             unsubRouterLink = activeRouterProxy.subscribe((s) => {
@@ -1012,24 +1051,18 @@ export function initRouter(config: RouterConfig): Router {
         // Migrate host `class`/`style` into internal refs and remove them
         // from the host so only the inner element is styled.
         try {
-          const host = (ctx as { _host?: HTMLElement } | undefined)?._host;
-          if (typeof HTMLElement !== 'undefined' && host instanceof HTMLElement) {
-            const hc = host.getAttribute('class');
-            const hs = host.getAttribute('style');
+          if (hostEl instanceof HTMLElement) {
+            const hc = hostEl.getAttribute('class');
+            const hs = hostEl.getAttribute('style');
             if (hc) hostClassRef.value = hc;
             if (hs) hostStyleRef.value = hs;
             // Remove attributes from host to avoid styling the host
-            if (hc !== null) host.removeAttribute('class');
-            if (hs !== null) host.removeAttribute('style');
+            if (hc !== null) hostEl.removeAttribute('class');
+            if (hs !== null) hostEl.removeAttribute('style');
             // Re-render to ensure migrated host classes/styles are applied
             // to the internal anchor/button element.
             try {
-              // The `ctx` passed into useOnConnected is the component context
-              // which exposes `_requestRender`. Call that to re-render after
-              // migrating host attributes into internal refs.
-              (
-                ctx as unknown as { _requestRender?: () => void }
-              )?._requestRender?.();
+              renderCtx?._requestRender?.();
               // Ensure DOM updates from the scheduled render are flushed so
               // callers (and tests) can synchronously observe migrated
               // classes/styles on the inner anchor/button.
@@ -1048,6 +1081,17 @@ export function initRouter(config: RouterConfig): Router {
       });
 
       useOnDisconnected(() => {
+        // Remove prefetch listener (no-op if once: true already removed it)
+        if (prefetchHandler && hostEl instanceof HTMLElement) {
+          try {
+            hostEl.removeEventListener('mouseenter', prefetchHandler);
+          } catch {
+            /* ignore */
+          } finally {
+            prefetchHandler = null;
+          }
+        }
+
         // Clean up router subscription
         if (typeof unsubRouterLink === 'function') {
           try {

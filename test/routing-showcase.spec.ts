@@ -20,11 +20,17 @@ describe('routing-showcase interactions', () => {
       modComp.homeDoSomething();
     }
 
+    // Pre-load page modules so their components are registered before we
+    // inspect the registry (routes are lazy-loaded in the real app).
+    await import('../src/components/routing-home');
+    await import('../src/components/routing-about');
+
     const el = document.createElement('routing-showcase') as HTMLElement;
     document.body.appendChild(el);
+
     await nextTick();
 
-    // home-page should be registered
+    // home-page should be registered (pre-loaded above)
     expect(customElements.get('home-page')).toBeDefined();
 
     // If the registry is present, call each component's render function
