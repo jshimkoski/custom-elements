@@ -1,6 +1,10 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v3.4.0] - 2026-03-21
+
+- feat(ssr): add renderToStreamWithJITCSSDSD — convenience streaming alias for DSD mode (5a00d08)
+
 ## [v3.3.0] - 2026-03-21
 
 - feat: add prefetching to router-link (b87fd3b)
