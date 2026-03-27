@@ -1,6 +1,6 @@
 import type { ComponentConfig, HydrateStrategy, VNode } from '../types';
 import { reactiveSystem } from '../reactive';
-import { toKebab } from '../helpers';
+import { resolveTagName } from '../tag-utils';
 import {
   setCurrentComponentContext,
   clearCurrentComponentContext,
@@ -123,10 +123,7 @@ export function component(
   // performed lazily to avoid module-load side-effects that prevent
   // tree-shaking by bundlers.
   initGlobalRegistryIfNeeded();
-  let normalizedTag = toKebab(tag);
-  if (!normalizedTag.includes('-')) {
-    normalizedTag = `cer-${normalizedTag}`;
-  }
+  const normalizedTag = resolveTagName(tag);
 
   // Store lifecycle hooks from the render function
   const lifecycleHooks: {

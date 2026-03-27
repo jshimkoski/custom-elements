@@ -381,10 +381,11 @@ jit.destroy(); // tear down
 
 **Package:** `@jasonshimmy/custom-elements-runtime/vite-plugin`
 
-Build-time static analysis plugin that emits pre-generated CSS, eliminating runtime parsing cost entirely. Two exports are available:
+Build-time plugins for JIT CSS, SSR config, and per-page component code splitting. Three exports are available:
 
 - **`cerPlugin`** — All-in-one: JIT CSS + SSR configuration. Recommended for SSR apps.
 - **`cerJITCSS`** — JIT CSS only.
+- **`cerComponentImports`** — Per-page component code splitting: injects static `import` statements for custom elements used in `html\`` templates so Rollup can chunk components per page.
 
 ```ts
 // vite.config.ts — SSR app (recommended)
@@ -415,11 +416,29 @@ export default defineConfig({
 });
 ```
 
-| Export      | Description                                                                                   |
-| ----------- | --------------------------------------------------------------------------------------------- |
-| `cerPlugin` | Combined plugin: JIT CSS + SSR config (`virtual:cer-ssr-config`). Returns a `Plugin[]` array. |
-| `cerJITCSS` | JIT CSS-only Vite plugin that scans source files at build time and emits pre-generated CSS.   |
-| **Types**   | `CerPluginOptions`, `CerSSROptions`, `CerJITCSSPluginOptions`                                 |
+```ts
+// vite.config.ts — per-page component code splitting
+import { cerComponentImports } from '@jasonshimmy/custom-elements-runtime/vite-plugin';
+
+export default defineConfig({
+  plugins: [
+    cerComponentImports({
+      componentsDir: '/absolute/path/to/app/components',
+      appRoot: '/absolute/path/to/app',
+    }),
+  ],
+});
+```
+
+| Export                | Description                                                                                                  |
+| --------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `cerPlugin`           | Combined plugin: JIT CSS + SSR config (`virtual:cer-ssr-config`). Returns a `Plugin[]` array.                |
+| `cerJITCSS`           | JIT CSS-only Vite plugin that scans source files at build time and emits pre-generated CSS.                  |
+| `cerComponentImports` | Transform plugin that injects per-file static imports for custom elements, enabling per-page code splitting. |
+| `resolveTagName`      | Normalize a component name to its kebab-case custom-element tag name (prefixes with `cer-` if no hyphen).   |
+| `extractTemplateTagNames` | Extract hyphenated custom-element tag names from a source string's `html\`` templates.                 |
+| `extractComponentRegistrations` | Extract resolved tag names from all `component('name', …)` calls in a source string.          |
+| **Types**             | `CerPluginOptions`, `CerSSROptions`, `CerJITCSSPluginOptions`, `CerComponentImportsOptions`                  |
 
 ---
 
@@ -453,7 +472,8 @@ Explore the complete documentation for every runtime feature:
 
 - [🎨 JIT CSS](./docs/jit-css.md) - On-demand utility-first styling system (opt-in architecture, all utilities, `useJITCSS`, `useDesignTokens`, `useGlobalStyle`, `cls`)
 - [⚡ DOM JIT CSS](./docs/dom-jit-css.md) - Runtime DOM scanner for non-Shadow DOM contexts (React, Svelte, Vue, plain HTML)
-- [🔧 Vite Plugin](./docs/vite-plugin.md) - `cerPlugin` (JIT CSS + SSR config) and `cerJITCSS` (JIT CSS only) build-time plugins
+- [🔧 Vite Plugin](./docs/vite-plugin.md) - `cerPlugin` (JIT CSS + SSR config), `cerJITCSS` (JIT CSS only), and `cerComponentImports` (per-page code splitting) build-time plugins
+- [🔌 cerComponentImports](./docs/vite-plugin-component-imports.md) - Per-page component code splitting: auto-inject imports from `html\`` templates
 - [📏 Space Utilities](./docs/space-utilities.md) - Tailwind-style `space-x-*` and `space-y-*` spacing utilities
 - [📝 Prose Typography](./docs/prose.md) - Beautiful typography for long-form content
 - [🎨 Colors](./docs/colors.md) - Extended Tailwind-compatible color palette (`/css/colors` subpath)

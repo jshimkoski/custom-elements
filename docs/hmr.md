@@ -78,6 +78,31 @@ component('hmr-demo', () => {
 - **Error handling:**
   - Errors during HMR are caught and displayed using error boundaries
 
+---
+
+## 🔌 Plugin-level HMR — `cerComponentImports`
+
+The `cerComponentImports` Vite plugin has its own `handleHotUpdate` hook that operates at the **build-tool level**, independently of runtime component HMR.
+
+When a component file inside `componentsDir` changes, the plugin:
+
+1. Reads the new file content.
+2. Extracts the current set of registered tag names.
+3. Compares the new set against what was in the manifest before the change.
+
+| Scenario | Result |
+|---|---|
+| Component body changed, same tag name | No manifest change — standard Vite HMR for the file |
+| Tag name changed (e.g. `'old-name'` → `'new-name'`) | Manifest updated; full browser reload + all app modules invalidated |
+| New component file added | Manifest updated; full reload so the new tag is available |
+| Component file deleted | Manifest updated; pages that imported the tag will fail on next load |
+
+A full reload is necessary when the manifest changes because the injected `import` statements in page files are stale — the transform hook must re-run to inject the corrected import paths.
+
+See [cerComponentImports](./vite-plugin-component-imports.md) for the full plugin API.
+
+---
+
 ## ❓ FAQ
 
 **Q: Is HMR enabled in production?**

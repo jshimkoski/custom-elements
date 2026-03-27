@@ -1,9 +1,10 @@
-# 🔧 Vite Plugin (Build-time JIT CSS + SSR Config)
+# 🔧 Vite Plugin (Build-time JIT CSS + SSR Config + Component Imports)
 
-Two plugins are exported from `@jasonshimmy/custom-elements-runtime/vite-plugin`:
+Three plugins are exported from `@jasonshimmy/custom-elements-runtime/vite-plugin`:
 
 - **`cerJITCSS`** — Build-time static analysis: scans source files and emits pre-generated CSS, eliminating all runtime JIT parsing cost (light DOM, not Shadow DOM).
 - **`cerPlugin`** — All-in-one: combines `cerJITCSS` with SSR configuration. Registers a `virtual:cer-ssr-config` module so server entry files can import the resolved render options.
+- **`cerComponentImports`** — Per-page component code splitting: scans `html\`` templates in app files and injects static `import` statements so Rollup can split components into per-page chunks.
 
 ## 📦 Import
 
@@ -12,6 +13,7 @@ Two plugins are exported from `@jasonshimmy/custom-elements-runtime/vite-plugin`
 import {
   cerJITCSS,
   cerPlugin,
+  cerComponentImports,
 } from '@jasonshimmy/custom-elements-runtime/vite-plugin';
 ```
 
@@ -297,9 +299,55 @@ export default defineConfig({
 4. If `virtualModule` is true, the generated CSS is served as `virtual:cer-jit-css`.
 5. **`handleHotUpdate`** — in dev mode, whenever a watched file changes, the plugin re-generates CSS, writes the output file, and invalidates the virtual module.
 
+---
+
+## `cerComponentImports` — Per-page Component Code Splitting
+
+Use `cerComponentImports` to automatically inject per-file static `import` statements for custom elements found in `html\`` template literals. This gives Rollup the module graph edges needed to code-split components per page — only the components a page actually uses are bundled into that page's chunk.
+
+### Quick Start
+
+```ts
+// vite.config.ts
+import { defineConfig } from 'vite';
+import { cerComponentImports } from '@jasonshimmy/custom-elements-runtime/vite-plugin';
+
+export default defineConfig({
+  plugins: [
+    cerComponentImports({
+      componentsDir: '/absolute/path/to/app/components',
+      appRoot: '/absolute/path/to/app',
+    }),
+  ],
+});
+```
+
+### `CerComponentImportsOptions`
+
+```ts
+interface CerComponentImportsOptions {
+  /** Absolute path to the directory containing component source files. */
+  componentsDir: string;
+  /** Absolute path to the app root. Only files inside this directory are transformed. */
+  appRoot: string;
+}
+```
+
+### How It Works
+
+1. **`buildStart`** — scans `componentsDir` for `**/*.ts` files, extracts `component('tag-name', …)` calls, builds a `Map<tagName, absPath>` manifest.
+2. **`transform`** — for each file inside `appRoot` that contains an `html\`` template: extracts hyphenated tag names, looks them up in the manifest, prepends relative `import` statements, and returns a source map.
+3. **`watchChange`** — keeps the manifest current during dev (`create`/`update`/`delete` events).
+4. **`handleHotUpdate`** — when tag names change in a component file, sends a `full-reload` and invalidates app modules.
+
+See [cerComponentImports deep dive](./vite-plugin-component-imports.md) for the full API reference.
+
+---
+
 ## 🔗 Related
 
 - [JIT CSS deep dive](./jit-css.md) — full utility reference
 - [DOM JIT CSS](./dom-jit-css.md) — runtime DOM scanner for non-build scenarios
 - [SSR](./ssr.md) — server-side rendering with DSD output and JIT CSS pre-generation
 - [SSR Middleware](./ssr-middleware.md) — Express/Fastify/Hono handler factories
+- [cerComponentImports](./vite-plugin-component-imports.md) — per-page component code splitting

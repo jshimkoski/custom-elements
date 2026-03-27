@@ -58,7 +58,7 @@ export default defineConfig({
         },
       },
     },
-    minify: 'esbuild',
+    minify: 'oxc',
     sourcemap: true,
   },
 });
