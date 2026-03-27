@@ -1,6 +1,11 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v3.5.0] - 2026-03-27
+
+- feat(tag-utils): add resolveTagName utility for consistent tag resolution test: add tests for resolveTagName, extractTemplateTagNames, and extractComponentRegistrations chore: update dependencies (c34a70a)
+- docs: add link to vite-plugin-cer-app to readme (2bebccf)
+
 ## [v3.4.0] - 2026-03-21
 
 - feat(ssr): add renderToStreamWithJITCSSDSD — convenience streaming alias for DSD mode (5a00d08)
