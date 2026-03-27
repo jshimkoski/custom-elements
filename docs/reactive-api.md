@@ -406,18 +406,36 @@ Watchers and effects created with `watch()` and `watchEffect()` return **stop fu
 
 ### Inside Components
 
-The recommended pattern is to register the stop function with `useOnDisconnected()` so it is cancelled automatically when the component is removed from the DOM:
+Watchers created directly in the render function body are **automatically cleaned up** when the component disconnects. The reactive system registers them under the component's ID during render, and `cleanup()` cascades to release them on disconnect:
 
 ```typescript
 component('search-box', () => {
   const query = ref('');
 
-  const stop = watch(query, (newVal) => {
+  // No need to store the stop function — this watcher is automatically
+  // released when the component disconnects.
+  watch(query, (newVal) => {
     console.log('Query:', newVal);
   });
 
-  // Cancel the watcher when the component disconnects
-  useOnDisconnected(stop);
+  return html`<input :value="${query.value}" @input="${(e: Event) =>
+    (query.value = (e.target as HTMLInputElement).value)}" />`;
+});
+```
+
+If you create a watcher inside a lifecycle hook (`useOnConnected`, `useOnDisconnected`) or an event handler — rather than directly in the render function body — it is not registered under the component and must be stopped manually:
+
+```typescript
+component('search-box', () => {
+  const query = ref('');
+
+  useOnConnected(() => {
+    // Created inside useOnConnected, not during render — must stop manually.
+    const stop = watch(query, (newVal) => {
+      console.log('Query:', newVal);
+    });
+    useOnDisconnected(stop);
+  });
 
   return html`<input :value="${query.value}" @input="${(e: Event) =>
     (query.value = (e.target as HTMLInputElement).value)}" />`;
@@ -446,6 +464,38 @@ stopThemeWatcher();
 ### `reactiveSystem.cleanup(componentId)`
 
 The `reactiveSystem` object exposes a `cleanup(componentId: string)` method that removes all reactive dependency records for the given component. This is called automatically by the runtime on `disconnectedCallback` for every component rendered via `component()`. You only need to call it manually if you are building low-level integrations outside the standard component lifecycle.
+
+**Watcher cascade:** `cleanup()` also recursively cleans up all `watch()`, `watchEffect()`, and `computed()` watchers that were registered during the component's last render. This means that watchers created during render are automatically released when the component disconnects — you do **not** need to call `stop()` or `useOnDisconnected(stop)` for watchers created inside the component's render function body.
+
+```typescript
+component('auto-cleanup-demo', () => {
+  const count = ref(0);
+
+  // This watchEffect is registered under the component.
+  // It is automatically stopped when the component disconnects — no manual cleanup needed.
+  watchEffect(() => {
+    document.title = `Count: ${count.value}`;
+  });
+
+  return html`<button @click="${() => count.value++}">Increment</button>`;
+});
+```
+
+Watchers created **outside** a component render context (e.g., inside `useOnConnected`, inside event handlers, or at module scope) are **not** tracked by the component's registry and must still be stopped manually:
+
+```typescript
+component('manual-cleanup-demo', () => {
+  const count = ref(0);
+
+  useOnConnected(() => {
+    // This watch is created outside the render function body — must be stopped manually.
+    const stop = watch(count, (n) => console.log('count changed:', n));
+    useOnDisconnected(stop);
+  });
+
+  return html`<button @click="${() => count.value++}">Increment</button>`;
+});
+```
 
 ---
 

@@ -245,8 +245,10 @@ export function renderToStringWithJITCSSDSD(
  */
 export function renderToStream(
   vnode: VNode,
-  options?: RenderOptions & DSDRenderOptions & { jit?: JITCSSOptions },
+  options?: RenderOptions & DSDRenderOptions & { jit?: JITCSSOptions; asyncTimeout?: number },
 ): ReadableStream<string> {
+  const timeoutMs = options?.asyncTimeout ?? 30_000;
+
   return new ReadableStream<string>({
     async start(controller) {
       const asyncEntries: AsyncStreamEntry[] = [];
@@ -264,9 +266,13 @@ export function renderToStream(
 
       // Resolve async components and stream swap scripts as they settle.
       // Each resolved component replaces its placeholder via an inline script.
+      // A per-entry timeout prevents hung async components from blocking the stream.
       for (const entry of asyncEntries) {
         try {
-          const resolvedVNodes = await entry.promise;
+          const timeout = new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error(`[cer] async component timed out after ${timeoutMs}ms`)), timeoutMs),
+          );
+          const resolvedVNodes = await Promise.race([entry.promise, timeout]);
           const shadowHTML = Array.isArray(resolvedVNodes)
             ? (resolvedVNodes as VNode[]).map((n) => renderToDSD(n, entry.opts)).join('')
             : renderToDSD(resolvedVNodes as VNode, entry.opts);
@@ -326,7 +332,7 @@ export function renderToStream(
 export function renderToStreamWithJITCSSDSD(
   vnode: VNode,
   options?: Omit<
-    RenderOptions & DSDRenderOptions & { jit?: JITCSSOptions },
+    RenderOptions & DSDRenderOptions & { jit?: JITCSSOptions; asyncTimeout?: number },
     'dsd'
   >,
 ): ReadableStream<string> {

@@ -403,6 +403,26 @@ When `renderToStream` encounters an async `render` function, it:
 
 > **Dev-mode warning:** When a component with an async `render` function is encountered in non-streaming SSR (`renderToStringWithJITCSS` / `renderToStringWithJITCSSDSD`), a dev warning is logged recommending `renderToStream`. This warning is **suppressed automatically** when using `renderToStream` — you will not see it during incremental streaming.
 
+### Async component timeout
+
+By default each async component Promise is raced against a **30-second timeout**. If a component's render Promise does not settle within that window (network failure, infinite loop in setup), the timeout fires and the placeholder element is left in the DOM for client-side hydration — the stream is not blocked. The timeout fires per-entry, not globally, so one slow component does not delay others.
+
+Configure the timeout with the `asyncTimeout` option (milliseconds):
+
+```ts
+// Timeout after 10 seconds instead of the default 30.
+const stream = renderToStream(appVNode, { dsd: true, asyncTimeout: 10_000 });
+
+// Disable the timeout entirely (only for known-safe environments).
+const stream = renderToStream(appVNode, { dsd: true, asyncTimeout: Infinity });
+```
+
+The same option is accepted by `renderToStreamWithJITCSSDSD`:
+
+```ts
+const stream = renderToStreamWithJITCSSDSD(appVNode, { asyncTimeout: 10_000 });
+```
+
 ### Node.js example
 
 ```ts
@@ -619,11 +639,15 @@ All `DSDRenderOptions` (same as `renderToStringWithJITCSS` options minus `jit`).
 
 ### `renderToStream(vnode, options?)`
 
-All `DSDRenderOptions` + `jit`. Returns `ReadableStream<string>`.
+All `DSDRenderOptions` + `jit` + the streaming-specific options below. Returns `ReadableStream<string>`.
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `asyncTimeout` | `number` | `30_000` | Per-entry timeout (ms) for async component Promises. When elapsed, the placeholder is left in the DOM and the stream moves on. Pass `Infinity` to disable. |
 
 ### `renderToStreamWithJITCSSDSD(vnode, options?)`
 
-Convenience alias: `renderToStream(vnode, { ...options, dsd: true })`. Returns `ReadableStream<string>`.
+Convenience alias: `renderToStream(vnode, { ...options, dsd: true })`. Accepts all options of `renderToStream` (including `asyncTimeout`). Returns `ReadableStream<string>`.
 
 ### `hydrateApp(root?)`
 

@@ -235,6 +235,17 @@ class ReactiveSystem {
   cleanup(componentId: string): void {
     const data = this.componentData.get(componentId);
     if (data) {
+      // Cascade cleanup to child watchers (watch/watchEffect/computed) registered
+      // during this component's render so their subscriptions are also released.
+      if (data.watchers.size) {
+        for (const wid of data.watchers.values()) {
+          try {
+            this.cleanup(wid);
+          } catch {
+            // swallow — watcher may already be cleaned up
+          }
+        }
+      }
       for (const state of data.dependencies) {
         state.removeDependent(componentId);
       }
