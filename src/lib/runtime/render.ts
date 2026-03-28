@@ -32,6 +32,35 @@ const aggregatedHtmlCache = new WeakMap<ShadowRoot, string>();
 // Cache for tracking child component elements per shadowRoot for faster aggregation
 const childComponentCache = new WeakMap<ShadowRoot, Set<HTMLElement>>();
 
+// P2-5: Shared stylesheet cache — keyed by the exact CSS text.
+// When multiple instances of the same component use identical computed styles
+// (e.g. from the css`` helper), they share one CSSStyleSheet object instead of
+// each creating their own. This eliminates per-instance <style> duplication.
+// Only populated when adoptedStyleSheets is supported (Chrome 73+, FF 101+, Safari 16.4+).
+const _sharedStyleSheetCache = new Map<string, CSSStyleSheet>();
+
+/**
+ * Returns a shared `CSSStyleSheet` for the given CSS text, creating and caching
+ * it on first use. Falls back to null when `CSSStyleSheet.replaceSync` is
+ * unavailable (old browsers / test environments without full CSS support).
+ * @internal
+ */
+export function getSharedStyleSheet(cssText: string): CSSStyleSheet | null {
+  if (typeof CSSStyleSheet === 'undefined' || !('replaceSync' in CSSStyleSheet.prototype)) {
+    return null;
+  }
+  const cached = _sharedStyleSheetCache.get(cssText);
+  if (cached) return cached;
+  try {
+    const sheet = new CSSStyleSheet();
+    sheet.replaceSync(cssText);
+    _sharedStyleSheetCache.set(cssText, sheet);
+    return sheet;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Register a child component element for faster HTML aggregation
  * @internal
@@ -456,20 +485,37 @@ export function applyStyle<
   finalStyle = sanitizeCSS(finalStyle);
   finalStyle = minifyCSS(finalStyle);
 
-  // Apply styles using constructable stylesheets when available
+  // Apply styles using constructable stylesheets when available.
   if (supportsAdopted) {
-    let sheet = styleSheet;
-    if (!sheet) {
-      sheet = new CSSStyleSheet();
+    // P2-5: When only static computedStyle is present (no per-instance JIT CSS),
+    // use a shared CSSStyleSheet keyed by the CSS text so all instances of the
+    // same component share one object in memory.
+    const isStaticCss = !jitCss?.trim() && !!computedStyle;
+    let sheet: CSSStyleSheet | null;
+    if (isStaticCss) {
+      sheet = getSharedStyleSheet(finalStyle);
+      if (!sheet) {
+        // Fallback: create a per-instance sheet if shared cache fails
+        sheet = new CSSStyleSheet();
+      }
+    } else {
+      sheet = styleSheet;
+      if (!sheet) {
+        sheet = new CSSStyleSheet();
+      }
     }
 
     try {
-      sheet.replaceSync(finalStyle);
+      if (!isStaticCss) {
+        // Only replaceSync for per-instance sheets; shared sheets are already populated.
+        (sheet as CSSStyleSheet).replaceSync(finalStyle);
+      }
       const sheets = [getBaseResetSheet(), transitionSheet];
       if (proseSheet) sheets.push(proseSheet);
-      sheets.push(sheet);
+      sheets.push(sheet as CSSStyleSheet);
       shadowRoot.adoptedStyleSheets = sheets;
-      setStyleSheet(sheet);
+      // Store the per-instance sheet reference only for non-shared sheets.
+      setStyleSheet(isStaticCss ? null : sheet as CSSStyleSheet);
       return;
     } catch {
       // Fall through to style element approach

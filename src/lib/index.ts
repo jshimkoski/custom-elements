@@ -2,6 +2,10 @@
 export { component } from './runtime/component';
 export type { ComponentOptions } from './runtime/component/factory';
 
+// Async component lazy loading (equivalent of Vue's defineAsyncComponent / React.lazy)
+export { defineAsyncComponent } from './runtime/component/async-component';
+export type { AsyncComponentOptions } from './runtime/component/async-component';
+
 // Hydration
 export { hydrateApp } from './runtime/hydration';
 export type { HydrateStrategy } from './runtime/types';

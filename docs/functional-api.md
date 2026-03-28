@@ -1699,7 +1699,48 @@ component('advanced-component', () => {
 
 ## ⏳ Async Components
 
-Handle asynchronous operations seamlessly:
+### `defineAsyncComponent` — lazy-loaded components
+
+`defineAsyncComponent` registers a custom element whose render function is loaded
+asynchronously. Use it for heavy components that should not block the initial render.
+
+```typescript
+import { defineAsyncComponent, html } from '@jasonshimmy/custom-elements-runtime';
+
+defineAsyncComponent(
+  'heavy-chart',
+  () => import('./chart-impl').then(m => m.renderFn),
+  {
+    loading: () => html`<p>Loading chart…</p>`,   // shown while pending
+    error:   () => html`<p>Chart unavailable.</p>`, // shown on failure
+    timeout: 5000,                                   // ms before showing error
+  },
+)
+```
+
+The element transitions through four states:
+
+| State | Description |
+|---|---|
+| `idle` / `loading` | Loader promise is pending. The `loading` template is rendered if provided. |
+| `resolved` | Loader fulfilled. The returned render function is called. |
+| `error` / `timeout` | Loader rejected or timeout exceeded. The `error` template is rendered. |
+
+**Loader return value:** The promise must resolve with a render function `() => VNode | VNode[]`.
+The render function runs inside the component's reactive context — `useProps`, `ref`, etc.
+are all available.
+
+**Timeout:** If `timeout` is set and the loader does not resolve within that many
+milliseconds the element moves to the `error` state and renders the `error` template.
+
+See [async-components.md](./async-components.md) for the full API reference.
+
+---
+
+### Inline async state (manual pattern)
+
+For simpler cases where you want to manage loading state yourself inside a
+single component — without code-splitting — use a reactive `ref` pattern:
 
 ```typescript
 component('async-data', () => {
