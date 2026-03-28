@@ -1,6 +1,10 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v3.7.1] - 2026-03-28
+
+- fix: update readme (3ca9115)
+
 ## [v3.7.0] - 2026-03-28
 
 - feat(async): add defineAsyncComponent for lazy-loaded components with loading/error states (505f840)
