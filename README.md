@@ -430,15 +430,15 @@ export default defineConfig({
 });
 ```
 
-| Export                | Description                                                                                                  |
-| --------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `cerPlugin`           | Combined plugin: JIT CSS + SSR config (`virtual:cer-ssr-config`). Returns a `Plugin[]` array.                |
-| `cerJITCSS`           | JIT CSS-only Vite plugin that scans source files at build time and emits pre-generated CSS.                  |
-| `cerComponentImports` | Transform plugin that injects per-file static imports for custom elements, enabling per-page code splitting. |
-| `resolveTagName`      | Normalize a component name to its kebab-case custom-element tag name (prefixes with `cer-` if no hyphen).   |
-| `extractTemplateTagNames` | Extract hyphenated custom-element tag names from a source string's `html\`` templates.                 |
-| `extractComponentRegistrations` | Extract resolved tag names from all `component('name', …)` calls in a source string.          |
-| **Types**             | `CerPluginOptions`, `CerSSROptions`, `CerJITCSSPluginOptions`, `CerComponentImportsOptions`                  |
+| Export                          | Description                                                                                                  |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `cerPlugin`                     | Combined plugin: JIT CSS + SSR config (`virtual:cer-ssr-config`). Returns a `Plugin[]` array.                |
+| `cerJITCSS`                     | JIT CSS-only Vite plugin that scans source files at build time and emits pre-generated CSS.                  |
+| `cerComponentImports`           | Transform plugin that injects per-file static imports for custom elements, enabling per-page code splitting. |
+| `resolveTagName`                | Normalize a component name to its kebab-case custom-element tag name (prefixes with `cer-` if no hyphen).    |
+| `extractTemplateTagNames`       | Extract hyphenated custom-element tag names from a source string's `html\`` templates.                       |
+| `extractComponentRegistrations` | Extract resolved tag names from all `component('name', …)` calls in a source string.                         |
+| **Types**                       | `CerPluginOptions`, `CerSSROptions`, `CerJITCSSPluginOptions`, `CerComponentImportsOptions`                  |
 
 ---
 
@@ -540,6 +540,7 @@ For examples and implementation details, explore the source code in `src/lib/`.
 
 ### Community Gallery
 
+- [CER App Framework](https://github.com/jshimkoski/cer-app-framework) allows you to SPA, SSR, and SSG apps with this runtime.
 - [Material Design 3 Components](https://github.com/jshimkoski/cer-material) built with this runtime.
 - [Solatro](https://solatro.netlify.app) is a RTS card-based game built with this runtime.
 
