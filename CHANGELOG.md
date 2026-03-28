@@ -1,6 +1,10 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v3.7.0] - 2026-03-28
+
+- feat(async): add defineAsyncComponent for lazy-loaded components with loading/error states (505f840)
+
 ## [v3.6.0] - 2026-03-27
 
 - feat(reactive): implement cascading cleanup for child watchers on component disconnect (bdea256)
