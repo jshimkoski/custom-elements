@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Computed E2E Fixture</title>
+  </head>
+  <body>
+    <div id="value"></div>
+
+    <script type="module">
+      import { ref, computed } from '/src/lib';
+      import { updateScheduler } from '/src/lib/runtime/scheduler';
+
+      // Force the runtime scheduler into a production-like deferred mode
+      // for this fixture so the E2E test reliably reproduces the case
+      // where invalidation is deferred to the scheduler.
+      try {
+        updateScheduler.testEnv = {
+          isTest: false,
+          isVitest: false,
+          isCypress: false,
+        };
+      } catch (e) {
+        // best-effort; continue if the environment doesn't allow mutation
+      }
+
+      // Expose simple test APIs on window so Cypress can drive them
+      window.__testRef = ref(1);
+      window.__testComputed = computed(() => window.__testRef.value * 2);
+
+      // Seed DOM
+      document.getElementById('value').textContent = String(
+        window.__testComputed.value,
+      );
+
+      // Synchronous update+read API
+      window.updateAndRead = (v) => {
+        window.__testRef.value = v;
+        return window.__testComputed.value;
+      };
+
+      // Update the DOM to the latest computed value (helper)
+      window.updateAndUpdateDom = (v) => {
+        window.__testRef.value = v;
+        document.getElementById('value').textContent = String(
+          window.__testComputed.value,
+        );
+      };
+    </script>
+  </body>
+</html>

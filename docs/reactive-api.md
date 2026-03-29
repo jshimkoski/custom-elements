@@ -220,7 +220,7 @@ component('price-display', () => {
 ### How It Works
 
 1. **Initial computation** — `fn()` runs immediately when `computed()` is called to establish reactive dependencies and seed the cache.
-2. **Invalidation** — When any tracked dependency changes, the cached value is marked stale (`isDirty = true`).
+2. **Invalidation** — When any tracked dependency changes, the cached value is marked stale (`isDirty = true`). Invalidation is performed synchronously by the runtime so that an immediate read of `.value` right after mutating a dependency will observe the updated value (avoids stale reads that could occur if invalidation were deferred).
 3. **Re-computation** — On the next `.value` access when stale, `fn()` runs again to update the cache.
 4. **Dependency propagation** — On every `.value` access `fn()` is also called in the _calling_ context so the consumer (a component or outer `computed`) directly tracks the same dependencies. This preserves synchronous notification semantics.
 
@@ -418,8 +418,11 @@ component('search-box', () => {
     console.log('Query:', newVal);
   });
 
-  return html`<input :value="${query.value}" @input="${(e: Event) =>
-    (query.value = (e.target as HTMLInputElement).value)}" />`;
+  return html`<input
+    :value="${query.value}"
+    @input="${(e: Event) =>
+      (query.value = (e.target as HTMLInputElement).value)}"
+  />`;
 });
 ```
 
@@ -437,8 +440,11 @@ component('search-box', () => {
     useOnDisconnected(stop);
   });
 
-  return html`<input :value="${query.value}" @input="${(e: Event) =>
-    (query.value = (e.target as HTMLInputElement).value)}" />`;
+  return html`<input
+    :value="${query.value}"
+    @input="${(e: Event) =>
+      (query.value = (e.target as HTMLInputElement).value)}"
+  />`;
 });
 ```
 
@@ -453,9 +459,13 @@ import { ref, watch } from '@jasonshimmy/custom-elements-runtime';
 const theme = ref<'light' | 'dark'>('light');
 
 // Store the stop function and call it to cancel
-const stopThemeWatcher = watch(theme, (newTheme) => {
-  document.documentElement.setAttribute('data-theme', newTheme);
-}, { immediate: true });
+const stopThemeWatcher = watch(
+  theme,
+  (newTheme) => {
+    document.documentElement.setAttribute('data-theme', newTheme);
+  },
+  { immediate: true },
+);
 
 // Later, when tearing down:
 stopThemeWatcher();
@@ -516,7 +526,12 @@ The simplest pattern is to subscribe unconditionally in the render function body
 
 ```typescript
 import { createStore } from '@jasonshimmy/custom-elements-runtime/store';
-import { component, html, ref, useOnDisconnected } from '@jasonshimmy/custom-elements-runtime';
+import {
+  component,
+  html,
+  ref,
+  useOnDisconnected,
+} from '@jasonshimmy/custom-elements-runtime';
 
 const counterStore = createStore({ count: 0 });
 

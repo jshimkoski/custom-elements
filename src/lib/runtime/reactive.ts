@@ -1,6 +1,6 @@
 import { scheduleDOMUpdate } from './scheduler';
 import { ProxyOptimizer } from './reactive-proxy-cache';
-import { devWarn } from './logger';
+import { devWarn, devError } from './logger';
 import { isDiscoveryRender } from './discovery-state';
 import type { WatchOptions } from './types';
 
@@ -29,6 +29,9 @@ class ReactiveSystem {
       lastWarnTime: number;
       // watchers registered by the component during render
       watchers: Map<string, string>;
+      // flag used to indicate lightweight computed/watch-only entries that
+      // should be invalidated synchronously (no DOM work here).
+      isComputed?: boolean;
     }
   >();
   // Flat storage: compound key `${componentId}:${stateIndex}` -> ReactiveState
@@ -38,7 +41,11 @@ class ReactiveSystem {
   /**
    * Set the current component being rendered for dependency tracking
    */
-  setCurrentComponent(componentId: string, renderFn: () => void): void {
+  setCurrentComponent(
+    componentId: string,
+    renderFn: () => void,
+    options?: { isComputed?: boolean },
+  ): void {
     // Push onto the stack so nested calls can restore previous component
     this.currentComponentStack.push(componentId);
     // (no-op) push logged in debug builds
@@ -49,6 +56,7 @@ class ReactiveSystem {
         stateIndex: 0,
         lastWarnTime: 0,
         watchers: new Map(),
+        isComputed: options?.isComputed ?? false,
       });
     } else {
       const data = this.componentData.get(componentId)!;
@@ -65,6 +73,12 @@ class ReactiveSystem {
       }
       data.renderFn = renderFn;
       data.stateIndex = 0; // Reset state index for this render
+      if (
+        options &&
+        Object.prototype.hasOwnProperty.call(options, 'isComputed')
+      ) {
+        data.isComputed = options!.isComputed;
+      }
     }
   }
 
@@ -224,7 +238,26 @@ class ReactiveSystem {
     for (const componentId of deps) {
       const data = this.componentData.get(componentId);
       if (data) {
-        scheduleDOMUpdate(data.renderFn, componentId);
+        // Computed/watch-only entries only need to be invalidated so that
+        // their cached values become stale immediately. Calling the renderFn
+        // synchronously here avoids leaving computed values stale until the
+        // batched scheduler runs (which would make synchronous reads wrong
+        // in production). For full components and side-effectful watchers,
+        // keep the existing batched scheduling behaviour.
+        if (data.isComputed) {
+          try {
+            data.renderFn();
+          } catch (err) {
+            // Avoid crashing the update loop for a single computed invalidation.
+            try {
+              devError('Error during computed invalidation:', err);
+            } catch {
+              /* swallow */
+            }
+          }
+        } else {
+          scheduleDOMUpdate(data.renderFn, componentId);
+        }
       }
     }
   }
@@ -371,7 +404,8 @@ export class ReactiveState<T> {
     if (
       (typeof Node !== 'undefined' && (obj as unknown) instanceof Node) ||
       (typeof Element !== 'undefined' && (obj as unknown) instanceof Element) ||
-      (typeof HTMLElement !== 'undefined' && (obj as unknown) instanceof HTMLElement)
+      (typeof HTMLElement !== 'undefined' &&
+        (obj as unknown) instanceof HTMLElement)
     ) {
       return obj;
     }
@@ -466,7 +500,9 @@ export function computed<T>(fn: () => T): { readonly value: T } {
 
   // Initial computation: establishes which reactive sources this computed depends on
   // for invalidation tracking.
-  reactiveSystem.setCurrentComponent(computedId, invalidate);
+  reactiveSystem.setCurrentComponent(computedId, invalidate, {
+    isComputed: true,
+  });
   cachedValue = fn();
   reactiveSystem.clearCurrentComponent();
   isDirty = false;
@@ -475,7 +511,9 @@ export function computed<T>(fn: () => T): { readonly value: T } {
     get value(): T {
       if (isDirty) {
         // Re-run fn() in computedId's context to re-subscribe for future invalidations.
-        reactiveSystem.setCurrentComponent(computedId, invalidate);
+        reactiveSystem.setCurrentComponent(computedId, invalidate, {
+          isComputed: true,
+        });
         cachedValue = fn();
         reactiveSystem.clearCurrentComponent();
         isDirty = false;

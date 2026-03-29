@@ -83,9 +83,27 @@ All documentation written in the docs directory should be:
 
 ## Testing and Documentation
 
-- Write unit tests for components using Vitest.
+- Write unit tests for components using Vitest, and add end-to-end tests (Cypress) for any user-visible behavior or integration that could regress. All changes MUST include tests that verify the actual feature, bug fix, or enhancement — not superficial assertions.
 - Provide clear and concise comments for complex logic.
 - Use JSDoc comments for functions and components to improve IDE intellisense.
+
+Verification requirements - NON-NEGOTIABLE:
+
+- EVERY change must be verified locally by running `npm run all:ci` and it MUST complete successfully with zero errors and zero warnings before merging. If `npm run all:ci` requires a running dev server for e2e tests, developers must start the server or provide the exact steps to reproduce the CI environment locally.
+- Changes that cannot be fully verified locally (external services, infra) must include a documented verification plan and reproducible CI configuration that the reviewer can run.
+- Do NOT open a PR unless `npm run all:ci` passes locally; PRs that intentionally fail CI will be rejected.
+
+Evidence-based workflow:
+
+- Reproduce the bug or missing behavior with a failing unit and/or e2e test first.
+- Implement the minimal fix that makes the test pass.
+- Run the full verification suite: `npm run all:ci`.
+- Update all related documentation (docs/, README, and inline comments) to reflect the change.
+- Only then open a PR with the failing test (if applicable), the fix, and the verification steps recorded in the PR description.
+
+NO GUESSING / NO ASSUMPTIONS:
+
+- Never apply speculative or guesswork fixes. Changes must be backed by tests, logs, or reproducible traces. If you are uncertain about an edge case, add a test that demonstrates the expected behavior and document any assumptions explicitly in the test and PR.
 
 ## Error Handling and Validation
 
@@ -108,6 +126,12 @@ All documentation written in the docs directory should be:
 - Always write tests for your code.
 - Always follow best practices in coding, security, and performance.
 - A change can only be considered complete when it meets all the above criteria and has been thoroughly tested and reviewed and the command `npm run all:ci` runs without errors or warnings. THIS IS NON-NEGOTIABLE.
+
+## Repository Interaction (Non-Interactive Policy)
+
+- NEVER open pull requests, push commits, create branches, or perform any repository actions. Only the project maintainer or designated developer is authorized to open PRs or push changes.
+- NEVER attempt to interact with the repository on behalf of the developer (no PRs, pushes, merges, branch creation, or direct CI manipulation). The assistant must only produce proposed patches/diffs and clear step-by-step instructions for the developer to apply.
+- When preparing fixes or features, provide the patch/diff, exact commands to run locally (including `npm run all:ci`), and the expected outputs; do not execute or submit changes to the repository yourself.
 
 ## Methodology
 
