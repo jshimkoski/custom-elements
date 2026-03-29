@@ -1,6 +1,10 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v3.7.2] - 2026-03-29
+
+- fix: prevent computed value stale data in synchronous calls (43d777e)
+
 ## [v3.7.1] - 2026-03-28
 
 - fix: update readme (3ca9115)
