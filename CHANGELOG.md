@@ -1,6 +1,10 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v3.7.3] - 2026-03-30
+
+- fix: useOnConnect not working with reactive values (7aea1cf)
+
 ## [v3.7.2] - 2026-03-29
 
 - fix: prevent computed value stale data in synchronous calls (43d777e)
