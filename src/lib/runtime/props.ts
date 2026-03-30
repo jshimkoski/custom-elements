@@ -1,5 +1,5 @@
 import { toKebab } from './helpers';
-import { isReactiveState } from './reactive';
+import { isReactiveState, ReactiveState } from './reactive';
 import type { ComponentConfig, ComponentContext } from './types';
 
 export type PropDefinition = {
@@ -19,6 +19,31 @@ function parseProp(val: string, type: unknown) {
   }
   if (type === Number) return Number(val);
   return val;
+}
+
+const usePropsStateKey = Symbol.for('@cer/usePropsState');
+
+function syncUsePropsState(context: Record<string, unknown> | null): void {
+  if (!context) return;
+  const typedContext = context as unknown as Record<
+    typeof usePropsStateKey,
+    Map<string, ReactiveState<unknown>>
+  >;
+  const map = typedContext[usePropsStateKey] as
+    | Map<string, ReactiveState<unknown>>
+    | undefined;
+  if (!map) return;
+
+  for (const [key, state] of map.entries()) {
+    try {
+      const currentValue = (context as Record<string, unknown>)[key];
+      if (!Object.is(state.peek(), currentValue)) {
+        state.value = currentValue;
+      }
+    } catch {
+      // ignore syncing failures for individual props
+    }
+  }
 }
 
 /**
@@ -187,7 +212,9 @@ export function applyProps<
     } catch {
       // ignore
     }
+    syncUsePropsState(context);
     return;
   }
   applyPropsFromDefinitions(element, cfg.props, context);
+  syncUsePropsState(context);
 }

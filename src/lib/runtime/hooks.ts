@@ -3,7 +3,7 @@
  * Provides React-like hooks with perfect TypeScript inference
  */
 
-import { isReactiveState } from './reactive';
+import { isReactiveState, ReactiveState, reactiveSystem } from './reactive';
 import { toKebab } from './helpers';
 import { devWarn, devError } from './logger';
 import { isDiscoveryRender as _isDiscoveryRenderFn } from './discovery-state';
@@ -274,7 +274,10 @@ export function useOnError(callback: (error: Error) => void): void {
       if (err instanceof Error) callback(err);
       else callback(new Error(String(err)));
     } catch (handlerErr) {
-      devError('[useOnError] The error handler itself threw an exception:', handlerErr);
+      devError(
+        '[useOnError] The error handler itself threw an exception:',
+        handlerErr,
+      );
     }
   });
 }
@@ -292,6 +295,30 @@ export function useOnError(callback: (error: Error) => void): void {
  * });
  * ```
  */
+const usePropsStateKey = Symbol.for('@cer/usePropsState');
+
+function getUsePropsStateMap(
+  context: Record<string, unknown>,
+): Map<string, ReactiveState<unknown>> {
+  const typedContext = context as unknown as Record<
+    typeof usePropsStateKey,
+    Map<string, ReactiveState<unknown>>
+  >;
+  let map = typedContext[usePropsStateKey] as
+    | Map<string, ReactiveState<unknown>>
+    | undefined;
+  if (!map) {
+    map = new Map();
+    Object.defineProperty(context, usePropsStateKey, {
+      value: map,
+      writable: false,
+      enumerable: false,
+      configurable: false,
+    });
+  }
+  return map;
+}
+
 export function useProps<T extends Record<string, unknown>>(defaults: T): T {
   if (!currentComponentContext) {
     throw new Error('useProps must be called during component render');
@@ -419,6 +446,10 @@ export function useProps<T extends Record<string, unknown>>(defaults: T): T {
       if (typeof prop !== 'string') return undefined;
       const def = (defaults as Record<string, unknown>)[prop];
 
+      const propStateMap = getUsePropsStateMap(ctx);
+      let state = propStateMap.get(prop);
+      let currentValue: unknown;
+
       // If a host element is available, prefer reading from attributes first,
       // then from properties. This ensures that HTML attributes take precedence
       // over default property values (like the standard "title" attribute).
@@ -429,7 +460,8 @@ export function useProps<T extends Record<string, unknown>>(defaults: T): T {
         if (host) {
           // Check attribute first (only if host is an actual HTMLElement)
           if (
-            (typeof HTMLElement !== 'undefined' && host instanceof HTMLElement) ||
+            (typeof HTMLElement !== 'undefined' &&
+              host instanceof HTMLElement) ||
             (typeof (host as { getAttribute?: (name: string) => string | null })
               .getAttribute === 'function' &&
               typeof (host as { hasAttribute?: (name: string) => boolean })
@@ -440,75 +472,61 @@ export function useProps<T extends Record<string, unknown>>(defaults: T): T {
               host as { getAttribute: (name: string) => string | null }
             ).getAttribute(kebabKey);
             if (attrValue !== null) {
-              // Attribute exists - convert based on default type
               if (typeof def === 'boolean') {
-                return attrValue === '' || attrValue === 'true';
+                currentValue = attrValue === '' || attrValue === 'true';
+              } else if (typeof def === 'number') {
+                currentValue = Number(attrValue);
+              } else {
+                currentValue = attrValue;
               }
-              if (typeof def === 'number') {
-                return Number(attrValue);
-              }
-              return attrValue;
             }
           }
 
           // No attribute - check property value
-          const hostValue = (host as unknown as Record<string, unknown>)[prop];
-          // Only use host value if it's explicitly set (not undefined AND not empty string for string defaults)
-          // Empty strings on standard HTML properties (like 'title') should fall through to defaults
-          if (typeof hostValue !== 'undefined' && hostValue !== '') {
-            // If the declared default is a string, avoid returning raw DOM
-            // object-like properties (such as element.style which is a CSSStyleDeclaration)
-            // since templates expect primitives and serializing objects can
-            // cause DOMExceptions. However, wrapper-like objects that expose
-            // a `.value` property (or ReactiveState instances) should be
-            // unwrapped and returned even for string defaults.
-            const isWrapperLike =
-              hostValue &&
-              typeof hostValue === 'object' &&
-              'value' in hostValue &&
-              !(typeof Node !== 'undefined' && hostValue instanceof Node);
-            if (
-              typeof def === 'string' &&
-              hostValue &&
-              typeof hostValue === 'object' &&
-              !isWrapperLike &&
-              !isReactiveState(hostValue)
-            ) {
-              // treat as not present and fall through to ctx/default
-            } else {
-              // Special handling for boolean props: if default is false and hostValue is empty string,
-              // treat it as if the property wasn't set (use default false)
+          if (currentValue === undefined) {
+            const hostValue = (host as unknown as Record<string, unknown>)[
+              prop
+            ];
+            if (typeof hostValue !== 'undefined' && hostValue !== '') {
+              const isWrapperLike =
+                hostValue &&
+                typeof hostValue === 'object' &&
+                'value' in hostValue &&
+                !(typeof Node !== 'undefined' && hostValue instanceof Node);
               if (
-                typeof def === 'boolean' &&
-                def === false &&
-                hostValue === ''
+                !(
+                  typeof def === 'string' &&
+                  hostValue &&
+                  typeof hostValue === 'object' &&
+                  !isWrapperLike &&
+                  !isReactiveState(hostValue)
+                )
               ) {
-                return def;
+                if (
+                  typeof def === 'boolean' &&
+                  def === false &&
+                  hostValue === ''
+                ) {
+                  currentValue = def;
+                } else if (isReactiveState(hostValue)) {
+                  currentValue = (hostValue as { value: unknown }).value;
+                } else if (isWrapperLike) {
+                  currentValue = (hostValue as { value: unknown }).value;
+                } else if (
+                  typeof def === 'boolean' &&
+                  typeof hostValue === 'string'
+                ) {
+                  currentValue = hostValue === '' || hostValue === 'true';
+                } else if (
+                  typeof def === 'number' &&
+                  typeof hostValue === 'string' &&
+                  !Number.isNaN(Number(hostValue))
+                ) {
+                  currentValue = Number(hostValue);
+                } else {
+                  currentValue = hostValue;
+                }
               }
-
-              // Unwrap ReactiveState instances and wrapper-like objects coming
-              // from the host so useProps mirrors applyProps/destructured props
-              // behavior and returns primitive/current values.
-              if (isReactiveState(hostValue)) {
-                return (hostValue as { value: unknown }).value;
-              }
-              if (isWrapperLike) {
-                return (hostValue as { value: unknown }).value;
-              }
-
-              // Primitive on host - return directly (but coerce strings if default provided).
-              // Use the same rule as the attribute path: empty string (standalone attribute
-              // presence) or the literal string 'true' coerce to true; everything else is false.
-              if (typeof def === 'boolean' && typeof hostValue === 'string') {
-                return hostValue === '' || hostValue === 'true';
-              }
-              if (
-                typeof def === 'number' &&
-                typeof hostValue === 'string' &&
-                !Number.isNaN(Number(hostValue))
-              )
-                return Number(hostValue);
-              return hostValue;
             }
           }
         }
@@ -517,43 +535,49 @@ export function useProps<T extends Record<string, unknown>>(defaults: T): T {
       }
 
       // Fall back to reading from the component context itself.
-      const raw = ctx[prop];
-      // Treat empty-string on context as boolean true (attribute presence)
-      // EXCEPT when the default is false - in that case, empty string means "not set"
-      if (typeof def === 'boolean' && raw === '') {
-        if (def === false) {
-          // For boolean props with default false, empty string means use the default
-          return def;
+      if (currentValue === undefined) {
+        const raw = ctx[prop];
+
+        if (typeof def === 'boolean' && raw === '') {
+          currentValue = def === false ? def : true;
+        } else if (isReactiveState(raw)) {
+          currentValue = (raw as { value: unknown }).value;
+        } else if (
+          raw &&
+          typeof raw === 'object' &&
+          'value' in raw &&
+          !(typeof Node !== 'undefined' && raw instanceof Node)
+        ) {
+          currentValue = (raw as { value: unknown }).value;
+        } else if (raw != null && raw !== '') {
+          if (typeof def === 'boolean' && typeof raw === 'string') {
+            currentValue = raw === 'true';
+          } else if (
+            typeof def === 'number' &&
+            typeof raw === 'string' &&
+            !Number.isNaN(Number(raw))
+          ) {
+            currentValue = Number(raw);
+          } else {
+            currentValue = raw;
+          }
+        } else {
+          currentValue = def;
         }
-        // For boolean props with default true, empty string means attribute presence = true
-        return true;
       }
-      // If the context stores a ReactiveState or wrapper, unwrap it here
-      // so components using useProps receive the primitive/current value
-      // when the source is the component context itself. Host-provided
-      // ReactiveState instances are preserved above; this path is only
-      // for ctx values and defaults.
-      if (isReactiveState(raw)) return (raw as { value: unknown }).value;
-      if (
-        raw &&
-        typeof raw === 'object' &&
-        'value' in raw &&
-        !(typeof Node !== 'undefined' && raw instanceof Node)
-      )
-        return (raw as { value: unknown }).value;
-      if (raw != null && raw !== '') {
-        if (typeof def === 'boolean' && typeof raw === 'string') {
-          return raw === 'true';
+
+      if (!state) {
+        state = new ReactiveState(currentValue);
+        propStateMap.set(prop, state);
+      } else if (!Object.is(state.peek(), currentValue)) {
+        if (reactiveSystem.isRenderingComponent()) {
+          state.initSilent(currentValue);
+        } else {
+          state.value = currentValue;
         }
-        if (
-          typeof def === 'number' &&
-          typeof raw === 'string' &&
-          !Number.isNaN(Number(raw))
-        )
-          return Number(raw);
-        return raw;
       }
-      return def;
+
+      return state.value;
     },
     has(_target, prop: string) {
       return typeof prop === 'string' && (prop in ctx || prop in defaults);

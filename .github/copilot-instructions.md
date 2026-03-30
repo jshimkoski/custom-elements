@@ -90,6 +90,7 @@ All documentation written in the docs directory should be:
 Verification requirements - NON-NEGOTIABLE:
 
 - EVERY change must be verified locally by running `npm run all:ci` and it MUST complete successfully with zero errors and zero warnings before merging. If `npm run all:ci` requires a running dev server for e2e tests, developers must start the server or provide the exact steps to reproduce the CI environment locally.
+- If any warnings or errors are encountered during a change, those must be resolved before the change is considered complete. This is non-negotiable.
 - Changes that cannot be fully verified locally (external services, infra) must include a documented verification plan and reproducible CI configuration that the reviewer can run.
 - Do NOT open a PR unless `npm run all:ci` passes locally; PRs that intentionally fail CI will be rejected.
 

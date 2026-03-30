@@ -394,4 +394,69 @@ describe('🎣 Context-Based Hooks API', () => {
     expect(seen).toBeTruthy();
     expect(seen!.tagName).toBe('HEADER');
   });
+
+  it('should update computed props dependencies in a useOnConnected scroll handler', async () => {
+    component('test-useprops-scroll-collapsible', () => {
+      const props = useProps({
+        variant: 'small' as 'small' | 'medium' | 'large',
+      });
+      const collapsed = ref(false);
+      const isCollapsible = computed(
+        () => props.variant === 'medium' || props.variant === 'large',
+      );
+
+      const onScroll = () => {
+        collapsed.value = isCollapsible.value && (window.scrollY ?? 0) > 0;
+      };
+
+      useOnConnected(() => {
+        onScroll();
+        window.addEventListener('scroll', onScroll);
+      });
+      useOnDisconnected(() => {
+        window.removeEventListener('scroll', onScroll);
+      });
+
+      return html`
+        <header
+          :class="${{
+            collapsed: collapsed.value,
+            medium: props.variant === 'medium',
+          }}"
+        >
+          Collapsible ${props.variant}
+        </header>
+      `;
+    });
+
+    container.innerHTML =
+      '<test-useprops-scroll-collapsible></test-useprops-scroll-collapsible>';
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    const host = container.querySelector(
+      'test-useprops-scroll-collapsible',
+    ) as HTMLElement;
+    const header = host.shadowRoot?.querySelector('header') as HTMLElement;
+    expect(header.classList.contains('collapsed')).toBe(false);
+
+    // Put the component in a state where it should be collapsible.
+    host.setAttribute('variant', 'medium');
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    // Simulate scrolling
+    try {
+      Object.defineProperty(window, 'scrollY', {
+        value: 100,
+        writable: true,
+        configurable: true,
+      });
+    } catch {
+      // ignore environments where scrollY isn't configurable
+    }
+
+    window.dispatchEvent(new Event('scroll'));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(header.classList.contains('collapsed')).toBe(true);
+  });
 });

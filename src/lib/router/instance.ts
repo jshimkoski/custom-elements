@@ -988,7 +988,9 @@ export function initRouter(config: RouterConfig): Router {
             }
           };
           // once: true — remove the listener automatically after the first hover.
-          hostEl.addEventListener('mouseenter', prefetchHandler, { once: true });
+          hostEl.addEventListener('mouseenter', prefetchHandler, {
+            once: true,
+          });
         }
 
         try {

@@ -129,6 +129,10 @@ class ReactiveSystem {
     return this.currentComponentStack.length > 0;
   }
 
+  hasComponent(componentId: string): boolean {
+    return this.componentData.has(componentId);
+  }
+
   /**
    * Return whether we should emit a render-time warning for the current component.
    * This throttles warnings to avoid spamming the console for legitimate rapid updates.
@@ -509,8 +513,10 @@ export function computed<T>(fn: () => T): { readonly value: T } {
 
   return {
     get value(): T {
-      if (isDirty) {
-        // Re-run fn() in computedId's context to re-subscribe for future invalidations.
+      if (isDirty || !reactiveSystem.hasComponent(computedId)) {
+        // For detached computed instances (e.g. callbacks captured by
+        // useOnConnected across renders), re-run fn() on demand to keep values
+        // fresh even when the parent component lifecycle entry has been cleaned.
         reactiveSystem.setCurrentComponent(computedId, invalidate, {
           isComputed: true,
         });

@@ -17,6 +17,9 @@ import { createDOMJITCSS } from './lib/dom-jit-css';
 import { when, each, match } from './lib/directives';
 import { eventBus } from './lib/event-bus';
 
+// Import example material design app bar
+import './components/md-app-bar';
+
 // Import example components so they register themselves
 import './components/examples/BabyChildParent';
 import './components/examples/MinimalExample';
@@ -683,6 +686,11 @@ ${JSON.stringify(
 
 document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
   <div>
+    <md-app-bar
+      style="position: sticky; top: 0;"
+      title="Material Design 3"
+      variant="large"
+    ></md-app-bar>
     <ce-test-props></ce-test-props>
     <test-app></test-app>
     <switch-test></switch-test>
