@@ -299,8 +299,18 @@ export function createElementClass<
         }
 
         // Default ('load' or no attribute): hydrate immediately.
+        // Use a synchronous render here (not _requestRender) so that
+        // handleConnected fires AFTER a fully up-to-date render. This
+        // guarantees the lifecycle callbacks registered via useOnConnected /
+        // useOnDisconnected close over the current ReactiveState objects
+        // (including after a disconnect+reconnect where cleanup() has
+        // replaced the stateStorage entries). In production the scheduler
+        // is async, so _requestRender() would defer the render to a later
+        // microtask — leaving handleConnected with stale closures from the
+        // previous render, which is the root cause of the bug where
+        // collapsed.value changes but the template never re-renders.
         this._applyProps(config);
-        this._requestRender();
+        this._render(config);
         handleConnected(config, this.context, this._mounted, (val) => {
           this._mounted = val;
         });
@@ -311,7 +321,7 @@ export function createElementClass<
     private _hydrateNow(cfg: ComponentConfig<S, C, P, T>): void {
       this._runLogicWithinErrorBoundary(cfg, () => {
         this._applyProps(cfg);
-        this._requestRender();
+        this._render(cfg);
         handleConnected(cfg, this.context, this._mounted, (val) => {
           this._mounted = val;
         });
