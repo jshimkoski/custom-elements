@@ -1,6 +1,10 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v3.7.4] - 2026-04-02
+
+- fix: resolve production lifecycle hook bug by using synchronous rendering (ace12a5)
+
 ## [v3.7.3] - 2026-03-30
 
 - fix: useOnConnect not working with reactive values (7aea1cf)
