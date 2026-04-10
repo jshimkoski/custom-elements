@@ -8,6 +8,7 @@
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
     "moduleDetection": "force",
+    "rootDir": "./src/lib",
     "noEmit": false,
     "declaration": true,
     "declarationDir": "./dist",
