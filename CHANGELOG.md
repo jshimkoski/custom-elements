@@ -1,6 +1,11 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v3.7.5] - 2026-04-13
+
+- fix: enhance logger with warning deduplication, improve unsafeHTML handling, and update dependencies (49c5543)
+- chore: update dependencies, fix typescript config issue in tsconfig.json (d4ff81b)
+
 ## [v3.7.4] - 2026-04-02
 
 - fix: resolve production lifecycle hook bug by using synchronous rendering (ace12a5)
