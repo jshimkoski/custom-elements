@@ -10,7 +10,7 @@ import {
 import { ref, computed } from '../runtime/reactive';
 import { flushDOMUpdates } from '../runtime/scheduler';
 import { createStore } from '../store';
-import { devError, devWarn } from '../runtime/logger';
+import { devError, devWarn, devWarnOnce } from '../runtime/logger';
 import { match } from '../directives';
 import type {
   RouteState,
@@ -514,7 +514,7 @@ export function useRouter(config: RouterConfig): Router {
       // Force compilation of all routes during SSR initialization
       cachedMatchRoute(route.path);
     }
-    devWarn(`Pre-compiled ${routes.length} routes for SSR`);
+    devWarnOnce(`Pre-compiled ${routes.length} routes for SSR`);
   }
 
   // If an explicit `initialUrl` is provided we treat this as SSR/static rendering

@@ -687,7 +687,7 @@ ${JSON.stringify(
 document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
   <div>
     <md-app-bar
-      style="position: sticky; top: 0;"
+      style="position: sticky; top: 0; z-index: 100;"
       title="Material Design 3"
       variant="large"
     ></md-app-bar>

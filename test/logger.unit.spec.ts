@@ -1,4 +1,6 @@
-import { describe, it, expect, vi } from 'vitest';
+/// <reference types="node" />
+
+import { describe, it, expect, vi, afterEach } from 'vitest';
 
 describe('runtime/logger', () => {
   const loggerPath = '../src/lib/runtime/logger';
@@ -8,9 +10,9 @@ describe('runtime/logger', () => {
     vi.restoreAllMocks();
   });
 
-  it('does not call console methods in production mode', async () => {
+  it('only suppresses dev-only warnings and logs in production mode', async () => {
     // arrange: simulate production
-    (process as any).env = { ...(process.env || {}), NODE_ENV: 'production' };
+    process.env = { ...(process.env || {}), NODE_ENV: 'production' };
     vi.resetModules();
     const logger = await import(loggerPath);
     const spyWarn = vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -24,12 +26,12 @@ describe('runtime/logger', () => {
 
     // assert - production shouldn't log
     expect(spyWarn).not.toHaveBeenCalled();
-    expect(spyError).not.toHaveBeenCalled();
+    expect(spyError).toHaveBeenCalledWith('y');
     expect(spyLog).not.toHaveBeenCalled();
   });
 
   it('calls console methods in dev/test mode', async () => {
-    (process as any).env = { ...(process.env || {}), NODE_ENV: 'test' };
+    process.env = { ...(process.env || {}), NODE_ENV: 'test' };
     vi.resetModules();
     const logger = await import(loggerPath);
     const spyWarn = vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -46,7 +48,8 @@ describe('runtime/logger', () => {
   });
 
   it('falls back to window detection when process is unavailable', async () => {
-    // simulate environment without process and with a window
+    // simulate environment without process; the test runner still provides
+    // import.meta.env in test mode so dev logging remains enabled
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore
     const realProcess = globalThis.process;
@@ -65,5 +68,40 @@ describe('runtime/logger', () => {
       // @ts-ignore
       globalThis.process = realProcess;
     }
+  });
+
+  it('dedupes repeated warnings within a render warning scope', async () => {
+    process.env = { ...(process.env || {}), NODE_ENV: 'test' };
+    vi.resetModules();
+    const logger = await import(loggerPath);
+    const spyWarn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    logger.beginRenderWarningScope();
+    try {
+      logger.devWarn('same warning');
+      logger.devWarn('same warning');
+      logger.devWarn('different warning');
+    } finally {
+      logger.endRenderWarningScope();
+    }
+
+    expect(spyWarn).toHaveBeenCalledTimes(2);
+    expect(spyWarn).toHaveBeenNthCalledWith(1, 'same warning');
+    expect(spyWarn).toHaveBeenNthCalledWith(2, 'different warning');
+  });
+
+  it('dedupes repeated warn-once messages across separate calls', async () => {
+    process.env = { ...(process.env || {}), NODE_ENV: 'test' };
+    vi.resetModules();
+    const logger = await import(loggerPath);
+    const spyWarn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    logger.devWarnOnce('same warning');
+    logger.devWarnOnce('same warning');
+    logger.devWarnOnce('different warning');
+
+    expect(spyWarn).toHaveBeenCalledTimes(2);
+    expect(spyWarn).toHaveBeenNthCalledWith(1, 'same warning');
+    expect(spyWarn).toHaveBeenNthCalledWith(2, 'different warning');
   });
 });

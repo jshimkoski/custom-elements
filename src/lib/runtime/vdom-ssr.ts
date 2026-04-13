@@ -1,5 +1,9 @@
 import type { VNode } from './types';
 import { escapeHTML } from './helpers';
+import {
+  beginRenderWarningScope,
+  endRenderWarningScope,
+} from './logger';
 import { VOID_ELEMENTS, buildAttrs, type RenderOptions } from './ssr-utils';
 
 /**
@@ -12,6 +16,15 @@ import { VOID_ELEMENTS, buildAttrs, type RenderOptions } from './ssr-utils';
 export type { RenderOptions } from './ssr-utils';
 
 export function renderToString(vnode: VNode, opts?: RenderOptions): string {
+  beginRenderWarningScope();
+  try {
+    return renderToStringImpl(vnode, opts);
+  } finally {
+    endRenderWarningScope();
+  }
+}
+
+function renderToStringImpl(vnode: VNode, opts?: RenderOptions): string {
   if (typeof vnode === 'string') return escapeHTML(vnode) as string;
 
   if (vnode.tag === '#text') {
@@ -28,7 +41,7 @@ export function renderToString(vnode: VNode, opts?: RenderOptions): string {
     const children = Array.isArray(vnode.children)
       ? vnode.children.filter((c) => c !== null && c !== undefined)
       : [];
-    return children.map((c) => renderToString(c, opts)).join('');
+    return children.map((c) => renderToStringImpl(c, opts)).join('');
   }
 
   if (vnode.tag === '#raw') {
@@ -53,12 +66,12 @@ export function renderToString(vnode: VNode, opts?: RenderOptions): string {
   const children = Array.isArray(vnode.children)
     ? vnode.children
         .filter((c) => c !== null && c !== undefined)
-        .map((c) => renderToString(c, opts))
+        .map((c) => renderToStringImpl(c, opts))
         .join('')
     : typeof vnode.children === 'string'
       ? escapeHTML(vnode.children)
       : vnode.children
-        ? renderToString(vnode.children, opts)
+        ? renderToStringImpl(vnode.children, opts)
         : '';
 
   return `<${vnode.tag}${attrsString}>${children}</${vnode.tag}>`;

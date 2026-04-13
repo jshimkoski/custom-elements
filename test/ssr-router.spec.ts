@@ -9,13 +9,14 @@
  *  - createSSRHandler + matchRouteSSR: correct component rendered per URL
  *  - 404 pattern: route: null when no route matches
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   matchRouteSSR,
   useRouter,
   initRouter,
   activeRouterProxy,
 } from '../src/lib/router';
+import { __resetWarningDeduplicationForTests } from '../src/lib/runtime/logger';
 import { renderToStringWithJITCSSDSD } from '../src/lib/ssr';
 import {
   createSSRHandler,
@@ -290,6 +291,11 @@ describe('useRouter() route guards in SSR', () => {
 // ---------------------------------------------------------------------------
 
 describe('initRouter() with initialUrl', () => {
+  afterEach(() => {
+    __resetWarningDeduplicationForTests();
+    vi.restoreAllMocks();
+  });
+
   it('exposes the current route via activeRouterProxy', async () => {
     const routes = [
       { path: '/', component: 'home-page' },
@@ -309,6 +315,24 @@ describe('initRouter() with initialUrl', () => {
     const state = activeRouterProxy.getCurrent();
     expect(state.path).toBe('/products/99');
     expect(state.params.id).toBe('99');
+  });
+
+  it('logs SSR route pre-compilation only once across repeated initRouter calls', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const routes = [
+      { path: '/', component: 'home-page' },
+      { path: '/about', component: 'about-page' },
+    ] as Route[];
+
+    initRouter({ routes, initialUrl: '/' });
+    initRouter({ routes, initialUrl: '/about' });
+    initRouter({ routes, initialUrl: '/' });
+
+    const calls = warnSpy.mock.calls.filter(
+      ([message]) => message === 'Pre-compiled 2 routes for SSR',
+    );
+
+    expect(calls).toHaveLength(1);
   });
 });
 

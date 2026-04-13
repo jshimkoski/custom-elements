@@ -13,7 +13,12 @@ import {
 } from './render-bridge';
 import { getTransitionStyleSheet } from '../transitions';
 import type { ComponentConfig, ComponentContext, VNode, Refs } from './types';
-import { devWarn, devError } from './logger';
+import {
+  beginRenderWarningScope,
+  devWarn,
+  devError,
+  endRenderWarningScope,
+} from './logger';
 import { detectTestEnvironment } from './scheduler';
 
 // Module-level stack for context injection (scoped to render cycle, no global pollution)
@@ -117,6 +122,7 @@ export function renderComponent<
   contextStack.push(context);
 
   try {
+    beginRenderWarningScope();
     const outputOrPromise = cfg.render(context);
 
     if (outputOrPromise instanceof Promise) {
@@ -153,6 +159,7 @@ export function renderComponent<
           devError(`[${tag}] Async render error:`, err);
           setError(err);
         });
+      endRenderWarningScope();
       return;
     }
 
@@ -164,6 +171,7 @@ export function renderComponent<
     devError(`[${tag}] Render error:`, err);
     setError(err);
   } finally {
+    endRenderWarningScope();
     // Always pop context from stack after rendering (ensures cleanup even on errors)
     contextStack.pop();
   }
@@ -186,13 +194,18 @@ export function renderOutput<
 ): void {
   if (!shadowRoot) return;
 
-  vdomRenderer(
-    shadowRoot,
-    Array.isArray(output) ? output : [output],
-    context,
-    refs,
-  );
-  setHtmlString(shadowRoot.innerHTML);
+  beginRenderWarningScope();
+  try {
+    vdomRenderer(
+      shadowRoot,
+      Array.isArray(output) ? output : [output],
+      context,
+      refs,
+    );
+    setHtmlString(shadowRoot.innerHTML);
+  } finally {
+    endRenderWarningScope();
+  }
 }
 
 /**

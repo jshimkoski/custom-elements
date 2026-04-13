@@ -1,3 +1,5 @@
+/// <reference types="node" />
+
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 describe('runtime/logger (env-aware)', () => {
@@ -13,7 +15,7 @@ describe('runtime/logger (env-aware)', () => {
     vi.restoreAllMocks();
   });
 
-  it('does not call console.* when NODE_ENV=production', async () => {
+  it('only logs errors when NODE_ENV=production', async () => {
     process.env.NODE_ENV = 'production';
     // import after setting env so module-level isDev is calculated accordingly
     const logger = await import('../src/lib/runtime/logger');
@@ -26,7 +28,7 @@ describe('runtime/logger (env-aware)', () => {
     logger.devWarn('warn');
     logger.devLog('log');
 
-    expect(err).not.toHaveBeenCalled();
+    expect(err).toHaveBeenCalledWith('err', 1);
     expect(warn).not.toHaveBeenCalled();
     expect(log).not.toHaveBeenCalled();
   });

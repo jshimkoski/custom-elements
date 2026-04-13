@@ -3,23 +3,40 @@
  * These are stripped out in production builds via bundler configuration
  */
 
-// Robust dev-mode detection across environments (Node tests, Vite dev server, browser)
-let isDev = false;
-try {
-  const maybeProcess = (
-    globalThis as { process?: { env?: Record<string, string> } }
-  ).process;
+type RuntimeEnv = {
+  DEV?: boolean;
+  PROD?: boolean;
+  MODE?: string;
+};
 
-  if (maybeProcess?.env) {
-    const env = maybeProcess.env.NODE_ENV ?? maybeProcess.env.MODE;
-    isDev = env !== 'production';
-  } else {
-    // Browser fallback
-    isDev = typeof window !== 'undefined' && typeof document !== 'undefined';
+function detectStaticDevMode(): boolean {
+  try {
+    const maybeProcess = (
+      globalThis as { process?: { env?: Record<string, string | undefined> } }
+    ).process;
+    const env = maybeProcess?.env?.NODE_ENV ?? maybeProcess?.env?.MODE;
+    if (typeof env === 'string' && env.length > 0) {
+      return env !== 'production';
+    }
+  } catch {
+    // ignore
   }
-} catch {
-  isDev = true;
+
+  try {
+    const env = (import.meta as ImportMeta & { env?: RuntimeEnv }).env;
+    if (typeof env?.DEV === 'boolean') return env.DEV;
+    if (typeof env?.PROD === 'boolean') return !env.PROD;
+    if (typeof env?.MODE === 'string' && env.MODE.length > 0) {
+      return env.MODE !== 'production';
+    }
+  } catch {
+    // ignore
+  }
+
+  return false;
 }
+
+const isDev = detectStaticDevMode();
 
 // Runtime-overridable flag. Consumers can set `globalThis.__CE_RUNTIME_DEV__ = true`
 // before importing the library, or call `setDevMode(true)` at runtime to enable
@@ -27,6 +44,9 @@ try {
 // runtime flag at each call so bundlers cannot safely remove the console calls
 // if consumers rely on runtime toggling.
 let runtimeFlag: boolean | undefined;
+let renderWarningDepth = 0;
+let renderWarningsThisCycle: Set<string> | null = null;
+let warningsSeenGlobally = new Set<string>();
 
 /**
  * Programmatically toggle dev-mode logging at runtime.
@@ -51,6 +71,21 @@ export function setDevMode(v: boolean): void {
   }
 }
 
+export function beginRenderWarningScope(): void {
+  renderWarningDepth += 1;
+  if (renderWarningDepth === 1) {
+    renderWarningsThisCycle = new Set();
+  }
+}
+
+export function endRenderWarningScope(): void {
+  if (renderWarningDepth === 0) return;
+  renderWarningDepth -= 1;
+  if (renderWarningDepth === 0) {
+    renderWarningsThisCycle = null;
+  }
+}
+
 function runtimeDevEnabled(): boolean {
   try {
     const g = globalThis as unknown as { __CE_RUNTIME_DEV__?: unknown };
@@ -63,22 +98,52 @@ function runtimeDevEnabled(): boolean {
   return runtimeFlag === true || isDev;
 }
 
+function shouldEmitWarning(message: string): boolean {
+  if (!renderWarningsThisCycle) return true;
+  if (renderWarningsThisCycle.has(message)) return false;
+  renderWarningsThisCycle.add(message);
+  return true;
+}
+
+function shouldEmitWarningOnce(message: string): boolean {
+  if (warningsSeenGlobally.has(message)) return false;
+  warningsSeenGlobally.add(message);
+  return true;
+}
+
 /**
- * Log error only in development mode
+ * Log runtime errors in all modes.
+ * Production builds suppress framework warnings, not actual errors.
  */
 export function devError(message: string, ...args: unknown[]): void {
-  if (runtimeDevEnabled()) {
-    console.error(message, ...args);
-  }
+  console.error(message, ...args);
 }
 
 /**
  * Log warning only in development mode
  */
 export function devWarn(message: string, ...args: unknown[]): void {
-  if (runtimeDevEnabled()) {
+  if (runtimeDevEnabled() && shouldEmitWarning(message)) {
     console.warn(message, ...args);
   }
+}
+
+/**
+ * Log a warning only once for the lifetime of the current runtime instance.
+ * Useful for API-level warnings like unsafeHTML() where repeated renders would
+ * otherwise re-emit the same message on every request.
+ */
+export function devWarnOnce(message: string, ...args: unknown[]): void {
+  if (runtimeDevEnabled() && shouldEmitWarningOnce(message)) {
+    console.warn(message, ...args);
+  }
+}
+
+/** @internal Test-only helper to reset warning dedupe state. */
+export function __resetWarningDeduplicationForTests(): void {
+  warningsSeenGlobally = new Set();
+  renderWarningDepth = 0;
+  renderWarningsThisCycle = null;
 }
 
 /**

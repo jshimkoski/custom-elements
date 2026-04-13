@@ -21,7 +21,11 @@ import {
   setCurrentComponentContext,
   clearCurrentComponentContext,
 } from './hooks';
-import { devWarn } from './logger';
+import {
+  beginRenderWarningScope,
+  devWarn,
+  endRenderWarningScope,
+} from './logger';
 
 // ---------------------------------------------------------------------------
 // Global-style SSR collector
@@ -175,6 +179,7 @@ export function runComponentSSRRender(
   let shadowVNode: VNode | VNode[] | null = null;
   let asyncPromise: Promise<VNode | VNode[]> | undefined;
   try {
+    beginRenderWarningScope();
     const result = config.render(
       ssrContext as ComponentContext<object, object, object, object>,
     );
@@ -195,6 +200,7 @@ export function runComponentSSRRender(
       err,
     );
   } finally {
+    endRenderWarningScope();
     // Clear context. The factory wrapper clears it too, but calling clearCurrentComponentContext()
     // twice (null → null) is harmless and ensures clean state if config.render was a raw function.
     clearCurrentComponentContext();

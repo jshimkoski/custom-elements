@@ -10,7 +10,7 @@ export const safe = (fn: () => void): void => {
 };
 
 import { isReactiveState } from './reactive';
-import { devWarn } from './logger';
+import { devWarn, devWarnOnce } from './logger';
 
 // Caches for string transformations to improve performance
 const KEBAB_CASE_CACHE = new Map<string, string>();
@@ -415,6 +415,10 @@ export function unsafeHTML(html: string): {
   __rawHTML: string;
 } {
   const s = String(html);
+  devWarnOnce(
+    '[#raw] Inserting unsanitized HTML. Ensure the content is trusted or ' +
+      'sanitized before use — unsanitized input can lead to XSS vulnerabilities.',
+  );
   // Provide both property names to be compatible with compiler/renderer expectations
   return { __unsafeHTML: s, __rawHTML: s };
 }
