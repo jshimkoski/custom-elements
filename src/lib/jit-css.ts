@@ -29,6 +29,7 @@ export {
   parseColorWithOpacity,
   parseGradientColorStop,
   parseSpacing,
+  parseZIndex,
   parseArbitrary,
   utilityMap,
   selectorVariants,

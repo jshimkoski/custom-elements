@@ -210,10 +210,40 @@ The `size-*` shorthand sets both `width` and `height` in a single utility — id
 
 `visible`, `invisible`
 
+### **Float & Clear**
+
+`float-right`, `float-left`, `float-none`, `float-start`, `float-end`
+`clear-left`, `clear-right`, `clear-both`, `clear-none`, `clear-start`, `clear-end`, `clearfix`
+
+`float-start` and `float-end` use logical values (`inline-start` / `inline-end`) for RTL-aware layouts. `clearfix` generates the standard `display:table; clear:both` micro-clearfix pattern.
+
+```html
+<!-- Text wrapped around an image -->
+<img class="float-left mr-4 mb-2" src="avatar.png" />
+<p>Text flows around the floated image...</p>
+<div class="clear-both"></div>
+
+<!-- RTL-aware float -->
+<img class="float-start me-4" src="avatar.png" />
+```
+
 ### **Z-index**
 
-`z-0`, `z-1`, `z-2`, `z-3`, `z-4`, `z-5`, `z-6`, `z-7`, `z-8`, `z-9`, `z-10`, `z-20`, `z-30`, `z-40`, `z-50`
-`-z-10`, `-z-20`, `-z-30`, `-z-40`, `-z-50`
+Z-index accepts **any integer or `auto`** — all values are resolved dynamically at runtime by `parseZIndex`, so you are not limited to a predefined set:
+
+`z-0`, `z-10`, `z-50`, `z-100`, `z-999`, `z-9999` — any non-negative integer
+`-z-10`, `-z-100`, `-z-999` — any negative integer
+`z-auto` — `z-index: auto`
+
+```html
+<!-- Fixed navbar above modal backdrop -->
+<div class="z-50 fixed top-0 w-full">Navbar</div>
+<div class="z-40 fixed inset-0 bg-black/50">Backdrop</div>
+
+<!-- Custom stack level -->
+<div class="z-100">Above everything</div>
+<div class="-z-10">Behind the document flow</div>
+```
 
 ### **Grid**
 
@@ -435,7 +465,7 @@ Examples: `from-primary-500`, `to-secondary-600`, `via-neutral-300`
 
 For a complete list, see the `utilityMap` in [`src/lib/runtime/style.ts`](../src/lib/runtime/style.ts).
 
-**Note:** Some utilities are parsed at runtime rather than enumerated as literal keys in `utilityMap`. Color utilities (e.g. `bg-<color>-<shade>`), opacity modifiers (`/50`), arbitrary values (`prop-[value]`) and spacing shorthands (`m`, `mx`, `p`, `px`, `gap`, etc.) are handled by the runtime helpers `parseColorClass`, `parseOpacityModifier`, `parseArbitrary`, and `parseSpacing` respectively (see `src/lib/runtime/style.ts`).
+**Note:** Some utilities are parsed at runtime rather than enumerated as literal keys in `utilityMap`. Color utilities (e.g. `bg-<color>-<shade>`), opacity modifiers (`/50`), arbitrary values (`prop-[value]`), spacing shorthands (`m`, `mx`, `p`, `px`, `gap`, etc.), and unbounded z-index integers (`z-<n>`, `-z-<n>`) are handled by the runtime helpers `parseColorClass`, `parseOpacityModifier`, `parseArbitrary`, `parseSpacing`, and `parseZIndex` respectively (see `src/lib/runtime/style.ts`).
 
 ### **Divide / Sibling Borders**
 
@@ -570,7 +600,7 @@ Apply filter effects to the area **behind** an element (e.g., frosted glass). Us
 
 **Touch Action:** `touch-auto`, `touch-none`, `touch-pan-x`, `touch-pan-left`, `touch-pan-right`, `touch-pan-y`, `touch-pan-up`, `touch-pan-down`, `touch-pinch-zoom`, `touch-manipulation`
 
-**Z-Index:** See the Z-Index section in Built-in Utilities above (`z-0` through `z-50`, plus `z-auto` and negative `-z-10` through `-z-50`)
+**Z-Index:** See the Z-Index section in Built-in Utilities above (any integer: `z-0`, `z-10`, `z-100`, `z-999`, `-z-10`, `-z-999`, etc., plus `z-auto`)
 
 **Display:** `flow-root` — establishes a new block formatting context (replaces clearfix hacks).
 
@@ -1635,6 +1665,7 @@ The following are exported from the root entry (`@jasonshimmy/custom-elements-ru
 All of the following are exported from `@jasonshimmy/custom-elements-runtime/jit-css`:
 
 - `parseSpacing(className: string): string | null` — Parses spacing utilities (`w-4`, `p-2`, `m-auto`, etc.)
+- `parseZIndex(className: string): string | null` — Parses any integer z-index utility (`z-100`, `-z-50`, etc.)
 - `parseColorClass(className: string): string | null` — Parses color utility classes (`bg-primary-500`, `text-neutral-700`, etc.)
 - `parseColorWithOpacity(className: string): string | null` — Parses a color class with an optional `/opacity` modifier
 - `parseGradientColorStop(className: string): string | null` — Parses gradient color stop utilities (`from-*`, `via-*`, `to-*`)

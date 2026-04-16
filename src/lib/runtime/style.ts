@@ -972,14 +972,6 @@ const generateUtilities = (): CSSMap => {
     'grabbing',
   ];
   for (const c of cursors) utils[`cursor-${c}`] = `cursor:${c};`;
-  for (const z of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 30, 40, 50])
-    utils[`z-${z}`] = `z-index:${z};`;
-  utils['z-auto'] = 'z-index:auto;';
-  utils['-z-10'] = 'z-index:-10;';
-  utils['-z-20'] = 'z-index:-20;';
-  utils['-z-30'] = 'z-index:-30;';
-  utils['-z-40'] = 'z-index:-40;';
-  utils['-z-50'] = 'z-index:-50;';
   Object.assign(utils, {
     'sr-only':
       'position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border-width:0;',
@@ -989,6 +981,18 @@ const generateUtilities = (): CSSMap => {
     'pointer-events-auto': 'pointer-events:auto;',
     visible: 'visibility:visible;',
     invisible: 'visibility:hidden;',
+    'float-right': 'float:right;',
+    'float-left': 'float:left;',
+    'float-none': 'float:none;',
+    'float-start': 'float:inline-start;',
+    'float-end': 'float:inline-end;',
+    clearfix: 'content:"";display:table;clear:both;',
+    'clear-left': 'clear:left;',
+    'clear-right': 'clear:right;',
+    'clear-both': 'clear:both;',
+    'clear-none': 'clear:none;',
+    'clear-start': 'clear:inline-start;',
+    'clear-end': 'clear:inline-end;',
   });
 
   // Size utilities and auto margins
@@ -2129,6 +2133,16 @@ export function parseOpacity(className: string): string | null {
   return value < 0 || value > 100 ? null : `opacity:${value / 100};`;
 }
 
+export function parseZIndex(className: string): string | null {
+  if (className === 'z-auto') return 'z-index:auto;';
+  const negative = className.startsWith('-');
+  const raw = negative ? className.slice(1) : className;
+  const match = /^z-(\d+)$/.exec(raw);
+  if (!match) return null;
+  const value = parseInt(match[1], 10);
+  return `z-index:${negative ? -value : value};`;
+}
+
 // Enhanced arbitrary value parser
 export function parseArbitrary(className: string): string | null {
   // [prop:value] format
@@ -2462,6 +2476,7 @@ export function jitCSS(html: string): string {
         parseSpacing(checkPart) ||
         parseSpaceUtility(checkPart) ||
         parseOpacity(checkPart) ||
+        parseZIndex(checkPart) ||
         parseColorWithOpacity(checkPart) ||
         parseGradientColorStop(checkPart) ||
         parseArbitrary(checkPart)
@@ -2482,6 +2497,7 @@ export function jitCSS(html: string): string {
       parseSpacing(cleanBase) ??
       parseSpaceUtility(cleanBase) ??
       parseOpacity(cleanBase) ??
+      parseZIndex(cleanBase) ??
       parseColorWithOpacity(cleanBase) ??
       parseGradientColorStop(cleanBase) ??
       parseArbitrary(cleanBase);
@@ -3059,6 +3075,7 @@ export function jitCSS(html: string): string {
         parseSpacing(cleaned) ||
         parseSpaceUtility(cleaned) ||
         parseOpacity(cleaned) ||
+        parseZIndex(cleaned) ||
         parseColorWithOpacity(cleaned) ||
         parseGradientColorStop(cleaned) ||
         parseArbitrary(cleaned)

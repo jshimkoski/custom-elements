@@ -5,6 +5,7 @@ import {
   selectorVariants,
   parseColorClass,
   parseSpacing,
+  parseZIndex,
   jitCSS,
 } from '../src/lib/runtime/style';
 
@@ -534,19 +535,26 @@ describe('JIT CSS — new utility gaps', () => {
   // ─── Gap #14: Z-auto and intermediate z-index ─────────────────────────────
 
   describe('z-index utilities (Gap #14)', () => {
-    it('z-auto sets z-index:auto', () => {
-      expect(utilityMap['z-auto']).toBe('z-index:auto;');
+    it('z-auto resolves via parseZIndex', () => {
+      expect(parseZIndex('z-auto')).toBe('z-index:auto;');
+      expect(utilityMap['z-auto']).toBeUndefined();
     });
 
-    it('intermediate z-index values 1–9 are defined', () => {
-      for (let i = 1; i <= 9; i++) {
-        expect(utilityMap[`z-${i}`]).toBe(`z-index:${i};`);
+    it('integer z-index values 0–9 resolve via parseZIndex', () => {
+      for (let i = 0; i <= 9; i++) {
+        expect(parseZIndex(`z-${i}`)).toBe(`z-index:${i};`);
       }
     });
 
-    it('negative z-index utilities are defined', () => {
-      expect(utilityMap['-z-10']).toBe('z-index:-10;');
-      expect(utilityMap['-z-50']).toBe('z-index:-50;');
+    it('common z-index values 10–50 resolve via parseZIndex', () => {
+      for (const z of [10, 20, 30, 40, 50]) {
+        expect(parseZIndex(`z-${z}`)).toBe(`z-index:${z};`);
+      }
+    });
+
+    it('negative z-index utilities resolve via parseZIndex', () => {
+      expect(parseZIndex('-z-10')).toBe('z-index:-10;');
+      expect(parseZIndex('-z-50')).toBe('z-index:-50;');
     });
   });
 
@@ -684,6 +692,106 @@ describe('JIT CSS — new utility gaps', () => {
       // TypeScript type test — if this compiles and runs, the types are correct
       const colorScale: Record<string, string> = extendedColors['slate'];
       expect(colorScale['500']).toBe('#64748b');
+    });
+  });
+
+  // ─── Gap #20: Float & clear utilities ────────────────────────────────────
+
+  describe('float utilities (Gap #20)', () => {
+    it('float-right/left/none set float property', () => {
+      expect(utilityMap['float-right']).toBe('float:right;');
+      expect(utilityMap['float-left']).toBe('float:left;');
+      expect(utilityMap['float-none']).toBe('float:none;');
+    });
+
+    it('float-start/end use logical float values', () => {
+      expect(utilityMap['float-start']).toBe('float:inline-start;');
+      expect(utilityMap['float-end']).toBe('float:inline-end;');
+    });
+
+    it('clear-left/right/both/none set clear property', () => {
+      expect(utilityMap['clear-left']).toBe('clear:left;');
+      expect(utilityMap['clear-right']).toBe('clear:right;');
+      expect(utilityMap['clear-both']).toBe('clear:both;');
+      expect(utilityMap['clear-none']).toBe('clear:none;');
+    });
+
+    it('clear-start/end use logical clear values', () => {
+      expect(utilityMap['clear-start']).toBe('clear:inline-start;');
+      expect(utilityMap['clear-end']).toBe('clear:inline-end;');
+    });
+
+    it('clearfix generates content + display + clear declarations', () => {
+      expect(utilityMap['clearfix']).toContain('clear:both');
+      expect(utilityMap['clearfix']).toContain('display:table');
+    });
+
+    it('generates CSS for float utilities via jitCSS', () => {
+      const css = jitCSS('<img class="float-left" /><div class="clear-both"></div>');
+      expect(css).toContain('float:left');
+      expect(css).toContain('clear:both');
+    });
+
+    it('float utilities work with responsive variants', () => {
+      const css = jitCSS('<img class="md:float-right" />');
+      expect(css).toContain('float:right');
+    });
+  });
+
+  // ─── Gap #20 (cont.): Dynamic z-index ────────────────────────────────────
+
+  describe('dynamic z-index via parseZIndex (Gap #20)', () => {
+    it('returns null for non-z-index class names', () => {
+      expect(parseZIndex('hidden')).toBeNull();
+      expect(parseZIndex('flex')).toBeNull();
+    });
+
+    it('parses positive integer z-index values', () => {
+      expect(parseZIndex('z-0')).toBe('z-index:0;');
+      expect(parseZIndex('z-10')).toBe('z-index:10;');
+      expect(parseZIndex('z-50')).toBe('z-index:50;');
+      expect(parseZIndex('z-100')).toBe('z-index:100;');
+      expect(parseZIndex('z-999')).toBe('z-index:999;');
+      expect(parseZIndex('z-9999')).toBe('z-index:9999;');
+    });
+
+    it('parses negative integer z-index values', () => {
+      expect(parseZIndex('-z-1')).toBe('z-index:-1;');
+      expect(parseZIndex('-z-10')).toBe('z-index:-10;');
+      expect(parseZIndex('-z-100')).toBe('z-index:-100;');
+      expect(parseZIndex('-z-999')).toBe('z-index:-999;');
+    });
+
+    it('rejects non-integer z-index values', () => {
+      expect(parseZIndex('z-')).toBeNull();
+      expect(parseZIndex('z-abc')).toBeNull();
+      expect(parseZIndex('z-1.5')).toBeNull();
+    });
+
+    it('generates CSS for arbitrary z-index values via jitCSS', () => {
+      const css = jitCSS('<div class="z-100"></div><div class="z-999"></div>');
+      expect(css).toContain('z-index:100');
+      expect(css).toContain('z-index:999');
+    });
+
+    it('generates CSS for negative arbitrary z-index values via jitCSS', () => {
+      const css = jitCSS('<div class="-z-100"></div>');
+      expect(css).toContain('z-index:-100');
+    });
+
+    it('all integer z-index values are absent from utilityMap and resolve via parseZIndex', () => {
+      // No integer z-index entries live in the static map — all go through parseZIndex
+      expect(utilityMap['z-10']).toBeUndefined();
+      expect(utilityMap['z-50']).toBeUndefined();
+      expect(parseZIndex('z-11')).toBe('z-index:11;');
+      expect(parseZIndex('z-75')).toBe('z-index:75;');
+      expect(parseZIndex('z-250')).toBe('z-index:250;');
+    });
+
+    it('z-index works with hover and responsive variants', () => {
+      const css = jitCSS('<div class="hover:z-100 md:z-50"></div>');
+      expect(css).toContain('z-index:100');
+      expect(css).toContain('z-index:50');
     });
   });
 
