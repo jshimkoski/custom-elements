@@ -1,6 +1,10 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v3.7.6] - 2026-04-16
+
+- fix: add float and clear utilities, enhance z-index parsing, and update tests (2782600)
+
 ## [v3.7.5] - 2026-04-13
 
 - fix: enhance logger with warning deduplication, improve unsafeHTML handling, and update dependencies (49c5543)
