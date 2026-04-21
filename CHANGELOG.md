@@ -1,6 +1,10 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v3.7.7] - 2026-04-21
+
+- fix: prevent LRU-cache corruption by cloning VNode props and add regression tests (607140b)
+
 ## [v3.7.6] - 2026-04-16
 
 - fix: add float and clear utilities, enhance z-index parsing, and update tests (2782600)
