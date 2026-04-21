@@ -2438,6 +2438,30 @@ export function patch(
 }
 
 /**
+ * Recursively clone a VNode tree so that every node has its own `props.attrs`
+ * and `props.props` objects.  This prevents `writebackAttr` (called during
+ * patchProps on the _stored_ previous vnode) from mutating the LRU-cached
+ * vnode objects that the template compiler hands back on every render.
+ */
+function cloneVNodeForStorage(vnode: VNode | string | null | undefined): VNode {
+  if (!vnode || typeof vnode === 'string') return vnode as unknown as VNode;
+  const cloned: VNode = { ...vnode };
+  if (vnode.props) {
+    cloned.props = {
+      ...vnode.props,
+      attrs: vnode.props.attrs ? { ...vnode.props.attrs } : undefined,
+      props: vnode.props.props ? { ...vnode.props.props } : undefined,
+    };
+  }
+  if (Array.isArray(vnode.children)) {
+    cloned.children = vnode.children.map(
+      (c) => cloneVNodeForStorage(c as VNode) as VNode,
+    );
+  }
+  return cloned;
+}
+
+/**
  * Virtual DOM renderer.
  * @param root The root element to render into.
  * @param vnodeOrArray The virtual node or array of virtual nodes to render.
@@ -2533,26 +2557,14 @@ export function vdomRenderer(
   nodesToRemove.forEach((node) => root.removeChild(node));
 
   // Update tracked VNode and DOM node.
-  // Store a copy of newVNode with its own props/attrs objects so that
-  // subsequent writebackAttr calls (inside patchProps) do not mutate the
-  // LRU-cached VNode that the template compiler returns on every render.
-  // Shallow-copying props + deep-copying attrs/props sub-objects is
-  // enough because writebackAttr only writes one level deep into attrs.
-  const prevVNodeToStore: VNode =
-    newVNode && typeof newVNode === 'object' && newVNode.props
-      ? ({
-          ...newVNode,
-          props: {
-            ...newVNode.props,
-            attrs: newVNode.props.attrs
-              ? { ...newVNode.props.attrs }
-              : undefined,
-            props: newVNode.props.props
-              ? { ...newVNode.props.props }
-              : undefined,
-          },
-        } as VNode)
-      : newVNode;
+  // Store a deep copy of newVNode where every node in the tree has its own
+  // props.attrs and props.props objects.  writebackAttr writes into oldProps
+  // (i.e. the stored _prevVNode's children) on every subsequent patch, and
+  // those stored children share the same object references as the LRU-cached
+  // vnodes returned by the template compiler.  Without this full-tree clone,
+  // writebackAttr corrupts the LRU cache, causing the wrong class / attr
+  // values to appear the next time createElement uses the cached vnode.
+  const prevVNodeToStore: VNode = cloneVNodeForStorage(newVNode);
   (root as unknown as Record<string, unknown>)._prevVNode =
     prevVNodeToStore as unknown;
   (root as unknown as Record<string, unknown>)._prevDom = newDom as unknown;
