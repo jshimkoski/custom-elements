@@ -1,6 +1,10 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v3.7.8] - 2026-04-25
+
+- fix: enhance SSR rendering with class/style directive processing and prose CSS inlining (2e402d6)
+
 ## [v3.7.7] - 2026-04-21
 
 - fix: prevent LRU-cache corruption by cloning VNode props and add regression tests (607140b)
