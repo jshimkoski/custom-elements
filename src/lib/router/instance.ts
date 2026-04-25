@@ -64,7 +64,7 @@ export function useRouter(config: RouterConfig): Router {
     fragment?: string;
   };
   let store: ReturnType<typeof createStore<RouteState>>;
-  let update: (replace?: boolean) => Promise<void>;
+  let update: (replace?: boolean, isPopState?: boolean) => Promise<void>;
   let push: (path: string) => Promise<void>;
   let replaceFn: (path: string) => Promise<void>;
   let back: () => void;
@@ -312,7 +312,7 @@ export function useRouter(config: RouterConfig): Router {
   // Navigation lock to prevent concurrent navigation race conditions
   let isNavigating = false;
 
-  const navigate = async (path: string, replace = false): Promise<void> => {
+  const navigate = async (path: string, replace = false, isPopState = false): Promise<void> => {
     // Prevent concurrent navigation
     if (isNavigating) {
       devWarn(`Navigation to ${path} blocked - navigation already in progress`);
@@ -324,7 +324,7 @@ export function useRouter(config: RouterConfig): Router {
     redirectTracker.clear();
 
     try {
-      await performNavigation(path, replace);
+      await performNavigation(path, replace, isPopState);
     } finally {
       isNavigating = false;
       redirectDepth = 0;
@@ -354,6 +354,7 @@ export function useRouter(config: RouterConfig): Router {
   const performNavigation = async (
     path: string,
     replace = false,
+    isPopState = false,
   ): Promise<void> => {
     try {
       const loc = parseNavigationPath(path);
@@ -376,7 +377,7 @@ export function useRouter(config: RouterConfig): Router {
         redirectDepth++;
         const redirectKey = `${to.path}->${beforeEnterResult}`;
         redirectTracker.add(redirectKey);
-        await performNavigation(beforeEnterResult, true);
+        await performNavigation(beforeEnterResult, true, isPopState);
         return;
       }
 
@@ -388,7 +389,7 @@ export function useRouter(config: RouterConfig): Router {
         redirectDepth++;
         const redirectKey = `${to.path}->${onEnterResult}`;
         redirectTracker.add(redirectKey);
-        await performNavigation(onEnterResult, true);
+        await performNavigation(onEnterResult, true, isPopState);
         return;
       }
 
@@ -411,18 +412,22 @@ export function useRouter(config: RouterConfig): Router {
       // afterEnter hook (post commit)
       runAfterEnter(to, from);
 
-      // If there's a fragment (hash) preserve it on the URL and attempt to
-      // scroll to the element with that id on client-side navigation.
+      // Scroll handling after navigation commit.
       if (typeof window !== 'undefined' && typeof document !== 'undefined') {
         try {
           const frag = (to as { fragment?: string }).fragment;
           if (_scrollConfig.enabled && frag) {
-            // Start the robust scroll flow (observer + timeout + cancellation)
+            // Fragment navigation: scroll to the target element.
             startScrollForNavigation(
               String(frag),
               _scrollConfig.offset,
               _scrollConfig.timeoutMs,
             ).catch(() => {});
+          } else if (_scrollConfig.enabled && !isPopState) {
+            // Regular navigation without a fragment: scroll to top.
+            // isPopState navigations (back/forward) are skipped so the browser
+            // can restore the previous scroll position via its history stack.
+            window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
           }
         } catch {
           /* swallow */
@@ -552,12 +557,12 @@ export function useRouter(config: RouterConfig): Router {
       fragment: (initial as { fragment?: string }).fragment,
     });
 
-    update = async (replace = false) => {
+    update = async (replace = false, isPopState = false) => {
       const loc = getLocation();
-      await navigate(loc.path, replace);
+      await navigate(loc.path, replace, isPopState);
     };
 
-    const handlePopState = () => update(true);
+    const handlePopState = () => update(true, true);
     window.addEventListener('popstate', handlePopState);
     destroyFn = () => window.removeEventListener('popstate', handlePopState);
 

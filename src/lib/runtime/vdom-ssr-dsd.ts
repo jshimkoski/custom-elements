@@ -29,10 +29,11 @@ import { renderToString } from './vdom-ssr';
 import { VOID_ELEMENTS, buildAttrs, buildRawAttrs, type RenderOptions } from './ssr-utils';
 import { registry } from './component/registry';
 import { runComponentSSRRender } from './ssr-context';
-import { jitCSS } from './style';
+import { jitCSS, getProseSheet } from './style';
 import { baseReset, minifyCSS } from './css-utils';
-import { escapeHTML } from './helpers';
+import { escapeHTML, toKebab } from './helpers';
 import { devWarn } from './logger';
+import { processClassDirective, processStyleDirective } from './vdom-directives';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -101,6 +102,9 @@ function isRegisteredCustomElement(tag: string): boolean {
  *   1. baseReset — global reset + CSS custom properties
  *   2. useStyle() output — component-defined rules (:host, ::slotted, etc.)
  *   3. JIT CSS — utility classes extracted from the shadow HTML
+ *   4. Prose CSS — inlined when the shadow HTML uses prose/prose-sm/etc. classes,
+ *      because the singleton proseSheet is applied via adoptedStyleSheets at runtime
+ *      and is therefore unavailable at first paint without this inline copy.
  */
 export function buildShadowStyleBlock(
   useStyleCSS: string,
@@ -115,6 +119,18 @@ export function buildShadowStyleBlock(
   const jit = jitCSS(shadowHTML);
   if (jit.trim()) {
     parts.push(jit);
+  }
+
+  // jitCSS() registers prose sizes as a side-effect when it encounters prose/prose-sm
+  // etc. class names. getProseSheet() returns the singleton prose CSS (or null when no
+  // prose classes were found). We inline it here so prose styles are available before
+  // JavaScript executes — otherwise the shadow DOM has no prose CSS at first paint.
+  const proseSheet = getProseSheet();
+  if (proseSheet) {
+    const proseCSS = String(proseSheet);
+    if (proseCSS.trim()) {
+      parts.push(proseCSS);
+    }
   }
 
   const combined = minifyCSS(parts.join('\n'));
@@ -187,6 +203,20 @@ export function renderToDSD(vnode: VNode, opts: DSDRenderOptions): string {
     ? { ...vnode.props.attrs }
     : {};
 
+  // Process :class and :style directives so computed classes/styles appear
+  // in DSD output — same fix as vdom-ssr.ts renderToStringImpl.
+  const directives = (vnode as VNode).props?.directives;
+  if (directives) {
+    if (directives.class) {
+      processClassDirective(directives.class.value, attrsObj, undefined, vnode.props?.attrs as Record<string, unknown>);
+      if (attrsObj.class === undefined) delete attrsObj.class;
+    }
+    if (directives.style) {
+      processStyleDirective(directives.style.value, attrsObj);
+      if (attrsObj.style === undefined) delete attrsObj.style;
+    }
+  }
+
   const attrsString = buildAttrs(attrsObj, tag, opts);
 
   if (VOID_ELEMENTS.has(tag)) {
@@ -201,9 +231,25 @@ function renderCustomElementDSD(vnode: VNode, opts: DSDRenderOptions): string {
   const tag = vnode.tag;
   const config = registry.get(tag);
 
-  // Build the plain attribute string (no namespace injection for custom elements)
+  // Build the outer element attribute string.
+  // rawAttrs holds static attrs (non-bound). The template compiler moves ALL
+  // bound attrs on custom elements to vnode.props.props (camelCase) and deletes
+  // them from attrs, so we re-add any serialisable primitive props (strings,
+  // numbers, booleans) back as kebab-case HTML attributes. This ensures the
+  // client-side component can read its initial prop values from the DOM during
+  // hydration without re-rendering from defaults, which would cause pop-in.
   const rawAttrs = vnode.props?.attrs ?? {};
-  const attrsString = buildRawAttrs(rawAttrs);
+  const vnodeProps = vnode.props?.props ?? {};
+  const primitivePropsAsAttrs: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(vnodeProps)) {
+    const t = typeof v;
+    if (t === 'string' || t === 'number' || t === 'boolean') {
+      primitivePropsAsAttrs[toKebab(k)] = v;
+    }
+  }
+  // rawAttrs wins over derived primitive props on key conflict (explicit static
+  // attrs should not be silently overridden by bound primitive props).
+  const attrsString = buildRawAttrs({ ...primitivePropsAsAttrs, ...rawAttrs });
 
   // Move the null check BEFORE reading config.* properties for clarity.
   if (!config) {
@@ -221,9 +267,21 @@ function renderCustomElementDSD(vnode: VNode, opts: DSDRenderOptions): string {
       ? ` data-cer-hydrate="${hydrateStrategy}"`
       : '';
 
+  // The template compiler moves bound complex-object attrs (arrays, objects,
+  // elements) from vnode.props.attrs to vnode.props.props (camelCase keys)
+  // for custom elements, then deletes them from attrs. runComponentSSRRender
+  // must receive both sources so useProps() inside the shadow DOM render sees
+  // the actual JS values — not just the (now-empty) attrs dict.
+  // vnode.props.props wins over vnode.props.attrs on conflict so complex JS
+  // values are preferred over any residual serialised string representation.
+  const ssrAttrs: Record<string, unknown> = {
+    ...rawAttrs,
+    ...(vnode.props?.props ?? {}),
+  };
+
   // Run the component's render function in a minimal SSR context to get the
   // shadow DOM VNode tree and capture any useStyle() output.
-  const { shadowVNode, useStyleCSS, asyncPromise } = runComponentSSRRender(config, rawAttrs, tag, opts.router);
+  const { shadowVNode, useStyleCSS, asyncPromise } = runComponentSSRRender(config, ssrAttrs, tag, opts.router);
 
   // When streaming and this component has an async render, emit a placeholder
   // and register the promise for later resolution.

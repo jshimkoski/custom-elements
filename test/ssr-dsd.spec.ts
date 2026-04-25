@@ -20,6 +20,7 @@ import {
   DSD_POLYFILL_SCRIPT,
   type SSRJITResult,
 } from '../src/lib/ssr';
+import { renderToDSD } from '../src/lib/runtime/vdom-ssr-dsd';
 import { registry } from '../src/lib/runtime/component/registry';
 import { useStyle, useProps, useGlobalStyle } from '../src/lib/runtime/hooks';
 import {
@@ -27,6 +28,114 @@ import {
   registerErrorBoundary,
 } from '../src/lib/runtime/builtin-components';
 import { registerKeepAlive } from '../src/lib/keep-alive';
+
+// ---------------------------------------------------------------------------
+// Prose CSS inlining in DSD shadow style block
+// ---------------------------------------------------------------------------
+
+describe('buildShadowStyleBlock prose CSS inlining', () => {
+  it('includes prose CSS inline when shadow HTML contains prose class', () => {
+    const TAG = 'cer-prose-inline-test';
+    registry.set(TAG, {
+      props: {},
+      render: () =>
+        ({
+          tag: 'article',
+          props: { attrs: { class: 'prose' } },
+          children: [{ tag: 'p', props: {}, children: 'Hello' }],
+        }) as never,
+    });
+    const vnode = { tag: TAG, props: { attrs: {} }, children: [] };
+    const html = renderToStringDSD(vnode as never, { dsdPolyfill: false });
+    // The <style> block inside the DSD template must contain prose CSS rules
+    // (not just the empty placeholder that jitCSS emits for the singleton sheet).
+    expect(html).toContain('.prose');
+    // Verify actual prose rules are present, not just the empty placeholder
+    const templateMatch = html.match(/<template shadowrootmode="open">([\s\S]*?)<\/template>/);
+    expect(templateMatch).toBeTruthy();
+    const shadowContent = templateMatch![1];
+    // The prose CSS should include child element rules (h1, p, etc.)
+    expect(shadowContent).toMatch(/\.prose\s+[hp]|\.prose\s*\{/);
+  });
+
+  it('includes flex/gap utilities without prose rules when no prose class is used (before any prose registration)', () => {
+    // This test must run before any prose class is registered in this describe block.
+    // Note: detectedProseSizes is module-level, so once prose is registered by any test
+    // in the suite, getProseSheet() will always return a non-null value. This test
+    // verifies that JIT CSS works correctly for non-prose utility classes.
+    const TAG = 'cer-no-prose-utilities-test';
+    registry.set(TAG, {
+      props: {},
+      render: () =>
+        ({
+          tag: 'div',
+          props: { attrs: { class: 'flex gap-4 text-sm' } },
+          children: [],
+        }) as never,
+    });
+    const vnode = { tag: TAG, props: { attrs: {} }, children: [] };
+    const html = renderToStringDSD(vnode as never, { dsdPolyfill: false });
+    const templateMatch = html.match(/<template shadowrootmode="open">([\s\S]*?)<\/template>/);
+    expect(templateMatch).toBeTruthy();
+    const shadowContent = templateMatch![1];
+    // Utility classes for flex, gap-4, and text-sm should be present
+    expect(shadowContent).toContain('.flex');
+    expect(shadowContent).toContain('.gap-4');
+    expect(shadowContent).toContain('.text-sm');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// :class and :style directive handling in SSR renderers
+// ---------------------------------------------------------------------------
+
+describe('SSR :class directive processing', () => {
+  it('renderToDSD applies :class object syntax to regular elements', () => {
+    const vnode = {
+      tag: 'header',
+      props: {
+        attrs: {},
+        directives: { class: { value: { 'app-bar': true, small: true, collapsed: false }, modifiers: [] } },
+      },
+      children: [],
+    };
+    const html = renderToDSD(vnode as never, { dsd: true });
+    expect(html).toContain('class="app-bar small"');
+    expect(html).not.toContain('collapsed');
+  });
+
+  it('renderToDSD merges static class with :class directive', () => {
+    const vnode = {
+      tag: 'div',
+      props: {
+        attrs: { class: 'base' },
+        directives: { class: { value: { active: true }, modifiers: [] } },
+      },
+      children: [],
+    };
+    const html = renderToDSD(vnode as never, { dsd: true });
+    expect(html).toContain('class="base active"');
+  });
+
+  it('renderToStringDSD emits :class inside component shadow DOM', () => {
+    const TAG = 'cer-class-dir-test';
+    registry.set(TAG, {
+      props: {},
+      render: () =>
+        ({
+          tag: 'header',
+          props: {
+            attrs: {},
+            directives: { class: { value: { 'app-bar': true, small: true }, modifiers: [] } },
+          },
+          children: [],
+        }) as never,
+    });
+    const vnode = { tag: TAG, props: { attrs: {} }, children: [] };
+    const html = renderToStringDSD(vnode as never, { dsdPolyfill: false });
+    expect(html).toContain('class="app-bar small"');
+  });
+});
 
 // ---------------------------------------------------------------------------
 // DSD polyfill constant
@@ -1071,5 +1180,132 @@ describe('renderToStreamWithJITCSSDSD()', () => {
     const chunks = await streamPromise;
     expect(chunks.length).toBeGreaterThanOrEqual(2);
     expect(chunks.slice(1).join('')).toContain('streamed');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Complex object props in DSD SSR (regression: fakeHost.getAttribute junk string)
+// ---------------------------------------------------------------------------
+
+describe('DSD SSR complex object props', () => {
+  it('renders array props correctly without stringifying to [object Object]', () => {
+    const TAG = 'cer-ssr-array-prop';
+    const items = [
+      { id: 'a', label: 'Alpha' },
+      { id: 'b', label: 'Beta' },
+      { id: 'c', label: 'Gamma' },
+    ];
+    registry.set(TAG, {
+      props: {},
+      render: () => {
+        const props = useProps({ items: [] as { id: string; label: string }[] });
+        return {
+          tag: 'ul',
+          props: {},
+          children: props.items.map((item) => ({
+            tag: 'li',
+            props: { attrs: { id: item.id } },
+            children: item.label,
+          })),
+        } as never;
+      },
+    });
+    const vnode = { tag: TAG, props: { attrs: { items } }, children: [] };
+    const html = renderToStringDSD(vnode as never, { dsdPolyfill: false });
+    // The shadow DOM must contain the rendered list items, not an empty template
+    const templateMatch = html.match(/<template shadowrootmode="open">([\s\S]*?)<\/template>/);
+    expect(templateMatch).toBeTruthy();
+    const shadow = templateMatch![1];
+    expect(shadow).toContain('<li');
+    expect(shadow).toContain('Alpha');
+    expect(shadow).toContain('Beta');
+    expect(shadow).toContain('Gamma');
+    // Must not contain the stringified garbage
+    expect(shadow).not.toContain('[object Object]');
+  });
+
+  it('renders object props correctly without stringifying', () => {
+    const TAG = 'cer-ssr-object-prop';
+    const config = { title: 'Hello', count: 3 };
+    registry.set(TAG, {
+      props: {},
+      render: () => {
+        const props = useProps({ config: null as { title: string; count: number } | null });
+        const title = props.config?.title ?? 'none';
+        return {
+          tag: 'p',
+          props: {},
+          children: title,
+        } as never;
+      },
+    });
+    const vnode = { tag: TAG, props: { attrs: { config } }, children: [] };
+    const html = renderToStringDSD(vnode as never, { dsdPolyfill: false });
+    const templateMatch = html.match(/<template shadowrootmode="open">([\s\S]*?)<\/template>/);
+    expect(templateMatch).toBeTruthy();
+    expect(templateMatch![1]).toContain('Hello');
+    expect(templateMatch![1]).not.toContain('[object Object]');
+  });
+
+  it('still returns primitive attrs as strings', () => {
+    const TAG = 'cer-ssr-primitive-attrs';
+    registry.set(TAG, {
+      props: {},
+      render: () => {
+        const props = useProps({ label: '', count: 0, active: false });
+        return {
+          tag: 'span',
+          props: { attrs: { 'data-label': props.label, 'data-count': String(props.count), 'data-active': String(props.active) } },
+          children: [],
+        } as never;
+      },
+    });
+    const vnode = { tag: TAG, props: { attrs: { label: 'hi', count: 5, active: true } }, children: [] };
+    const html = renderToStringDSD(vnode as never, { dsdPolyfill: false });
+    const templateMatch = html.match(/<template shadowrootmode="open">([\s\S]*?)<\/template>/);
+    expect(templateMatch).toBeTruthy();
+    const shadow = templateMatch![1];
+    expect(shadow).toContain('data-label="hi"');
+    expect(shadow).toContain('data-count="5"');
+    expect(shadow).toContain('data-active="true"');
+  });
+
+  it('renders array props passed via vnode.props.props (template-compiler path for custom elements)', () => {
+    // The template compiler moves bound attrs on custom elements from attrs to
+    // props (camelCase), deleting them from attrs. This test reproduces that
+    // exact VNode shape to ensure runComponentSSRRender sees the values.
+    const TAG = 'cer-ssr-props-path';
+    const crumbs = [
+      { label: 'Home', path: '/', key: '/', isLast: false, hasPage: true },
+      { label: 'Music', path: '/music', key: '/music', isLast: true, hasPage: true },
+    ];
+    registry.set(TAG, {
+      props: {},
+      render: () => {
+        const props = useProps({ crumbs: [] as { label: string; path: string }[] });
+        if (props.crumbs.length <= 1) {
+          return { tag: 'div', props: {}, children: '' } as never;
+        }
+        return {
+          tag: 'nav',
+          props: {},
+          children: props.crumbs.map((c) => ({
+            tag: 'span',
+            props: {},
+            children: c.label,
+          })),
+        } as never;
+      },
+    });
+    // vnode.props.attrs is empty (moved by template compiler); crumbs is in props
+    const vnode = { tag: TAG, props: { attrs: {}, props: { crumbs } }, children: [] };
+    const html = renderToStringDSD(vnode as never, { dsdPolyfill: false });
+    const templateMatch = html.match(/<template shadowrootmode="open">([\s\S]*?)<\/template>/);
+    expect(templateMatch).toBeTruthy();
+    const shadow = templateMatch![1];
+    expect(shadow).toContain('<nav');
+    expect(shadow).toContain('Home');
+    expect(shadow).toContain('Music');
+    expect(shadow).not.toContain('[object Object]');
   });
 });

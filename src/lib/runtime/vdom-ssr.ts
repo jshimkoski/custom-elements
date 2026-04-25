@@ -5,6 +5,7 @@ import {
   endRenderWarningScope,
 } from './logger';
 import { VOID_ELEMENTS, buildAttrs, type RenderOptions } from './ssr-utils';
+import { processClassDirective, processStyleDirective } from './vdom-directives';
 
 /**
  * Render a VNode to a string (SSR).
@@ -55,6 +56,24 @@ function renderToStringImpl(vnode: VNode, opts?: RenderOptions): string {
   const attrsObj: Record<string, unknown> = vnode.props?.attrs
     ? { ...vnode.props.attrs }
     : {};
+
+  // Process :class and :style directives so computed classes/styles appear in
+  // the SSR output. Without this, elements using :class (e.g. md-app-bar's
+  // <header :class="..."> ) emit no class attribute, breaking CSS rules that
+  // depend on those classes being present at first paint.
+  const directives = vnode.props?.directives;
+  if (directives) {
+    if (directives.class) {
+      processClassDirective(directives.class.value, attrsObj, undefined, vnode.props?.attrs as Record<string, unknown>);
+      // processClassDirective sets attrs.class = undefined when the directive resolves
+      // to empty; delete the key so buildAttrs doesn't emit class="undefined".
+      if (attrsObj.class === undefined) delete attrsObj.class;
+    }
+    if (directives.style) {
+      processStyleDirective(directives.style.value, attrsObj);
+      if (attrsObj.style === undefined) delete attrsObj.style;
+    }
+  }
 
   const attrsString = buildAttrs(attrsObj, vnode.tag, opts ?? {});
 

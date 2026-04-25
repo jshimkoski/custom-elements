@@ -102,7 +102,7 @@ let _ssrRenderCounter = 0;
 
 export function runComponentSSRRender(
   config: ComponentConfig<object, object, object, object>,
-  attrs: Record<string, string | number | boolean | null | undefined>,
+  attrs: Record<string, unknown>,
   tag = 'unknown',
   ssrRouter?: unknown,
 ): SSRRenderResult {
@@ -116,14 +116,23 @@ export function runComponentSSRRender(
   const fakeHost = {
     getAttribute(name: string): string | null {
       const camel = toCamel(name);
-      if (
-        propsFromAttrs[camel] !== undefined &&
-        propsFromAttrs[camel] !== null
-      ) {
-        return String(propsFromAttrs[camel]);
+      const v = propsFromAttrs[camel];
+      if (v !== undefined && v !== null) {
+        // Complex objects (arrays, elements) cannot be represented as HTML attribute
+        // strings. Returning null here lets useProps() fall through to ctx[prop],
+        // which holds the actual value spread from propsFromAttrs. Without this
+        // guard, String([{...}]) returns "[object Object]" and useProps() returns
+        // that junk string instead of the real prop — causing empty SSR output and
+        // a visible flash when the client re-renders with the correct data.
+        if (typeof v === 'object' || typeof v === 'function') return null;
+        return String(v);
       }
       const raw = (attrs ?? {})[name];
-      return raw !== undefined && raw !== null ? String(raw) : null;
+      if (raw !== undefined && raw !== null) {
+        if (typeof raw === 'object' || typeof raw === 'function') return null;
+        return String(raw);
+      }
+      return null;
     },
     hasAttribute(name: string): boolean {
       return this.getAttribute(name) !== null;

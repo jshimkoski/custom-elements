@@ -339,6 +339,45 @@ describe('vdom.ts coverage additions', () => {
     expect(html).toContain('hi');
   });
 
+  it('renderToString applies :class directive (object syntax) to output', () => {
+    const vnode = {
+      tag: 'header',
+      props: {
+        attrs: {},
+        directives: { class: { value: { 'app-bar': true, small: true, collapsed: false }, modifiers: [] } },
+      },
+      children: [],
+    };
+    const html = renderToString(vnode);
+    expect(html).toContain('class="app-bar small"');
+  });
+
+  it('renderToString merges static class with :class directive', () => {
+    const vnode = {
+      tag: 'div',
+      props: {
+        attrs: { class: 'base' },
+        directives: { class: { value: { active: true }, modifiers: [] } },
+      },
+      children: [],
+    };
+    const html = renderToString(vnode);
+    expect(html).toContain('class="base active"');
+  });
+
+  it('renderToString omits class attribute when :class directive resolves to empty', () => {
+    const vnode = {
+      tag: 'div',
+      props: {
+        attrs: {},
+        directives: { class: { value: { hidden: false }, modifiers: [] } },
+      },
+      children: [],
+    };
+    const html = renderToString(vnode);
+    expect(html).not.toContain('class=');
+  });
+
   it('cleanupRefs does nothing for text node', () => {
     const text = document.createTextNode('hi');
     const refs: Record<string, any> = { foo: text };
