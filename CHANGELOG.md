@@ -1,6 +1,10 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v3.7.9] - 2026-04-27
+
+- fix: update attribute handling to use undefined instead of null for better SSR compatibility (267eeec)
+
 ## [v3.7.8] - 2026-04-25
 
 - fix: enhance SSR rendering with class/style directive processing and prose CSS inlining (2e402d6)
