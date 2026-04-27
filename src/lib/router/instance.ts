@@ -1313,11 +1313,11 @@ export function initRouter(config: RouterConfig): Router {
             <button
               part="button"
               class="${classString.value}"
-              style="${inlineStyle.value || null}"
+              style="${inlineStyle.value || undefined}"
               aria-current="${ariaCurrentValue.value}"
-              disabled="${isDisabled.value ? '' : null}"
-              aria-disabled="${isDisabled.value ? 'true' : null}"
-              tabindex="${isDisabled.value ? '-1' : null}"
+              disabled="${isDisabled.value ? '' : undefined}"
+              aria-disabled="${isDisabled.value ? 'true' : undefined}"
+              tabindex="${isDisabled.value ? '-1' : undefined}"
               @click="${navigate}"
             >
               <slot></slot>
@@ -1327,14 +1327,14 @@ export function initRouter(config: RouterConfig): Router {
         .otherwise(html`
           <a
             part="link"
-            href="${isDisabled.value ? null : hrefTarget.value}"
+            href="${isDisabled.value ? undefined : hrefTarget.value}"
             class="${classString.value}"
-            style="${inlineStyle.value || null}"
+            style="${inlineStyle.value || undefined}"
             aria-current="${ariaCurrentValue.value}"
-            aria-disabled="${isDisabled.value ? 'true' : null}"
-            tabindex="${isDisabled.value ? '-1' : null}"
-            target="${isExternal.value ? '_blank' : null}"
-            rel="${isExternal.value ? 'noopener noreferrer' : null}"
+            aria-disabled="${isDisabled.value ? 'true' : undefined}"
+            tabindex="${isDisabled.value ? '-1' : undefined}"
+            target="${isExternal.value ? '_blank' : undefined}"
+            rel="${isExternal.value ? 'noopener noreferrer' : undefined}"
             @click="${navigate}"
             ><slot></slot
           ></a>

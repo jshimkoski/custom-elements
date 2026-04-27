@@ -45,12 +45,14 @@ export function buildAttrs(
   }
 
   return Object.entries(merged)
+    .filter(([, v]) => v !== null && v !== undefined)
     .map(([k, v]) => ` ${k}="${escapeHTML(String(v))}"`)
     .join('');
 }
 
 export function buildRawAttrs(attrs: Record<string, unknown>): string {
   return Object.entries(attrs)
+    .filter(([, v]) => v !== null && v !== undefined)
     .map(([k, v]) => ` ${k}="${escapeHTML(String(v))}"`)
     .join('');
 }
