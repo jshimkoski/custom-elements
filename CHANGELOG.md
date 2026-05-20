@@ -1,6 +1,10 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v3.8.1] - 2026-05-20
+
+- fix: add missing id-token permission for GitHub Actions (669a708)
+
 ## [v3.8.0] - 2026-05-20
 
 - feat: add CSS variable shorthand syntax for Tailwind 4 compatibility (07f71b7)
