@@ -218,7 +218,7 @@ jobs:
         if: steps.should_release.outputs.value == 'true'
         run: |
           if [[ "${{ github.ref_name }}" == "develop" ]]; then
-            npm publish --tag beta
+            npm publish --tag beta --access public
           else
-            npm publish
+            npm publish --access public
           fi

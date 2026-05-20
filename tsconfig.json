@@ -34,6 +34,8 @@
     "cypress",
     "docs",
     "public",
-    "coverage"
+    "coverage",
+    "**/*.cy.ts",
+    "**/*.spec.ts"
   ]
 }
