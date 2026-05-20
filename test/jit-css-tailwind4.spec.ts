@@ -246,6 +246,50 @@ describe('Tailwind CSS 4 parity utilities', () => {
     });
   });
 
+  describe('CSS variable shorthand syntax — prop-(--custom-property)', () => {
+    it('bg-(--my-color) generates background-color:var(--my-color)', () => {
+      const css = jitCSS('<div class="bg-(--my-color)"></div>');
+      expect(css).toContain('background-color:var(--my-color)');
+    });
+
+    it('text-(--my-color) generates color:var(--my-color)', () => {
+      const css = jitCSS('<div class="text-(--my-color)"></div>');
+      expect(css).toContain('color:var(--my-color)');
+    });
+
+    it('w-(--my-width) generates width:var(--my-width)', () => {
+      const css = jitCSS('<div class="w-(--my-width)"></div>');
+      expect(css).toContain('width:var(--my-width)');
+    });
+
+    it('h-(--my-height) generates height:var(--my-height)', () => {
+      const css = jitCSS('<div class="h-(--my-height)"></div>');
+      expect(css).toContain('height:var(--my-height)');
+    });
+
+    it('p-(--my-spacing) generates padding:var(--my-spacing)', () => {
+      const css = jitCSS('<div class="p-(--my-spacing)"></div>');
+      expect(css).toContain('padding:var(--my-spacing)');
+    });
+
+    it('works with multi-word custom property names', () => {
+      const css = jitCSS('<div class="bg-(--md-sys-color-primary)"></div>');
+      expect(css).toContain('background-color:var(--md-sys-color-primary)');
+    });
+
+    it('works inside a variant — hover:bg-(--my-color)', () => {
+      const css = jitCSS('<div class="hover:bg-(--my-color)"></div>');
+      expect(css).toContain('background-color:var(--my-color)');
+      expect(css).toContain(':hover');
+    });
+
+    it('works inside focus variant — focus:text-(--my-color)', () => {
+      const css = jitCSS('<div class="focus:text-(--my-color)"></div>');
+      expect(css).toContain('color:var(--my-color)');
+      expect(css).toContain(':focus');
+    });
+  });
+
   describe('text-shadow color utilities', () => {
     it('text-shadow-primary-500 sets --cer-text-shadow-color', () => {
       const css = jitCSS('<div class="text-shadow-primary-500"></div>');

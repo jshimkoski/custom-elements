@@ -2145,6 +2145,14 @@ export function parseZIndex(className: string): string | null {
 
 // Enhanced arbitrary value parser
 export function parseArbitrary(className: string): string | null {
+  // Normalize prop-(--custom-property) → prop-[var(--custom-property)]
+  // e.g. bg-(--my-color) → bg-[var(--my-color)]
+  const parenVarStart = className.indexOf('-(--');
+  if (parenVarStart > 0 && className.endsWith(')')) {
+    const varName = className.slice(parenVarStart + 2, -1); // --my-color
+    className = `${className.slice(0, parenVarStart)}-[var(${varName})]`;
+  }
+
   // [prop:value] format
   if (
     className.startsWith('[') &&

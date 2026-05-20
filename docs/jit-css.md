@@ -855,6 +855,7 @@ Arbitrary values let you use any valid CSS value, not just those in the built-in
 
 **Property-Value:** `prop-[value]`
 **CSS Property-Value:** `[property:value]`
+**CSS Variable Shorthand:** `prop-(--custom-property)` (Tailwind 4)
 
 ### **Supported Properties for `prop-[value]` Format**
 
@@ -913,6 +914,43 @@ Based on the enhanced property mappings in the implementation:
 <button class="hover:bg-[#09f] focus:[box-shadow:0_0_0_2px_#09f]"></button>
 <div class="md:p-[2rem] dark:bg-[#222] @lg:gap-[3rem]"></div>
 ```
+
+### **CSS Variable Shorthand — `prop-(--custom-property)`**
+
+The `prop-(--custom-property)` syntax is a shorthand borrowed from Tailwind CSS 4. It is equivalent to writing `prop-[var(--custom-property)]` and is normalized to that form before parsing.
+
+```html
+<!-- Shorthand form (Tailwind 4 style) -->
+<div class="bg-(--brand-color)"></div>
+<div class="text-(--md-sys-color-on-surface)"></div>
+<div class="w-(--sidebar-width) h-(--header-height)"></div>
+
+<!-- Equivalent explicit form -->
+<div class="bg-[var(--brand-color)]"></div>
+<div class="text-[var(--md-sys-color-on-surface)]"></div>
+```
+
+Multi-segment variable names (e.g. `--md-sys-color-primary`) work without any extra escaping:
+
+```html
+<div class="bg-(--md-sys-color-primary)"></div>
+<div class="p-(--spacing-comfortable)"></div>
+```
+
+Variants compose with the shorthand normally:
+
+```html
+<button class="hover:bg-(--color-interactive) focus:outline-(--color-focus-ring)">
+  Themed button
+</button>
+<div class="dark:text-(--on-dark-surface) sm:p-(--layout-gutter)">
+  Responsive + dark-mode
+</div>
+```
+
+Any property that accepts `prop-[value]` also accepts `prop-(--custom-property)`.
+
+> **Implementation note:** Normalization happens at the top of `parseArbitrary()` — `bg-(--x)` is rewritten to `bg-[var(--x)]` before the rest of the parsing pipeline runs. CSS selector escaping (`\(`, `\)`) is handled automatically, so the generated class name selector is always valid.
 
 ## 🧪 Arbitrary Variants
 
@@ -1611,7 +1649,7 @@ Use `cls()` when you store class name strings outside template literals — for 
 ## 📚 Tips & Best Practices
 
 - **Utility-first approach:** Start with utility classes, use `useStyle` for complex dynamic logic
-- **Arbitrary values:** Use `prop-[value]` for quick customizations and `[property:value]` for complex CSS
+- **Arbitrary values:** Use `prop-[value]` for quick customizations, `[property:value]` for complex CSS, and `prop-(--custom-property)` as a shorthand for CSS variable references
 - **Combine variants** for powerful, dynamic styling (e.g., `hover:focus:bg-primary-600`)
 - **Use semantic colors** and CSS variables for easy theming
 - **Container queries** provide more precise responsive design than viewport-based breakpoints
@@ -1669,7 +1707,7 @@ All of the following are exported from `@jasonshimmy/custom-elements-runtime/jit
 - `parseColorClass(className: string): string | null` — Parses color utility classes (`bg-primary-500`, `text-neutral-700`, etc.)
 - `parseColorWithOpacity(className: string): string | null` — Parses a color class with an optional `/opacity` modifier
 - `parseGradientColorStop(className: string): string | null` — Parses gradient color stop utilities (`from-*`, `via-*`, `to-*`)
-- `parseArbitrary(className: string): string | null` — Parses arbitrary value utilities (`w-[200px]`, `bg-[#ff0000]`, etc.)
+- `parseArbitrary(className: string): string | null` — Parses arbitrary value utilities (`w-[200px]`, `bg-[#ff0000]`, `bg-(--my-var)`, etc.). CSS variable shorthand (`prop-(--x)`) is normalized to `prop-[var(--x)]` before parsing.
 
 ### **Configuration Objects**
 

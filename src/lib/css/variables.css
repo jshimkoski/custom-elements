@@ -389,12 +389,12 @@
   inherits: false;
 }
 @property --cer-translate-x {
-  syntax: '<length>';
+  syntax: '<length-percentage>';
   initial-value: 0px;
   inherits: false;
 }
 @property --cer-translate-y {
-  syntax: '<length>';
+  syntax: '<length-percentage>';
   initial-value: 0px;
   inherits: false;
 }
