@@ -1,6 +1,10 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v3.8.2] - 2026-05-20
+
+- fix: update dependencies and add Cypress TypeScript configuration (b948bbc)
+
 ## [v3.8.1] - 2026-05-20
 
 - fix: add missing id-token permission for GitHub Actions (669a708)
