@@ -1,6 +1,10 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v3.8.0] - 2026-05-20
+
+- feat: add CSS variable shorthand syntax for Tailwind 4 compatibility (07f71b7)
+
 ## [v3.7.9] - 2026-04-27
 
 - fix: update attribute handling to use undefined instead of null for better SSR compatibility (267eeec)
