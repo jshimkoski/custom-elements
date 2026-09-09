@@ -1,6 +1,10 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v3.9.0] - 2026-09-09
+
+- feat(tests): add comprehensive tests for router functionality and behavior (34ac87a)
+
 ## [v3.8.2] - 2026-05-20
 
 - fix: update dependencies and add Cypress TypeScript configuration (b948bbc)
