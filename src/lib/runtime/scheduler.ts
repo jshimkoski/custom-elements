@@ -202,7 +202,12 @@ class UpdateScheduler {
    * Schedule periodic cleanup to prevent memory leaks
    */
   private schedulePeriodicCleanup(): void {
-    if (this.testEnv.isTest) return; // Skip in tests
+    // The scheduler is also imported by SSR entry points. A recurring Node.js
+    // timer would keep short-lived build/worker processes alive for five
+    // minutes after otherwise completing, while providing no useful cleanup
+    // (normal updates are microtask-drained). Only browsers need the diagnostic
+    // periodic check.
+    if (this.testEnv.isTest || typeof window === 'undefined') return;
 
     const cleanup = () => {
       this.performPeriodicCleanup();

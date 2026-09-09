@@ -214,6 +214,59 @@ describe('cerComponentImports()', () => {
     expect(result).toBeNull();
   });
 
+  it('injects imports returned by external component resolvers', () => {
+    const plugin = cerComponentImports({
+      componentsDir,
+      appRoot: appDir,
+      resolvers: [
+        (tag) => tag.startsWith('md-')
+          ? `@example/material/components/${tag}`
+          : undefined,
+      ],
+    }) as unknown as TestPlugin;
+    plugin.buildStart();
+
+    const pageId = resolve(join(appDir, 'pages/index.ts'));
+    const result = plugin.transform('return html`<md-button></md-button>`', pageId);
+
+    expect(result?.code).toContain('import "@example/material/components/md-button";');
+  });
+
+  it('prefers local components over external component resolvers', () => {
+    writeFileSync(join(componentsDir, 'md-button.ts'), "component('md-button', () => {})");
+    const resolver = vi.fn(() => '@example/material/components/md-button');
+    const plugin = cerComponentImports({
+      componentsDir,
+      appRoot: appDir,
+      resolvers: [resolver],
+    }) as unknown as TestPlugin;
+    plugin.buildStart();
+
+    const pageId = resolve(join(appDir, 'pages/index.ts'));
+    const result = plugin.transform('return html`<md-button></md-button>`', pageId);
+
+    expect(result?.code).toContain('md-button.ts');
+    expect(result?.code).not.toContain('@example/material');
+    expect(resolver).not.toHaveBeenCalled();
+  });
+
+  it('deduplicates package imports returned for multiple tags', () => {
+    const plugin = cerComponentImports({
+      componentsDir,
+      appRoot: appDir,
+      resolvers: [() => '@example/material/register'],
+    }) as unknown as TestPlugin;
+    plugin.buildStart();
+
+    const pageId = resolve(join(appDir, 'pages/index.ts'));
+    const result = plugin.transform(
+      'return html`<md-button></md-button><md-card></md-card>`',
+      pageId,
+    );
+
+    expect(result?.code.match(/@example\/material\/register/g)).toHaveLength(1);
+  });
+
   it('strips Vite query strings from the module id', () => {
     writeFileSync(join(componentsDir, 'ks-badge.ts'), "component('ks-badge', () => {})");
 

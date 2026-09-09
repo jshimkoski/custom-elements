@@ -1,8 +1,19 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import { html } from '../src/lib/runtime/template-compiler';
 import type { VNode } from '../src/lib/runtime/types';
 
 describe('template-compiler additional cases', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('promotes wrapped native values when the DOM Node constructor is unavailable', () => {
+    vi.stubGlobal('Node', undefined);
+    const wrapped = { value: 'ready' };
+    const vnode = html`<input :value="${wrapped}" />` as VNode;
+
+    expect(vnode.props?.props?.value).toBe('ready');
+    expect(vnode.props?.attrs?.value).toBeUndefined();
+  });
+
   it('does not treat non-hyphenated tags as custom elements by default', () => {
     const vnode = html`<div :model="foo" />` as unknown as VNode;
     // For plain non-hyphenated elements, the compiler should not canonicalize

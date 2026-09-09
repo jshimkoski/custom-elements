@@ -32,4 +32,37 @@ describe('vdom model checkbox handling', () => {
     expect(Array.isArray(context._state.selected)).toBe(true);
     expect(context._state.selected.includes('b')).toBe(true);
   });
+
+  it('accepts programmatically dispatched input events in production', () => {
+    const originalNodeEnv = process.env.NODE_ENV;
+    const vitestMarker = (globalThis as any).__vitest__;
+    process.env.NODE_ENV = 'production';
+    delete (globalThis as any).__vitest__;
+
+    try {
+      const context: any = {
+        _state: { query: '' },
+        _requestRender: () => {},
+      };
+      const props: Record<string, any> = {};
+      const attrs: Record<string, any> = {};
+      const listeners: Record<string, any> = {};
+      const el = document.createElement('input');
+      el.type = 'text';
+
+      processModelDirective('query', [], props, attrs, listeners, context, el);
+      el.value = 'programmatic value';
+      listeners.input({
+        target: el,
+        isTrusted: false,
+        isComposing: false,
+      });
+
+      expect(context._state.query).toBe('programmatic value');
+    } finally {
+      process.env.NODE_ENV = originalNodeEnv;
+      if (vitestMarker === undefined) delete (globalThis as any).__vitest__;
+      else (globalThis as any).__vitest__ = vitestMarker;
+    }
+  });
 });

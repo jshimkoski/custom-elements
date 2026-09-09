@@ -94,15 +94,35 @@ describe('vdom.ts edge cases', () => {
     expect(result).toEqual(arr);
   });
 
-  it('patchProps removes attribute if newVal is false', () => {
+  it('patchProps removes an HTML boolean attribute if newVal is false', () => {
     const el = document.createElement('input');
-    el.setAttribute('foo', 'bar');
+    el.setAttribute('disabled', '');
     patchProps(
       el,
-      { props: {}, attrs: { foo: 'bar' } },
-      { props: {}, attrs: { foo: false } },
+      { props: {}, attrs: { disabled: true } },
+      { props: {}, attrs: { disabled: false } },
     );
-    expect(el.hasAttribute('foo')).toBe(false);
+    expect(el).not.toHaveAttribute('disabled');
+  });
+
+  it('preserves runtime-owned hydration attributes during vnode reconciliation', () => {
+    const el = document.createElement('test-hydration-attribute-owner');
+    el.setAttribute('data-cer-hydrate', 'load');
+    el.setAttribute('data-cer-hydrated', '');
+
+    patchProps(
+      el,
+      {
+        attrs: {
+          'data-cer-hydrate': 'load',
+          'data-cer-hydrated': '',
+        },
+      },
+      { attrs: {} },
+    );
+
+    expect(el).toHaveAttribute('data-cer-hydrate', 'load');
+    expect(el).toHaveAttribute('data-cer-hydrated');
   });
 
   it('createElement assigns ref from props.ref', () => {

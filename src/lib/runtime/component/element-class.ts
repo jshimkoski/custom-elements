@@ -7,7 +7,7 @@ import type {
 import { isReactiveState, reactiveSystem } from '../reactive';
 import { toKebab, safe } from '../helpers';
 import { initWatchers, triggerWatchers } from '../watchers';
-import { applyProps } from '../props';
+import { applyProps, externallySetPropsKey } from '../props';
 import {
   handleConnected,
   handleDisconnected,
@@ -23,6 +23,118 @@ import {
 import { scheduleDOMUpdate } from '../scheduler';
 import { devError, devWarn } from '../logger';
 import { registry } from './registry';
+
+const HYDRATION_INTERACTION_EVENTS = [
+  'click',
+  'input',
+  'change',
+  'submit',
+] as const;
+
+function cloneHydrationEvent(event: Event): Event {
+  const common = {
+    bubbles: event.bubbles,
+    cancelable: event.cancelable,
+    composed: event.composed,
+  };
+  if (typeof InputEvent !== 'undefined' && event instanceof InputEvent) {
+    return new InputEvent(event.type, {
+      ...common,
+      data: event.data,
+      inputType: event.inputType,
+      isComposing: event.isComposing,
+    });
+  }
+  if (event instanceof MouseEvent) {
+    return new MouseEvent(event.type, {
+      ...common,
+      button: event.button,
+      buttons: event.buttons,
+      clientX: event.clientX,
+      clientY: event.clientY,
+      ctrlKey: event.ctrlKey,
+      metaKey: event.metaKey,
+      shiftKey: event.shiftKey,
+      altKey: event.altKey,
+    });
+  }
+  if (typeof SubmitEvent !== 'undefined' && event instanceof SubmitEvent) {
+    return new SubmitEvent(event.type, {
+      ...common,
+      submitter: event.submitter,
+    });
+  }
+  return new Event(event.type, common);
+}
+
+function hasNonHydratingAncestor(element: Element): boolean {
+  let current: Element | null = element.parentElement;
+  if (!current) {
+    const root = element.getRootNode();
+    if (root instanceof ShadowRoot) current = root.host;
+  }
+
+  while (current) {
+    // The nearest explicit boundary owns the subtree. This lets a deliberately
+    // interactive island opt back in with data-cer-hydrate="load" inside a
+    // static page while keeping every unmarked sibling inert.
+    const strategy = current.getAttribute('data-cer-hydrate');
+    if (strategy) return strategy === 'none';
+    if (current.parentElement) {
+      current = current.parentElement;
+      continue;
+    }
+    const root = current.getRootNode();
+    current = root instanceof ShadowRoot ? root.host : null;
+  }
+  return false;
+}
+
+type VisibilityHydrator = () => void;
+
+let sharedVisibilityObserver: IntersectionObserver | null = null;
+let visibleHydrationCount = 0;
+const visibleHydrators = new WeakMap<Element, VisibilityHydrator>();
+
+function observeForVisibleHydration(
+  element: Element,
+  hydrate: VisibilityHydrator,
+): () => void {
+  if (typeof IntersectionObserver === 'undefined') {
+    const timeoutId = setTimeout(hydrate, 0);
+    return () => clearTimeout(timeoutId);
+  }
+
+  if (!sharedVisibilityObserver) {
+    sharedVisibilityObserver = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          visibleHydrators.get(entry.target)?.();
+        }
+      },
+      { rootMargin: '0px', threshold: 0 },
+    );
+  }
+
+  const observer = sharedVisibilityObserver;
+  let active = true;
+  visibleHydrators.set(element, hydrate);
+  visibleHydrationCount++;
+  observer.observe(element);
+
+  return () => {
+    if (!active) return;
+    active = false;
+    visibleHydrators.delete(element);
+    observer.unobserve?.(element);
+    visibleHydrationCount = Math.max(0, visibleHydrationCount - 1);
+    if (visibleHydrationCount === 0 && sharedVisibilityObserver === observer) {
+      observer.disconnect();
+      sharedVisibilityObserver = null;
+    }
+  };
+}
 
 export function createElementClass<
   S extends object,
@@ -44,17 +156,23 @@ export function createElementClass<
     };
   }
   return class extends HTMLElement {
-    public context: ComponentContext<S, C, P, T>;
+    public context!: ComponentContext<S, C, P, T>;
     private _refs: Refs['refs'] = {};
     private _listeners: Array<() => void> = [];
     private _watchers: Map<string, WatcherState> = new Map();
     /** @internal */
     private _renderTimeoutId: ReturnType<typeof setTimeout> | null = null;
+    private _hydrationTimeoutId: ReturnType<typeof setTimeout> | null = null;
+    private _hydrationIdleId: number | null = null;
+    private _hydrationInteractionCleanup: (() => void) | null = null;
+    private _visibleHydrationCleanup: (() => void) | null = null;
+    private _componentInitialized = false;
     private _mounted = false;
     private _hasError = false;
     private _initializing = true;
+    private _hydrateExistingDOM = false;
 
-    private _componentId: string;
+    private _componentId = '';
 
     private _styleSheet: CSSStyleSheet | null = null;
 
@@ -96,6 +214,14 @@ export function createElementClass<
 
     constructor() {
       super();
+      // Native Declarative Shadow DOM is attached and populated before the
+      // custom element upgrades. Preserve that server output until the single
+      // connectedCallback hydration render instead of doing an otherwise
+      // redundant constructor render immediately beforehand.
+      const hasServerRenderedShadowContent = Boolean(
+        this.shadowRoot?.hasChildNodes(),
+      );
+      this._hydrateExistingDOM = hasServerRenderedShadowContent;
       // When a Declarative Shadow DOM template was parsed by the browser
       // (i.e. the server rendered with dsd: true), this.shadowRoot is already
       // set. Calling attachShadow() on an element that already has a shadow
@@ -106,6 +232,23 @@ export function createElementClass<
       // Always read the latest config from the registry so re-registration
       // (HMR / tests) updates future instances.
       this._cfg = (registry.get(tag) as ComponentConfig<S, C, P, T>) || config;
+      // Every DSD host already has everything needed for first paint. Avoid
+      // constructing reactive proxies, prop descriptors, watchers, and IDs in
+      // the synchronous custom-element upgrade task. connectedCallback either
+      // hydrates it in the strategy's scheduled task or leaves a static island
+      // untouched. Client-created elements still initialize eagerly.
+      if (!hasServerRenderedShadowContent) {
+        this._initializeComponent(config, hasServerRenderedShadowContent);
+      }
+    }
+
+    private _initializeComponent(
+      config: ComponentConfig<S, C, P, T>,
+      hasServerRenderedShadowContent = this._hydrateExistingDOM,
+    ): void {
+      if (this._componentInitialized) return;
+      this._componentInitialized = true;
+      this._restoreSerializedHydrationProps(this._cfg);
 
       // Generate unique component ID for render deduplication
       this._componentId = `${tag}-${crypto.randomUUID()}`;
@@ -217,8 +360,27 @@ export function createElementClass<
 
       // Set up reactive property setters for all props to detect external changes
       if (cfgToUse.props) {
+        const externallySetProps = new Set<string>();
+        Object.defineProperty(this, externallySetPropsKey, {
+          value: externallySetProps,
+          writable: false,
+          enumerable: false,
+          configurable: false,
+        });
         for (const propName in cfgToUse.props) {
-          let internalValue = (this as Record<string, unknown>)[propName];
+          // A declared prop may share a name with an inherited DOM property
+          // (`role`, `title`, `hidden`, etc.). An unset inherited value is not
+          // an explicit component input and must not replace the prop default.
+          // Preserve own properties assigned before custom-element upgrade;
+          // otherwise initialize the public property from its declaration.
+          const hadOwnValue = Object.prototype.hasOwnProperty.call(
+            this,
+            propName,
+          );
+          let internalValue = hadOwnValue
+            ? (this as Record<string, unknown>)[propName]
+            : cfgToUse.props[propName].default;
+          if (hadOwnValue) externallySetProps.add(propName);
 
           Object.defineProperty(this, propName, {
             get() {
@@ -227,17 +389,21 @@ export function createElementClass<
             set(newValue) {
               const oldValue = internalValue;
               internalValue = newValue;
+              externallySetProps.add(propName);
 
-              // Update the context to trigger watchers
-              (this.context as Record<string, unknown>)[propName] = newValue;
+              // Keep legacy context access in sync without letting the proxy
+              // schedule its own render. The explicit request below is the one
+              // canonical update for this external property assignment.
+              const wasInitializing = this._initializing;
+              this._initializing = true;
+              try {
+                (this.context as Record<string, unknown>)[propName] = newValue;
+              } finally {
+                this._initializing = wasInitializing;
+              }
 
-              // Apply props to sync with context
-              if (!this._initializing) {
-                this._applyProps(cfgToUse);
-                // Trigger re-render if the value actually changed
-                if (oldValue !== newValue) {
-                  this._requestRender();
-                }
+              if (!wasInitializing && this._mounted && oldValue !== newValue) {
+                this._requestRender();
               }
             },
             enumerable: true,
@@ -256,8 +422,61 @@ export function createElementClass<
       // but connectedCallback will re-apply props and re-render
       this._applyProps(cfgToUse);
 
-      // Initial render (styles are applied within render)
-      this._render(cfgToUse);
+      // Client-created elements still render eagerly so their shadow DOM is
+      // available before connection. Server-rendered elements already have
+      // useful DSD content and hydrate exactly once when connected.
+      if (!hasServerRenderedShadowContent) {
+        this._render(cfgToUse);
+      }
+    }
+
+    /**
+     * Restore complex props serialized for an interactive island inside a
+     * static SSR boundary. The static parent cannot run a client render to
+     * promote its bound props, so the island consumes this escaped one-shot
+     * payload before property descriptors and useProps state are initialized.
+     */
+    private _restoreSerializedHydrationProps(
+      cfg: ComponentConfig<S, C, P, T>,
+    ): void {
+      if (!this._hydrateExistingDOM) return;
+      const serialized = this.getAttribute('data-cer-props');
+      if (serialized === null) return;
+
+      // Remove the transport attribute even when malformed. It is internal,
+      // one-shot state and must not remain as a stale or user-editable source.
+      this.removeAttribute('data-cer-props');
+
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(serialized);
+      } catch {
+        return;
+      }
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return;
+
+      const declaredProps = cfg.props ?? {};
+      for (const [key, value] of Object.entries(parsed)) {
+        if (
+          key === '__proto__' ||
+          key === 'prototype' ||
+          key === 'constructor' ||
+          !Object.prototype.hasOwnProperty.call(declaredProps, key) ||
+          Object.prototype.hasOwnProperty.call(this, key) ||
+          this.hasAttribute(toKebab(key))
+        ) {
+          continue;
+        }
+
+        safe(() => {
+          Object.defineProperty(this, key, {
+            value,
+            writable: true,
+            enumerable: true,
+            configurable: true,
+          });
+        });
+      }
     }
 
     connectedCallback() {
@@ -268,33 +487,63 @@ export function createElementClass<
           registerChildComponent(parentHost as ShadowRoot, this);
         }
 
-        // Partial hydration: honour data-cer-hydrate if present.
-        const hydrateStrategy = this.getAttribute('data-cer-hydrate');
+        // Partial-hydration markers describe how existing server DOM should be
+        // activated. Client-created elements have already rendered locally and
+        // must mount normally even when a router carries the same route marker
+        // into a later client-side navigation.
+        const ownHydrateStrategy = this.getAttribute('data-cer-hydrate');
+        const hydrateStrategy = this._hydrateExistingDOM
+          ? ownHydrateStrategy ?? (hasNonHydratingAncestor(this) ? 'none' : null)
+          : null;
         if (hydrateStrategy === 'none') {
           // Static element — never hydrate. Keep the DSD content as-is.
           return;
         }
         if (hydrateStrategy === 'idle') {
-          const cb = () => this._hydrateNow(config);
+          const cb = () => {
+            this._hydrationIdleId = null;
+            this._hydrationTimeoutId = null;
+            this._hydrateNow(config);
+          };
           if (typeof requestIdleCallback !== 'undefined') {
-            requestIdleCallback(cb);
+            this._hydrationIdleId = requestIdleCallback(cb);
           } else {
             // Fallback for environments without requestIdleCallback (e.g. Safari < 16)
-            setTimeout(cb, 200);
+            this._hydrationTimeoutId = setTimeout(cb, 200);
           }
           return;
         }
         if (hydrateStrategy === 'visible') {
-          const observer = new IntersectionObserver(
-            (entries, obs) => {
-              if (entries.some((e) => e.isIntersecting)) {
-                obs.disconnect();
-                this._hydrateNow(config);
-              }
+          this._visibleHydrationCleanup?.();
+          this._visibleHydrationCleanup = observeForVisibleHydration(
+            this,
+            () => {
+              this._visibleHydrationCleanup?.();
+              this._visibleHydrationCleanup = null;
+              this._hydrateNow(config);
             },
-            { rootMargin: '0px', threshold: 0 },
           );
-          observer.observe(this);
+          return;
+        }
+
+        if (this._hydrateExistingDOM) {
+          // customElements.define() upgrades every matching SSR instance in one
+          // synchronous browser task. Rendering each one inside that callback
+          // turns large lists into a single long task even though their DSD is
+          // already painted. Give each existing shadow root its own task so the
+          // browser can yield for input and rendering between instances.
+          // If a user reaches the already-painted DSD before its scheduled
+          // task, hydrate during capture so the same event still reaches the
+          // newly bound target listener. This preserves responsiveness without
+          // dropping fast clicks or input.
+          this._armInteractionHydration(config);
+          const hydrate = () => {
+            this._hydrationIdleId = null;
+            this._hydrationTimeoutId = null;
+            this._clearInteractionHydration();
+            if (this.isConnected) this._hydrateNow(config);
+          };
+          this._hydrationTimeoutId = setTimeout(hydrate, 0);
           return;
         }
 
@@ -314,27 +563,87 @@ export function createElementClass<
         handleConnected(config, this.context, this._mounted, (val) => {
           this._mounted = val;
         });
+        this.setAttribute('data-cer-hydrated', '');
       });
     }
 
     /** Execute the standard hydration sequence (used by deferred strategies). */
     private _hydrateNow(cfg: ComponentConfig<S, C, P, T>): void {
+      if (!this.isConnected) return;
+      this._initializeComponent(cfg);
       this._runLogicWithinErrorBoundary(cfg, () => {
         this._applyProps(cfg);
         this._render(cfg);
         handleConnected(cfg, this.context, this._mounted, (val) => {
           this._mounted = val;
         });
+        this.setAttribute('data-cer-hydrated', '');
       });
+    }
+
+    private _armInteractionHydration(
+      cfg: ComponentConfig<S, C, P, T>,
+    ): void {
+      const root = this.shadowRoot;
+      if (!root || this._hydrationInteractionCleanup) return;
+
+      const hydrate = (event: Event) => {
+        const target = event.target;
+        // Chromium snapshots a dispatch path's listeners before capture begins,
+        // so listeners bound during hydration do not receive the original
+        // interaction. Consume it and replay one equivalent event afterwards.
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        this._clearInteractionHydration();
+        this._cancelScheduledHydration();
+        if (!this.isConnected) return;
+        this._hydrateNow(cfg);
+        if (target) {
+          target.dispatchEvent(cloneHydrationEvent(event));
+        }
+      };
+
+      for (const eventName of HYDRATION_INTERACTION_EVENTS) {
+        root.addEventListener(eventName, hydrate, { capture: true });
+      }
+      this._hydrationInteractionCleanup = () => {
+        for (const eventName of HYDRATION_INTERACTION_EVENTS) {
+          root.removeEventListener(eventName, hydrate, { capture: true });
+        }
+      };
+    }
+
+    private _clearInteractionHydration(): void {
+      this._hydrationInteractionCleanup?.();
+      this._hydrationInteractionCleanup = null;
+    }
+
+    private _cancelScheduledHydration(): void {
+      if (this._hydrationTimeoutId !== null) {
+        clearTimeout(this._hydrationTimeoutId);
+        this._hydrationTimeoutId = null;
+      }
+      if (this._hydrationIdleId !== null) {
+        if (typeof cancelIdleCallback !== 'undefined') {
+          cancelIdleCallback(this._hydrationIdleId);
+        }
+        this._hydrationIdleId = null;
+      }
     }
 
     disconnectedCallback() {
       this._runLogicWithinErrorBoundary(config, () => {
+        this._visibleHydrationCleanup?.();
+        this._visibleHydrationCleanup = null;
+        this._cancelScheduledHydration();
+        this._clearInteractionHydration();
         // Unregister this component from parent's shadowRoot cache
         const parentHost = this.getRootNode() as ShadowRoot | Document;
         if (parentHost && parentHost !== document && 'host' in parentHost) {
           unregisterChildComponent(parentHost as ShadowRoot, this);
         }
+
+        if (!this._componentInitialized) return;
 
         handleDisconnected(
           config,
@@ -367,11 +676,25 @@ export function createElementClass<
       oldValue: string | null,
       newValue: string | null,
     ) {
+      if (!this._componentInitialized) return;
       this._runLogicWithinErrorBoundary(config, () => {
-        this._applyProps(config);
-        // Re-render after applying props to ensure component shows updated values
-        if (oldValue !== newValue) {
-          this._requestRender();
+        const propName = Object.keys(config.props ?? {}).find(
+          (key) => toKebab(key) === name,
+        );
+        if (propName) {
+          const externallySetProps = (
+            this as unknown as Record<symbol, unknown>
+          )[externallySetPropsKey];
+          if (externallySetProps instanceof Set) {
+            externallySetProps.delete(propName);
+          }
+        }
+        // Before the first connected render, props are read in one batch by
+        // connectedCallback. Scheduling here would race deferred DSD hydration
+        // and render the same component repeatedly while the parent binds it.
+        if (this._mounted) {
+          this._applyProps(config);
+          if (oldValue !== newValue) this._requestRender();
         }
         handleAttributeChanged(config, name, oldValue, newValue, this.context);
       });
@@ -384,6 +707,8 @@ export function createElementClass<
     // --- Render ---
     private _render(cfg: ComponentConfig<S, C, P, T>) {
       this._runLogicWithinErrorBoundary(cfg, () => {
+        const hydrateExisting = this._hydrateExistingDOM;
+        this._hydrateExistingDOM = false;
         // _render invoked; proceed to render via renderComponent
         renderComponent(
           this.shadowRoot,
@@ -420,6 +745,7 @@ export function createElementClass<
             selfAsAny2?.onErrorStateChange?.(err as Error);
           },
           (html) => this._applyStyle(cfg, html),
+          hydrateExisting,
         );
       });
     }
@@ -429,11 +755,19 @@ export function createElementClass<
     }
 
     _requestRender() {
+      // Detached instances cannot produce visible work. More importantly, a
+      // queued render from an instance that was just replaced must not run
+      // after disconnectedCallback cleaned its reactive subscriptions; doing
+      // so can resurrect stale state and overwrite instance-scoped closures.
+      if (!this.isConnected) return;
       this._runLogicWithinErrorBoundary(this._cfg, () => {
         // Use scheduler to batch render requests
         scheduleDOMUpdate(() => {
+          if (!this.isConnected) return;
           requestRender(
-            () => this._render(this._cfg),
+            () => {
+              if (this.isConnected) this._render(this._cfg);
+            },
             this._lastRenderTime,
             this._renderCount,
             (t) => {
@@ -578,7 +912,7 @@ export function createElementClass<
                     return function (...args: unknown[]) {
                       const result = value.apply(target, args);
 
-                      if (!self._initializing) {
+                      if (!self._initializing && self._mounted) {
                         const fullPath = path || 'root';
                         self._triggerWatchers(fullPath, target);
                         scheduleDOMUpdate(
@@ -596,7 +930,7 @@ export function createElementClass<
               },
               set(target, prop, value) {
                 (target as Record<string, unknown>)[String(prop)] = value;
-                if (!self._initializing) {
+                if (!self._initializing && self._mounted) {
                   const fullPath = path
                     ? `${path}.${String(prop)}`
                     : String(prop);
@@ -607,7 +941,7 @@ export function createElementClass<
               },
               deleteProperty(target, prop) {
                 delete (target as Record<string, unknown>)[String(prop)];
-                if (!self._initializing) {
+                if (!self._initializing && self._mounted) {
                   const fullPath = path
                     ? `${path}.${String(prop)}`
                     : String(prop);
@@ -635,7 +969,7 @@ export function createElementClass<
                   : String(prop);
                 (target as Record<string, unknown>)[String(prop)] =
                   createReactive(value, fullPath);
-                if (!self._initializing) {
+                if (!self._initializing && self._mounted) {
                   self._triggerWatchers(
                     fullPath,
                     (target as Record<string, unknown>)[String(prop)],

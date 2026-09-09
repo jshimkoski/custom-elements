@@ -12,7 +12,13 @@
  */
 
 import type { VNode, VDomRefs, AnchorBlockVNode } from './types';
-import { toCamel, safe, safeSerializeAttr, isClassLikeAttr } from './helpers';
+import {
+  toCamel,
+  safe,
+  safeSerializeAttr,
+  isClassLikeAttr,
+  isHTMLBooleanAttribute,
+} from './helpers';
 import {
   setAttributeSmart,
   removeAttributeSmart,
@@ -56,6 +62,16 @@ const directiveListenerCache = new WeakMap<
   Element,
   Record<string, EventListener>
 >();
+
+/**
+ * These attributes describe runtime hydration state rather than authored VDOM.
+ * SSR seeds them on descendant islands before their client modules execute, so
+ * an ancestor's first hydration pass must not remove them as "extra" attrs.
+ */
+const RUNTIME_OWNED_ATTRIBUTES = new Set([
+  'data-cer-hydrate',
+  'data-cer-hydrated',
+]);
 
 /** @internal Minimal transition metadata alias used by the renderer. */
 type Transition = TransitionMetadata;
@@ -232,6 +248,8 @@ export function patchProps(
   context?: Record<string, unknown>,
 ) {
   // Process directives first
+  const oldDirectives =
+    (oldProps.directives as Record<string, DirectiveSpec> | undefined) ?? {};
   const newDirectives =
     (newProps.directives as Record<string, DirectiveSpec> | undefined) ?? {};
 
@@ -266,12 +284,9 @@ export function patchProps(
 
   const oldPropProps = (oldProps.props as PropsMap) ?? {};
   const newPropProps = mergedProps;
-  // Detect whether this vnode represents a custom element so we can
-  // trigger its internal prop application lifecycle after patching.
   const elIsCustom = Boolean(
     newProps?.isCustomElement ?? oldProps?.isCustomElement ?? false,
   );
-  let anyChange = false;
   // Collect keys from both old and new without allocating a merged object.
   const visitedPropKeys = new Set<string>();
   for (const k in oldPropProps) visitedPropKeys.add(k);
@@ -305,7 +320,6 @@ export function patchProps(
     }
 
     if (!(oldVal === newVal && oldUnwrapped === newUnwrapped)) {
-      anyChange = true;
       if (
         key === 'value' &&
         (el instanceof HTMLInputElement ||
@@ -476,11 +490,16 @@ export function patchProps(
   const oldAttrs = { ...(oldProps.attrs ?? {}) } as Record<string, unknown>;
   const newAttrs = mergedAttrs;
 
-  // If a :class directive exists, read the actual DOM class to ensure
-  // we have the current state for comparison
+  // Directive output is applied to the DOM during element creation but is not
+  // written into the VNode's static attrs bag. When a same-tag render changes
+  // template shape (for example, a list item changing from a text <div> to a
+  // wrapper <div> containing an <a>), a directive can disappear entirely.
+  // Include directives from either side of the diff so their old DOM output is
+  // visible and can be removed instead of leaking onto the reused element.
   const pdAttrs = (processedDirectives && processedDirectives.attrs) || {};
   if (
-    Object.prototype.hasOwnProperty.call(pdAttrs, 'class') &&
+    (Object.prototype.hasOwnProperty.call(pdAttrs, 'class') ||
+      Object.prototype.hasOwnProperty.call(oldDirectives, 'class')) &&
     typeof el.getAttribute === 'function'
   ) {
     const actual = el.getAttribute('class');
@@ -489,7 +508,9 @@ export function patchProps(
     }
   }
   if (
-    Object.prototype.hasOwnProperty.call(pdAttrs, 'style') &&
+    (Object.prototype.hasOwnProperty.call(pdAttrs, 'style') ||
+      Object.prototype.hasOwnProperty.call(oldDirectives, 'style') ||
+      Object.prototype.hasOwnProperty.call(oldDirectives, 'show')) &&
     typeof el.getAttribute === 'function'
   ) {
     const actual = el.getAttribute('style');
@@ -566,13 +587,19 @@ export function patchProps(
     }
 
     if (oldUnwrapped !== newUnwrapped) {
-      anyChange = true;
+      if (
+        newUnwrapped === undefined &&
+        RUNTIME_OWNED_ATTRIBUTES.has(key)
+      ) {
+        continue;
+      }
+
       // Handle removal/null/false: remove attribute and clear corresponding
       // DOM property for native controls where Vue treats null/undefined as ''
       if (
         newUnwrapped === undefined ||
         newUnwrapped === null ||
-        newUnwrapped === false
+        (newUnwrapped === false && isHTMLBooleanAttribute(key))
       ) {
         safe(() => {
           removeAttributeSmart(el as Element, key);
@@ -763,10 +790,6 @@ export function patchProps(
     }
   }
 
-  // If this is a custom element, attempt to notify it that props/attrs
-  // were updated so it can re-run its internal applyProps logic and
-  // schedule a render. This mirrors the behavior in createElement where
-  // newly created custom elements are told to apply props and render.
   // Defensive: ensure native disabled property matches the intended source
   try {
     if (isNativeControl(el)) {
@@ -831,22 +854,6 @@ export function patchProps(
     void 0;
   }
 
-  if (elIsCustom && anyChange) {
-    const maybeEl = el as unknown as {
-      _applyProps?: (cfg?: unknown) => void;
-      _cfg?: unknown;
-      requestRender?: () => void;
-      _render?: (cfg?: unknown) => void;
-    };
-    safe(() => {
-      maybeEl._applyProps?.(maybeEl._cfg);
-    });
-    safe(() => {
-      if (typeof maybeEl.requestRender === 'function') maybeEl.requestRender();
-      else if (typeof maybeEl._render === 'function')
-        maybeEl._render?.(maybeEl._cfg);
-    });
-  }
 }
 
 /**
@@ -1065,13 +1072,19 @@ export function createElement(
     const unwrappedVal = unwrapValue(val);
 
     if (typeof unwrappedVal === 'boolean') {
-      // Use the unwrapped boolean to decide presence of boolean attributes
-      if (unwrappedVal) {
-        setAttributeSmart(el as Element, key, '');
+      // Only HTML boolean attributes use presence/absence semantics. ARIA,
+      // contenteditable, data attributes, and other enumerated attributes
+      // require the literal "true"/"false" value.
+      if (isHTMLBooleanAttribute(key)) {
+        if (unwrappedVal) {
+          setAttributeSmart(el as Element, key, '');
+        } else {
+          safe(() => {
+            removeAttributeSmart(el as Element, key);
+          });
+        }
       } else {
-        safe(() => {
-          removeAttributeSmart(el as Element, key);
-        });
+        setAttributeSmart(el as Element, key, String(unwrappedVal));
       }
     } else if (unwrappedVal !== undefined && unwrappedVal !== null) {
       // For disabled attr on native inputs, coerce to boolean and set property
@@ -1319,7 +1332,9 @@ export function createElement(
             const existingProp = (el as unknown as Record<string, unknown>)[
               key
             ];
-            if (typeof existingProp === 'boolean') {
+            if (vnodeIsCustom && isReactiveState(propValue)) {
+              (el as unknown as Record<string, unknown>)[key] = propValue;
+            } else if (typeof existingProp === 'boolean') {
               let assignValue: unknown = propValue;
               if (typeof propValue === 'string') {
                 if (propValue === 'false') assignValue = false;
@@ -2462,6 +2477,202 @@ function cloneVNodeForStorage(vnode: VNode | string | null | undefined): VNode {
 }
 
 /**
+ * Bind a freshly-rendered VNode tree to matching server-rendered DOM.
+ *
+ * Declarative Shadow DOM already gives the browser the correct element tree.
+ * Recreating that tree during custom-element upgrade is both destructive (node
+ * identity, selection, and form state are lost) and disproportionately costly
+ * on content-heavy pages. This walk retains matching nodes while applying the
+ * runtime-only pieces SSR cannot serialize: listeners, refs, directives, and
+ * bound properties. A structural mismatch returns false so the normal renderer
+ * can safely take over.
+ */
+function hydrateVNode(
+  dom: Node,
+  vnode: VNode | string,
+  context?: Record<string, unknown>,
+  refs?: VDomRefs,
+): boolean {
+  if (typeof vnode === 'string' || vnode.tag === '#text') {
+    if (dom.nodeType !== Node.TEXT_NODE) return false;
+    const text =
+      typeof vnode === 'string'
+        ? vnode
+        : typeof vnode.children === 'string'
+          ? vnode.children
+          : '';
+    if (dom.textContent !== text) dom.textContent = text;
+    if (typeof vnode !== 'string' && vnode.key != null) {
+      setNodeKey(dom, String(vnode.key));
+    }
+    return true;
+  }
+
+  // Raw HTML has no serializable runtime bindings of its own. When it is the
+  // final child, the existing server nodes are already the desired subtree.
+  if (vnode.tag === '#raw') return true;
+
+  // SSR intentionally omits anchor boundary nodes. Until a stable boundary
+  // mapping is available, use the normal renderer for components containing
+  // anchor blocks rather than guessing and risking an incorrect future patch.
+  if (vnode.tag === '#anchor' || !(dom instanceof Element)) return false;
+  if (dom.localName !== vnode.tag.toLowerCase()) return false;
+
+  if (vnode.key != null) setNodeKey(dom, String(vnode.key));
+
+  // Seed the old attribute bag from live SSR DOM so patchProps avoids redundant
+  // setAttribute calls (and their custom-element attribute callbacks). A parent
+  // only owns the attributes it authored on a custom-element child. The child
+  // may already have reflected ARIA/state attributes onto its host while upgrade
+  // and descendant hydration tasks interleave; treating those as parent-owned
+  // SSR leftovers would incorrectly delete them here.
+  const oldAttrs: Record<string, string> = {};
+  const parentAuthoredCustomElementAttrs = dom.localName.includes('-')
+    ? new Set(Object.keys(vnode.props?.attrs ?? {}))
+    : null;
+  for (const attr of Array.from(dom.attributes)) {
+    if (
+      attr.name !== 'data-anchor-key' &&
+      (!parentAuthoredCustomElementAttrs ||
+        parentAuthoredCustomElementAttrs.has(attr.name))
+    ) {
+      oldAttrs[attr.name] = attr.value;
+    }
+  }
+  patchProps(
+    dom as HTMLElement,
+    { attrs: oldAttrs },
+    vnode.props || {},
+    context,
+  );
+  assignRef(vnode, dom, refs);
+
+  if (typeof vnode.children === 'string') {
+    if (dom.textContent !== vnode.children) dom.textContent = vnode.children;
+    return true;
+  }
+  if (!Array.isArray(vnode.children)) return dom.childNodes.length === 0;
+
+  const children = vnode.children.filter(
+    (child) => child !== null && child !== undefined,
+  );
+  const domChildren = Array.from(dom.childNodes);
+  let domIndex = 0;
+
+  for (let vnodeIndex = 0; vnodeIndex < children.length; vnodeIndex++) {
+    const child = children[vnodeIndex];
+    if (typeof child !== 'string' && child.tag === '#anchor') {
+      const anchor = child as AnchorBlockVNode;
+      const anchorChildren = Array.isArray(anchor.children)
+        ? anchor.children.filter(
+            (entry) => entry !== null && entry !== undefined,
+          )
+        : [];
+      const start = document.createTextNode('');
+      const end = document.createTextNode('');
+      if (anchor.key != null) {
+        setNodeKey(start, `${anchor.key}:start`);
+        setNodeKey(end, `${anchor.key}:end`);
+      }
+      anchor._startNode = start;
+      anchor._endNode = end;
+
+      dom.insertBefore(start, domChildren[domIndex] ?? null);
+      domChildren.splice(domIndex, 0, start);
+      let anchorDomIndex = domIndex + 1;
+
+      for (const anchorChild of anchorChildren) {
+        // Nested anchors and multi-node raw blocks do not have enough SSR
+        // boundary information to map unambiguously; fall back safely.
+        if (
+          typeof anchorChild !== 'string' &&
+          (anchorChild.tag === '#anchor' || anchorChild.tag === '#raw')
+        ) {
+          return false;
+        }
+        const anchorDom = domChildren[anchorDomIndex];
+        if (
+          !anchorDom ||
+          !hydrateVNode(anchorDom, anchorChild, context, refs)
+        ) {
+          return false;
+        }
+        anchorDomIndex++;
+      }
+
+      dom.insertBefore(end, domChildren[anchorDomIndex] ?? null);
+      domChildren.splice(anchorDomIndex, 0, end);
+      domIndex = anchorDomIndex + 1;
+      continue;
+    }
+    const childIsText =
+      typeof child === 'string' ||
+      (typeof child !== 'string' && child.tag === '#text');
+    if (childIsText) {
+      // HTML parsing coalesces adjacent text produced around interpolations
+      // (for example whitespace + a dynamic value + whitespace) into one DOM
+      // Text node, while the VNode tree keeps separate nodes. Split that server
+      // node into the VDOM shape once so later patches remain index-stable.
+      const textRun: Array<VNode | string> = [child];
+      while (vnodeIndex + textRun.length < children.length) {
+        const next = children[vnodeIndex + textRun.length];
+        if (
+          typeof next !== 'string' &&
+          (typeof next === 'string' || next.tag !== '#text')
+        ) {
+          break;
+        }
+        textRun.push(next);
+      }
+
+      const firstTextNode = domChildren[domIndex];
+      if (!firstTextNode || firstTextNode.nodeType !== Node.TEXT_NODE) {
+        return false;
+      }
+
+      for (let textIndex = 0; textIndex < textRun.length; textIndex++) {
+        let textNode = domChildren[domIndex + textIndex];
+        if (!textNode || textNode.nodeType !== Node.TEXT_NODE) {
+          textNode = document.createTextNode('');
+          dom.insertBefore(textNode, domChildren[domIndex + textIndex] ?? null);
+          domChildren.splice(domIndex + textIndex, 0, textNode);
+        }
+        if (!hydrateVNode(textNode, textRun[textIndex], context, refs)) {
+          return false;
+        }
+      }
+      domIndex += textRun.length;
+      vnodeIndex += textRun.length - 1;
+      continue;
+    }
+    if (typeof child !== 'string' && child.tag === '#raw') {
+      // A raw block can expand to any number of DOM nodes. It is safe to keep
+      // the remaining server subtree when the block is the final VNode child.
+      return vnodeIndex === children.length - 1;
+    }
+    const domChild = domChildren[domIndex++];
+    if (!domChild || !hydrateVNode(domChild, child, context, refs)) return false;
+  }
+
+  return domIndex === domChildren.length;
+}
+
+function hydrateExistingShadowDOM(
+  root: ShadowRoot,
+  vnode: VNode,
+  context?: Record<string, unknown>,
+  refs?: VDomRefs,
+): Node | null {
+  const contentNodes = Array.from(root.childNodes).filter(
+    (node) => !(node instanceof HTMLStyleElement),
+  );
+  if (contentNodes.length !== 1) return null;
+
+  const dom = contentNodes[0];
+  return hydrateVNode(dom, vnode, context, refs) ? dom : null;
+}
+
+/**
  * Virtual DOM renderer.
  * @param root The root element to render into.
  * @param vnodeOrArray The virtual node or array of virtual nodes to render.
@@ -2473,7 +2684,8 @@ export function vdomRenderer(
   vnodeOrArray: VNode | VNode[],
   context?: Record<string, unknown>,
   refs?: VDomRefs,
-) {
+  hydrateExisting = false,
+): boolean {
   let newVNode: VNode;
   if (Array.isArray(vnodeOrArray)) {
     if (vnodeOrArray.length === 1) {
@@ -2515,8 +2727,32 @@ export function vdomRenderer(
     null;
 
   let newDom: Node;
+  let hydrated = false;
 
-  if (prevVNode && prevDom) {
+  if (hydrateExisting && !prevVNode) {
+    const existingDom = hydrateExistingShadowDOM(
+      root,
+      newVNode,
+      context,
+      refs,
+    );
+    if (existingDom) {
+      newDom = existingDom;
+      hydrated = true;
+    } else {
+      newDom = createElement(
+        newVNode,
+        context,
+        refs,
+        root.host instanceof Element ? (root.host.namespaceURI ?? null) : null,
+      );
+      const firstContentNode = Array.from(root.childNodes).find(
+        (node) => !(node instanceof HTMLStyleElement),
+      );
+      if (firstContentNode) root.replaceChild(newDom, firstContentNode);
+      else root.appendChild(newDom);
+    }
+  } else if (prevVNode && prevDom) {
     // Only replace if tag or key changed
     if (
       typeof prevVNode !== 'string' &&
@@ -2568,4 +2804,5 @@ export function vdomRenderer(
   (root as unknown as Record<string, unknown>)._prevVNode =
     prevVNodeToStore as unknown;
   (root as unknown as Record<string, unknown>)._prevDom = newDom as unknown;
+  return hydrated;
 }

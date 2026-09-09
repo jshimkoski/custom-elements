@@ -32,6 +32,8 @@ export {
   useExpose,
   // Access named slots in the component (Priority 1)
   useSlots,
+  // Access the current custom-element host without relying on internal context fields
+  useHost,
   // Internal: for advanced consumers and library authors
   getCurrentComponentContext,
 } from './runtime/hooks';

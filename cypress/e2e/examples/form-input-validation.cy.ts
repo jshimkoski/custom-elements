@@ -1,6 +1,6 @@
 /// <reference types="cypress" />
 
-describe.skip('FormInputValidation Component', () => {
+describe('FormInputValidation Component', () => {
   beforeEach(() => {
     cy.visit('/');
     cy.get('form-input-validation').should('exist');
@@ -36,19 +36,55 @@ describe.skip('FormInputValidation Component', () => {
       .should('exist');
   });
 
-  it('shows error for empty required fields', () => {
+  it('preserves native HTML constraint validation for pointer and keyboard submission', () => {
+    cy.get('form-input-validation')
+      .shadow()
+      .find('form')
+      .should(($form) => {
+        expect(($form[0] as HTMLFormElement).noValidate).to.equal(false);
+        expect(($form[0] as HTMLFormElement).checkValidity()).to.equal(false);
+      });
+
     cy.get('form-input-validation')
       .shadow()
       .find('button[type="submit"]')
       .click();
-    cy.wait(100);
     cy.get('form-input-validation')
       .shadow()
-      .find('.error')
-      .should('contain', 'Please enter a valid email address.');
+      .find('input[type="email"]')
+      .should('match', ':invalid')
+      .then(($input) => {
+        expect(($input[0] as HTMLInputElement).validationMessage).not.to.equal('');
+      });
+    cy.get('form-input-validation').shadow().find('.error').should('not.exist');
+
+    cy.get('form-input-validation')
+      .shadow()
+      .find('button[type="submit"]')
+      .focus();
+    cy.press(Cypress.Keyboard.Keys.ENTER);
+    cy.get('form-input-validation')
+      .shadow()
+      .find('input[type="email"]')
+      .should('match', ':invalid');
+    cy.get('form-input-validation').shadow().find('.error').should('not.exist');
   });
 
-  it('shows error for invalid email format', () => {
+  it('uses native validation for empty required fields', () => {
+    cy.get('form-input-validation')
+      .shadow()
+      .find('button[type="submit"]')
+      .click();
+    cy.get('form-input-validation')
+      .shadow()
+      .find('input[type="email"]')
+      .should('match', ':invalid')
+      .then(($input) => {
+        expect(($input[0] as HTMLInputElement).validity.valueMissing).to.equal(true);
+      });
+  });
+
+  it('uses native validation for invalid email format', () => {
     cy.get('form-input-validation')
       .shadow()
       .find('input[type="email"]')
@@ -57,14 +93,17 @@ describe.skip('FormInputValidation Component', () => {
       .shadow()
       .find('button[type="submit"]')
       .click();
-    cy.wait(100);
     cy.get('form-input-validation')
       .shadow()
-      .find('.error')
-      .should('contain', 'Please enter a valid email address.');
+      .find('input[type="email"]')
+      .should('match', ':invalid')
+      .then(($input) => {
+        expect(($input[0] as HTMLInputElement).validity.typeMismatch).to.equal(true);
+      });
   });
 
-  it('shows error for short username', () => {
+  it('exposes native minlength and a defensive username fallback', () => {
+    let originalInput: HTMLInputElement;
     cy.get('form-input-validation')
       .shadow()
       .find('input[type="email"]')
@@ -72,19 +111,37 @@ describe.skip('FormInputValidation Component', () => {
     cy.get('form-input-validation')
       .shadow()
       .find('input[type="text"]')
+      .then(($input) => {
+        originalInput = $input[0] as HTMLInputElement;
+      })
       .type('ab');
     cy.get('form-input-validation')
       .shadow()
       .find('button[type="submit"]')
       .click();
-    cy.wait(100);
+    cy.get('form-input-validation')
+      .shadow()
+      .find('input[type="text"]')
+      .then(($input) => {
+        const input = $input[0] as HTMLInputElement;
+        expect(input).to.equal(originalInput);
+        expect(input.getAttribute('minlength')).to.equal('3');
+        expect(input.minLength).to.equal(3);
+        expect(input.value).to.equal('ab');
+      });
+    cy.get('form-input-validation')
+      .shadow()
+      .find('form')
+      .then(($form) => {
+        $form[0].dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      });
     cy.get('form-input-validation')
       .shadow()
       .find('.error')
       .should('contain', 'Username must be at least 3 characters.');
   });
 
-  it('shows error for short bio', () => {
+  it('exposes native minlength and a defensive bio fallback', () => {
     cy.get('form-input-validation')
       .shadow()
       .find('input[type="email"]')
@@ -98,14 +155,28 @@ describe.skip('FormInputValidation Component', () => {
       .shadow()
       .find('button[type="submit"]')
       .click();
-    cy.wait(100);
+    cy.get('form-input-validation')
+      .shadow()
+      .find('textarea')
+      .then(($input) => {
+        const input = $input[0] as HTMLTextAreaElement;
+        expect(input.getAttribute('minlength')).to.equal('10');
+        expect(input.minLength).to.equal(10);
+        expect(input.value).to.equal('short');
+      });
+    cy.get('form-input-validation')
+      .shadow()
+      .find('form')
+      .then(($form) => {
+        $form[0].dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      });
     cy.get('form-input-validation')
       .shadow()
       .find('.error')
       .should('contain', 'Bio must be at least 10 characters.');
   });
 
-  it('shows error for missing gender', () => {
+  it('uses native required validation for the gender group', () => {
     cy.get('form-input-validation')
       .shadow()
       .find('input[type="email"]')
@@ -127,14 +198,17 @@ describe.skip('FormInputValidation Component', () => {
       .shadow()
       .find('button[type="submit"]')
       .click();
-    cy.wait(100);
     cy.get('form-input-validation')
       .shadow()
-      .find('.error')
-      .should('contain', 'Please select a gender.');
+      .find('input[type="radio"]')
+      .first()
+      .should('match', ':invalid')
+      .then(($input) => {
+        expect(($input[0] as HTMLInputElement).validity.valueMissing).to.equal(true);
+      });
   });
 
-  it('shows error for missing country', () => {
+  it('uses native required validation for the country', () => {
     cy.get('form-input-validation')
       .shadow()
       .find('input[type="email"]')
@@ -160,14 +234,16 @@ describe.skip('FormInputValidation Component', () => {
       .shadow()
       .find('button[type="submit"]')
       .click();
-    cy.wait(100);
     cy.get('form-input-validation')
       .shadow()
-      .find('.error')
-      .should('contain', 'Please select a country.');
+      .find('select')
+      .should('match', ':invalid')
+      .then(($select) => {
+        expect(($select[0] as HTMLSelectElement).validity.valueMissing).to.equal(true);
+      });
   });
 
-  it('shows error for missing fruits', () => {
+  it('uses native required validation for at least one favorite fruit', () => {
     cy.get('form-input-validation')
       .shadow()
       .find('input[type="email"]')
@@ -190,11 +266,13 @@ describe.skip('FormInputValidation Component', () => {
       .shadow()
       .find('button[type="submit"]')
       .click();
-    cy.wait(100);
     cy.get('form-input-validation')
       .shadow()
-      .find('.error')
-      .should('contain', 'Please select at least one favorite fruit.');
+      .find('input[type="checkbox"][value="apple"]')
+      .should('match', ':invalid')
+      .then(($input) => {
+        expect(($input[0] as HTMLInputElement).validity.valueMissing).to.equal(true);
+      });
   });
 
   it('accepts valid input and submits', () => {

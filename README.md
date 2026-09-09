@@ -424,6 +424,10 @@ export default defineConfig({
     cerComponentImports({
       componentsDir: '/absolute/path/to/app/components',
       appRoot: '/absolute/path/to/app',
+      // Optional package-level, tree-shakable component registrations.
+      resolvers: [tag => tag === 'design-button'
+        ? '@acme/design-system/components/button'
+        : undefined],
     }),
   ],
 });

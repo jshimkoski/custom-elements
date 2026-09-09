@@ -1,6 +1,6 @@
 /// <reference types="cypress" />
 
-describe.skip('TodoApp Component', () => {
+describe('TodoApp Component', () => {
   beforeEach(() => {
     cy.visit('/');
     cy.get('todo-app').should('exist');
@@ -65,6 +65,42 @@ describe.skip('TodoApp Component', () => {
           .eq(0)
           .find('span.todo-text')
           .should('have.attr', 'data-done', 'false');
+      });
+  });
+
+  it('toggles and removes only the selected todo when several exist', () => {
+    cy.get('todo-app')
+      .shadow()
+      .within(() => {
+        for (const text of ['First task', 'Second task', 'Third task']) {
+          cy.get('input[type="text"]').type(text);
+          cy.get('button[type="submit"]').click();
+        }
+
+        cy.get('ul li').should('have.length', 3);
+        cy.get('ul li').eq(1).find('input[type="checkbox"]').check();
+
+        cy.get('ul li').then(($items) => {
+          expect(
+            [...$items].map((item) =>
+              item.querySelector('input[type="checkbox"]')?.checked,
+            ),
+          ).to.deep.equal([false, true, false]);
+          expect(
+            [...$items].map((item) =>
+              item.querySelector('span.todo-text')?.getAttribute('data-done'),
+            ),
+          ).to.deep.equal(['false', 'true', 'false']);
+        });
+
+        cy.get('ul li').eq(1).find('button.remove-btn').click();
+        cy.get('ul li').should('have.length', 2);
+        cy.get('ul li span.todo-text').then(($labels) => {
+          expect([...$labels].map((label) => label.textContent?.trim())).to.deep.equal([
+            'First task',
+            'Third task',
+          ]);
+        });
       });
   });
 

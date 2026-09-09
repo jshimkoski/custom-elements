@@ -532,6 +532,39 @@ export function safeSerializeAttr(val: unknown): string | null {
   return null; // complex objects, nodes, functions -> do not serialize
 }
 
+const HTML_BOOLEAN_ATTRIBUTES = new Set([
+  'allowfullscreen',
+  'async',
+  'autofocus',
+  'autoplay',
+  'checked',
+  'controls',
+  'default',
+  'defer',
+  'disabled',
+  'formnovalidate',
+  'hidden',
+  'inert',
+  'ismap',
+  'itemscope',
+  'loop',
+  'multiple',
+  'muted',
+  'nomodule',
+  'novalidate',
+  'open',
+  'playsinline',
+  'readonly',
+  'required',
+  'reversed',
+  'selected',
+]);
+
+/** Return whether an attribute uses HTML presence/absence boolean semantics. */
+export function isHTMLBooleanAttribute(name: string): boolean {
+  return HTML_BOOLEAN_ATTRIBUTES.has(name.toLowerCase());
+}
+
 /**
  * Determine if an attribute name is class-like and should be preserved on hosts.
  * Class-like: exactly 'class', camelCase ending with 'Class', or kebab-case ending with '-class'.

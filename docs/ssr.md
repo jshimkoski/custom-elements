@@ -289,6 +289,10 @@ hydrateApp(document.getElementById('app')!);
 
 Control when each component hydrates using the `hydrate` option in `component()`. The strategy is serialized as a `data-cer-hydrate` attribute during DSD SSR and read by the client runtime on `connectedCallback`.
 
+An explicit nested strategy creates an island boundary. For example, a child
+declared with `{ hydrate: 'load' }` remains interactive inside a page declared
+with `{ hydrate: 'none' }`; unmarked siblings and descendants stay static.
+
 ### Hydration strategies
 
 | Strategy           | Behavior                                                              | Use case                                           |
@@ -296,7 +300,7 @@ Control when each component hydrates using the `hydrate` option in `component()`
 | `'load'` (default) | Hydrate immediately when the element connects                         | Interactive components visible on load             |
 | `'idle'`           | Defer to `requestIdleCallback` (or `setTimeout(cb, 200)`)             | Below-fold or low-priority components              |
 | `'visible'`        | Hydrate when the element enters the viewport (`IntersectionObserver`) | Lazy sections, infinite scroll, below-fold content |
-| `'none'`           | Never hydrate — keep DSD content as static HTML                       | Pure display components, server-only content       |
+| `'none'`           | Never hydrate this DSD subtree, including descendant custom elements | Pure display components, server-only route content |
 
 ```ts
 component(
@@ -354,6 +358,14 @@ component(
   <template shadowrootmode="open">...</template>
 </static-badge>
 ```
+
+`'none'` is a cascading hydration boundary. Descendant custom elements remain
+static even if their own default strategy is `'load'`; otherwise nested DSD
+components would still upgrade and perform the work that the parent boundary
+was intended to avoid. Native HTML semantics inside the boundary—links,
+forms, `<details>`, and similar browser controls—continue to work without the
+runtime. Use those semantics for progressive enhancement, and place controls
+that require component state outside a `'none'` boundary.
 
 ---
 

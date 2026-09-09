@@ -26,4 +26,20 @@ describe('template-compiler :model (plain) -> modelValue', () => {
     expect(handlerKey).toBeDefined();
     expect(typeof props[handlerKey!]).toBe('function');
   });
+
+  it.each([false, 0, ''])('preserves a falsy update detail (%j)', (detail) => {
+    const tpl = Object.assign([`<my-custom :model="value"></my-custom>`], {
+      raw: ['<my-custom :model="value"></my-custom>'],
+    }) as unknown as TemplateStringsArray;
+    const context = { value: 'before', __isCustomElements: ['my-custom'] };
+    const vnode = htmlImpl(tpl, [], context) as any;
+    const props = vnode.props.props || vnode.props;
+    const handlerKey = Object.keys(props).find((key) =>
+      key.toLowerCase().includes('onupdate'),
+    );
+
+    props[handlerKey!]({ detail });
+
+    expect(context.value).toBe(detail);
+  });
 });

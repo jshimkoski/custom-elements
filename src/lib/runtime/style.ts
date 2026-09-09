@@ -2383,6 +2383,35 @@ export function jitCSS(html: string): string {
   // regardless of the order classes appear in the HTML.
   const buckets: string[][] = [[], [], [], [], []];
   const ruleCache: Record<string, string | null> = {};
+  const compositionClasses = {
+    transform: new Set<string>(),
+    filter: new Set<string>(),
+    backdropFilter: new Set<string>(),
+    ring: new Set<string>(),
+    gradient: new Set<string>(),
+  };
+
+  const registerCompositionClass = (cls: string, body: string): void => {
+    const selector = escapeClassName(cls);
+    if (/(?:^|;)transform:/.test(body) && body.includes('--cer-')) {
+      compositionClasses.transform.add(selector);
+    }
+    if (/(?:^|;)filter:/.test(body) && body.includes('--cer-')) {
+      compositionClasses.filter.add(selector);
+    }
+    if (/(?:^|;)backdrop-filter:/.test(body) && body.includes('--cer-')) {
+      compositionClasses.backdropFilter.add(selector);
+    }
+    if (body.includes('--cer-ring-color') || body.includes('var(--cer-ring-color')) {
+      compositionClasses.ring.add(selector);
+    }
+    if (
+      body.includes('--cer-gradient-') ||
+      body.includes('var(--cer-gradient-stops)')
+    ) {
+      compositionClasses.gradient.add(selector);
+    }
+  };
 
   const generateRuleCached = (
     cls: string,
@@ -3096,7 +3125,20 @@ export function jitCSS(html: string): string {
     const bucketNum = classify(variantsForBucket);
 
     const rule = generateRuleCached(cls);
-    if (rule) buckets[bucketNum].push(rule);
+    if (rule) {
+      const cleanBase = basePart.replace(/^!/, '').replace(/!$/, '');
+      const baseRule =
+        utilityMap[cleanBase] ??
+        parseSpacing(cleanBase) ??
+        parseSpaceUtility(cleanBase) ??
+        parseOpacity(cleanBase) ??
+        parseZIndex(cleanBase) ??
+        parseColorWithOpacity(cleanBase) ??
+        parseGradientColorStop(cleanBase) ??
+        parseArbitrary(cleanBase);
+      if (baseRule) registerCompositionClass(cls, baseRule);
+      buckets[bucketNum].push(rule);
+    }
   }
 
   // Ensure explicit gradient color-stop classes generate rules.
@@ -3115,6 +3157,41 @@ export function jitCSS(html: string): string {
       if (generated) buckets[0].push(generated);
     }
   }
+
+  const addCompositionDefaults = (
+    selectors: Set<string>,
+    declarations: string,
+  ): void => {
+    if (selectors.size === 0) return;
+    buckets[0].unshift(
+      `:where(${Array.from(selectors).join(',')}){${declarations}}`,
+    );
+  };
+
+  // Composition variables must not inherit from an ancestor using a similar
+  // utility. Initialize them only on class-bearing elements instead of every
+  // element in every shadow root. :where() keeps these defaults at zero
+  // specificity so the utility declarations always win.
+  addCompositionDefaults(
+    compositionClasses.gradient,
+    '--cer-gradient-from-position:0%;--cer-gradient-to-position:100%;--cer-gradient-via-position:50%;--cer-gradient-from:rgba(255,255,255,0);--cer-gradient-to:rgba(255,255,255,0);--cer-gradient-stops:var(--cer-gradient-from),var(--cer-gradient-to);',
+  );
+  addCompositionDefaults(
+    compositionClasses.ring,
+    '--cer-ring-color:rgb(59 130 246/0.5);',
+  );
+  addCompositionDefaults(
+    compositionClasses.backdropFilter,
+    '--cer-backdrop-blur:;--cer-backdrop-brightness:;--cer-backdrop-contrast:;--cer-backdrop-grayscale:;--cer-backdrop-hue-rotate:;--cer-backdrop-invert:;--cer-backdrop-saturate:;--cer-backdrop-sepia:;',
+  );
+  addCompositionDefaults(
+    compositionClasses.filter,
+    '--cer-blur:;--cer-brightness:;--cer-contrast:;--cer-grayscale:;--cer-hue-rotate:;--cer-invert:;--cer-saturate:;--cer-sepia:;--cer-drop-shadow:;',
+  );
+  addCompositionDefaults(
+    compositionClasses.transform,
+    '--cer-translate-x:0px;--cer-translate-y:0px;--cer-rotate:0deg;--cer-skew-x:0deg;--cer-skew-y:0deg;--cer-scale-x:1;--cer-scale-y:1;',
+  );
 
   // Sort rules within buckets to ensure proper CSS cascade order.
   // Larger breakpoints must come after smaller ones for correct precedence.

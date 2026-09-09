@@ -16,6 +16,11 @@ export default {
     cerComponentImports({
       componentsDir: '/absolute/path/to/app/components',
       appRoot: '/absolute/path/to/app',
+      resolvers: [
+        tag => tag === 'design-button'
+          ? '@acme/design-system/components/button'
+          : undefined,
+      ],
     }),
   ],
 };
@@ -29,7 +34,11 @@ interface CerComponentImportsOptions {
   componentsDir: string;
   /** Absolute path to the app root. Only files inside this directory are transformed. */
   appRoot: string;
+  /** Package resolvers consulted after local components, in declaration order. */
+  resolvers?: readonly CerComponentImportResolver[];
 }
+
+type CerComponentImportResolver = (tag: string) => string | undefined;
 ```
 
 ### `componentsDir`
@@ -44,6 +53,17 @@ The directory scanned at build start to build the tag-name → source-file manif
 
 Only files whose resolved path starts with `appRoot` are transformed. Files outside this boundary (e.g. `node_modules`, other packages) are left untouched.
 
+### `resolvers`
+
+**Type:** `readonly ((tag: string) => string | undefined)[]` — optional
+
+Resolvers let a component library map its public tags to side-effect registration
+modules without forcing an application to import the library's full component
+index. They are consulted in order only when no local component registered the
+tag. Return a bare or absolute module specifier for supported tags and
+`undefined` otherwise. A local component always wins, so applications can
+deliberately override a package component.
+
 ---
 
 ## 🔄 How It Works
@@ -51,7 +71,7 @@ Only files whose resolved path starts with `appRoot` are transformed. Files outs
 1. **`buildStart`** — scans `componentsDir` with a glob, reads each file, extracts `component()` tag-name calls, and builds a `Map<tagName, absPath>` manifest.
 2. **`transform`** — for each file inside `appRoot` that contains an `html\`` template literal:
    - Extracts all hyphenated custom-element tag names (ignoring comments, closing tags, and native HTML tags).
-   - Looks up each tag in the manifest.
+   - Looks up each tag in the local manifest, then in package resolvers.
    - Prepends a relative `import` statement for every match not already imported.
    - Returns the transformed code with a VLQ source map so debugger line numbers stay correct.
 3. **`watchChange`** — keeps the manifest in sync during dev:

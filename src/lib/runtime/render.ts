@@ -115,6 +115,7 @@ export function renderComponent<
   setLoading: (val: boolean) => void,
   setError: (err: Error | null) => void,
   applyStyle: (html: string) => void,
+  hydrateExisting = false,
 ): void {
   if (!shadowRoot) return;
 
@@ -147,8 +148,15 @@ export function renderComponent<
           if (sr._asyncRenderToken !== renderToken) return;
           setLoading(false);
           setError(null);
-          renderOutput(shadowRoot, output, context, refs, setHtmlString);
-          applyStyle(shadowRoot.innerHTML);
+          const hydrated = renderOutput(
+            shadowRoot,
+            output,
+            context,
+            refs,
+            setHtmlString,
+            hydrateExisting,
+          );
+          if (!hydrated) applyStyle(shadowRoot.innerHTML);
         })
         .catch((error) => {
           if (wasConnected && !shadowRoot.host.isConnected) return;
@@ -163,8 +171,15 @@ export function renderComponent<
       return;
     }
 
-    renderOutput(shadowRoot, outputOrPromise, context, refs, setHtmlString);
-    applyStyle(shadowRoot.innerHTML);
+    const hydrated = renderOutput(
+      shadowRoot,
+      outputOrPromise,
+      context,
+      refs,
+      setHtmlString,
+      hydrateExisting,
+    );
+    if (!hydrated) applyStyle(shadowRoot.innerHTML);
   } catch (error) {
     const err = error instanceof Error ? error : new Error(String(error));
     const tag = shadowRoot.host.tagName.toLowerCase();
@@ -191,18 +206,27 @@ export function renderOutput<
   context: ComponentContext<S, C, P, T>,
   refs: Refs['refs'],
   setHtmlString: (html: string) => void,
-): void {
-  if (!shadowRoot) return;
+  hydrateExisting = false,
+): boolean {
+  if (!shadowRoot) return false;
 
   beginRenderWarningScope();
   try {
-    vdomRenderer(
+    const hydrated = vdomRenderer(
       shadowRoot,
       Array.isArray(output) ? output : [output],
       context,
       refs,
+      hydrateExisting,
     );
-    setHtmlString(shadowRoot.innerHTML);
+    // Retained Declarative Shadow DOM already includes the server-generated
+    // styles, and renderComponent deliberately skips applyStyle() in this
+    // branch. Avoid serializing the entire shadow tree solely to populate the
+    // client JIT snapshot; raw content blocks can make that otherwise dominate
+    // hydration time. A later reactive patch takes the normal path and refreshes
+    // the snapshot before applying styles.
+    if (!hydrated) setHtmlString(shadowRoot.innerHTML);
+    return hydrated;
   } finally {
     endRenderWarningScope();
   }

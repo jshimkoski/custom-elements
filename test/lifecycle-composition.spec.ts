@@ -6,6 +6,7 @@ import {
   useOnConnected,
   useOnDisconnected,
   useOnAttributeChanged,
+  useHost,
 } from '../src/lib';
 
 let container: HTMLElement;
@@ -55,6 +56,98 @@ describe('🔗 Lifecycle hook composition (multiple hooks per type)', () => {
     await new Promise((r) => setTimeout(r, 50));
 
     expect(log).toEqual(['cleanup-a', 'cleanup-b']);
+  });
+
+  it('runs cleanup functions returned by useOnConnected exactly once', async () => {
+    const log: string[] = [];
+
+    component('lc-connected-cleanup', () => {
+      useOnConnected(() => {
+        log.push('connected');
+        return () => log.push('returned-cleanup');
+      });
+      useOnDisconnected(() => log.push('disconnected'));
+      return html`<div>connected cleanup</div>`;
+    });
+
+    container.innerHTML = '<lc-connected-cleanup></lc-connected-cleanup>';
+    await new Promise((r) => setTimeout(r, 50));
+    container.innerHTML = '';
+    await new Promise((r) => setTimeout(r, 50));
+
+    expect(log).toEqual(['connected', 'returned-cleanup', 'disconnected']);
+  });
+
+  it('retains cleanup functions returned by async useOnConnected handlers', async () => {
+    const log: string[] = [];
+
+    component('lc-async-connected-cleanup', () => {
+      useOnConnected(async () => {
+        await Promise.resolve();
+        log.push('connected');
+        return () => log.push('returned-cleanup');
+      });
+      return html`<div>async connected cleanup</div>`;
+    });
+
+    container.innerHTML = '<lc-async-connected-cleanup></lc-async-connected-cleanup>';
+    await new Promise((r) => setTimeout(r, 20));
+    container.innerHTML = '';
+    await new Promise((r) => setTimeout(r, 20));
+
+    expect(log).toEqual(['connected', 'returned-cleanup']);
+  });
+
+  it('runs a late async cleanup immediately when disconnect wins the race', async () => {
+    let resolveHook!: (cleanup: () => void) => void;
+    let cleanupCalls = 0;
+
+    component('lc-late-async-cleanup', () => {
+      useOnConnected(() => new Promise<() => void>((resolve) => {
+        resolveHook = resolve;
+      }));
+      return html`<div>late async cleanup</div>`;
+    });
+
+    container.innerHTML = '<lc-late-async-cleanup></lc-late-async-cleanup>';
+    await new Promise((r) => setTimeout(r, 20));
+    container.innerHTML = '';
+    resolveHook(() => { cleanupCalls += 1; });
+    await new Promise((r) => setTimeout(r, 20));
+
+    expect(cleanupCalls).toBe(1);
+  });
+
+  it('keeps disconnect callbacks scoped to the instance that connected', async () => {
+    let renderToken = 0;
+    const connectedTokens = new Map<string, number>();
+    const disconnectedTokens = new Map<string, number>();
+
+    component('lc-instance-scoped-disconnect', () => {
+      const token = ++renderToken;
+      const host = useHost();
+      useOnConnected(() => {
+        if (host) connectedTokens.set(host.id, token);
+      });
+      useOnDisconnected(() => {
+        if (host) disconnectedTokens.set(host.id, token);
+      });
+      return html`<div>instance lifecycle</div>`;
+    });
+
+    const first = document.createElement('lc-instance-scoped-disconnect');
+    first.id = 'first';
+    const second = document.createElement('lc-instance-scoped-disconnect');
+    second.id = 'second';
+    container.append(first, second);
+    await new Promise((r) => setTimeout(r, 50));
+
+    first.remove();
+    second.remove();
+    await new Promise((r) => setTimeout(r, 50));
+
+    expect(disconnectedTokens.get('first')).toBe(connectedTokens.get('first'));
+    expect(disconnectedTokens.get('second')).toBe(connectedTokens.get('second'));
   });
 
   it('calls all useOnAttributeChanged handlers when an attribute changes', async () => {

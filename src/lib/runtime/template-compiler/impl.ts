@@ -17,6 +17,102 @@ import { TEMPLATE_COMPILE_CACHE } from './lru-cache';
 import type { ParsePropsResult } from './props-parser';
 import { parseProps } from './props-parser';
 
+export type TemplateToken = readonly [
+  raw: string,
+  tagName: string | undefined,
+  attrs: string | undefined,
+  interpolationIndex: string | undefined,
+  text: string | undefined,
+];
+
+// TemplateStringsArray instances are stable per tagged-template callsite. Cache
+// syntax tokens by that identity so repeated component instances only resolve
+// runtime values; they do not rebuild and regex-parse identical markup.
+const TEMPLATE_TOKEN_CACHE = new WeakMap<
+  TemplateStringsArray,
+  readonly TemplateToken[]
+>();
+const TEMPLATE_TOKEN_PATTERN =
+  /<!--[\s\S]*?-->|<\/?([a-zA-Z0-9-]+)((?:\s+[^\s=>/]+(?:\s*=\s*(?:"(?:\\.|[^"])*"|'(?:\\.|[^'])*'|[^\s>]+))?)*)\s*\/?>|{{(\d+)}}|([^<]+)/;
+
+export function tokenizeTemplate(
+  strings: TemplateStringsArray,
+): readonly TemplateToken[] {
+  const cached = TEMPLATE_TOKEN_CACHE.get(strings);
+  if (cached) return cached;
+
+  let template = '';
+  for (let i = 0; i < strings.length; i++) {
+    template += strings[i];
+    if (i < strings.length - 1) template += `{{${i}}}`;
+  }
+
+  const matcher = new RegExp(TEMPLATE_TOKEN_PATTERN.source, 'g');
+  const tokens: TemplateToken[] = [];
+  let match: RegExpExecArray | null;
+  while ((match = matcher.exec(template))) {
+    tokens.push([
+      match[0],
+      match[1],
+      match[2],
+      match[3],
+      match[4],
+    ]);
+  }
+  TEMPLATE_TOKEN_CACHE.set(strings, tokens);
+  return tokens;
+}
+
+const WHITESPACE_PRESERVING_TAGS = new Set([
+  'pre',
+  'code',
+  'textarea',
+  'script',
+  'style',
+]);
+const VOID_ELEMENTS = new Set([
+  'area',
+  'base',
+  'br',
+  'col',
+  'embed',
+  'hr',
+  'img',
+  'input',
+  'link',
+  'meta',
+  'param',
+  'source',
+  'track',
+  'wbr',
+]);
+const NATIVE_PROMOTE_MAP: Readonly<Record<string, readonly string[]>> = {
+  input: [
+    'value',
+    'checked',
+    'readonly',
+    'required',
+    'placeholder',
+    'maxlength',
+    'minlength',
+  ],
+  textarea: [
+    'value',
+    'readonly',
+    'required',
+    'placeholder',
+    'maxlength',
+    'minlength',
+  ],
+  select: ['value', 'required', 'multiple'],
+  option: ['selected', 'value'],
+  video: ['muted', 'autoplay', 'controls', 'loop', 'playsinline'],
+  audio: ['muted', 'autoplay', 'controls', 'loop'],
+  img: ['src', 'alt', 'width', 'height'],
+  button: ['type', 'name', 'value', 'autofocus', 'form'],
+};
+const KEY_ATTRS = new Set(['id', 'name', 'data-key', 'key']);
+
 /**
  * Transform VNodes with :when directive into anchor blocks for conditional rendering
  */
@@ -148,48 +244,12 @@ export function htmlImpl(
     return h('#text', {}, decoded as string, key);
   }
 
-  // Stitch template with interpolation markers
-  let template = '';
-  for (let i = 0; i < strings.length; i++) {
-    template += strings[i];
-    if (i < values.length) template += `{{${i}}}`;
-  }
-
-  // Matches: comments, tags (open/close/self), standalone interpolation markers, or any other text
-  // How this works:
-  // const tagRegex =
-  //   /<!--[\s\S]*?-->                                 # HTML comments
-  //   |<\/?([a-zA-Z0-9-]+)                            # tag name
-  //   (                                               # start attributes group
-  //     (?:\s+                                        # whitespace before attribute
-  //       [^\s=>/]+                                   # attribute name
-  //       (?:\s*=\s*                                  # optional equals
-  //         (?:
-  //           "(?:\\.|[^"])*"                         # double-quoted value
-  //           |'(?:\\.|[^'])*'                        # single-quoted value
-  //           |[^\s>]+                                # unquoted value
-  //         )
-  //       )?
-  //     )*                                            # repeat for multiple attributes
-  //   )\s*\/?>                                        # end of tag
-  //   |{{(\d+)}}                                      # placeholder
-  //   |([^<]+)                                        # text node
-  //   /gmx;
-  // We explicitly match attributes one by one, and if a value is quoted, we allow anything inside (including >).
-  // Handles both ' and " quotes.
-  // Matches unquoted attributes like disabled or checked.
-  // Keeps {{(\d+)}} and text node capture groups intact.
-  // Added support for HTML comments which are ignored during parsing.
-  const tagRegex =
-    /<!--[\s\S]*?-->|<\/?([a-zA-Z0-9-]+)((?:\s+[^\s=>/]+(?:\s*=\s*(?:"(?:\\.|[^"])*"|'(?:\\.|[^'])*'|[^\s>]+))?)*)\s*\/?>|{{(\d+)}}|([^<]+)/g;
-
   const stack: Array<{
     tag: string;
     props: Record<string, unknown>;
     children: VNode[];
     key: string | number | undefined;
   }> = [];
-  let match: RegExpExecArray | null;
   let currentChildren: VNode[] = [];
   let currentTag: string | null = null;
   let currentProps: Record<string, unknown> = {};
@@ -197,23 +257,17 @@ export function htmlImpl(
   let nodeIndex = 0;
   const fragmentChildren: VNode[] = []; // Track root-level nodes for fragments
 
-  // Whitespace-preserving elements: pre, code, textarea, script, style
-  const whitespacePreservingTags = new Set([
-    'pre',
-    'code',
-    'textarea',
-    'script',
-    'style',
-  ]);
-
   // Helper to check if we're inside a whitespace-preserving element
   function isInWhitespacePreservingContext(): boolean {
-    if (currentTag && whitespacePreservingTags.has(currentTag.toLowerCase())) {
+    if (
+      currentTag &&
+      WHITESPACE_PRESERVING_TAGS.has(currentTag.toLowerCase())
+    ) {
       return true;
     }
     // Check stack for nested contexts
     for (const frame of stack) {
-      if (whitespacePreservingTags.has(frame.tag.toLowerCase())) {
+      if (WHITESPACE_PRESERVING_TAGS.has(frame.tag.toLowerCase())) {
         return true;
       }
     }
@@ -346,24 +400,7 @@ export function htmlImpl(
     targetChildren.push(textVNode(String(val), baseKey));
   }
 
-  const voidElements = new Set([
-    'area',
-    'base',
-    'br',
-    'col',
-    'embed',
-    'hr',
-    'img',
-    'input',
-    'link',
-    'meta',
-    'param',
-    'source',
-    'track',
-    'wbr',
-  ]);
-
-  while ((match = tagRegex.exec(template))) {
+  for (const match of tokenizeTemplate(strings)) {
     // Skip HTML comments (they are matched by the regex but ignored)
     if (match[0].startsWith('<!--') && match[0].endsWith('-->')) {
       continue;
@@ -374,7 +411,7 @@ export function htmlImpl(
       const tagName = match[1];
       const isClosing = match[0][1] === '/';
       const isSelfClosing =
-        match[0][match[0].length - 2] === '/' || voidElements.has(tagName);
+        match[0][match[0].length - 2] === '/' || VOID_ELEMENTS.has(tagName);
 
       const {
         props: rawProps,
@@ -432,34 +469,8 @@ export function htmlImpl(
         // can cause accidental enabling/disabling when bound expressions or
         // wrapper proxies evaluate to truthy values. The runtime already
         // performs defensive coercion for boolean-like values; prefer that.
-        const nativePromoteMap: Record<string, string[]> = {
-          input: [
-            'value',
-            'checked',
-            'readonly',
-            'required',
-            'placeholder',
-            'maxlength',
-            'minlength',
-          ],
-          textarea: [
-            'value',
-            'readonly',
-            'required',
-            'placeholder',
-            'maxlength',
-            'minlength',
-          ],
-          select: ['value', 'required', 'multiple'],
-          option: ['selected', 'value'],
-          video: ['muted', 'autoplay', 'controls', 'loop', 'playsinline'],
-          audio: ['muted', 'autoplay', 'controls', 'loop'],
-          img: ['src', 'alt', 'width', 'height'],
-          button: ['type', 'name', 'value', 'autofocus', 'form'],
-        };
-
         const lname = tagName.toLowerCase();
-        const promotable = nativePromoteMap[lname] ?? [];
+        const promotable = NATIVE_PROMOTE_MAP[lname] ?? [];
 
         if (vnodeProps.attrs) {
           for (const propName of promotable) {
@@ -480,7 +491,9 @@ export function htmlImpl(
                 attrValue &&
                 typeof attrValue === 'object' &&
                 'value' in (attrValue as Record<string, unknown>) &&
-                !(attrValue instanceof Node)
+                !(
+                  typeof Node !== 'undefined' && attrValue instanceof Node
+                )
               ) {
                 // Support simple wrapper objects that carry a `value` property
                 // (for example useProps/ref-like wrappers that aren't our
@@ -567,7 +580,6 @@ export function htmlImpl(
 
           if (boundList && vnodeProps.attrs) {
             // Preserve attributes that may be used for stable key generation
-            const keyAttrs = new Set(['id', 'name', 'data-key', 'key']);
             for (const b of boundList) {
               if (
                 b in vnodeProps.attrs &&
@@ -589,7 +601,7 @@ export function htmlImpl(
                 //  - `class`
                 //  - any camelCase that ends with `Class` (e.g. activeClass)
                 //  - any kebab-case that ends with `-class` (e.g. active-class)
-                const preserveInAttrs = keyAttrs.has(b) || isClassLikeAttr(b);
+                const preserveInAttrs = KEY_ATTRS.has(b) || isClassLikeAttr(b);
                 if (preserveInAttrs) {
                   try {
                     const serialized = safeSerializeAttr(vnodeProps.attrs[b]);

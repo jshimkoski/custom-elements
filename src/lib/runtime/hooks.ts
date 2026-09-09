@@ -10,6 +10,7 @@ import { isDiscoveryRender as _isDiscoveryRenderFn } from './discovery-state';
 import { sanitizeCSS, minifyCSS } from './css-utils';
 import type { JITCSSOptions } from './style';
 import { captureGlobalStyleForSSR } from './ssr-context';
+import { hasExternallySetProp } from './props';
 
 // Re-export JITCSSOptions as a type-only re-export so consumers can still
 // import it from './runtime/hooks' without creating a runtime dependency on style.ts.
@@ -30,7 +31,12 @@ export function isDiscoveryRender(): boolean {
 // Global state to track current component context during render
 // Narrowed internal type for currentComponentContext to expose _hookCallbacks
 interface InternalHookCallbacks {
-  onConnected?: Array<(context?: unknown) => void>;
+  onConnected?: Array<
+    (context?: unknown) =>
+      | void
+      | (() => void)
+      | Promise<void | (() => void)>
+  >;
   onDisconnected?: Array<(context?: unknown) => void>;
   onAttributeChanged?: Array<
     (name: string, oldValue: string | null, newValue: string | null) => void
@@ -82,6 +88,34 @@ export function clearCurrentComponentContext(): void {
  */
 export function getCurrentComponentContext(): Record<string, unknown> | null {
   return currentComponentContext;
+}
+
+/**
+ * Return the custom-element host for the component currently being rendered.
+ *
+ * The host is unavailable during the metadata-only discovery render and on
+ * the server, so consumers should resolve DOM relationships lazily (for
+ * example inside `useOnConnected()` or an event handler).
+ *
+ * @example
+ * ```ts
+ * component('section-nav', () => {
+ *   const host = useHost();
+ *   useOnConnected(() => {
+ *     const section = host?.getRootNode().querySelector?.('section');
+ *   });
+ *   return html`<nav>...</nav>`;
+ * });
+ * ```
+ */
+export function useHost<T extends HTMLElement = HTMLElement>(): T | null {
+  if (!currentComponentContext) {
+    throw new Error('useHost must be called during component render');
+  }
+  if (_isDiscoveryRenderFn() || typeof HTMLElement === 'undefined') return null;
+
+  const host = (currentComponentContext as { _host?: unknown })._host;
+  return host instanceof HTMLElement ? (host as T) : null;
 }
 
 /**
@@ -163,7 +197,9 @@ function ensureHookCallbacks(context: Record<string, unknown>): void {
  * });
  * ```
  */
-export function useOnConnected(callback: () => void): void {
+export function useOnConnected(
+  callback: () => void | (() => void) | Promise<void | (() => void)>,
+): void {
   if (!currentComponentContext) {
     throw new Error('useOnConnected must be called during component render');
   }
@@ -358,19 +394,23 @@ export function useProps<T extends Record<string, unknown>>(defaults: T): T {
                 | HTMLElement
                 | undefined;
               if (host) {
-                // First, check for attribute value (attributes should take precedence)
-                const kebabKey = toKebab(key);
-                const attrValue = host.getAttribute(kebabKey);
-                if (attrValue !== null) {
-                  const defaultType = typeof defaults[key];
-                  if (defaultType === 'boolean') {
-                    // Standalone boolean attributes have empty string value
-                    return attrValue === '' || attrValue === 'true';
+                // An SSR attribute supplies the initial value. Once a parent
+                // assigns the public property (for example through `:prop`),
+                // that newer value must win over the serialized attribute.
+                if (!hasExternallySetProp(host, key)) {
+                  const kebabKey = toKebab(key);
+                  const attrValue = host.getAttribute(kebabKey);
+                  if (attrValue !== null) {
+                    const defaultType = typeof defaults[key];
+                    if (defaultType === 'boolean') {
+                      // Standalone boolean attributes have empty string value
+                      return attrValue === '' || attrValue === 'true';
+                    }
+                    if (defaultType === 'number') {
+                      return Number(attrValue);
+                    }
+                    return attrValue;
                   }
-                  if (defaultType === 'number') {
-                    return Number(attrValue);
-                  }
-                  return attrValue;
                 }
 
                 // If no attribute, check if host has a property value set
@@ -458,14 +498,17 @@ export function useProps<T extends Record<string, unknown>>(defaults: T): T {
           | HTMLElement
           | undefined;
         if (host) {
-          // Check attribute first (only if host is an actual HTMLElement)
+          // Check the serialized attribute first until the public property is
+          // explicitly assigned. A later property binding is newer state and
+          // must not be shadowed by the SSR attribute it replaced.
           if (
-            (typeof HTMLElement !== 'undefined' &&
+            !hasExternallySetProp(host, prop) &&
+            ((typeof HTMLElement !== 'undefined' &&
               host instanceof HTMLElement) ||
-            (typeof (host as { getAttribute?: (name: string) => string | null })
-              .getAttribute === 'function' &&
-              typeof (host as { hasAttribute?: (name: string) => boolean })
-                .hasAttribute === 'function')
+              (typeof (host as { getAttribute?: (name: string) => string | null })
+                .getAttribute === 'function' &&
+                typeof (host as { hasAttribute?: (name: string) => boolean })
+                  .hasAttribute === 'function'))
           ) {
             const kebabKey = prop.replace(/([A-Z])/g, '-$1').toLowerCase();
             const attrValue = (

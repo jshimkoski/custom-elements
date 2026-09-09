@@ -18,6 +18,7 @@ import {
   renderToStream,
   renderToStreamWithJITCSSDSD,
   DSD_POLYFILL_SCRIPT,
+  shareRepeatedDeclarativeShadowStyles,
   type SSRJITResult,
 } from '../src/lib/ssr';
 import { renderToDSD } from '../src/lib/runtime/vdom-ssr-dsd';
@@ -28,6 +29,7 @@ import {
   registerErrorBoundary,
 } from '../src/lib/runtime/builtin-components';
 import { registerKeepAlive } from '../src/lib/keep-alive';
+import { html } from '../src/lib';
 
 // ---------------------------------------------------------------------------
 // Prose CSS inlining in DSD shadow style block
@@ -58,6 +60,124 @@ describe('buildShadowStyleBlock prose CSS inlining', () => {
     expect(shadowContent).toMatch(/\.prose\s+[hp]|\.prose\s*\{/);
   });
 
+  it('emits base prose CSS before JIT variants so dark mode wins the cascade', () => {
+    const TAG = 'cer-prose-dark-cascade-test';
+    registry.set(TAG, {
+      props: {},
+      render: () =>
+        ({
+          tag: 'article',
+          props: { attrs: { class: 'prose dark:prose-invert' } },
+          children: [{ tag: 'p', props: {}, children: 'Dark prose' }],
+        }) as never,
+    });
+
+    const html = renderToStringDSD(
+      { tag: TAG, props: { attrs: {} }, children: [] } as never,
+      { dsdPolyfill: false },
+    );
+    const shadowContent = html.match(
+      /<template shadowrootmode="open">([\s\S]*?)<\/template>/,
+    )?.[1] ?? '';
+    const baseProseIndex = shadowContent.indexOf(
+      '.prose{--cer-prose-body:var(--cer-color-neutral-900)',
+    );
+    const darkProseIndex = shadowContent.indexOf('.dark\\:prose-invert{');
+
+    expect(baseProseIndex).toBeGreaterThan(-1);
+    expect(darkProseIndex).toBeGreaterThan(-1);
+    expect(baseProseIndex).toBeLessThan(darkProseIndex);
+  });
+
+  it('does not leak prose CSS into a later shadow root without a prose class', () => {
+    const PROSE_TAG = 'cer-prose-leak-source';
+    const PLAIN_TAG = 'cer-prose-leak-target';
+
+    registry.set(PROSE_TAG, {
+      props: {},
+      render: () =>
+        ({
+          tag: 'article',
+          props: { attrs: { class: 'prose' } },
+          children: [{ tag: 'p', props: {}, children: 'Prose' }],
+        }) as never,
+    });
+    registry.set(PLAIN_TAG, {
+      props: {},
+      render: () =>
+        ({
+          tag: 'div',
+          props: { attrs: { class: 'flex gap-4' } },
+          children: ['Plain'],
+        }) as never,
+    });
+
+    renderToStringDSD(
+      { tag: PROSE_TAG, props: { attrs: {} }, children: [] } as never,
+      { dsdPolyfill: false },
+    );
+    const html = renderToStringDSD(
+      { tag: PLAIN_TAG, props: { attrs: {} }, children: [] } as never,
+      { dsdPolyfill: false },
+    );
+    const shadowContent = html.match(
+      /<template shadowrootmode="open">([\s\S]*?)<\/template>/,
+    )?.[1];
+
+    expect(shadowContent).toBeTruthy();
+    expect(shadowContent).not.toContain('.prose');
+  });
+
+  it('does not repeat inheritable design-token declarations in every shadow root', () => {
+    const TAG = 'cer-dsd-compact-reset';
+    registry.set(TAG, {
+      props: {},
+      render: () =>
+        ({
+          tag: 'div',
+          props: { attrs: { class: 'text-primary-500' } },
+          children: ['Compact'],
+        }) as never,
+    });
+
+    const html = renderToStringDSD(
+      { tag: TAG, props: { attrs: {} }, children: [] } as never,
+      { dsdPolyfill: false },
+    );
+    const shadowContent = html.match(
+      /<template shadowrootmode="open">([\s\S]*?)<\/template>/,
+    )?.[1];
+
+    expect(shadowContent).toBeTruthy();
+    expect(shadowContent).toContain('box-sizing:border-box');
+    expect(shadowContent).not.toContain('--cer-color-primary-500:#3b82f6');
+    expect(shadowContent!.length).toBeLessThan(8_000);
+  });
+
+  it('matches the client fragment wrapper for multi-root component output', () => {
+    const TAG = 'cer-dsd-multi-root-parity';
+    registry.set(TAG, {
+      props: {},
+      render: () =>
+        [
+          { tag: 'span', props: {}, children: 'A' },
+          { tag: 'span', props: {}, children: 'B' },
+        ] as never,
+    });
+
+    const html = renderToStringDSD(
+      { tag: TAG, props: { attrs: {} }, children: [] } as never,
+      { dsdPolyfill: false },
+    );
+    const shadowContent = html.match(
+      /<template shadowrootmode="open">([\s\S]*?)<\/template>/,
+    )?.[1];
+
+    expect(shadowContent).toMatch(
+      /<\/style><div><span>A<\/span><span>B<\/span><\/div>$/,
+    );
+  });
+
   it('includes flex/gap utilities without prose rules when no prose class is used (before any prose registration)', () => {
     // This test must run before any prose class is registered in this describe block.
     // Note: detectedProseSizes is module-level, so once prose is registered by any test
@@ -82,6 +202,105 @@ describe('buildShadowStyleBlock prose CSS inlining', () => {
     expect(shadowContent).toContain('.flex');
     expect(shadowContent).toContain('.gap-4');
     expect(shadowContent).toContain('.text-sm');
+  });
+});
+
+describe('declarative shadow style sharing', () => {
+  it('escapes style payloads that could otherwise terminate the JSON script', () => {
+    const dangerousStyle = ':host{--value:"</script><script>bad()</script>"}';
+    const result = shareRepeatedDeclarativeShadowStyles(
+      `<x-test><template shadowrootmode="open"><style>${dangerousStyle}</style></template></x-test>` +
+        `<x-test><template shadowrootmode="open"><style>${dangerousStyle}</style></template></x-test>`,
+    );
+
+    expect(result).not.toContain('</script><script>bad()');
+    expect(result).toContain('\\u003c/script>');
+  });
+
+  it('emits repeated shadow CSS once and references a shared stylesheet', () => {
+    const TAG = 'cer-shared-dsd-style';
+    registry.set(TAG, {
+      props: {},
+      render: () =>
+        ({
+          tag: 'div',
+          props: { attrs: { class: 'flex gap-4' } },
+          children: ['Shared'],
+        }) as never,
+    });
+
+    const result = renderToStringWithJITCSSDSD(
+      {
+        tag: 'div',
+        props: {},
+        children: [
+          { tag: TAG, props: { attrs: {} }, children: [] },
+          { tag: TAG, props: { attrs: {} }, children: [] },
+        ],
+      } as never,
+      { dsdPolyfill: false },
+    );
+
+    expect(result.htmlWithStyles).toContain('id="cer-shared-styles"');
+    expect(result.htmlWithStyles).not.toContain('data-cer-style="');
+    expect(result.htmlWithStyles.match(/data-cer-style-ref="0"/g)).toHaveLength(2);
+    expect(result.htmlWithStyles.match(/data-cer-style-ref="1"/g)).toHaveLength(2);
+    expect(result.htmlWithStyles).toContain('adoptedStyleSheets');
+  });
+
+  it('shares the common shadow reset even when component styles differ', () => {
+    const FIRST = 'cer-shared-reset-first';
+    const SECOND = 'cer-shared-reset-second';
+    registry.set(FIRST, {
+      props: {},
+      render: () => {
+        useStyle(() => ':host { color: red; }');
+        return { tag: 'span', props: {}, children: ['First'] } as never;
+      },
+    });
+    registry.set(SECOND, {
+      props: {},
+      render: () => {
+        useStyle(() => ':host { color: blue; }');
+        return { tag: 'span', props: {}, children: ['Second'] } as never;
+      },
+    });
+
+    const result = renderToStringWithJITCSSDSD(
+      {
+        tag: 'div',
+        props: {},
+        children: [
+          { tag: FIRST, props: { attrs: {} }, children: [] },
+          { tag: SECOND, props: { attrs: {} }, children: [] },
+        ],
+      } as never,
+      { dsdPolyfill: false },
+    );
+
+    expect(result.htmlWithStyles).toContain('color:red');
+    expect(result.htmlWithStyles).toContain('color:blue');
+    expect(result.htmlWithStyles.match(/data-cer-style-ref="0"/g)).toHaveLength(2);
+  });
+
+  it('keeps unique shadow CSS inline instead of paying for the sharing bootstrap', () => {
+    const TAG = 'cer-unique-dsd-style-payload';
+    registry.set(TAG, {
+      props: {},
+      render: () => {
+        useStyle(() => ':host { color: rebeccapurple; }');
+        return { tag: 'span', props: {}, children: ['Unique'] } as never;
+      },
+    });
+
+    const result = renderToStringWithJITCSSDSD(
+      { tag: TAG, props: { attrs: {} }, children: [] } as never,
+      { dsdPolyfill: false },
+    );
+
+    expect(result.htmlWithStyles).not.toContain('id="cer-shared-styles"');
+    expect(result.htmlWithStyles).toContain('rebeccapurple');
+    expect(result.htmlWithStyles).toContain('<style>:host{color:rebeccapurple}');
   });
 });
 
@@ -364,6 +583,28 @@ describe('renderToStringWithJITCSSDSD()', () => {
     expect(css).toContain('display:flex');
   });
 
+  it('does not duplicate shadow-scoped utilities in the document stylesheet', () => {
+    const TAG = 'cer-dsd-jit-scope';
+    registry.set(TAG, {
+      props: {},
+      render: () =>
+        ({
+          tag: 'div',
+          props: { attrs: { class: 'flex items-center gap-4' } },
+          children: [],
+        }) as never,
+    });
+
+    const { css, htmlWithStyles } = renderToStringWithJITCSSDSD(
+      { tag: TAG, props: { attrs: {} }, children: [] } as never,
+      { dsdPolyfill: false },
+    );
+
+    expect(css).toBe('');
+    expect(htmlWithStyles).not.toContain('<style id="cer-ssr-jit">');
+    expect(htmlWithStyles).toContain('.items-center');
+  });
+
   it('injects style tags into htmlWithStyles', () => {
     const vnode = {
       tag: 'html',
@@ -449,11 +690,22 @@ describe('renderToStringWithJITCSS() — globalStyles field', () => {
 // ---------------------------------------------------------------------------
 
 describe('renderToStringDSD() — partial hydration attribute', () => {
-  it('does not emit data-cer-hydrate for default (load) strategy', () => {
+  it('emits data-cer-hydrate="load" when load is an explicit island boundary', () => {
     const TAG = 'cer-dsd-hydrate-load';
     registry.set(TAG, {
       props: {},
       hydrate: 'load',
+      render: () => ({ tag: 'div', props: {}, children: [] }) as never,
+    });
+    const vnode = { tag: TAG, props: { attrs: {} }, children: [] };
+    const result = renderToStringDSD(vnode as never, { dsdPolyfill: false });
+    expect(result).toContain('data-cer-hydrate="load"');
+  });
+
+  it('does not emit data-cer-hydrate when no strategy is configured', () => {
+    const TAG = 'cer-dsd-hydrate-default';
+    registry.set(TAG, {
+      props: {},
       render: () => ({ tag: 'div', props: {}, children: [] }) as never,
     });
     const vnode = { tag: TAG, props: { attrs: {} }, children: [] };
@@ -495,6 +747,102 @@ describe('renderToStringDSD() — partial hydration attribute', () => {
     const vnode = { tag: TAG, props: { attrs: {} }, children: [] };
     const result = renderToStringDSD(vnode as never, { dsdPolyfill: false });
     expect(result).toContain('data-cer-hydrate="none"');
+  });
+
+  it('serializes an island strategy onto its unconfigured descendants', () => {
+    const CHILD = 'cer-dsd-inherited-load-child';
+    const ISLAND = 'cer-dsd-inherited-load-island';
+    const STATIC = 'cer-dsd-inherited-load-static';
+    registry.set(CHILD, {
+      props: {},
+      render: () => ({ tag: 'button', props: {}, children: ['Child'] }) as never,
+    });
+    registry.set(ISLAND, {
+      props: {},
+      hydrate: 'load',
+      render: () => ({ tag: CHILD, props: { attrs: {} }, children: [] }) as never,
+    });
+    registry.set(STATIC, {
+      props: {},
+      hydrate: 'none',
+      render: () => ({ tag: ISLAND, props: { attrs: {} }, children: [] }) as never,
+    });
+
+    const result = renderToStringDSD(
+      { tag: STATIC, props: { attrs: {} }, children: [] } as never,
+      { dsdPolyfill: false },
+    );
+
+    expect(result).toMatch(
+      /<cer-dsd-inherited-load-child[^>]*data-cer-hydrate="load"/,
+    );
+  });
+
+  it('serializes complex props needed by an island inside a static boundary', () => {
+    const ISLAND = 'cer-dsd-static-boundary-props-island';
+    const STATIC = 'cer-dsd-static-boundary-props-parent';
+    const items = [
+      { label: 'Home', path: '/' },
+      { label: 'Music & amps', path: '/music/amps' },
+    ];
+
+    registry.set(ISLAND, {
+      props: {
+        items: { type: Function, default: [] },
+      },
+      hydrate: 'load',
+      render: (context) => ({
+        tag: 'p',
+        props: {},
+        children: String((context as { items?: unknown[] }).items?.length ?? 0),
+      }) as never,
+    });
+    registry.set(STATIC, {
+      props: {},
+      render: () => html`<cer-dsd-static-boundary-props-island
+        :items="${items}"
+      ></cer-dsd-static-boundary-props-island>`,
+    });
+
+    const result = renderToStringDSD(
+      {
+        tag: STATIC,
+        props: { attrs: { 'data-cer-hydrate': 'none' } },
+        children: [],
+      } as never,
+      { dsdPolyfill: false },
+    );
+
+    expect(result.match(/data-cer-hydrate="none"/g)).toHaveLength(1);
+    expect(result).toContain('data-cer-hydrate="load"');
+    expect(result).toContain(
+      'data-cer-props="{&quot;items&quot;:[{&quot;label&quot;:&quot;Home&quot;,&quot;path&quot;:&quot;/&quot;},{&quot;label&quot;:&quot;Music &amp; amps&quot;,&quot;path&quot;:&quot;/music/amps&quot;}]}"',
+    );
+  });
+
+  it('does not duplicate complex props when a hydrating parent can bind them', () => {
+    const CHILD = 'cer-dsd-normal-boundary-props-child';
+    const PARENT = 'cer-dsd-normal-boundary-props-parent';
+    registry.set(CHILD, {
+      props: { items: { type: Function, default: [] } },
+      render: () => ({ tag: 'p', props: {}, children: [] }) as never,
+    });
+    registry.set(PARENT, {
+      props: {},
+      hydrate: 'load',
+      render: () => ({
+        tag: CHILD,
+        props: { attrs: {}, props: { items: [{ id: 1 }] } },
+        children: [],
+      }) as never,
+    });
+
+    const result = renderToStringDSD(
+      { tag: PARENT, props: { attrs: {} }, children: [] } as never,
+      { dsdPolyfill: false },
+    );
+
+    expect(result).not.toContain('data-cer-props');
   });
 });
 

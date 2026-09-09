@@ -446,7 +446,19 @@ export interface CerComponentImportsOptions {
    * files under this directory so node_modules and generated files are skipped.
    */
   appRoot: string;
+  /**
+   * Optional package component resolvers. Resolvers are consulted in order when
+   * a tag is not registered by a local component file. Return a bare or absolute
+   * module specifier that registers the tag, or `undefined` when unsupported.
+   *
+   * Local components always take precedence so applications can intentionally
+   * override a package-provided custom element.
+   */
+  resolvers?: readonly CerComponentImportResolver[];
 }
+
+/** Resolves a custom-element tag to a side-effect component module import. */
+export type CerComponentImportResolver = (tag: string) => string | undefined;
 
 /**
  * Vite plugin that injects static `import` statements for custom element
@@ -533,7 +545,7 @@ export function cerComponentImports(options: CerComponentImportsOptions): Plugin
       const usedTags = extractTemplateTagNames(code);
       if (usedTags.size === 0) return null;
 
-      const injections: string[] = [];
+      const imports = new Set<string>();
       for (const tag of usedTags) {
         const componentFile = manifest.get(tag);
         if (componentFile) {
@@ -541,9 +553,19 @@ export function cerComponentImports(options: CerComponentImportsOptions): Plugin
           // absolute path to avoid exposing machine-local paths in build output.
           const rel = relative(dirname(cleanId), componentFile).replace(/\\/g, '/');
           const importPath = rel.startsWith('.') ? rel : `./${rel}`;
-          injections.push(`import ${JSON.stringify(importPath)};`);
+          imports.add(importPath);
+          continue;
+        }
+
+        for (const resolver of options.resolvers ?? []) {
+          const importPath = resolver(tag);
+          if (importPath) {
+            imports.add(importPath);
+            break;
+          }
         }
       }
+      const injections = [...imports].map((importPath) => `import ${JSON.stringify(importPath)};`);
       if (injections.length === 0) return null;
 
       const prefix = injections.join('\n') + '\n';

@@ -53,7 +53,7 @@
     "vite": "^8.0.13",
     "vitest": "^4.0.12"
   },
-  "main": "dist/custom-elements-runtime.cjs.js",
+  "main": "dist/custom-elements-runtime.cjs",
   "module": "dist/custom-elements-runtime.es.js",
   "types": "dist/index.d.ts",
   "files": [
@@ -104,42 +104,42 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/custom-elements-runtime.es.js",
-      "require": "./dist/custom-elements-runtime.cjs.js"
+      "require": "./dist/custom-elements-runtime.cjs"
     },
     "./ssr": {
       "types": "./dist/ssr.d.ts",
       "import": "./dist/custom-elements-runtime.ssr.es.js",
-      "require": "./dist/custom-elements-runtime.ssr.cjs.js"
+      "require": "./dist/custom-elements-runtime.ssr.cjs"
     },
     "./transitions": {
       "types": "./dist/transitions.d.ts",
       "import": "./dist/custom-elements-runtime.transitions.es.js",
-      "require": "./dist/custom-elements-runtime.transitions.cjs.js"
+      "require": "./dist/custom-elements-runtime.transitions.cjs"
     },
     "./directives": {
       "types": "./dist/directives.d.ts",
       "import": "./dist/custom-elements-runtime.directives.es.js",
-      "require": "./dist/custom-elements-runtime.directives.cjs.js"
+      "require": "./dist/custom-elements-runtime.directives.cjs"
     },
     "./directive-enhancements": {
       "types": "./dist/directive-enhancements.d.ts",
       "import": "./dist/custom-elements-runtime.directive-enhancements.es.js",
-      "require": "./dist/custom-elements-runtime.directive-enhancements.cjs.js"
+      "require": "./dist/custom-elements-runtime.directive-enhancements.cjs"
     },
     "./event-bus": {
       "types": "./dist/event-bus.d.ts",
       "import": "./dist/custom-elements-runtime.event-bus.es.js",
-      "require": "./dist/custom-elements-runtime.event-bus.cjs.js"
+      "require": "./dist/custom-elements-runtime.event-bus.cjs"
     },
     "./store": {
       "types": "./dist/store.d.ts",
       "import": "./dist/custom-elements-runtime.store.es.js",
-      "require": "./dist/custom-elements-runtime.store.cjs.js"
+      "require": "./dist/custom-elements-runtime.store.cjs"
     },
     "./router": {
       "types": "./dist/router.d.ts",
       "import": "./dist/custom-elements-runtime.router.es.js",
-      "require": "./dist/custom-elements-runtime.router.cjs.js"
+      "require": "./dist/custom-elements-runtime.router.cjs"
     },
     "./entities.json": "./entities.json",
     "./css": "./dist/style.css",
@@ -149,27 +149,27 @@
     "./css/colors": {
       "types": "./dist/css/colors.d.ts",
       "import": "./dist/custom-elements-runtime.colors.es.js",
-      "require": "./dist/custom-elements-runtime.colors.cjs.js"
+      "require": "./dist/custom-elements-runtime.colors.cjs"
     },
     "./jit-css": {
       "types": "./dist/jit-css.d.ts",
       "import": "./dist/custom-elements-runtime.jit-css.es.js",
-      "require": "./dist/custom-elements-runtime.jit-css.cjs.js"
+      "require": "./dist/custom-elements-runtime.jit-css.cjs"
     },
     "./dom-jit-css": {
       "types": "./dist/dom-jit-css.d.ts",
       "import": "./dist/custom-elements-runtime.dom-jit-css.es.js",
-      "require": "./dist/custom-elements-runtime.dom-jit-css.cjs.js"
+      "require": "./dist/custom-elements-runtime.dom-jit-css.cjs"
     },
     "./vite-plugin": {
       "types": "./dist/vite-plugin.d.ts",
       "import": "./dist/custom-elements-runtime.vite-plugin.es.js",
-      "require": "./dist/custom-elements-runtime.vite-plugin.cjs.js"
+      "require": "./dist/custom-elements-runtime.vite-plugin.cjs"
     },
     "./ssr-middleware": {
       "types": "./dist/ssr-middleware.d.ts",
       "import": "./dist/custom-elements-runtime.ssr-middleware.es.js",
-      "require": "./dist/custom-elements-runtime.ssr-middleware.cjs.js"
+      "require": "./dist/custom-elements-runtime.ssr-middleware.cjs"
     }
   },
   "publishConfig": {

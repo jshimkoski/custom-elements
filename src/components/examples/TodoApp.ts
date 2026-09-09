@@ -2,7 +2,7 @@
  * TodoApp: A classic todo list example.
  * Demonstrates ctx, directives, and input binding.
  */
-import { component, html, ref, watch } from '../../lib';
+import { component, html, ref } from '../../lib';
 import { each } from '../../lib/directives';
 
 interface Todo {
@@ -14,6 +14,10 @@ interface Todo {
 export const TodoApp = component('todo-app', () => {
   const todos = ref<Todo[]>([]);
   const input = ref('');
+  // Component setup is evaluated again as reactive dependencies change, so
+  // render-local mutable variables are not stable state. Keep the sequence in
+  // a ref to guarantee unique IDs across renders and rapid submissions.
+  const nextTodoId = ref(1);
 
   const submitForm = (event: Event) => {
     event.preventDefault();
@@ -22,7 +26,10 @@ export const TodoApp = component('todo-app', () => {
 
   const addTodo = () => {
     if (!input.value.trim()) return;
-    todos.value.push({ id: Date.now(), text: input.value, done: false });
+    todos.value = [
+      ...todos.value,
+      { id: nextTodoId.value++, text: input.value.trim(), done: false },
+    ];
     input.value = '';
   };
 
@@ -35,11 +42,6 @@ export const TodoApp = component('todo-app', () => {
   const removeTodo = (id: number) => {
     todos.value = todos.value.filter((todo) => todo.id !== id);
   };
-
-  watch(input, (value) => {
-    // Example of reacting to input changes if needed
-    console.log('Input changed:', value);
-  });
 
   return html`
     <div
@@ -88,16 +90,17 @@ export const TodoApp = component('todo-app', () => {
                 @change=${() => toggleTodo(todo.id)}
               />
               <span
+                :data-done="${todo.done}"
                 :class="${{
                   'grow text-left': true,
                   'line-through text-neutral-500': todo.done,
                 }}"
-                class="grow text-left"
+                class="todo-text grow text-left"
                 >${todo.text}</span
               >
               <button
-                class="px-4 py-2 bg-error-600 text-white rounded-sm hover:bg-error-700 focus:bg-error-700 disabled:pointer-events-none disabled:opacity-50"
-                :disabled=${!todo.done}
+                class="remove-btn px-4 py-2 bg-error-600 text-white rounded-sm hover:bg-error-700 focus:bg-error-700"
+                type="button"
                 @click=${() => removeTodo(todo.id)}
               >
                 Remove

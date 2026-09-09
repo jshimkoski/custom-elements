@@ -119,13 +119,17 @@ export function escapeRegExp(str: string): string {
 
 // --- Base reset stylesheet ---
 
-export const baseReset = css`
-  ${variables}
+/**
+ * Shadow-local reset rules. Design-token defaults are intentionally excluded:
+ * CSS custom properties declared on the document root inherit through shadow
+ * boundaries, so repeating the full token palette in every declarative shadow
+ * root only increases HTML parse cost.
+ */
+export const baseResetRules = css`
   :host,
   *,
   ::before,
   ::after {
-    all: isolate;
     box-sizing: border-box;
     border: 0 solid currentColor;
     margin: 0;
@@ -135,34 +139,6 @@ export const baseReset = css`
     background: transparent;
     color: inherit;
     -webkit-tap-highlight-color: transparent;
-    /* Transform composition variables (reset per-element for composability) */
-    --cer-translate-x: 0px;
-    --cer-translate-y: 0px;
-    --cer-rotate: 0deg;
-    --cer-skew-x: 0deg;
-    --cer-skew-y: 0deg;
-    --cer-scale-x: 1;
-    --cer-scale-y: 1;
-    /* Ring variables */
-    --cer-ring-color: rgb(59 130 246 / 0.5);
-    /* Filter composition variables (empty = no-op in filter chain) */
-    --cer-blur: ;
-    --cer-brightness: ;
-    --cer-contrast: ;
-    --cer-grayscale: ;
-    --cer-hue-rotate: ;
-    --cer-invert: ;
-    --cer-saturate: ;
-    --cer-sepia: ;
-    --cer-drop-shadow: ;
-    --cer-backdrop-blur: ;
-    --cer-backdrop-brightness: ;
-    --cer-backdrop-contrast: ;
-    --cer-backdrop-grayscale: ;
-    --cer-backdrop-hue-rotate: ;
-    --cer-backdrop-invert: ;
-    --cer-backdrop-saturate: ;
-    --cer-backdrop-sepia: ;
   }
   :host {
     display: contents;
@@ -173,13 +149,6 @@ export const baseReset = css`
     text-size-adjust: 100%;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    /* Default gradient variables to avoid undefined var() usage in generated utilities */
-    --cer-gradient-from-position: 0%;
-    --cer-gradient-to-position: 100%;
-    --cer-gradient-via-position: 50%;
-    --cer-gradient-from: rgba(255, 255, 255, 0);
-    --cer-gradient-to: rgba(255, 255, 255, 0);
-    --cer-gradient-stops: var(--cer-gradient-from), var(--cer-gradient-to);
     /* Default outline style variable */
     --cer-outline-style: solid;
   }
@@ -265,6 +234,12 @@ export const baseReset = css`
   [hidden] {
     display: none;
   }
+`;
+
+/** Full runtime reset used by the shared constructable stylesheet. */
+export const baseReset = css`
+  ${variables}
+  ${baseResetRules}
 `;
 
 /** Default spacing unit used by the JIT spacing scale. */

@@ -8,6 +8,7 @@ import {
   useOnDisconnected,
   useOnAttributeChanged,
   useOnError,
+  useHost,
   ref,
   computed,
   css,
@@ -28,6 +29,27 @@ afterEach(() => {
 });
 
 describe('🎣 Context-Based Hooks API', () => {
+  it('returns the current custom-element host without exposing internal context fields', async () => {
+    let hostFromRender: HTMLElement | null = null;
+    let hostFromConnected: HTMLElement | null = null;
+
+    component('test-use-host', () => {
+      const host = useHost();
+      hostFromRender = host;
+      useOnConnected(() => {
+        hostFromConnected = host;
+      });
+      return html`<div>Host test</div>`;
+    });
+
+    const element = document.createElement('test-use-host');
+    container.append(element);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(hostFromRender).toBe(element);
+    expect(hostFromConnected).toBe(element);
+  });
+
   it('should provide strongly typed useEmit hook', async () => {
     let emitResult: boolean | undefined;
     let eventData: any;

@@ -23,6 +23,19 @@ function parseProp(val: string, type: unknown) {
 
 const usePropsStateKey = Symbol.for('@cer/usePropsState');
 
+/** Tracks props assigned through the custom-element property API after upgrade. */
+export const externallySetPropsKey = Symbol.for('@cer/externallySetProps');
+
+export function hasExternallySetProp(
+  element: HTMLElement,
+  key: string,
+): boolean {
+  const assigned = (element as unknown as Record<symbol, unknown>)[
+    externallySetPropsKey
+  ];
+  return assigned instanceof Set && assigned.has(key);
+}
+
 function syncUsePropsState(context: Record<string, unknown> | null): void {
   if (!context) return;
   const typedContext = context as unknown as Record<
@@ -64,12 +77,30 @@ export function applyPropsFromDefinitions(
     const kebab = toKebab(key);
     const attr = element.getAttribute(kebab);
 
-    // Prefer function prop on the element instance
+    const preferProperty = hasExternallySetProp(element, key);
+
+    // Prefer function props and values explicitly assigned through the public
+    // property API. SSR attributes describe the initial value, but must not
+    // override a later parent `:prop` patch with their serialized stale value.
     if (
-      def.type === Function &&
+      (def.type === Function || preferProperty) &&
       typeof (element as unknown as Record<string, unknown>)[key] === 'function'
     ) {
       context[key] = (element as unknown as Record<string, unknown>)[key];
+    } else if (preferProperty) {
+      const propValue = (element as unknown as Record<string, unknown>)[key];
+      if (isReactiveState(propValue)) {
+        context[key] = (propValue as ReactiveState<unknown>).value;
+      } else if (
+        propValue &&
+        typeof propValue === 'object' &&
+        'value' in propValue &&
+        !(typeof Node !== 'undefined' && propValue instanceof Node)
+      ) {
+        context[key] = (propValue as { value: unknown }).value;
+      } else {
+        context[key] = propValue;
+      }
     } else {
       // Prefer attribute value (kebab-case)
       if (attr !== null) {
@@ -84,9 +115,22 @@ export function applyPropsFromDefinitions(
             key
           ];
           // If the property value is already the correct type, use it directly
+          // and unwrap reactive wrappers passed by parent `:model` / `:bind`
+          // directives. The live wrapper remains on the host property, where
+          // useProps tracks it; the context snapshot must stay a primitive so
+          // proxying cannot mutate getter-only computed/model objects.
+          if (isReactiveState(propValue)) {
+            context[key] = (propValue as ReactiveState<unknown>).value;
+          } else if (
+            propValue &&
+            typeof propValue === 'object' &&
+            'value' in propValue &&
+            !(typeof Node !== 'undefined' && propValue instanceof Node)
+          ) {
+            context[key] = (propValue as { value: unknown }).value;
           // For string props, attempt to convert object-like host properties to string.
           // If conversion throws, preserve the original object value on the context
-          if (
+          } else if (
             def.type === String &&
             propValue &&
             typeof propValue === 'object'

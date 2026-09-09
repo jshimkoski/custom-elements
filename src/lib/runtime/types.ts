@@ -147,7 +147,7 @@ export type ComponentContext<
  * | `'load'`  | Hydrate immediately when the element connects (default). |
  * | `'idle'`  | Defer until `requestIdleCallback` fires. |
  * | `'visible'` | Defer until the element enters the viewport (`IntersectionObserver`). |
- * | `'none'`  | Never hydrate — element stays as static server-rendered HTML. |
+ * | `'none'`  | Never hydrate this element or descendant custom elements. |
  */
 export type HydrateStrategy = 'load' | 'idle' | 'visible' | 'none';
 

@@ -15,8 +15,13 @@ import { createElementClass } from './element-class';
 /** Shape of the internal component context object used during rendering. */
 type InternalContext = Record<string, unknown> & {
   _componentId?: string;
+  _connectionCleanups?: Array<() => void>;
+  _connectionGeneration?: number;
+  _mountedDisconnectCallbacks?: Array<(context?: unknown) => void>;
   _hookCallbacks?: Record<string, unknown> & {
-    onConnected?: Array<() => void>;
+    onConnected?: Array<
+      (context?: unknown) => void | (() => void) | Promise<void | (() => void)>
+    >;
     onDisconnected?: Array<() => void>;
     onAttributeChanged?: Array<
       (
@@ -30,6 +35,258 @@ type InternalContext = Record<string, unknown> & {
     props?: Record<string, unknown>;
   };
 };
+
+const deferredVisibleDefinitionCleanups = new Map<string, () => void>();
+
+type DeferredRegistration = { tag: string; register: () => void };
+const deferredDsdRegistrations = new Map<string, DeferredRegistration>();
+const deferredDsdRegistrationQueue: string[] = [];
+let deferredDsdRegistrationTimer: ReturnType<typeof setTimeout> | null = null;
+let deferredDsdInteractionListenersInstalled = false;
+
+function removeDeferredDsdInteractionListeners(): void {
+  if (!deferredDsdInteractionListenersInstalled || typeof window === 'undefined') return;
+  deferredDsdInteractionListenersInstalled = false;
+  window.removeEventListener('pointerdown', flushDeferredDsdRegistrations, true);
+  window.removeEventListener('keydown', flushDeferredDsdRegistrations, true);
+}
+
+function flushDeferredDsdRegistrations(): void {
+  if (deferredDsdRegistrationTimer !== null) {
+    clearTimeout(deferredDsdRegistrationTimer);
+    deferredDsdRegistrationTimer = null;
+  }
+  removeDeferredDsdInteractionListeners();
+
+  while (deferredDsdRegistrationQueue.length) {
+    const tag = deferredDsdRegistrationQueue.shift()!;
+    const pending = deferredDsdRegistrations.get(tag);
+    deferredDsdRegistrations.delete(tag);
+    pending?.register();
+  }
+}
+
+function installDeferredDsdInteractionListeners(): void {
+  if (deferredDsdInteractionListenersInstalled || typeof window === 'undefined') return;
+  deferredDsdInteractionListenersInstalled = true;
+  // Finish registration in capture before application handlers see the first
+  // interaction. This prevents an immediately pressed shortcut or clicked SSR
+  // control from racing the post-paint registration queue.
+  window.addEventListener('pointerdown', flushDeferredDsdRegistrations, true);
+  window.addEventListener('keydown', flushDeferredDsdRegistrations, true);
+}
+
+function scheduleNextDsdRegistration(): void {
+  if (deferredDsdRegistrationTimer !== null) return;
+  deferredDsdRegistrationTimer = setTimeout(() => {
+    deferredDsdRegistrationTimer = null;
+
+    let pending: DeferredRegistration | undefined;
+    while (!pending && deferredDsdRegistrationQueue.length) {
+      const tag = deferredDsdRegistrationQueue.shift()!;
+      pending = deferredDsdRegistrations.get(tag);
+      deferredDsdRegistrations.delete(tag);
+    }
+
+    pending?.register();
+    if (deferredDsdRegistrationQueue.length) {
+      // One definition pass per task prevents a complete SSR component tree
+      // from upgrading in one long post-paint task. Metadata discovery remains
+      // synchronous so an already-painted control is interaction-ready.
+      scheduleNextDsdRegistration();
+    } else {
+      removeDeferredDsdInteractionListeners();
+    }
+  }, 0);
+}
+
+/**
+ * The app framework opts into definition batching while it activates a static
+ * SSR entry. Client-only components and normal runtime consumers retain the
+ * synchronous customElements.define() contract.
+ */
+function deferDsdComponentRegistration(
+  tag: string,
+  register: () => void,
+): boolean {
+  const runtimeState = globalThis as {
+    __CER_STATIC_ENTRY__?: boolean;
+    __CER_DSD_TAGS__?: Set<string>;
+  };
+  if (
+    typeof document === 'undefined' ||
+    runtimeState.__CER_STATIC_ENTRY__ !== true ||
+    !(runtimeState.__CER_DSD_TAGS__ instanceof Set) ||
+    !runtimeState.__CER_DSD_TAGS__.has(tag) ||
+    customElements.get(tag)
+  ) {
+    return false;
+  }
+
+  if (!deferredDsdRegistrations.has(tag)) {
+    deferredDsdRegistrationQueue.push(tag);
+  }
+  deferredDsdRegistrations.set(tag, { tag, register });
+  installDeferredDsdInteractionListeners();
+  scheduleNextDsdRegistration();
+  return true;
+}
+
+function scanOpenTree(
+  start: Document | ShadowRoot | Element,
+  tag: string,
+): { elements: Element[]; roots: Array<Document | ShadowRoot> } {
+  const elements = new Set<Element>();
+  const roots = new Set<Document | ShadowRoot>();
+  const queue: Array<Document | ShadowRoot | Element> = [start];
+  const visited = new Set<Document | ShadowRoot | Element>();
+
+  while (queue.length) {
+    const root = queue.pop()!;
+    if (visited.has(root)) continue;
+    visited.add(root);
+
+    if (root instanceof Element) {
+      if (root.matches(tag)) elements.add(root);
+      if (root.shadowRoot) queue.push(root.shadowRoot);
+    } else {
+      roots.add(root);
+    }
+
+    for (const element of root.querySelectorAll('*')) {
+      if (element.matches(tag)) elements.add(element);
+      if (element.shadowRoot) queue.push(element.shadowRoot);
+    }
+  }
+
+  return { elements: [...elements], roots: [...roots] };
+}
+
+/**
+ * Leave visibility-gated declarative-shadow elements undefined until one can
+ * actually be seen. Their complete DSD remains usable and accessible without
+ * paying constructor/context costs for closed drawers, sheets, and responsive
+ * desktop/mobile duplicates. Newly inserted client-only instances still force
+ * an immediate definition through the mutation observer.
+ */
+function deferVisibleCustomElementDefinition(
+  tag: string,
+  define: () => void,
+): boolean {
+  if (
+    typeof document === 'undefined' ||
+    typeof IntersectionObserver === 'undefined' ||
+    customElements.get(tag)
+  ) {
+    return false;
+  }
+
+  const initial = scanOpenTree(document, tag);
+  if (
+    initial.elements.length === 0 ||
+    initial.elements.some(
+      (element) =>
+        !element.shadowRoot ||
+        element.getAttribute('data-cer-hydrate') !== 'visible',
+    )
+  ) {
+    return false;
+  }
+
+  deferredVisibleDefinitionCleanups.get(tag)?.();
+
+  let finished = false;
+  const observedElements = new WeakSet<Element>();
+  const observedRoots = new WeakSet<Document | ShadowRoot>();
+  let mutationObserver: MutationObserver | null = null;
+
+  const restoreHydrationMarker = (
+    element: Element,
+    previous: string | null,
+  ) => {
+    if (previous === null) element.removeAttribute('data-cer-hydrate');
+    else element.setAttribute('data-cer-hydrate', previous);
+  };
+
+  const cleanup = () => {
+    intersectionObserver.disconnect();
+    mutationObserver?.disconnect();
+    document.removeEventListener('pointerdown', defineForInteraction, true);
+    document.removeEventListener('keydown', defineForInteraction, true);
+    if (deferredVisibleDefinitionCleanups.get(tag) === cleanup) {
+      deferredVisibleDefinitionCleanups.delete(tag);
+    }
+  };
+
+  const defineNow = (visibleElement?: Element) => {
+    if (finished || customElements.get(tag)) return;
+    finished = true;
+    cleanup();
+
+    // The observer already established visibility. Let this triggering host
+    // take the normal eager DSD path during synchronous custom-element upgrade;
+    // restore the public SSR hint immediately afterwards.
+    const previous = visibleElement?.getAttribute('data-cer-hydrate') ?? null;
+    if (visibleElement) visibleElement.setAttribute('data-cer-hydrate', 'load');
+    try {
+      define();
+    } finally {
+      if (visibleElement) restoreHydrationMarker(visibleElement, previous);
+    }
+  };
+
+  const defineForInteraction = (event: Event) => {
+    const host = event.composedPath().find(
+      (target): target is Element =>
+        target instanceof Element && target.matches(tag),
+    );
+    if (host) defineNow(host);
+  };
+  const intersectionObserver = new IntersectionObserver((entries) => {
+    const visible = entries.find((entry) => entry.isIntersecting);
+    if (visible) defineNow(visible.target);
+  });
+
+  const observeElement = (element: Element) => {
+    if (observedElements.has(element)) return;
+    observedElements.add(element);
+    intersectionObserver.observe(element);
+  };
+  const observeRoot = (root: Document | ShadowRoot) => {
+    if (!mutationObserver || observedRoots.has(root)) return;
+    observedRoots.add(root);
+    mutationObserver.observe(root, { childList: true, subtree: true });
+  };
+
+  if (typeof MutationObserver !== 'undefined') {
+    mutationObserver = new MutationObserver((records) => {
+      for (const record of records) {
+        for (const node of record.addedNodes) {
+          if (!(node instanceof Element)) continue;
+          const added = scanOpenTree(node, tag);
+          added.roots.forEach(observeRoot);
+          for (const element of added.elements) {
+            if (
+              !element.shadowRoot ||
+              element.getAttribute('data-cer-hydrate') !== 'visible'
+            ) {
+              defineNow();
+              return;
+            }
+            observeElement(element);
+          }
+        }
+      }
+    });
+  }
+
+  initial.elements.forEach(observeElement);
+  initial.roots.forEach(observeRoot);
+  document.addEventListener('pointerdown', defineForInteraction, true);
+  document.addEventListener('keydown', defineForInteraction, true);
+  deferredVisibleDefinitionCleanups.set(tag, cleanup);
+  return true;
+}
 
 /**
  * Invoke a lifecycle callback array, logging any errors in dev mode.
@@ -51,6 +308,89 @@ function invokeCallbacks(
       );
     }
   }
+}
+
+/** Invoke connected hooks and retain any cleanup functions they return. */
+function invokeConnectedCallbacks(
+  tag: string,
+  cbs: Array<
+    (context?: unknown) => void | (() => void) | Promise<void | (() => void)>
+  >,
+  context?: unknown,
+): void {
+  const cleanups: Array<() => void> = [];
+  const internal = context && typeof context === 'object'
+    ? context as InternalContext
+    : undefined;
+  const generation = (internal?._connectionGeneration ?? 0) + 1;
+
+  if (internal) {
+    // Publish bookkeeping before invoking user callbacks. A connected hook can
+    // synchronously trigger a render, disconnect the host, or return a promise.
+    // The generation lets delayed results distinguish the current connection
+    // from an already-disconnected/reconnected instance.
+    Object.defineProperty(internal, '_connectionGeneration', {
+      value: generation,
+      writable: true,
+      enumerable: false,
+      configurable: true,
+    });
+    Object.defineProperty(internal, '_connectionCleanups', {
+      value: cleanups,
+      writable: true,
+      enumerable: false,
+      configurable: true,
+    });
+  }
+
+  const retainCleanup = (cleanup: void | (() => void)) => {
+    if (typeof cleanup !== 'function') return;
+    if (!internal || internal._connectionGeneration === generation) {
+      cleanups.push(cleanup);
+      return;
+    }
+    // The component disconnected before the async hook settled. Running the
+    // cleanup immediately prevents leaked observers/listeners without reviving
+    // bookkeeping for a stale connection.
+    invokeCallbacks(tag, 'useOnConnected cleanup', [cleanup], []);
+  };
+
+  for (const cb of cbs) {
+    try {
+      const result = cb(context);
+      if (result && typeof (result as PromiseLike<unknown>).then === 'function') {
+        void Promise.resolve(result).then(retainCleanup).catch((err) => {
+          devError(`[${tag}] Error in useOnConnected lifecycle hook:`, err);
+        });
+      } else {
+        retainCleanup(result as void | (() => void));
+      }
+    } catch (err) {
+      devError(`[${tag}] Error in useOnConnected lifecycle hook:`, err);
+    }
+  }
+}
+
+/** Run and clear the cleanup functions captured from connected hooks. */
+function invokeConnectionCleanups(tag: string, context?: unknown): void {
+  if (!context || typeof context !== 'object') return;
+  const internal = context as InternalContext;
+  const cleanups = internal._connectionCleanups ?? [];
+  // Context objects are reactive proxies. Internal lifecycle bookkeeping must
+  // bypass their set trap or disconnect itself schedules a detached rerender.
+  Object.defineProperty(internal, '_connectionCleanups', {
+    value: [],
+    writable: true,
+    enumerable: false,
+    configurable: true,
+  });
+  Object.defineProperty(internal, '_connectionGeneration', {
+    value: (internal._connectionGeneration ?? 0) + 1,
+    writable: true,
+    enumerable: false,
+    configurable: true,
+  });
+  invokeCallbacks(tag, 'useOnConnected cleanup', cleanups, []);
 }
 
 /**
@@ -101,7 +441,8 @@ export interface ComponentOptions {
    * - `'load'`    — hydrate immediately on connection (default)
    * - `'idle'`    — defer to `requestIdleCallback`
    * - `'visible'` — defer until the element enters the viewport
-   * - `'none'`    — never hydrate (purely static, no JS runtime for this element)
+   * - `'none'`    — keep this element and unmarked descendants static. A nested
+   *                 component may explicitly opt back in with its own strategy.
    */
   hydrate?: HydrateStrategy;
 }
@@ -125,22 +466,6 @@ export function component(
   initGlobalRegistryIfNeeded();
   const normalizedTag = resolveTagName(tag);
 
-  // Store lifecycle hooks from the render function
-  const lifecycleHooks: {
-    // Forward context to hooks so user-provided lifecycle callbacks
-    // (registered via useOnConnected/useOnDisconnected) can access the
-    // component context and its internal _host reference when invoked.
-    onConnected?: (context?: unknown) => void;
-    onDisconnected?: (context?: unknown) => void;
-    onAttributeChanged?: (
-      name: string,
-      oldValue: string | null,
-      newValue: string | null,
-      context?: unknown,
-    ) => void;
-    onError?: (error: Error, context?: unknown) => void;
-  } = {};
-
   // Create component config
   const config: ComponentConfig<object, object, object, object> = {
     // Props are accessed via useProps() hook
@@ -149,42 +474,69 @@ export function component(
 
     // Add lifecycle hooks from the stored functions
     onConnected: (context) => {
-      if (lifecycleHooks.onConnected) {
-        try {
-          lifecycleHooks.onConnected(context);
-        } catch (err) {
-          devError(`[${normalizedTag}] Error in onConnected lifecycle hook:`, err);
-        }
+      const internal = context as InternalContext;
+      const connected = internal?._hookCallbacks?.onConnected;
+      // Pair disconnect hooks with the exact render whose connected hooks ran.
+      // Component config is shared by every instance and later renders replace
+      // their local closures; retaining these callbacks on the instance context
+      // prevents one instance (or rerender) from cleaning up another's effects.
+      const disconnected = internal?._hookCallbacks?.onDisconnected;
+      Object.defineProperty(internal, '_mountedDisconnectCallbacks', {
+        value: Array.isArray(disconnected) ? [...disconnected] : [],
+        writable: true,
+        enumerable: false,
+        configurable: true,
+      });
+      // Connected callbacks may synchronously request and flush a rerender.
+      // Capture the paired disconnect callbacks before invoking them so that
+      // such a render cannot replace the closure set we need at unmount.
+      if (Array.isArray(connected)) {
+        invokeConnectedCallbacks(normalizedTag, connected, context);
       }
     },
 
     onDisconnected: (context) => {
-      if (lifecycleHooks.onDisconnected) {
-        try {
-          lifecycleHooks.onDisconnected(context);
-        } catch (err) {
-          devError(`[${normalizedTag}] Error in onDisconnected lifecycle hook:`, err);
-        }
+      invokeConnectionCleanups(normalizedTag, context);
+      const internal = context as InternalContext;
+      const disconnected = internal?._mountedDisconnectCallbacks ?? [];
+      invokeCallbacks(
+        normalizedTag,
+        'useOnDisconnected',
+        disconnected as Array<(...args: unknown[]) => void>,
+        [context],
+      );
+      if (internal) {
+        Object.defineProperty(internal, '_mountedDisconnectCallbacks', {
+          value: [],
+          writable: true,
+          enumerable: false,
+          configurable: true,
+        });
       }
     },
 
     onAttributeChanged: (name, oldValue, newValue, context) => {
-      if (lifecycleHooks.onAttributeChanged) {
-        try {
-          lifecycleHooks.onAttributeChanged(name, oldValue, newValue, context);
-        } catch (err) {
-          devError(`[${normalizedTag}] Error in onAttributeChanged lifecycle hook:`, err);
-        }
+      const callbacks = (context as InternalContext)?._hookCallbacks
+        ?.onAttributeChanged;
+      if (Array.isArray(callbacks)) {
+        invokeCallbacks(
+          normalizedTag,
+          'useOnAttributeChanged',
+          callbacks as Array<(...args: unknown[]) => void>,
+          [name, oldValue, newValue, context],
+        );
       }
     },
 
     onError: (error, context) => {
-      if (lifecycleHooks.onError && error) {
-        try {
-          lifecycleHooks.onError(error, context);
-        } catch (err) {
-          devError(`[${normalizedTag}] Error in onError handler (the error handler itself threw):`, err);
-        }
+      const callbacks = (context as InternalContext)?._hookCallbacks?.onError;
+      if (error && Array.isArray(callbacks)) {
+        invokeCallbacks(
+          normalizedTag,
+          'useOnError',
+          callbacks as Array<(...args: unknown[]) => void>,
+          [error],
+        );
       }
     },
 
@@ -311,46 +663,6 @@ export function component(
         // Callbacks are stored as arrays to allow multiple registrations (composable pattern).
         if (ictx._hookCallbacks) {
           const hookCallbacks = ictx._hookCallbacks;
-          if (hookCallbacks.onConnected) {
-            const cbs = hookCallbacks.onConnected as Array<
-              (context?: unknown) => void
-            >;
-            lifecycleHooks.onConnected = (context?: unknown) => {
-              invokeCallbacks(normalizedTag, 'useOnConnected', cbs as Array<(...args: unknown[]) => void>, [context]);
-            };
-          }
-          if (hookCallbacks.onDisconnected) {
-            const cbs = hookCallbacks.onDisconnected as Array<
-              (context?: unknown) => void
-            >;
-            lifecycleHooks.onDisconnected = (context?: unknown) => {
-              invokeCallbacks(normalizedTag, 'useOnDisconnected', cbs as Array<(...args: unknown[]) => void>, [context]);
-            };
-          }
-          if (hookCallbacks.onAttributeChanged) {
-            const cbs = hookCallbacks.onAttributeChanged as Array<
-              (
-                name: string,
-                oldValue: string | null,
-                newValue: string | null,
-                context?: unknown,
-              ) => void
-            >;
-            lifecycleHooks.onAttributeChanged = (
-              name: string,
-              oldValue: string | null,
-              newValue: string | null,
-              context?: unknown,
-            ) => {
-              invokeCallbacks(normalizedTag, 'useOnAttributeChanged', cbs as Array<(...args: unknown[]) => void>, [name, oldValue, newValue, context]);
-            };
-          }
-          if (hookCallbacks.onError) {
-            const cbs = hookCallbacks.onError as Array<(err: Error) => void>;
-            lifecycleHooks.onError = (err: Error) => {
-              invokeCallbacks(normalizedTag, 'useOnError', cbs as Array<(...args: unknown[]) => void>, [err]);
-            };
-          }
           // `useStyle()` stores a computed style string directly on the
           // current context as `_computedStyle`. The runtime reads
           // `_computedStyle` in `applyStyle`.
@@ -497,10 +809,22 @@ export function component(
     }
 
     if (typeof customElements !== 'undefined' && !customElements.get(normalizedTag)) {
-      customElements.define(
-        normalizedTag,
-        createElementClass(normalizedTag, config) as CustomElementConstructor,
-      );
+      const define = () => {
+        if (customElements.get(normalizedTag)) return;
+        customElements.define(
+          normalizedTag,
+          createElementClass(normalizedTag, config) as CustomElementConstructor,
+        );
+      };
+      const defineWhenReady = () => {
+        const deferredUntilVisible =
+          options?.hydrate === 'visible' &&
+          deferVisibleCustomElementDefinition(normalizedTag, define);
+        if (!deferredUntilVisible) define();
+      };
+      if (!deferDsdComponentRegistration(normalizedTag, defineWhenReady)) {
+        defineWhenReady();
+      }
     }
   }
 }

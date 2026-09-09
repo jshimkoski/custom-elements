@@ -21,7 +21,6 @@ import {
 import {
   isNativeControl,
   type PropsMap,
-  type VDomGlobal,
 } from './vdom-helpers';
 
 /**
@@ -163,15 +162,6 @@ export function processModelDirective(
       (listeners as { _isComposing?: boolean })._isComposing
     )
       return;
-    // Allow synthetic events during testing (when isTrusted is false)
-    // but ignore them in production unless it's a synthetic test event
-    const _proc = (globalThis as VDomGlobal).process;
-    const isTestEnv =
-      (!!_proc && _proc.env?.NODE_ENV === 'test') ||
-      (typeof window !== 'undefined' && (globalThis as VDomGlobal).__vitest__);
-    if ((event as { isTrusted?: boolean }).isTrusted === false && !isTestEnv)
-      return;
-
     const target = event.target as
       | HTMLInputElement
       | HTMLTextAreaElement

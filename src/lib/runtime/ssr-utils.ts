@@ -2,7 +2,7 @@
  * Shared utilities for SSR renderers.
  * Imported by vdom-ssr.ts and vdom-ssr-dsd.ts to avoid duplication.
  */
-import { escapeHTML } from './helpers';
+import { escapeHTML, isHTMLBooleanAttribute } from './helpers';
 import { TAG_NAMESPACE_MAP, SVG_NS } from './namespace-helpers';
 
 export type RenderOptions = {
@@ -45,14 +45,30 @@ export function buildAttrs(
   }
 
   return Object.entries(merged)
-    .filter(([, v]) => v !== null && v !== undefined)
-    .map(([k, v]) => ` ${k}="${escapeHTML(String(v))}"`)
+    .filter(([k, v]) =>
+      v !== null &&
+      v !== undefined &&
+      !(typeof v === 'boolean' && isHTMLBooleanAttribute(k) && !v),
+    )
+    .map(([k, v]) =>
+      typeof v === 'boolean' && isHTMLBooleanAttribute(k)
+        ? ` ${k}`
+        : ` ${k}="${escapeHTML(String(v))}"`,
+    )
     .join('');
 }
 
 export function buildRawAttrs(attrs: Record<string, unknown>): string {
   return Object.entries(attrs)
-    .filter(([, v]) => v !== null && v !== undefined)
-    .map(([k, v]) => ` ${k}="${escapeHTML(String(v))}"`)
+    .filter(([k, v]) =>
+      v !== null &&
+      v !== undefined &&
+      !(typeof v === 'boolean' && isHTMLBooleanAttribute(k) && !v),
+    )
+    .map(([k, v]) =>
+      typeof v === 'boolean' && isHTMLBooleanAttribute(k)
+        ? ` ${k}`
+        : ` ${k}="${escapeHTML(String(v))}"`,
+    )
     .join('');
 }

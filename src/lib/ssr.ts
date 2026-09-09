@@ -105,6 +105,111 @@ export interface SSRJITResult {
   htmlWithStyles: string;
 }
 
+/**
+ * Shares identical declarative-shadow styles through constructable
+ * stylesheets before deferred module scripts execute. A small fallback expands
+ * references for older browsers and DSD polyfills so correctness never depends
+ * on adoptedStyleSheets support.
+ */
+export const DSD_STYLE_SHARING_SCRIPT =
+  '<script>(function(){' +
+  "var p=document.currentScript&&document.currentScript.previousElementSibling,m=new Map(),r=[],q=[document],t=[];" +
+  "try{m=new Map(Object.entries(JSON.parse(p&&p.textContent||'{}')))}catch(_){}if(p)p.remove();" +
+  "function c(n){n.querySelectorAll('template[shadowrootmode]').forEach(function(e){t.push(e.content);c(e.content)})}c(document);" +
+  "function f(e){e.textContent=m.get(e.getAttribute('data-cer-style-ref'))||'';e.removeAttribute('data-cer-style-ref')}" +
+  "if(t.length){t.forEach(function(n){n.querySelectorAll('style[data-cer-style-ref]').forEach(f)});return}" +
+  "while(q.length){var n=q.pop();n.querySelectorAll('*').forEach(function(e){if(e.shadowRoot){r.push(e.shadowRoot);q.push(e.shadowRoot)}})}" +
+  "if(typeof CSSStyleSheet==='function'&&CSSStyleSheet.prototype.replaceSync){var s=new Map();m.forEach(function(v,k){try{var x=new CSSStyleSheet();x.replaceSync(v);s.set(k,x)}catch(_){}});r.forEach(function(n){var e=Array.from(n.querySelectorAll('style[data-cer-style-ref]')),z=e.map(function(e){return s.get(e.getAttribute('data-cer-style-ref'))});try{if(z.some(function(x){return!x}))throw 0;n.adoptedStyleSheets=[].concat(Array.from(n.adoptedStyleSheets||[]),z);e.forEach(function(e){e.remove()})}catch(_){e.forEach(f)}})}else{r.forEach(function(n){n.querySelectorAll('style[data-cer-style-ref]').forEach(f)})}" +
+  '})()</script>';
+
+// Tokenize template boundaries and style blocks so every generated stylesheet
+// inside DSD participates in sharing, including component/JIT styles after the
+// common reset and styles in nested shadow templates. A single anchored regex
+// only sees the first style in each template and makes split CSS more expensive.
+const DSD_STYLE_TOKEN_PATTERN =
+  /<template\s+shadowrootmode=(?:"(?:open|closed)"|'(?:open|closed)')[^>]*>|<\/template>|<style>([\s\S]*?)<\/style>/g;
+
+const DSD_TEMPLATE_BOUNDARY_PATTERN =
+  /<template\s+shadowrootmode=(?:"(?:open|closed)"|'(?:open|closed)')[^>]*>|<\/template>/g;
+
+/** Keep only document/light-DOM markup when generating document-scoped JIT CSS. */
+function withoutDeclarativeShadowContents(html: string): string {
+  let output = '';
+  let cursor = 0;
+  let depth = 0;
+
+  for (const match of html.matchAll(DSD_TEMPLATE_BOUNDARY_PATTERN)) {
+    if (match[0].startsWith('<template')) {
+      if (depth === 0) output += html.slice(cursor, match.index);
+      depth++;
+    } else if (depth > 0) {
+      depth--;
+      if (depth === 0) cursor = (match.index ?? 0) + match[0].length;
+    }
+  }
+
+  if (depth === 0) output += html.slice(cursor);
+  return output;
+}
+
+/** @internal Compacts repeated DSD style text in a complete render result. */
+export function shareRepeatedDeclarativeShadowStyles(html: string): string {
+  const counts = new Map<string, number>();
+  let templateDepth = 0;
+  for (const match of html.matchAll(DSD_STYLE_TOKEN_PATTERN)) {
+    const token = match[0];
+    if (token.startsWith('<template')) {
+      templateDepth++;
+    } else if (token === '</template>') {
+      templateDepth = Math.max(0, templateDepth - 1);
+    } else if (templateDepth > 0) {
+      const css = match[1];
+      counts.set(css, (counts.get(css) ?? 0) + 1);
+    }
+  }
+
+  const repeatedStyles = [...counts.entries()]
+    .filter(([, count]) => count > 1)
+    .map(([css]) => css);
+  if (repeatedStyles.length === 0) return html;
+
+  const ids = new Map(
+    repeatedStyles.map((css, index) => [css, String(index)]),
+  );
+  templateDepth = 0;
+  const compacted = html.replace(
+    DSD_STYLE_TOKEN_PATTERN,
+    (match, css: string | undefined) => {
+      if (match.startsWith('<template')) {
+        templateDepth++;
+        return match;
+      }
+      if (match === '</template>') {
+        templateDepth = Math.max(0, templateDepth - 1);
+        return match;
+      }
+      if (templateDepth === 0 || css === undefined) return match;
+      const id = ids.get(css);
+      if (id === undefined) return match;
+      return match.replace(
+        `<style>${css}</style>`,
+        `<style data-cer-style-ref="${id}"></style>`,
+      );
+    },
+  );
+
+  const payload = JSON.stringify(
+    Object.fromEntries([...ids].map(([css, id]) => [id, css])),
+  ).replace(/</g, '\\u003c');
+  const sharingPayload =
+    `<script type="application/json" id="cer-shared-styles">${payload}</script>` +
+    DSD_STYLE_SHARING_SCRIPT;
+
+  return compacted.includes('</body>')
+    ? compacted.replace('</body>', `${sharingPayload}</body>`)
+    : compacted + sharingPayload;
+}
+
 // ---------------------------------------------------------------------------
 // renderToStringWithJITCSS — primary API, supports both modes
 // ---------------------------------------------------------------------------
@@ -159,7 +264,11 @@ export function renderToStringWithJITCSS(
     globalStylesCaptured = endSSRGlobalStyleCollection();
   }
 
-  const css = jitCSS(html);
+  // Shadow-root utilities are already emitted inside their DSD style payload.
+  // Generating them again as document CSS wastes bytes and CSSOM work while
+  // providing no styling benefit because document selectors cannot cross the
+  // shadow boundary.
+  const css = jitCSS(dsd ? withoutDeclarativeShadowContents(html) : html);
   const globalStyles = globalStylesCaptured.join('\n');
 
   const styleTags: string[] = [];
@@ -173,6 +282,10 @@ export function renderToStringWithJITCSS(
     htmlWithStyles = html.includes('</head>')
       ? html.replace('</head>', `${injection}</head>`)
       : `${injection}${html}`;
+  }
+
+  if (dsd) {
+    htmlWithStyles = shareRepeatedDeclarativeShadowStyles(htmlWithStyles);
   }
 
   // Append DSD polyfill script inside </body> when in DSD mode
@@ -274,7 +387,7 @@ export function renderToStream(
           );
           const resolvedVNodes = await Promise.race([entry.promise, timeout]);
           const shadowHTML = Array.isArray(resolvedVNodes)
-            ? (resolvedVNodes as VNode[]).map((n) => renderToDSD(n, entry.opts)).join('')
+            ? `<div>${(resolvedVNodes as VNode[]).map((n) => renderToDSD(n, entry.opts)).join('')}</div>`
             : renderToDSD(resolvedVNodes as VNode, entry.opts);
           const styleBlock = buildShadowStyleBlock(entry.useStyleCSS, shadowHTML);
           const shadowContent = `${styleBlock}${shadowHTML}`;

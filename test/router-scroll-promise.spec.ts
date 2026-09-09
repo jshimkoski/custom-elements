@@ -31,6 +31,27 @@ describe('router scrollToFragment promise semantics', () => {
       (HTMLElement.prototype as any).scrollIntoView = orig;
   });
 
+  it('finds fragment targets inside nested open shadow roots', async () => {
+    const outer = document.createElement('section');
+    const outerRoot = outer.attachShadow({ mode: 'open' });
+    const inner = document.createElement('article');
+    const innerRoot = inner.attachShadow({ mode: 'open' });
+    const target = document.createElement('h2');
+    target.id = 'shadow-team';
+    innerRoot.append(target);
+    outerRoot.append(inner);
+    document.body.append(outer);
+
+    const original = HTMLElement.prototype.scrollIntoView;
+    HTMLElement.prototype.scrollIntoView = vi.fn();
+    const router = initRouter({ routes: [{ path: '/' }] as any });
+
+    await expect(router.scrollToFragment('shadow-team')).resolves.toBe(true);
+    expect(target.scrollIntoView).toHaveBeenCalled();
+
+    HTMLElement.prototype.scrollIntoView = original;
+  });
+
   it('resolves false when element does not appear within timeout', async () => {
     const router = initRouter({
       routes: [{ path: '/about' }] as any,

@@ -317,6 +317,9 @@ export default defineConfig({
     cerComponentImports({
       componentsDir: '/absolute/path/to/app/components',
       appRoot: '/absolute/path/to/app',
+      resolvers: [tag => tag === 'design-button'
+        ? '@acme/design-system/components/button'
+        : undefined],
     }),
   ],
 });
@@ -330,13 +333,17 @@ interface CerComponentImportsOptions {
   componentsDir: string;
   /** Absolute path to the app root. Only files inside this directory are transformed. */
   appRoot: string;
+  /** Package resolvers consulted after local components, in declaration order. */
+  resolvers?: readonly CerComponentImportResolver[];
 }
+
+type CerComponentImportResolver = (tag: string) => string | undefined;
 ```
 
 ### How It Works
 
 1. **`buildStart`** — scans `componentsDir` for `**/*.ts` files, extracts `component('tag-name', …)` calls, builds a `Map<tagName, absPath>` manifest.
-2. **`transform`** — for each file inside `appRoot` that contains an `html\`` template: extracts hyphenated tag names, looks them up in the manifest, prepends relative `import` statements, and returns a source map.
+2. **`transform`** — for each file inside `appRoot` that contains an `html\`` template: extracts hyphenated tag names, looks them up in the local manifest and then package resolvers, prepends `import` statements, and returns a source map. Local components take precedence over packages.
 3. **`watchChange`** — keeps the manifest current during dev (`create`/`update`/`delete` events).
 4. **`handleHotUpdate`** — when tag names change in a component file, sends a `full-reload` and invalidates app modules.
 

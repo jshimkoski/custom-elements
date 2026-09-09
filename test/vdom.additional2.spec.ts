@@ -88,4 +88,38 @@ describe('vdom.additional', () => {
       true,
     );
   });
+
+  it('does not delete child-owned custom-element attributes during initial hydration', () => {
+    const host = document.createElement('div');
+    const root = host.attachShadow({ mode: 'open' });
+    const child = document.createElement('test-owned-hydration-attrs');
+    child.setAttribute('role', 'list');
+    child.setAttribute('aria-label', 'server');
+    root.append(child);
+
+    const hydratedVNode = {
+      tag: 'test-owned-hydration-attrs',
+      props: { attrs: { 'aria-label': 'client' }, isCustomElement: true },
+      children: [],
+    } as any;
+    expect(vdomRenderer(root, hydratedVNode, {}, {}, true)).toBe(true);
+
+    // The parent updates the attribute it authored, but leaves the role that
+    // the custom-element child owns alone.
+    expect(child).toHaveAttribute('aria-label', 'client');
+    expect(child).toHaveAttribute('role', 'list');
+
+    vdomRenderer(
+      root,
+      {
+        tag: 'test-owned-hydration-attrs',
+        props: { attrs: {}, isCustomElement: true },
+        children: [],
+      } as any,
+    );
+
+    // Parent-authored attributes remain removable during ordinary updates.
+    expect(child).not.toHaveAttribute('aria-label');
+    expect(child).toHaveAttribute('role', 'list');
+  });
 });

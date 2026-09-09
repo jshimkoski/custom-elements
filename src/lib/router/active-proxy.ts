@@ -75,17 +75,6 @@ function _rebindProxy() {
             /* swallow */
           }
         }
-      } else {
-        // Even if inner subscription called synchronously, ensure all listeners
-        // receive the current state immediately to handle router re-initialization
-        const cur = activeRouter.getCurrent();
-        for (const listener of _proxyListeners) {
-          try {
-            listener(cur);
-          } catch {
-            /* swallow */
-          }
-        }
       }
 
       // After synchronously forwarding the current snapshot to proxy

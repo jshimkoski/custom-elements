@@ -24,13 +24,13 @@
  * with DSD recursion active for any custom elements nested inside them.
  */
 
-import type { VNode } from './types';
+import type { HydrateStrategy, VNode } from './types';
 import { renderToString } from './vdom-ssr';
 import { VOID_ELEMENTS, buildAttrs, buildRawAttrs, type RenderOptions } from './ssr-utils';
 import { registry } from './component/registry';
 import { runComponentSSRRender } from './ssr-context';
-import { jitCSS, getProseSheet } from './style';
-import { baseReset, minifyCSS } from './css-utils';
+import { jitCSS, getProseSheet, extractClassesFromHTML } from './style';
+import { baseResetRules, minifyCSS } from './css-utils';
 import { escapeHTML, toKebab } from './helpers';
 import { devWarn } from './logger';
 import { processClassDirective, processStyleDirective } from './vdom-directives';
@@ -66,6 +66,8 @@ export type DSDRenderOptions = RenderOptions & {
    * `activeRouterProxy` there.
    */
   router?: unknown;
+  /** @internal Strategy inherited by registered descendants of an SSR island. */
+  _inheritedHydrateStrategy?: HydrateStrategy;
 };
 
 // ---------------------------------------------------------------------------
@@ -96,36 +98,78 @@ function isRegisteredCustomElement(tag: string): boolean {
 }
 
 /**
+ * Serialize JSON-safe object/array props for an island whose parent will never
+ * hydrate. Normally a hydrating parent promotes bound custom-element props to
+ * live JS properties before its children hydrate, so repeating those values in
+ * HTML would only increase document size. A `hydrate: 'none'` boundary cannot
+ * perform that handoff, however, and an explicitly interactive descendant
+ * needs its complex initial props before its first client render.
+ */
+function serializeStaticBoundaryIslandProps(
+  props: Record<string, unknown>,
+): string | null {
+  const entries: string[] = [];
+
+  for (const [key, value] of Object.entries(props)) {
+    if (value !== null && typeof value !== 'object') continue;
+
+    if (value !== null && !Array.isArray(value)) {
+      const prototype = Object.getPrototypeOf(value);
+      if (prototype !== Object.prototype && prototype !== null) continue;
+    }
+
+    try {
+      const encodedValue = JSON.stringify(value);
+      if (encodedValue !== undefined) {
+        entries.push(`${JSON.stringify(key)}:${encodedValue}`);
+      }
+    } catch {
+      // Circular and otherwise non-JSON values remain server-only. Hydration
+      // must never make an otherwise valid SSR render fail.
+    }
+  }
+
+  return entries.length ? `{${entries.join(',')}}` : null;
+}
+
+/**
  * Build the combined `<style>` block for a shadow root.
  *
  * Layer order (matches the runtime adoptedStyleSheets order):
- *   1. baseReset — global reset + CSS custom properties
- *   2. useStyle() output — component-defined rules (:host, ::slotted, etc.)
- *   3. JIT CSS — utility classes extracted from the shadow HTML
- *   4. Prose CSS — inlined when the shadow HTML uses prose/prose-sm/etc. classes,
+ *   1. baseResetRules — shadow-local reset (document tokens inherit naturally)
+ *   2. Prose CSS — inlined when the shadow HTML uses prose/prose-sm/etc. classes,
  *      because the singleton proseSheet is applied via adoptedStyleSheets at runtime
  *      and is therefore unavailable at first paint without this inline copy.
+ *   3. useStyle() output — component-defined rules (:host, ::slotted, etc.)
+ *   4. JIT CSS — utility classes extracted from the shadow HTML. Keeping variants
+ *      after prose base rules is required for equal-specificity utilities such as
+ *      dark:prose-invert to override the default prose variables.
  */
 export function buildShadowStyleBlock(
   useStyleCSS: string,
   shadowHTML: string,
 ): string {
-  const parts: string[] = [baseReset];
+  // Keep the reset in its own style element. Complete-document SSR can then
+  // share this identical sheet across every declarative shadow root even when
+  // each component has different local/JIT styles. Combining everything into
+  // one block repeats the reset once per component and forces the browser to
+  // parse the same rules dozens of times before first paint.
+  const reset = minifyCSS(baseResetRules);
+  const parts: string[] = [];
 
-  if (useStyleCSS.trim()) {
-    parts.push(useStyleCSS);
-  }
-
+  // Generate JIT CSS before reading the prose sheet because jitCSS() registers
+  // prose sizes as a side effect. The generated text is appended later so its
+  // utilities retain the same precedence as the client-side JIT stylesheet.
   const jit = jitCSS(shadowHTML);
-  if (jit.trim()) {
-    parts.push(jit);
-  }
 
   // jitCSS() registers prose sizes as a side-effect when it encounters prose/prose-sm
   // etc. class names. getProseSheet() returns the singleton prose CSS (or null when no
   // prose classes were found). We inline it here so prose styles are available before
   // JavaScript executes — otherwise the shadow DOM has no prose CSS at first paint.
-  const proseSheet = getProseSheet();
+  const containsProse = extractClassesFromHTML(shadowHTML).some((className) =>
+    /(?:^|:)prose(?:-(?:sm|lg|xl|2xl))?$/.test(className),
+  );
+  const proseSheet = containsProse ? getProseSheet() : null;
   if (proseSheet) {
     const proseCSS = String(proseSheet);
     if (proseCSS.trim()) {
@@ -133,8 +177,19 @@ export function buildShadowStyleBlock(
     }
   }
 
-  const combined = minifyCSS(parts.join('\n'));
-  return combined ? `<style>${combined}</style>` : '';
+  if (useStyleCSS.trim()) {
+    parts.push(useStyleCSS);
+  }
+
+  if (jit.trim()) {
+    parts.push(jit);
+  }
+
+  const componentCSS = minifyCSS(parts.join('\n'));
+  return [
+    reset ? `<style>${reset}</style>` : '',
+    componentCSS ? `<style>${componentCSS}</style>` : '',
+  ].join('');
 }
 
 // ---------------------------------------------------------------------------
@@ -230,6 +285,26 @@ export function renderToDSD(vnode: VNode, opts: DSDRenderOptions): string {
 function renderCustomElementDSD(vnode: VNode, opts: DSDRenderOptions): string {
   const tag = vnode.tag;
   const config = registry.get(tag);
+  const rawAttrs: Record<string, unknown> = {
+    ...(vnode.props?.attrs ?? {}),
+  };
+  const authoredHydrateStrategy = rawAttrs['data-cer-hydrate'];
+  const hydrateStrategy =
+    authoredHydrateStrategy === 'load' ||
+    authoredHydrateStrategy === 'idle' ||
+    authoredHydrateStrategy === 'visible' ||
+    authoredHydrateStrategy === 'none'
+      ? authoredHydrateStrategy
+      : config?.hydrate ?? opts._inheritedHydrateStrategy;
+  // data-cer-hydrate is runtime-owned output below. Removing the authored copy
+  // prevents duplicate attributes while preserving per-instance overrides.
+  delete rawAttrs['data-cer-hydrate'];
+  const hydrateAttr = hydrateStrategy
+    ? ` data-cer-hydrate="${hydrateStrategy}"`
+    : '';
+  const childOpts = hydrateStrategy
+    ? { ...opts, _inheritedHydrateStrategy: hydrateStrategy }
+    : opts;
 
   // Build the outer element attribute string.
   // rawAttrs holds static attrs (non-bound). The template compiler moves ALL
@@ -238,7 +313,6 @@ function renderCustomElementDSD(vnode: VNode, opts: DSDRenderOptions): string {
   // numbers, booleans) back as kebab-case HTML attributes. This ensures the
   // client-side component can read its initial prop values from the DOM during
   // hydration without re-rendering from defaults, which would cause pop-in.
-  const rawAttrs = vnode.props?.attrs ?? {};
   const vnodeProps = vnode.props?.props ?? {};
   const primitivePropsAsAttrs: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(vnodeProps)) {
@@ -247,25 +321,29 @@ function renderCustomElementDSD(vnode: VNode, opts: DSDRenderOptions): string {
       primitivePropsAsAttrs[toKebab(k)] = v;
     }
   }
+  const serializedIslandProps =
+    opts._inheritedHydrateStrategy === 'none' && hydrateStrategy !== 'none'
+      ? serializeStaticBoundaryIslandProps(vnodeProps)
+      : null;
+  const hydrationPropsAttr = serializedIslandProps
+    ? { 'data-cer-props': serializedIslandProps }
+    : {};
   // rawAttrs wins over derived primitive props on key conflict (explicit static
-  // attrs should not be silently overridden by bound primitive props).
-  const attrsString = buildRawAttrs({ ...primitivePropsAsAttrs, ...rawAttrs });
+  // attrs should not be silently overridden by bound primitive props). The
+  // runtime-owned hydration payload wins because data-cer-props is reserved.
+  const attrsString = buildRawAttrs({
+    ...primitivePropsAsAttrs,
+    ...rawAttrs,
+    ...hydrationPropsAttr,
+  });
 
   // Move the null check BEFORE reading config.* properties for clarity.
   if (!config) {
     // Component not in registry on server (e.g. dynamic import not yet run).
     // Emit a shell with an empty DSD template so the client hydrates normally.
-    const lightDOM = renderChildrenDSD(vnode.children, opts);
-    return `<${tag}${attrsString}><template shadowrootmode="open"></template>${lightDOM}</${tag}>`;
+    const lightDOM = renderChildrenDSD(vnode.children, childOpts);
+    return `<${tag}${attrsString}${hydrateAttr}><template shadowrootmode="open"></template>${lightDOM}</${tag}>`;
   }
-
-  // Emit data-cer-hydrate when a non-default strategy is configured.
-  // 'load' is the default and doesn't need to be serialised.
-  const hydrateStrategy = config.hydrate;
-  const hydrateAttr =
-    hydrateStrategy && hydrateStrategy !== 'load'
-      ? ` data-cer-hydrate="${hydrateStrategy}"`
-      : '';
 
   // The template compiler moves bound complex-object attrs (arrays, objects,
   // elements) from vnode.props.attrs to vnode.props.props (camelCase keys)
@@ -294,7 +372,7 @@ function renderCustomElementDSD(vnode: VNode, opts: DSDRenderOptions): string {
   }
   if (asyncPromise && _streamingCollector !== null) {
     const id = `cer-stream-${_streamingCounter++}`;
-    const lightDOM = renderChildrenDSD(vnode.children, opts);
+    const lightDOM = renderChildrenDSD(vnode.children, childOpts);
     _streamingCollector.push({
       id,
       tag,
@@ -302,7 +380,7 @@ function renderCustomElementDSD(vnode: VNode, opts: DSDRenderOptions): string {
       hydrateAttr,
       useStyleCSS,
       lightDOM,
-      opts,
+      opts: childOpts,
       promise: asyncPromise,
       router: opts.router,
     });
@@ -318,18 +396,21 @@ function renderCustomElementDSD(vnode: VNode, opts: DSDRenderOptions): string {
   let shadowHTML = '';
   if (shadowVNode !== null && shadowVNode !== undefined) {
     if (Array.isArray(shadowVNode)) {
-      shadowHTML = (shadowVNode as VNode[])
-        .map((n) => renderToDSD(n, opts))
-        .join('');
+      // The client VDOM normalizes multi-root output into one fragment wrapper.
+      // Emit the same shape on the server so hydration can retain the existing
+      // DOM instead of replacing every sibling during custom-element upgrade.
+      shadowHTML = `<div>${(shadowVNode as VNode[])
+        .map((n) => renderToDSD(n, childOpts))
+        .join('')}</div>`;
     } else {
-      shadowHTML = renderToDSD(shadowVNode as VNode, opts);
+      shadowHTML = renderToDSD(shadowVNode as VNode, childOpts);
     }
   }
 
   const styleBlock = buildShadowStyleBlock(useStyleCSS, shadowHTML);
 
   // Light DOM children become slotted content — rendered outside the template
-  const lightDOM = renderChildrenDSD(vnode.children, opts);
+  const lightDOM = renderChildrenDSD(vnode.children, childOpts);
 
   return (
     `<${tag}${attrsString}${hydrateAttr}>` +

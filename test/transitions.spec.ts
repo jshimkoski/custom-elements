@@ -126,6 +126,43 @@ describe('Transitions', () => {
       expect(onBeforeEnter).toHaveBeenCalled();
       expect(onAfterEnter).toHaveBeenCalled();
     });
+
+    it('runs JS leave hooks when a nested transition becomes hidden', async () => {
+      const onAfterLeave = vi.fn();
+      let visible!: ReturnType<typeof ref<boolean>>;
+
+      component('transition-test-js-leave', () => {
+        visible = ref(false);
+        return html`
+          <div>
+            ${Transition(
+              {
+                name: 'js-leave-regression',
+                show: visible.value,
+                css: false,
+                onLeave: (_element, done) => done(),
+                onAfterLeave,
+              },
+              html`<section data-testid="sheet">Sheet</section>`,
+            )}
+          </div>
+        `;
+      });
+
+      const el = document.createElement('transition-test-js-leave');
+      container.appendChild(el);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      visible.value = true;
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(el.shadowRoot?.querySelector('[data-testid="sheet"]')).not.toBeNull();
+
+      visible.value = false;
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      expect(onAfterLeave).toHaveBeenCalledOnce();
+      expect(el.shadowRoot?.querySelector('[data-testid="sheet"]')).toBeNull();
+    });
   });
 
   describe('Transition Presets', () => {

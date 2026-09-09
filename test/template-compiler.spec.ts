@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { html } from '../src/lib/runtime/template-compiler';
 import { htmlImpl } from '../src/lib/runtime/template-compiler';
+import { tokenizeTemplate } from '../src/lib/runtime/template-compiler/impl';
+import { tokenizeProps } from '../src/lib/runtime/template-compiler/props-parser';
 import type { VNode } from '../src/lib/runtime/types';
 
 // Edge case: empty template
@@ -43,6 +45,20 @@ it('should fallback for empty template', () => {
 });
 
 describe('template-compiler', () => {
+  it('tokenizes each template callsite only once', () => {
+    const strings = Object.assign(['<div>', '</div>'], {
+      raw: ['<div>', '</div>'],
+    }) as unknown as TemplateStringsArray;
+
+    expect(tokenizeTemplate(strings)).toBe(tokenizeTemplate(strings));
+  });
+
+  it('reuses parsed attribute syntax across component instances', () => {
+    const attrs = ' class="card" :value="{{0}}" @click="{{1}}"';
+
+    expect(tokenizeProps(attrs)).toBe(tokenizeProps(attrs));
+  });
+
   it('should handle deeply nested fragments', () => {
     const vnode = html`<div>
       ${[

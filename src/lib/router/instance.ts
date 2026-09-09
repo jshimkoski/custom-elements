@@ -6,6 +6,7 @@ import {
   useOnDisconnected,
   useStyle,
   getCurrentComponentContext,
+  isDiscoveryRender,
 } from '../runtime/hooks';
 import { ref, computed } from '../runtime/reactive';
 import { flushDOMUpdates } from '../runtime/scheduler';
@@ -192,9 +193,26 @@ export function useRouter(config: RouterConfig): Router {
     // No global cleanup needed - each promise manages its own lifecycle
   };
 
+  function findFragmentTarget(id: string): HTMLElement | null {
+    // Fragment targets frequently live inside component shadow roots. Native
+    // document.getElementById() cannot cross those boundaries, so walk only
+    // reachable open roots and retain the browser's exact ID semantics.
+    const roots: Array<Document | ShadowRoot> = [document];
+    for (let index = 0; index < roots.length; index++) {
+      const root = roots[index];
+      const direct = root.getElementById(id);
+      if (direct instanceof HTMLElement) return direct;
+
+      for (const element of root.querySelectorAll('*')) {
+        if (element.shadowRoot) roots.push(element.shadowRoot);
+      }
+    }
+    return null;
+  }
+
   async function doScrollToElement(id: string, offset = 0): Promise<boolean> {
     try {
-      const element = document.getElementById(id);
+      const element = findFragmentTarget(id);
       if (!element) {
         return false;
       }
@@ -309,27 +327,40 @@ export function useRouter(config: RouterConfig): Router {
     });
   }
 
-  // Navigation lock to prevent concurrent navigation race conditions
-  let isNavigating = false;
+  // Serialize overlapping navigations instead of silently dropping the later
+  // request. This is especially important during browser startup, where the
+  // queued initial guard replay can overlap an app bootstrap replace().
+  let activeNavigation: Promise<void> | null = null;
 
-  const navigate = async (path: string, replace = false, isPopState = false): Promise<void> => {
-    // Prevent concurrent navigation
-    if (isNavigating) {
-      devWarn(`Navigation to ${path} blocked - navigation already in progress`);
-      return;
-    }
+  const navigate = (
+    path: string,
+    replace = false,
+    isPopState = false,
+  ): Promise<void> => {
+    const previous = activeNavigation;
+    const run = (async () => {
+      if (previous) {
+        try {
+          await previous;
+        } catch {
+          // A failed navigation must not permanently block later requests.
+        }
+      }
 
-    isNavigating = true;
-    redirectDepth = 0;
-    redirectTracker.clear();
-
-    try {
-      await performNavigation(path, replace, isPopState);
-    } finally {
-      isNavigating = false;
       redirectDepth = 0;
       redirectTracker.clear();
-    }
+      try {
+        await performNavigation(path, replace, isPopState);
+      } finally {
+        redirectDepth = 0;
+        redirectTracker.clear();
+      }
+    })();
+
+    activeNavigation = run;
+    return run.finally(() => {
+      if (activeNavigation === run) activeNavigation = null;
+    });
   };
 
   // Extract path parsing logic for reuse in SSR
@@ -350,6 +381,19 @@ export function useRouter(config: RouterConfig): Router {
       fragment,
     };
   };
+
+  // Route locations are stored as separate path/query/fragment fields. Any
+  // replay of the current location (startup, popstate, or SSR update) must
+  // reassemble all three fields; passing only `loc.path` silently rewrites the
+  // browser URL and drops search parameters and hashes.
+  const serializeNavigationLocation = (loc: {
+    path: string;
+    query: Record<string, string>;
+    fragment?: string;
+  }): string =>
+    loc.path +
+    serializeQuery(loc.query) +
+    (loc.fragment ? `#${loc.fragment}` : '');
 
   const performNavigation = async (
     path: string,
@@ -559,7 +603,7 @@ export function useRouter(config: RouterConfig): Router {
 
     update = async (replace = false, isPopState = false) => {
       const loc = getLocation();
-      await navigate(loc.path, replace, isPopState);
+      await navigate(serializeNavigationLocation(loc), replace, isPopState);
     };
 
     const handlePopState = () => update(true, true);
@@ -573,9 +617,13 @@ export function useRouter(config: RouterConfig): Router {
     // Run initial navigation through the guard pipeline so beforeEnter guards
     // fire on the entry URL (e.g. protected routes redirect on hard refresh).
     // queueMicrotask defers until after setActiveRouter()/rebindProxy() complete,
-    // ensuring subscribers are bound before the navigation state updates.
+    // ensuring subscribers are bound before the navigation state updates. If an
+    // explicit navigation was requested synchronously after router creation,
+    // that request supersedes this replay; enqueuing the entry route behind it
+    // would otherwise move the user back after their navigation resolves.
     queueMicrotask(() => {
-      navigate(initial.path, true).catch((err) => {
+      if (activeNavigation) return;
+      navigate(serializeNavigationLocation(initial), true).catch((err) => {
         devError('Initial navigation error:', err);
       });
     });
@@ -612,7 +660,7 @@ export function useRouter(config: RouterConfig): Router {
 
     update = async () => {
       const loc = getLocation();
-      await navigateSSR(loc.path);
+      await navigateSSR(serializeNavigationLocation(loc));
     };
 
     // SSR navigation contract:
@@ -797,6 +845,12 @@ export function initRouter(config: RouterConfig): Router {
   }
 
   component('router-view', async () => {
+    // component() invokes render functions once to discover hook metadata.
+    // Resolving the current lazy route from that probe would download and
+    // execute a page chunk even when no <router-view> exists (for example, a
+    // hydrate:none SSR entry that intentionally keeps its static server tree).
+    if (isDiscoveryRender()) return html``;
+
     // In SSR, prefer the per-request router threaded through the component
     // context over the module-level activeRouterProxy singleton. This enables
     // concurrent SSR renders — each request carries its own router instance

@@ -2,7 +2,13 @@
  * FormInputValidation: A form with input validation and error handling.
  * Demonstrates form.value, validation, and error feedback.
  */
-import { component, html, ref, useOnConnected } from '../../lib';
+import {
+  component,
+  html,
+  ref,
+  useOnConnected,
+  useOnDisconnected,
+} from '../../lib';
 import { when } from '../../lib/directives';
 
 component('form-input-validation', () => {
@@ -11,27 +17,33 @@ component('form-input-validation', () => {
   const bio = ref('');
   const gender = ref('');
   const subscribe = ref(false);
-  const fruits = ref([]);
+  const fruits = ref<string[]>([]);
   const country = ref('');
   const errorMessage = ref('');
   const successMessage = ref('');
+  const successTimer = ref<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-  const submit = async (event: Event) => {
+  const submit = (event: Event) => {
     event.preventDefault();
+    // Ignore duplicate activation while a successful submission is being
+    // announced. The first submit resets the fields, so processing a rapid
+    // second click would otherwise replace the success status with a spurious
+    // validation error from the freshly cleared form.
+    if (successMessage.value) return;
     errorMessage.value = '';
     successMessage.value = '';
     // Email validation
-    if (!email.value.match(/^[^@\s]+@[^@\s]+\.[^@\s]+$/)) {
+    if (!email.value.trim().match(/^[^@\s]+@[^@\s]+\.[^@\s]+$/)) {
       errorMessage.value = 'Please enter a valid email address.';
       return;
     }
     // Username validation
-    if (!username.value || username.value.length < 3) {
+    if (username.value.trim().length < 3) {
       errorMessage.value = 'Username must be at least 3 characters.';
       return;
     }
     // Bio validation
-    if (!bio.value || bio.value.length < 10) {
+    if (bio.value.trim().length < 10) {
       errorMessage.value = 'Bio must be at least 10 characters.';
       return;
     }
@@ -60,14 +72,22 @@ component('form-input-validation', () => {
     fruits.value = [];
     country.value = '';
 
-    await setTimeout(() => {
+    if (successTimer.value !== undefined) clearTimeout(successTimer.value);
+    successTimer.value = setTimeout(() => {
       successMessage.value = '';
+      successTimer.value = undefined;
     }, 3000);
   };
 
   const emailInput = ref<HTMLElement | null>(null);
   useOnConnected(() => {
     emailInput.value?.focus();
+  });
+  useOnDisconnected(() => {
+    if (successTimer.value !== undefined) {
+      clearTimeout(successTimer.value);
+      successTimer.value = undefined;
+    }
   });
 
   return html`
@@ -117,6 +137,7 @@ component('form-input-validation', () => {
               type="radio"
               value="male"
               name="gender"
+              required
             />
             Male</label
           >
@@ -126,6 +147,7 @@ component('form-input-validation', () => {
               type="radio"
               value="female"
               name="gender"
+              required
             />
             Female</label
           >
@@ -135,6 +157,7 @@ component('form-input-validation', () => {
               type="radio"
               value="other"
               name="gender"
+              required
             />
             Other</label
           >
@@ -146,7 +169,12 @@ component('form-input-validation', () => {
         <div class="flex flex-col items-start gap-2 w-full mb-6">
           <span class="font-semibold">Favorite Fruits:</span>
           <label
-            ><input :model="${fruits}" type="checkbox" value="apple" />
+            ><input
+              :model="${fruits}"
+              :required="${fruits.value.length === 0}"
+              type="checkbox"
+              value="apple"
+            />
             Apple</label
           >
           <label
@@ -162,6 +190,7 @@ component('form-input-validation', () => {
           <span class="font-semibold">Country:</span>
           <select
             :model="${country}"
+            required
             class="w-full px-2 py-1 rounded-sm border border-neutral-300 dark:border-neutral-800 hover:bg-neutral-50 focus:bg-white dark:hover:bg-neutral-900 dark:focus:bg-black"
           >
             <option value="">Select...</option>
@@ -173,7 +202,11 @@ component('form-input-validation', () => {
         ${when(
           errorMessage.value !== '',
           html`
-            <div class="mb-6 text-sm text-error-600 dark:text-error-400">
+            <div
+              class="error mb-6 text-sm text-error-600 dark:text-error-400"
+              role="alert"
+              aria-live="assertive"
+            >
               ${errorMessage.value}
             </div>
           `,
@@ -187,7 +220,11 @@ component('form-input-validation', () => {
         ${when(
           successMessage.value !== '',
           html`
-            <div class="mt-4 text-sm text-success-600 dark:text-success-400">
+            <div
+              class="success mt-4 text-sm text-success-600 dark:text-success-400"
+              role="status"
+              aria-live="polite"
+            >
               ${successMessage.value}
             </div>
           `,

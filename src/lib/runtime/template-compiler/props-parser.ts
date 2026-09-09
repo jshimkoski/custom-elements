@@ -1,5 +1,6 @@
 import { isReactiveState } from '../reactive';
 import { devWarn } from '../logger';
+import { getCacheSize, LRUCache } from './lru-cache';
 
 export interface ParsePropsResult {
   props: Record<string, unknown>;
@@ -9,6 +10,61 @@ export interface ParsePropsResult {
     { value: unknown; modifiers: string[]; arg?: string }
   >;
   bound: string[];
+}
+
+export interface PropToken {
+  readonly prefix: string;
+  readonly rawName: string;
+  readonly rawValue: string;
+  readonly standalone: boolean;
+}
+
+const PROP_TOKEN_CACHE = new LRUCache<string, readonly PropToken[]>(
+  getCacheSize(),
+);
+const ATTRIBUTE_PATTERN =
+  /([:@#]?)([a-zA-Z0-9-:.]+)(?:\s*=\s*("([^"\\]*(\\.[^"\\]*)*)"|'([^'\\]*(\\.[^'\\]*)*)'|([^\s>]+)))?/g;
+const KNOWN_DIRECTIVES = new Set([
+  'model',
+  'bind',
+  'show',
+  'class',
+  'style',
+  'ref',
+  'when',
+]);
+
+export function tokenizeProps(str: string): readonly PropToken[] {
+  const cached = PROP_TOKEN_CACHE.get(str);
+  if (cached) return cached;
+
+  const tokens: PropToken[] = [];
+  const matcher = new RegExp(ATTRIBUTE_PATTERN.source, 'g');
+  let match: RegExpExecArray | null;
+  while ((match = matcher.exec(str))) {
+    let rawValue = '';
+    for (let i = 3; i < match.length; i++) {
+      if (match[i] !== undefined) {
+        rawValue = match[i] as string;
+        break;
+      }
+    }
+    if (
+      rawValue.length >= 2 &&
+      ((rawValue[0] === '"' && rawValue[rawValue.length - 1] === '"') ||
+        (rawValue[0] === "'" && rawValue[rawValue.length - 1] === "'"))
+    ) {
+      rawValue = rawValue.slice(1, -1);
+    }
+    tokens.push({
+      prefix: match[1],
+      rawName: match[2],
+      rawValue,
+      standalone: !/=/.test(match[0]),
+    });
+  }
+  PROP_TOKEN_CACHE.set(str, tokens);
+  return tokens;
 }
 
 /**
@@ -57,41 +113,9 @@ export function parseProps(
   > = {};
   const bound: string[] = [];
 
-  // Match attributes with optional prefix and support for single/double quotes
-  // and unquoted values (so `:model=${...}` or `@click=${...}` work without
-  // requiring surrounding quotes). Also matches standalone boolean attributes
-  // (without =value).
-  const attrRegex =
-    /([:@#]?)([a-zA-Z0-9-:.]+)(?:\s*=\s*("([^"\\]*(\\.[^"\\]*)*)"|'([^'\\]*(\\.[^'\\]*)*)'|([^\s>]+)))?/g;
-
-  let match: RegExpExecArray | null;
-
-  while ((match = attrRegex.exec(str))) {
-    const prefix = match[1];
-    const rawName = match[2];
-    // Extract the first non-undefined capture for the attribute value.
-    // We avoid relying on hard-coded group indexes because nested groups
-    // in the regex can shift indexes across environments/transpilers.
-    let rawVal = '';
-    for (let i = 3; i < match.length; i++) {
-      if (match[i] !== undefined) {
-        rawVal = match[i] as string;
-        break;
-      }
-    }
-
-    // Defensive quote stripping if surrounding quotes remain
-    if (
-      rawVal.length >= 2 &&
-      ((rawVal[0] === '"' && rawVal[rawVal.length - 1] === '"') ||
-        (rawVal[0] === "'" && rawVal[rawVal.length - 1] === "'"))
-    ) {
-      rawVal = rawVal.slice(1, -1);
-    }
-
-    // If no value was provided (standalone attribute), treat as boolean true
-    // Determine standalone by checking whether the matched token contains '='
-    const isStandalone = !/=/.test(match[0]);
+  for (const token of tokenizeProps(str)) {
+    const { prefix, rawName, rawValue: rawVal, standalone: isStandalone } =
+      token;
 
     // Interpolation detection
     // Full interpolation: the entire value is a single marker, e.g. `{{0}}`
@@ -118,20 +142,11 @@ export function parseProps(
     }
 
     // Known directive names
-    const knownDirectives = [
-      'model',
-      'bind',
-      'show',
-      'class',
-      'style',
-      'ref',
-      'when',
-    ];
     if (prefix === ':') {
       // Support :model:checked (directive with argument) and :class.foo (modifiers)
       const [nameAndModifiers, argPart] = rawName.split(':');
       const [maybeDirective, ...modifierParts] = nameAndModifiers.split('.');
-      if (knownDirectives.includes(maybeDirective)) {
+      if (KNOWN_DIRECTIVES.has(maybeDirective)) {
         const modifiers = [...modifierParts];
         // Allow multiple :model directives on the same tag by keying them with
         // their argument when present (e.g. 'model:test'). This preserves both

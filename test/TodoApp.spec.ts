@@ -51,4 +51,41 @@ describe('TodoApp example', () => {
     expect(listItem).not.toBeNull();
     expect(listItem!.textContent).toContain('buy milk');
   });
+
+  it('keeps item identity isolated across reactive renders', async () => {
+    const host = document.createElement('todo-app') as HTMLElement;
+    document.body.appendChild(host);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const root = host.shadowRoot ?? host;
+    const input = root.querySelector('input[type="text"]') as HTMLInputElement;
+    const submit = root.querySelector('button[type="submit"]') as HTMLButtonElement;
+
+    for (const text of ['First task', 'Second task', 'Third task']) {
+      input.value = text;
+      input.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+      submit.click();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+
+    let items = [...root.querySelectorAll('li')];
+    expect(items).toHaveLength(3);
+    const secondCheckbox = items[1].querySelector('input[type="checkbox"]') as HTMLInputElement;
+    secondCheckbox.checked = true;
+    secondCheckbox.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    items = [...root.querySelectorAll('li')];
+    expect(
+      items.map((item) =>
+        (item.querySelector('input[type="checkbox"]') as HTMLInputElement).checked,
+      ),
+    ).toEqual([false, true, false]);
+
+    (items[1].querySelector('button.remove-btn') as HTMLButtonElement).click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(
+      [...root.querySelectorAll('span.todo-text')].map((label) => label.textContent?.trim()),
+    ).toEqual(['First task', 'Third task']);
+  });
 });
