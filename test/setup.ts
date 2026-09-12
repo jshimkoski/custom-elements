@@ -1,5 +1,17 @@
 import '@testing-library/jest-dom';
 
+// Vitest 5 exposes jsdom globals through getter-only properties. Several tests
+// intentionally replace window/document to exercise browser and SSR branches,
+// so preserve the environment values as writable globals for those tests.
+for (const name of ['window', 'document', 'customElements', 'HTMLElement'] as const) {
+  Object.defineProperty(globalThis, name, {
+    configurable: true,
+    enumerable: true,
+    writable: true,
+    value: globalThis[name],
+  });
+}
+
 // Polyfill for Custom Elements and Shadow DOM if needed
 if (!window.customElements) {
   window.customElements = {
