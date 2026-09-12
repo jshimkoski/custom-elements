@@ -1,6 +1,10 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v3.10.1] - 2026-09-12
+
+- test: Add JIT CSS validation and compatibility tests (fa0d536)
+
 ## [v3.10.0] - 2026-09-12
 
 - feat(jit-css): add dependency-free Tailwind CSS 4.2/4.3 compatibility for logical spacing and sizing, scrollbar styling, named size containers, font features, zoom, tabs, current state/media/range variants, and the mauve/olive/mist/taupe palettes (966a94d)
