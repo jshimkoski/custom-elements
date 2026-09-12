@@ -1,6 +1,10 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v3.9.1] - 2026-09-12
+
+- fix: Upgrade development tooling and test setup (55c1210)
+
 ## [v3.9.0] - 2026-09-09
 
 - feat(tests): add comprehensive tests for router functionality and behavior (34ac87a)
