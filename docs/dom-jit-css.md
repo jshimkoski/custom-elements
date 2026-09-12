@@ -4,7 +4,7 @@ The `dom-jit-css` module brings the JIT CSS engine to **non-Shadow DOM** context
 
 It watches the real DOM for class changes and injects CSS rules into a shared stylesheet, providing the same utility-first experience as the Shadow DOM JIT CSS engine but scoped to the document or a specific container.
 
-> **Bundle note:** Importing `@jasonshimmy/custom-elements-runtime/dom-jit-css` always includes the full JIT engine (~20 KB gzip). The JIT engine is only available via the `/jit-css` and `/dom-jit-css` subpath entries — it is not exported from the root entry and is never included in the main bundle.
+> **Bundle note:** Importing `@jasonshimmy/custom-elements-runtime/dom-jit-css` includes the opt-in JIT engine. It is isolated from the root entry, has no runtime dependencies, and is protected by a 40 KiB gzip recursive ESM/CDN budget in `npm run validate:jit-css`.
 
 ## 📦 Import
 
@@ -60,7 +60,7 @@ const jit = createDOMJITCSS({
   // ID of the injected <style> element (defaults to 'cer-dom-jit-css')
   styleId?: string;
   // JIT CSS options (same as JITCSSOptions)
-  extendedColors?: boolean | string[]; // true = all 21 families, string[] = specific families
+  extendedColors?: boolean | string[]; // true = all 25 families, string[] = specific families
   customColors?: Record<string, Record<string, string>>;
   disableVariants?: Array<'responsive' | 'dark' | 'motion' | 'print' | 'container'>;
 });
@@ -68,9 +68,9 @@ const jit = createDOMJITCSS({
 
 > **`extendedColors` is a runtime flag, not a bundle boundary.** Because `dom-jit-css` always includes the full JIT engine, the extended color data is always present in your bundle regardless of what you pass to `extendedColors`. Setting it to `false` or omitting it only prevents those color utilities from generating CSS — it does not reduce bundle size.
 >
-> The reason to leave it disabled (the default) is **generated CSS size and style recalculation cost**. The extended palette has 21 families × 11 shades = 231 color tokens. Each can appear as `bg-`, `text-`, `border-`, `ring-`, `shadow-`, `outline-`, `from-`, `to-`, or `via-`, giving ~2,000 injectable rules at the theoretical maximum.
+> The reason to leave it disabled (the default) is **generated CSS size and style recalculation cost**. The extended palette has 25 families × 11 shades = 275 color tokens, each usable across several color utility families.
 >
-> Every rule injection via `insertRule()` can trigger a browser style recalculation. In a large DOM tree with many color utilities in use, enabling all 21 families adds measurable overhead to initial render and any subsequent DOM mutations the observer picks up. Use `string[]` to expose only the families you actually need.
+> The JIT remains usage-driven, but a large DOM tree with many distinct color utilities creates more generated CSS. Use `string[]` to expose only the families you actually need.
 
 ### `DOMJITCSSHandle`
 
@@ -94,7 +94,7 @@ jit.mount();
 ### Extended color palette
 
 ```ts
-// All 21 extended families
+// All 25 extended families
 const jit = createDOMJITCSS({ extendedColors: true });
 jit.mount();
 // Now bg-violet-500, text-rose-300, etc. generate CSS
@@ -164,17 +164,19 @@ window.addEventListener('beforeunload', () => jit.destroy());
 
 The DOM JIT CSS scanner is designed to be extremely lightweight:
 
-1. **Incremental class delta processing** — a monotonically growing `Set<string>` tracks processed classes. Each MutationObserver callback only processes new class names, never the full DOM.
+1. **Incremental discovery without DOM rescans** — a monotonically growing `Set<string>` tracks processed classes. Each MutationObserver callback extracts only changed/new nodes, then passes the compact class set to the compiler.
 
 2. **`queueMicrotask` batching** — multiple class mutations in the same tick (e.g., a framework rendering a list) are batched into a single CSS generation pass, executed before the browser paints.
 
-3. **`CSSStyleSheet.replaceSync()`** — the accumulated CSS is re-applied as a single `@layer cer-utilities { … }` block. Using `replaceSync` correctly handles nested at-rules (`@media`, `@container`, `@supports`) so dark and responsive variants apply as intended.
+3. **Canonical, cached replacement** — already-parsed rules are reused, then the complete sheet is replaced in deterministic property order. This keeps `m-0 mt-4` equivalent to `mt-4 m-0`, even when the classes are discovered in separate mutations. A single `@layer cer-utilities { … }` block preserves nested at-rules correctly.
 
 4. **`TreeWalker` initial scan** — the first full-tree class extraction uses `NodeFilter.SHOW_ELEMENT` for maximum performance.
 
 5. **Minimum viable observation** — the `MutationObserver` only watches `class` attribute changes and `childList` (new nodes). `characterData` observation is never enabled.
 
 6. **`@layer cer-utilities`** — all injected rules are wrapped in a cascade layer so library utility classes never overpower user styles without `!important`.
+
+7. **Hard validation gates** — the production build checks zero runtime dependencies, recursive gzip size, cold/hot compilation, and 250 successive class-set expansions.
 
 ## 🗂️ CSS Cascade Layers
 

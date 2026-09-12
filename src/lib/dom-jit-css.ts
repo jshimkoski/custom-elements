@@ -84,7 +84,10 @@ export function createDOMJITCSS(
   // Monotonically growing set of processed class names.
   // We never shrink this — rules remain valid even if classes are removed.
   const processedClasses = new Set<string>();
-  // CSS text that has been injected. Grown incrementally.
+  // Complete CSS text for every class discovered by this observer. The class
+  // set grows monotonically, but the stylesheet is regenerated in canonical
+  // utility order so a later broad shorthand can never jump ahead of an
+  // already-seen side utility in the cascade.
   let injectedCSS = '';
 
   let styleEl: HTMLStyleElement | null = null;
@@ -142,12 +145,11 @@ export function createDOMJITCSS(
     }
   }
 
-  function applyNewCSS(css: string): void {
-    if (!css) return;
-    injectedCSS += `\n${css}`;
+  function applyCSS(css: string): void {
+    injectedCSS = css;
     if (useAdoptedSheet && adoptedSheet) {
       try {
-        // Replace the entire sheet with the accumulated CSS wrapped in a single
+        // Replace the entire sheet with the canonical CSS wrapped in a single
         // @layer block. replaceSync handles nested at-rules (@media, @container,
         // @supports) correctly — the previous insertRule approach used a flat
         // regex that stripped at-rule wrappers, causing dark: and responsive
@@ -192,13 +194,12 @@ export function createDOMJITCSS(
 
     if (newClasses.length === 0) return;
 
-    // Build a minimal HTML string containing only the new class names so
-    // the jitCSS engine parses only the delta (not the full DOM).
-    const fakeHTML = `<div class="${newClasses.join(' ')}"></div>`;
-    const newCSS = jitCSS(fakeHTML);
-    if (newCSS) {
-      applyNewCSS(newCSS);
-    }
+    // Recompile the compact, monotonically-growing class set. This is not a DOM
+    // rescan: jitCSS receives one synthetic element and its sorted-set cache
+    // makes repeated sets O(1). Replacing canonical output is required for
+    // deterministic shorthand/side precedence across separate mutations.
+    const fakeHTML = `<div class="${Array.from(processedClasses).join(' ')}"></div>`;
+    applyCSS(jitCSS(fakeHTML));
   }
 
   function addClassesFromElement(el: Element): void {

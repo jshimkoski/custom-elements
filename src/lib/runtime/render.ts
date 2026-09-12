@@ -33,6 +33,10 @@ interface CERComponentElement extends HTMLElement {
 
 // Cache for tracking last aggregated HTML per shadowRoot to avoid redundant jitCSS calls
 const aggregatedHtmlCache = new WeakMap<ShadowRoot, string>();
+// Last minified user/JIT stylesheet actually applied to each root. Text-only
+// updates often change aggregated HTML without changing its class set; avoid a
+// redundant replaceSync() and browser style recalculation in that case.
+const appliedStyleCache = new WeakMap<ShadowRoot, string>();
 
 // Cache for tracking child component elements per shadowRoot for faster aggregation
 const childComponentCache = new WeakMap<ShadowRoot, Set<HTMLElement>>();
@@ -51,7 +55,10 @@ const _sharedStyleSheetCache = new Map<string, CSSStyleSheet>();
  * @internal
  */
 export function getSharedStyleSheet(cssText: string): CSSStyleSheet | null {
-  if (typeof CSSStyleSheet === 'undefined' || !('replaceSync' in CSSStyleSheet.prototype)) {
+  if (
+    typeof CSSStyleSheet === 'undefined' ||
+    !('replaceSync' in CSSStyleSheet.prototype)
+  ) {
     return null;
   }
   const cached = _sharedStyleSheetCache.get(cssText);
@@ -141,7 +148,8 @@ export function renderComponent<
       const wasConnected = shadowRoot.host.isConnected;
       type TokenHost = { _asyncRenderToken?: number };
       const sr = shadowRoot as unknown as TokenHost;
-      const renderToken = (sr._asyncRenderToken = (sr._asyncRenderToken ?? 0) + 1);
+      const renderToken = (sr._asyncRenderToken =
+        (sr._asyncRenderToken ?? 0) + 1);
       outputOrPromise
         .then((output) => {
           if (wasConnected && !shadowRoot.host.isConnected) return;
@@ -259,7 +267,11 @@ export function requestRender(
   //  - Vitest infinite-loop tests require a tight stop threshold (< 15 renders)
   //  - Cypress e2e tests simulate real user interactions with legitimate rapid
   //    renders and must NOT be stopped early.
-  const { isVitest, isCypress: isCypressEnv, isTest: isTestEnv } = detectTestEnvironment();
+  const {
+    isVitest,
+    isCypress: isCypressEnv,
+    isTest: isTestEnv,
+  } = detectTestEnvironment();
   // isVitestEnv: treat any non-Cypress test environment as Vitest for tight
   // loop-detection thresholds. (Matches original NODE_ENV=test && !Cypress logic.)
   const isVitestEnv = (isVitest || isTestEnv) && !isCypressEnv;
@@ -363,7 +375,8 @@ function aggregateChildHtml(shadowRoot: ShadowRoot, baseHtml: string): string {
       // Fast path: iterate only registered child components
       for (const el of childComponents) {
         try {
-          const childHtml = (el as Partial<CERComponentElement>).lastHtmlStringForJitCSS;
+          const childHtml = (el as Partial<CERComponentElement>)
+            .lastHtmlStringForJitCSS;
           if (childHtml?.trim()) {
             aggregated += '\n' + childHtml;
           }
@@ -376,7 +389,8 @@ function aggregateChildHtml(shadowRoot: ShadowRoot, baseHtml: string): string {
       const elements = shadowRoot.querySelectorAll('*');
       for (const el of elements) {
         try {
-          const childHtml = (el as Partial<CERComponentElement>).lastHtmlStringForJitCSS;
+          const childHtml = (el as Partial<CERComponentElement>)
+            .lastHtmlStringForJitCSS;
           if (childHtml?.trim()) {
             aggregated += '\n' + childHtml;
           }
@@ -489,10 +503,7 @@ export function applyStyle<
 
     // Apply base styles only
     if (supportsAdopted) {
-      shadowRoot.adoptedStyleSheets = [
-        getBaseResetSheet(),
-        transitionSheet,
-      ];
+      shadowRoot.adoptedStyleSheets = [getBaseResetSheet(), transitionSheet];
     } else {
       const baseText = minifyCSS(baseReset);
       const combined = minifyCSS(`${baseText}\n${transitionText}`);
@@ -507,6 +518,7 @@ export function applyStyle<
         // Ignore if assignment fails
       }
     }
+    appliedStyleCache.set(shadowRoot, '');
     return;
   }
 
@@ -521,6 +533,8 @@ export function applyStyle<
 
   finalStyle = sanitizeCSS(finalStyle);
   finalStyle = minifyCSS(finalStyle);
+
+  if (appliedStyleCache.get(shadowRoot) === finalStyle) return;
 
   // Apply styles using constructable stylesheets when available.
   if (supportsAdopted) {
@@ -551,8 +565,9 @@ export function applyStyle<
       if (proseSheet) sheets.push(proseSheet);
       sheets.push(sheet as CSSStyleSheet);
       shadowRoot.adoptedStyleSheets = sheets;
+      appliedStyleCache.set(shadowRoot, finalStyle);
       // Store the per-instance sheet reference only for non-shared sheets.
-      setStyleSheet(isStaticCss ? null : sheet as CSSStyleSheet);
+      setStyleSheet(isStaticCss ? null : (sheet as CSSStyleSheet));
       return;
     } catch {
       // Fall through to style element approach
@@ -563,6 +578,7 @@ export function applyStyle<
   const baseText = minifyCSS(baseReset);
   const combined = minifyCSS(`${baseText}\n${transitionText}\n${finalStyle}`);
   createOrUpdateStyleElement(shadowRoot, combined);
+  appliedStyleCache.set(shadowRoot, finalStyle);
 
   // Provide stubbed adoptedStyleSheets for testing consistency
   try {
@@ -603,5 +619,6 @@ export function applyStyle<
  */
 export function cleanupRenderCaches(shadowRoot: ShadowRoot): void {
   aggregatedHtmlCache.delete(shadowRoot);
+  appliedStyleCache.delete(shadowRoot);
   childComponentCache.delete(shadowRoot);
 }

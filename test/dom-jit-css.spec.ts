@@ -506,6 +506,23 @@ describe('createDOMJITCSS', () => {
       );
       jit.destroy();
     });
+
+    it('reorders the full discovered set when a broad utility arrives later', async () => {
+      const el = document.createElement('div');
+      el.className = 'mt-4';
+      document.body.appendChild(el);
+      const jit = createDOMJITCSS();
+      jit.mount();
+      await flushAsync();
+
+      el.className = 'mt-4 m-0';
+      await flushAsync();
+
+      const css = document.getElementById('cer-dom-jit-css')?.textContent ?? '';
+      expect(css.indexOf('.m-0')).toBeLessThan(css.indexOf('.mt-4'));
+      expect(css.match(/\.mt-4\{/g)).toHaveLength(1);
+      jit.destroy();
+    });
   });
 
   // ─── adoptedStyleSheets path ─────────────────────────────────────────────

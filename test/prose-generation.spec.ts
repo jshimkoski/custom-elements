@@ -37,56 +37,56 @@ describe('Prose CSS Generation Verification', () => {
     expect(css).toContain('--cer-prose-counters:');
     expect(css).toContain('--cer-prose-bullets:');
 
-    // Typography elements (now with :not(.not-prose) selectors)
-    expect(css).toContain('.prose p:not(.not-prose)');
-    expect(css).toContain('.prose .lead:not(.not-prose)');
-    expect(css).toContain('.prose h1:not(.not-prose)');
-    expect(css).toContain('.prose h2:not(.not-prose)');
-    expect(css).toContain('.prose h3:not(.not-prose)');
-    expect(css).toContain('.prose a:not(.not-prose)');
-    expect(css).toContain('.prose strong:not(.not-prose)');
-    expect(css).toContain('.prose em:not(.not-prose)');
+    // Typography elements exclude .not-prose subtrees with a compact selector list.
+    expect(css).toContain('.prose p:not(.not-prose,.not-prose *)');
+    expect(css).toContain('.prose .lead:not(.not-prose,.not-prose *)');
+    expect(css).toContain('.prose h1:not(.not-prose,.not-prose *)');
+    expect(css).toContain('.prose h2:not(.not-prose,.not-prose *)');
+    expect(css).toContain('.prose h3:not(.not-prose,.not-prose *)');
+    expect(css).toContain('.prose a:not(.not-prose,.not-prose *)');
+    expect(css).toContain('.prose strong:not(.not-prose,.not-prose *)');
+    expect(css).toContain('.prose em:not(.not-prose,.not-prose *)');
 
     // Lists (now with :not(.not-prose) selectors)
-    expect(css).toContain('.prose ol:not(.not-prose)');
-    expect(css).toContain('.prose ul:not(.not-prose)');
+    expect(css).toContain('.prose ol:not(.not-prose,.not-prose *)');
+    expect(css).toContain('.prose ul:not(.not-prose,.not-prose *)');
     expect(css).toContain(
-      '.prose ol:not(.not-prose):not(.not-prose *)>li:not(.not-prose)',
+      '.prose ol:not(.not-prose,.not-prose *)>li:not(.not-prose,.not-prose *)',
     );
     expect(css).toContain(
-      '.prose ul:not(.not-prose):not(.not-prose *)>li:not(.not-prose)',
+      '.prose ul:not(.not-prose,.not-prose *)>li:not(.not-prose,.not-prose *)',
     );
     expect(css).toContain('::marker');
     expect(css).toContain('list-style-type:decimal');
     expect(css).toContain('list-style-type:disc');
 
     // Code (now with :not(.not-prose) selectors)
-    expect(css).toContain('.prose code:not(.not-prose)');
-    expect(css).toContain('.prose pre:not(.not-prose)');
+    expect(css).toContain('.prose code:not(.not-prose,.not-prose *)');
+    expect(css).toContain('.prose pre:not(.not-prose,.not-prose *)');
     expect(css).toContain(
-      '.prose pre:not(.not-prose):not(.not-prose *) code:not(.not-prose)',
+      '.prose pre:not(.not-prose,.not-prose *) code:not(.not-prose,.not-prose *)',
     );
     expect(css).toContain('background-color:var(--cer-prose-code-bg)');
     expect(css).toContain('background-color:var(--cer-prose-pre-bg)');
     expect(css).toContain('font-family:ui-monospace');
 
     // Blockquotes (now with :not(.not-prose) selectors)
-    expect(css).toContain('.prose blockquote:not(.not-prose)');
+    expect(css).toContain('.prose blockquote:not(.not-prose,.not-prose *)');
     expect(css).toContain('border-left');
     expect(css).toContain('open-quote');
     expect(css).toContain('close-quote');
 
     // Horizontal rule (now with :not(.not-prose) selectors)
-    expect(css).toContain('.prose hr:not(.not-prose)');
+    expect(css).toContain('.prose hr:not(.not-prose,.not-prose *)');
 
     // Tables (now with :not(.not-prose) selectors)
-    expect(css).toContain('.prose table:not(.not-prose)');
-    expect(css).toContain('.prose thead:not(.not-prose)');
+    expect(css).toContain('.prose table:not(.not-prose,.not-prose *)');
+    expect(css).toContain('.prose thead:not(.not-prose,.not-prose *)');
     expect(css).toContain(
-      '.prose tbody:not(.not-prose):not(.not-prose *) tr:not(.not-prose)',
+      '.prose tbody:not(.not-prose,.not-prose *) tr:not(.not-prose,.not-prose *)',
     );
     expect(css).toContain(
-      '.prose tbody:not(.not-prose):not(.not-prose *) td:not(.not-prose)',
+      '.prose tbody:not(.not-prose,.not-prose *) td:not(.not-prose,.not-prose *)',
     );
 
     console.log('\n✓ Generated CSS length:', css.length, 'characters');
@@ -124,7 +124,7 @@ describe('Prose CSS Generation Verification', () => {
 
     // Element modifiers with proper scoping
     expect(css).toContain('.prose-a\\:text-primary-600');
-    expect(css).toContain('a:not(.not-prose)');
+    expect(css).toContain('a:not(.not-prose):not(.not-prose *)');
     expect(css).toContain('.prose-code\\:text-sm');
 
     console.log('✓ Element modifiers working correctly');

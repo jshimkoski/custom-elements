@@ -45,6 +45,30 @@ describe('render module - applyStyle and renderComponent', () => {
     _resetJITCSS();
   });
 
+  it('skips replaceSync when text changes but generated styles do not', () => {
+    const root = document.createElement('div').attachShadow({ mode: 'open' });
+    const ctx: any = { _computedStyle: undefined };
+    let sheet: CSSStyleSheet | null = null;
+    enableJITCSS();
+    vi.spyOn(renderBridge, 'isJITCSSActiveFor').mockReturnValue(true);
+    vi.spyOn(renderBridge, 'processJITCSS').mockReturnValue(
+      '.x{display:block;}',
+    );
+    const replaceSpy = vi.spyOn(CSSStyleSheet.prototype, 'replaceSync');
+
+    applyStyle(root, ctx, '<div class="x">one</div>', sheet, (next) => {
+      sheet = next;
+    });
+    const firstCount = replaceSpy.mock.calls.length;
+    applyStyle(root, ctx, '<div class="x">two</div>', sheet, (next) => {
+      sheet = next;
+    });
+
+    expect(replaceSpy.mock.calls.length).toBe(firstCount);
+    replaceSpy.mockRestore();
+    _resetJITCSS();
+  });
+
   it('renderComponent handles promise-returning render functions', async () => {
     const shadow = document.createElement('div').attachShadow({ mode: 'open' });
     const cfg: any = {

@@ -34,7 +34,11 @@ function buildProseCSS(): void {
   }
   proseCSSCache = minifyCSS(combinedProseCSS);
 
-  if (proseSheet && typeof proseSheet.replaceSync === 'function' && combinedProseCSS) {
+  if (
+    proseSheet &&
+    typeof proseSheet.replaceSync === 'function' &&
+    combinedProseCSS
+  ) {
     try {
       proseSheet.replaceSync(proseCSSCache);
     } catch {
@@ -94,7 +98,7 @@ export type CSSMap = Record<string, string>;
 export interface JITCSSOptions {
   /**
    * Include the extended Tailwind color palette (slate, gray, red, orange, blue, violet, rose, etc.).
-   * Pass `true` to include all 21 color families, or an array of specific family names to include only
+   * Pass `true` to include all 25 color families, or an array of specific family names to include only
    * those (e.g. `['slate', 'blue', 'red']`). A targeted list reduces `_activeColors` size and improves
    * JIT match performance when only a few extended families are needed.
    */
@@ -331,6 +335,7 @@ export function registerJITCSSComponent(
       _globalJITCSSOptions = merged;
       rebuildActiveColors(_globalJITCSSOptions);
       jitCssCache.clear();
+      jitRuleCache.clear();
     }
   }
   // Lazy registration so render.ts can call back into the JIT engine.
@@ -365,6 +370,7 @@ export function enableJITCSS(options?: JITCSSOptions): void {
   _ensureBridgeRegistered();
   // Invalidate cache so new colors take effect on the next render.
   jitCssCache.clear();
+  jitRuleCache.clear();
 }
 
 /**
@@ -403,6 +409,7 @@ export function _resetJITCSS(): void {
   _bridgeRegistered = false;
   _activeColors = { ...colors };
   jitCssCache.clear();
+  jitRuleCache.clear();
 }
 
 const semanticSizes: Record<string, number> = {
@@ -423,29 +430,23 @@ const semanticSizes: Record<string, number> = {
 
 // Property mappings for spacing utilities
 export const spacingProps: Record<string, string[]> = {
-  m: ['margin'],
-  mx: ['margin-inline'],
-  my: ['margin-block'],
-  mt: ['margin-top'],
-  mr: ['margin-right'],
-  mb: ['margin-bottom'],
-  ml: ['margin-left'],
-  p: ['padding'],
-  px: ['padding-inline'],
-  py: ['padding-block'],
-  pt: ['padding-top'],
-  pr: ['padding-right'],
-  pb: ['padding-bottom'],
-  pl: ['padding-left'],
   inset: ['inset'],
   'inset-x': ['inset-inline'],
   'inset-y': ['inset-block'],
+  'inset-bs': ['inset-block-start'],
+  'inset-be': ['inset-block-end'],
   h: ['height'],
   w: ['width'],
+  block: ['block-size'],
+  inline: ['inline-size'],
   'min-h': ['min-height'],
   'min-w': ['min-width'],
+  'min-block': ['min-block-size'],
+  'min-inline': ['min-inline-size'],
   'max-h': ['max-height'],
   'max-w': ['max-width'],
+  'max-block': ['max-block-size'],
+  'max-inline': ['max-inline-size'],
   top: ['top'],
   bottom: ['bottom'],
   left: ['left'],
@@ -456,10 +457,6 @@ export const spacingProps: Record<string, string[]> = {
   // size-* sets both width and height simultaneously (Tailwind v3+)
   size: ['width', 'height'],
   // Logical (flow-relative) properties — RTL / vertical writing mode support
-  ms: ['margin-inline-start'],
-  me: ['margin-inline-end'],
-  ps: ['padding-inline-start'],
-  pe: ['padding-inline-end'],
   bs: ['margin-block-start'],
   be: ['margin-block-end'],
   start: ['inset-inline-start'],
@@ -467,10 +464,45 @@ export const spacingProps: Record<string, string[]> = {
   'inset-s': ['inset-inline-start'],
   'inset-e': ['inset-inline-end'],
 };
+const boxSides: Record<string, string> = {
+  '': '',
+  x: 'inline',
+  y: 'block',
+  s: 'inline-start',
+  e: 'inline-end',
+  bs: 'block-start',
+  be: 'block-end',
+  t: 'top',
+  r: 'right',
+  b: 'bottom',
+  l: 'left',
+};
+for (const [short, property] of [
+  ['m', 'margin'],
+  ['p', 'padding'],
+]) {
+  for (const [side, suffix] of Object.entries(boxSides)) {
+    spacingProps[`${short}${side}`] = [
+      `${property}${suffix ? `-${suffix}` : ''}`,
+    ];
+    spacingProps[`scroll-${short}${side}`] = [
+      `scroll-${property}${suffix ? `-${suffix}` : ''}`,
+    ];
+  }
+}
 
 // Utility generators for reduced code bloat
 const generateUtilities = (): CSSMap => {
   const utils: CSSMap = {};
+  const addValues = (
+    prefix: string,
+    property: string,
+    values: readonly string[],
+  ): void => {
+    for (const value of values) {
+      utils[`${prefix}-${value}`] = `${property}:${value};`;
+    }
+  };
 
   // Add @container utility
   utils['@container'] = 'container-type:inline-size;';
@@ -500,32 +532,9 @@ const generateUtilities = (): CSSMap => {
 
   // Flex utilities
   Object.assign(utils, {
-    'items-center': 'align-items:center;',
-    'items-start': 'align-items:flex-start;',
-    'items-end': 'align-items:flex-end;',
-    'items-baseline': 'align-items:baseline;',
-    'items-stretch': 'align-items:stretch;',
-    'justify-center': 'justify-content:center;',
-    'justify-start': 'justify-content:flex-start;',
-    'justify-between': 'justify-content:space-between;',
-    'justify-around': 'justify-content:space-around;',
-    'justify-evenly': 'justify-content:space-evenly;',
-    'justify-end': 'justify-content:flex-end;',
     'flex-wrap': 'flex-wrap:wrap;',
     'flex-nowrap': 'flex-wrap:nowrap;',
     'flex-wrap-reverse': 'flex-wrap:wrap-reverse;',
-    'content-center': 'align-content:center;',
-    'content-start': 'align-content:flex-start;',
-    'content-end': 'align-content:flex-end;',
-    'content-between': 'align-content:space-between;',
-    'content-around': 'align-content:space-around;',
-    'content-evenly': 'align-content:space-evenly;',
-    'content-stretch': 'align-content:stretch;',
-    'self-auto': 'align-self:auto;',
-    'self-start': 'align-self:flex-start;',
-    'self-end': 'align-self:flex-end;',
-    'self-center': 'align-self:center;',
-    'self-stretch': 'align-self:stretch;',
     'flex-col': 'flex-direction:column;',
     'flex-row': 'flex-direction:row;',
     'flex-col-reverse': 'flex-direction:column-reverse;',
@@ -539,6 +548,29 @@ const generateUtilities = (): CSSMap => {
     'grow-0': 'flex-grow:0;',
     'shrink-0': 'flex-shrink:0;',
   });
+  const flexAlignmentValues: Record<string, string> = {
+    center: 'center',
+    start: 'flex-start',
+    end: 'flex-end',
+    baseline: 'baseline',
+    stretch: 'stretch',
+  };
+  for (const [name, value] of Object.entries(flexAlignmentValues)) {
+    utils[`items-${name}`] = `align-items:${value};`;
+    if (name !== 'baseline') utils[`self-${name}`] = `align-self:${value};`;
+  }
+  utils['self-auto'] = 'align-self:auto;';
+  for (const [name, value] of Object.entries({
+    ...flexAlignmentValues,
+    between: 'space-between',
+    around: 'space-around',
+    evenly: 'space-evenly',
+  })) {
+    utils[`content-${name}`] = `align-content:${value};`;
+    if (name !== 'baseline' && name !== 'stretch') {
+      utils[`justify-${name}`] = `justify-content:${value};`;
+    }
+  }
 
   // Grid utilities
   for (let i = 1; i <= 12; i++) {
@@ -557,35 +589,26 @@ const generateUtilities = (): CSSMap => {
     'grid-rows-none': 'grid-template-rows:none;',
     'col-span-full': 'grid-column:1 / -1;',
     'row-span-full': 'grid-row:1 / -1;',
-    'auto-cols-auto': 'grid-auto-columns:auto;',
-    'auto-cols-min': 'grid-auto-columns:min-content;',
-    'auto-cols-max': 'grid-auto-columns:max-content;',
-    'auto-cols-fr': 'grid-auto-columns:1fr;',
-    'auto-rows-auto': 'grid-auto-rows:auto;',
-    'auto-rows-min': 'grid-auto-rows:min-content;',
-    'auto-rows-max': 'grid-auto-rows:max-content;',
-    'auto-rows-fr': 'grid-auto-rows:1fr;',
-    'grid-flow-row': 'grid-auto-flow:row;',
-    'grid-flow-col': 'grid-auto-flow:column;',
-    'grid-flow-row-dense': 'grid-auto-flow:row dense;',
-    'grid-flow-col-dense': 'grid-auto-flow:column dense;',
   });
+  for (const [axis, property] of [
+    ['cols', 'columns'],
+    ['rows', 'rows'],
+  ]) {
+    for (const [name, value] of Object.entries({
+      auto: 'auto',
+      min: 'min-content',
+      max: 'max-content',
+      fr: '1fr',
+    })) {
+      utils[`auto-${axis}-${name}`] = `grid-auto-${property}:${value};`;
+    }
+  }
+  for (const flow of ['row', 'col', 'row-dense', 'col-dense']) {
+    utils[`grid-flow-${flow}`] = `grid-auto-flow:${flow.replace('-', ' ')};`;
+  }
 
   // Typography utilities
   Object.assign(utils, {
-    'text-left': 'text-align:left;',
-    'text-center': 'text-align:center;',
-    'text-right': 'text-align:right;',
-    'text-justify': 'text-align:justify;',
-    'font-thin': 'font-weight:100;',
-    'font-extralight': 'font-weight:200;',
-    'font-light': 'font-weight:300;',
-    'font-normal': 'font-weight:400;',
-    'font-medium': 'font-weight:500;',
-    'font-semibold': 'font-weight:600;',
-    'font-bold': 'font-weight:700;',
-    'font-extrabold': 'font-weight:800;',
-    'font-black': 'font-weight:900;',
     italic: 'font-style:italic;',
     'not-italic': 'font-style:normal;',
     uppercase: 'text-transform:uppercase;',
@@ -597,20 +620,39 @@ const generateUtilities = (): CSSMap => {
     'line-through': 'text-decoration-line:line-through;',
     'no-underline': 'text-decoration-line:none;',
     truncate: 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;',
-    'whitespace-normal': 'white-space:normal;',
-    'whitespace-nowrap': 'white-space:nowrap;',
-    'whitespace-pre': 'white-space:pre;',
-    'whitespace-pre-line': 'white-space:pre-line;',
-    'whitespace-pre-wrap': 'white-space:pre-wrap;',
     'break-normal': 'overflow-wrap:normal;word-break:normal;',
     'break-words': 'overflow-wrap:break-word;',
     'break-all': 'word-break:break-all;',
-    // Text-wrap utilities (Tailwind v3.3+)
-    'text-wrap': 'text-wrap:wrap;',
-    'text-nowrap': 'text-wrap:nowrap;',
-    'text-balance': 'text-wrap:balance;',
-    'text-pretty': 'text-wrap:pretty;',
   });
+  addValues('text', 'text-align', ['left', 'center', 'right', 'justify']);
+  addValues('whitespace', 'white-space', [
+    'normal',
+    'nowrap',
+    'pre',
+    'pre-line',
+    'pre-wrap',
+  ]);
+  for (const [name, weight] of [
+    'thin',
+    'extralight',
+    'light',
+    'normal',
+    'medium',
+    'semibold',
+    'bold',
+    'extrabold',
+    'black',
+  ].entries()) {
+    utils[`font-${weight}`] = `font-weight:${(name + 1) * 100};`;
+  }
+  for (const [name, value] of Object.entries({
+    wrap: 'wrap',
+    nowrap: 'nowrap',
+    balance: 'balance',
+    pretty: 'pretty',
+  })) {
+    utils[`text-${name}`] = `text-wrap:${value};`;
+  }
 
   // Font sizes with proper line heights
   // Use a CSS variable `--cer-line-height` so `leading-*` utilities can override
@@ -697,6 +739,10 @@ const generateUtilities = (): CSSMap => {
       `border-left-width:${px};border-right-width:${px};`;
     utils[`border-y-${w}`] =
       `border-top-width:${px};border-bottom-width:${px};`;
+    utils[`border-s-${w}`] = `border-inline-start-width:${px};`;
+    utils[`border-e-${w}`] = `border-inline-end-width:${px};`;
+    utils[`border-bs-${w}`] = `border-block-start-width:${px};`;
+    utils[`border-be-${w}`] = `border-block-end-width:${px};`;
   }
   Object.assign(utils, {
     'font-sans':
@@ -719,6 +765,10 @@ const generateUtilities = (): CSSMap => {
     'border-l': 'border-left-width:1px;',
     'border-x': 'border-left-width:1px;border-right-width:1px;',
     'border-y': 'border-top-width:1px;border-bottom-width:1px;',
+    'border-s': 'border-inline-start-width:1px;',
+    'border-e': 'border-inline-end-width:1px;',
+    'border-bs': 'border-block-start-width:1px;',
+    'border-be': 'border-block-end-width:1px;',
     'border-solid': 'border-style:solid;',
     'border-dashed': 'border-style:dashed;',
     'border-dotted': 'border-style:dotted;',
@@ -783,81 +833,66 @@ const generateUtilities = (): CSSMap => {
   });
 
   // Overflow utilities
-  Object.assign(utils, {
-    'overflow-auto': 'overflow:auto;',
-    'overflow-hidden': 'overflow:hidden;',
-    'overflow-visible': 'overflow:visible;',
-    'overflow-scroll': 'overflow:scroll;',
-    'overflow-x-auto': 'overflow-x:auto;',
-    'overflow-x-hidden': 'overflow-x:hidden;',
-    'overflow-x-visible': 'overflow-x:visible;',
-    'overflow-x-scroll': 'overflow-x:scroll;',
-    'overflow-y-auto': 'overflow-y:auto;',
-    'overflow-y-hidden': 'overflow-y:hidden;',
-    'overflow-y-visible': 'overflow-y:visible;',
-    'overflow-y-scroll': 'overflow-y:scroll;',
-  });
+  for (const axis of ['', '-x', '-y']) {
+    addValues(`overflow${axis}`, `overflow${axis}`, [
+      'auto',
+      'hidden',
+      'visible',
+      'scroll',
+    ]);
+  }
 
   // Background utilities (position, size, repeat, attachment, clip)
   Object.assign(utils, {
-    'bg-cover': 'background-size:cover;',
-    'bg-contain': 'background-size:contain;',
-    'bg-auto': 'background-size:auto;',
-    'bg-center': 'background-position:center;',
-    'bg-top': 'background-position:top;',
-    'bg-bottom': 'background-position:bottom;',
-    'bg-left': 'background-position:left;',
-    'bg-right': 'background-position:right;',
     'bg-left-top': 'background-position:left top;',
     'bg-left-bottom': 'background-position:left bottom;',
     'bg-right-top': 'background-position:right top;',
     'bg-right-bottom': 'background-position:right bottom;',
-    'bg-no-repeat': 'background-repeat:no-repeat;',
-    'bg-repeat': 'background-repeat:repeat;',
     'bg-repeat-x': 'background-repeat:repeat-x;',
     'bg-repeat-y': 'background-repeat:repeat-y;',
     'bg-repeat-round': 'background-repeat:round;',
     'bg-repeat-space': 'background-repeat:space;',
-    'bg-fixed': 'background-attachment:fixed;',
-    'bg-local': 'background-attachment:local;',
-    'bg-scroll': 'background-attachment:scroll;',
-    'bg-origin-border': 'background-origin:border-box;',
-    'bg-origin-padding': 'background-origin:padding-box;',
-    'bg-origin-content': 'background-origin:content-box;',
-    'bg-clip-border': 'background-clip:border-box;',
-    'bg-clip-padding': 'background-clip:padding-box;',
-    'bg-clip-content': 'background-clip:content-box;',
     'bg-clip-text': 'background-clip:text;-webkit-background-clip:text;',
   });
+  addValues('bg', 'background-size', ['cover', 'contain', 'auto']);
+  addValues('bg', 'background-position', [
+    'center',
+    'top',
+    'bottom',
+    'left',
+    'right',
+  ]);
+  for (const value of ['fixed', 'local', 'scroll']) {
+    utils[`bg-${value}`] = `background-attachment:${value};`;
+  }
+  utils['bg-no-repeat'] = 'background-repeat:no-repeat;';
+  utils['bg-repeat'] = 'background-repeat:repeat;';
+  for (const box of ['border', 'padding', 'content']) {
+    utils[`bg-origin-${box}`] = `background-origin:${box}-box;`;
+    utils[`bg-clip-${box}`] = `background-clip:${box}-box;`;
+  }
 
   // Text decoration style and thickness utilities
   Object.assign(utils, {
-    'decoration-solid': 'text-decoration-style:solid;',
-    'decoration-dashed': 'text-decoration-style:dashed;',
-    'decoration-dotted': 'text-decoration-style:dotted;',
-    'decoration-double': 'text-decoration-style:double;',
-    'decoration-wavy': 'text-decoration-style:wavy;',
     'decoration-from-font': 'text-decoration-thickness:from-font;',
     'decoration-auto': 'text-decoration-thickness:auto;',
-    'decoration-1': 'text-decoration-thickness:1px;',
-    'decoration-2': 'text-decoration-thickness:2px;',
-    'decoration-4': 'text-decoration-thickness:4px;',
-    'decoration-8': 'text-decoration-thickness:8px;',
     'underline-offset-auto': 'text-underline-offset:auto;',
-    'underline-offset-1': 'text-underline-offset:1px;',
-    'underline-offset-2': 'text-underline-offset:2px;',
-    'underline-offset-4': 'text-underline-offset:4px;',
-    'underline-offset-8': 'text-underline-offset:8px;',
   });
+  addValues('decoration', 'text-decoration-style', [
+    'solid',
+    'dashed',
+    'dotted',
+    'double',
+    'wavy',
+  ]);
+  for (const width of [1, 2, 4, 8]) {
+    utils[`decoration-${width}`] = `text-decoration-thickness:${width}px;`;
+    utils[`underline-offset-${width}`] = `text-underline-offset:${width}px;`;
+  }
 
   // List utilities
-  Object.assign(utils, {
-    'list-none': 'list-style-type:none;',
-    'list-disc': 'list-style-type:disc;',
-    'list-decimal': 'list-style-type:decimal;',
-    'list-inside': 'list-style-position:inside;',
-    'list-outside': 'list-style-position:outside;',
-  });
+  addValues('list', 'list-style-type', ['none', 'disc', 'decimal']);
+  addValues('list', 'list-style-position', ['inside', 'outside']);
 
   // Content utilities for pseudo-elements
   Object.assign(utils, {
@@ -888,75 +923,92 @@ const generateUtilities = (): CSSMap => {
   });
 
   // Will-change utilities
-  Object.assign(utils, {
-    'will-change-auto': 'will-change:auto;',
-    'will-change-scroll': 'will-change:scroll-position;',
-    'will-change-contents': 'will-change:contents;',
-    'will-change-transform': 'will-change:transform;',
-    'will-change-opacity': 'will-change:opacity;',
-  });
+  addValues('will-change', 'will-change', [
+    'auto',
+    'scroll-position',
+    'contents',
+    'transform',
+    'opacity',
+  ]);
+  utils['will-change-scroll'] = utils['will-change-scroll-position'];
+  delete utils['will-change-scroll-position'];
 
   // Touch action utilities
+  addValues('touch', 'touch-action', [
+    'auto',
+    'none',
+    'pan-x',
+    'pan-left',
+    'pan-right',
+    'pan-y',
+    'pan-up',
+    'pan-down',
+    'pinch-zoom',
+    'manipulation',
+  ]);
+
+  // Tailwind 4.1 alignment and overflow-wrap additions. These are static
+  // declarations so they add no runtime parser branches.
   Object.assign(utils, {
-    'touch-auto': 'touch-action:auto;',
-    'touch-none': 'touch-action:none;',
-    'touch-pan-x': 'touch-action:pan-x;',
-    'touch-pan-left': 'touch-action:pan-left;',
-    'touch-pan-right': 'touch-action:pan-right;',
-    'touch-pan-y': 'touch-action:pan-y;',
-    'touch-pan-up': 'touch-action:pan-up;',
-    'touch-pan-down': 'touch-action:pan-down;',
-    'touch-pinch-zoom': 'touch-action:pinch-zoom;',
-    'touch-manipulation': 'touch-action:manipulation;',
+    'items-baseline-last': 'align-items:last baseline;',
+    'self-baseline-last': 'align-self:last baseline;',
+    'wrap-normal': 'overflow-wrap:normal;',
+    'wrap-break-word': 'overflow-wrap:break-word;',
+    'wrap-anywhere': 'overflow-wrap:anywhere;',
   });
+  for (const [prefix, property] of [
+    ['items', 'align-items'],
+    ['justify', 'justify-content'],
+    ['justify-self', 'justify-self'],
+    ['place-content', 'place-content'],
+    ['place-items', 'place-items'],
+    ['place-self', 'place-self'],
+    ['self', 'align-self'],
+  ]) {
+    for (const value of ['center', 'end']) {
+      utils[`${prefix}-${value}-safe`] = `${property}:safe ${value};`;
+    }
+  }
 
   // Columns utilities
-  Object.assign(utils, {
-    'columns-auto': 'columns:auto;',
-    'columns-1': 'columns:1;',
-    'columns-2': 'columns:2;',
-    'columns-3': 'columns:3;',
-    'columns-4': 'columns:4;',
-    'columns-5': 'columns:5;',
-    'columns-6': 'columns:6;',
-    'columns-7': 'columns:7;',
-    'columns-8': 'columns:8;',
-    'columns-9': 'columns:9;',
-    'columns-10': 'columns:10;',
-    'columns-11': 'columns:11;',
-    'columns-12': 'columns:12;',
-    'columns-3xs': `columns:${0.25 * 64}rem;`,
-    'columns-2xs': `columns:${0.25 * 80}rem;`,
-    'columns-xs': `columns:${0.25 * 96}rem;`,
-    'columns-sm': `columns:${0.25 * 112}rem;`,
-    'columns-md': `columns:${0.25 * 128}rem;`,
-    'columns-lg': `columns:${0.25 * 160}rem;`,
-    'columns-xl': `columns:${0.25 * 192}rem;`,
-    'columns-2xl': `columns:${0.25 * 224}rem;`,
-    'columns-3xl': `columns:${0.25 * 256}rem;`,
-    'columns-4xl': `columns:${0.25 * 280}rem;`,
-    'columns-5xl': `columns:${0.25 * 320}rem;`,
-  });
+  utils['columns-auto'] = 'columns:auto;';
+  for (let count = 1; count <= 12; count++) {
+    utils[`columns-${count}`] = `columns:${count};`;
+  }
+  for (const [name, quarterRem] of Object.entries({
+    '3xs': 64,
+    '2xs': 80,
+    xs: 96,
+    sm: 112,
+    md: 128,
+    lg: 160,
+    xl: 192,
+    '2xl': 224,
+    '3xl': 256,
+    '4xl': 280,
+    '5xl': 320,
+  })) {
+    utils[`columns-${name}`] = `columns:${quarterRem / 4}rem;`;
+  }
 
   // Divide utilities (sibling selectors using special marker for post-processing)
   // These use > * + * selectors which need special handling in generateRule()
   Object.assign(utils, {
-    'divide-x': 'border-left-width:1px;',
-    'divide-x-0': 'border-left-width:0px;',
-    'divide-x-2': 'border-left-width:2px;',
-    'divide-x-4': 'border-left-width:4px;',
-    'divide-x-8': 'border-left-width:8px;',
-    'divide-y': 'border-top-width:1px;',
-    'divide-y-0': 'border-top-width:0px;',
-    'divide-y-2': 'border-top-width:2px;',
-    'divide-y-4': 'border-top-width:4px;',
-    'divide-y-8': 'border-top-width:8px;',
     'divide-solid': 'border-style:solid;',
     'divide-dashed': 'border-style:dashed;',
     'divide-dotted': 'border-style:dotted;',
     'divide-double': 'border-style:double;',
     'divide-none': 'border-style:none;',
   });
+  for (const [axis, property] of [
+    ['x', 'border-left-width'],
+    ['y', 'border-top-width'],
+  ]) {
+    utils[`divide-${axis}`] = `${property}:1px;`;
+    for (const width of [0, 2, 4, 8]) {
+      utils[`divide-${axis}-${width}`] = `${property}:${width}px;`;
+    }
+  }
 
   // Accessibility, pointer events, visibility, cursors, z-index
   const cursors = [
@@ -977,52 +1029,82 @@ const generateUtilities = (): CSSMap => {
       'position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border-width:0;',
     'not-sr-only':
       'position:static;width:auto;height:auto;padding:0;margin:0;overflow:visible;clip:auto;white-space:normal;',
-    'pointer-events-none': 'pointer-events:none;',
-    'pointer-events-auto': 'pointer-events:auto;',
     visible: 'visibility:visible;',
     invisible: 'visibility:hidden;',
-    'float-right': 'float:right;',
-    'float-left': 'float:left;',
-    'float-none': 'float:none;',
     'float-start': 'float:inline-start;',
     'float-end': 'float:inline-end;',
     clearfix: 'content:"";display:table;clear:both;',
-    'clear-left': 'clear:left;',
-    'clear-right': 'clear:right;',
-    'clear-both': 'clear:both;',
-    'clear-none': 'clear:none;',
     'clear-start': 'clear:inline-start;',
     'clear-end': 'clear:inline-end;',
   });
+  addValues('pointer-events', 'pointer-events', ['none', 'auto']);
+  addValues('float', 'float', ['right', 'left', 'none']);
+  addValues('clear', 'clear', ['left', 'right', 'both', 'none']);
 
   // Size utilities and auto margins
-  Object.assign(utils, {
-    'w-full': 'width:100%;',
-    'w-screen': 'width:100dvw;',
-    'h-full': 'height:100%;',
-    'h-screen': 'height:100dvh;',
-    'max-w-full': 'max-width:100%;',
-    'max-h-full': 'max-height:100%;',
-    'max-w-screen': 'max-width:100dvw;',
-    'max-h-screen': 'max-height:100dvh;',
-    'min-w-0': 'min-width:0;',
-    'min-h-0': 'min-height:0;',
-    'min-w-full': 'min-width:100%;',
-    'min-h-full': 'min-height:100%;',
-    'min-w-screen': 'min-width:100dvw;',
-    'min-h-screen': 'min-height:100dvh;',
-    'w-auto': 'width:auto;',
-    'h-auto': 'height:auto;',
-    'w-fit': 'width:fit-content;',
-    'h-fit': 'height:fit-content;',
-    'w-min': 'width:min-content;',
-    'h-min': 'height:min-content;',
-    'w-max': 'width:max-content;',
-    'h-max': 'height:max-content;',
-    'm-auto': 'margin:auto;',
-    'mx-auto': 'margin-inline:auto;',
-    'my-auto': 'margin-block:auto;',
-  });
+  for (const [axis, property, viewport] of [
+    ['w', 'width', '100dvw'],
+    ['h', 'height', '100dvh'],
+  ]) {
+    const values = {
+      full: '100%',
+      screen: viewport,
+      auto: 'auto',
+      fit: 'fit-content',
+      min: 'min-content',
+      max: 'max-content',
+    };
+    for (const [name, value] of Object.entries(values)) {
+      utils[`${axis}-${name}`] = `${property}:${value};`;
+      if (name === 'full' || name === 'screen') {
+        utils[`min-${axis}-${name}`] = `min-${property}:${value};`;
+        utils[`max-${axis}-${name}`] = `max-${property}:${value};`;
+      }
+    }
+    utils[`min-${axis}-0`] = `min-${property}:0;`;
+  }
+  for (const key of [
+    'm',
+    'mx',
+    'my',
+    'ms',
+    'me',
+    'mbs',
+    'mbe',
+    'mt',
+    'mr',
+    'mb',
+    'ml',
+  ]) {
+    utils[`${key}-auto`] = spacingProps[key]
+      .map((property) => `${property}:auto;`)
+      .join('');
+  }
+
+  // Logical sizing counterparts. Existing physical w-/h- utilities remain
+  // available as additive aliases.
+  const logicalInlineSizes: Record<string, string> = {
+    auto: 'auto',
+    full: '100%',
+    screen: '100dvw',
+    min: 'min-content',
+    max: 'max-content',
+    fit: 'fit-content',
+  };
+  const logicalBlockSizes: Record<string, string> = {
+    ...logicalInlineSizes,
+    screen: '100dvh',
+  };
+  for (const [key, value] of Object.entries(logicalInlineSizes)) {
+    utils[`inline-${key}`] = `inline-size:${value};`;
+    utils[`min-inline-${key}`] = `min-inline-size:${value};`;
+    utils[`max-inline-${key}`] = `max-inline-size:${value};`;
+  }
+  for (const [key, value] of Object.entries(logicalBlockSizes)) {
+    utils[`block-${key}`] = `block-size:${value};`;
+    utils[`min-block-${key}`] = `min-block-size:${value};`;
+    utils[`max-block-${key}`] = `max-block-size:${value};`;
+  }
 
   // Semantic sizes
   for (const [key, value] of Object.entries(semanticSizes)) {
@@ -1032,6 +1114,12 @@ const generateUtilities = (): CSSMap => {
     utils[`max-h-${key}`] = `max-height:calc(${spacing} * ${value});`;
     utils[`min-h-${key}`] = `min-height:calc(${spacing} * ${value});`;
     utils[`h-${key}`] = `height:calc(${spacing} * ${value});`;
+    utils[`inline-${key}`] = `inline-size:calc(${spacing} * ${value});`;
+    utils[`min-inline-${key}`] = `min-inline-size:calc(${spacing} * ${value});`;
+    utils[`max-inline-${key}`] = `max-inline-size:calc(${spacing} * ${value});`;
+    utils[`block-${key}`] = `block-size:calc(${spacing} * ${value});`;
+    utils[`min-block-${key}`] = `min-block-size:calc(${spacing} * ${value});`;
+    utils[`max-block-${key}`] = `max-block-size:calc(${spacing} * ${value});`;
   }
 
   // Transition utilities
@@ -1049,273 +1137,197 @@ const generateUtilities = (): CSSMap => {
     'ease-in': 'transition-timing-function:ease-in;',
     'ease-out': 'transition-timing-function:ease-out;',
     'ease-in-out': 'transition-timing-function:ease-in-out;',
-    'duration-75': 'transition-duration:75ms;',
-    'duration-100': 'transition-duration:100ms;',
-    'duration-150': 'transition-duration:150ms;',
-    'duration-200': 'transition-duration:200ms;',
-    'duration-300': 'transition-duration:300ms;',
-    'duration-500': 'transition-duration:500ms;',
-    'duration-700': 'transition-duration:700ms;',
-    'duration-1000': 'transition-duration:1000ms;',
   });
 
-  // Transition delay utilities
-  Object.assign(utils, {
-    'delay-0': 'transition-delay:0ms;',
-    'delay-75': 'transition-delay:75ms;',
-    'delay-100': 'transition-delay:100ms;',
-    'delay-150': 'transition-delay:150ms;',
-    'delay-200': 'transition-delay:200ms;',
-    'delay-300': 'transition-delay:300ms;',
-    'delay-500': 'transition-delay:500ms;',
-    'delay-700': 'transition-delay:700ms;',
-    'delay-1000': 'transition-delay:1000ms;',
-  });
+  for (const duration of [0, 75, 100, 150, 200, 300, 500, 700, 1000]) {
+    if (duration)
+      utils[`duration-${duration}`] = `transition-duration:${duration}ms;`;
+    utils[`delay-${duration}`] = `transition-delay:${duration}ms;`;
+  }
 
   // Transform utilities — CSS-variable–composed so multiple transforms compose
   const TRANSFORM_COMPOSE =
     'translateX(var(--cer-translate-x)) translateY(var(--cer-translate-y)) rotate(var(--cer-rotate)) skewX(var(--cer-skew-x)) skewY(var(--cer-skew-y)) scaleX(var(--cer-scale-x)) scaleY(var(--cer-scale-y))';
-  const tx = (v: string) =>
-    `--cer-translate-x:${v};transform:${TRANSFORM_COMPOSE};`;
-  const ty = (v: string) =>
-    `--cer-translate-y:${v};transform:${TRANSFORM_COMPOSE};`;
-  Object.assign(utils, {
-    // Scale (uniform)
-    'scale-0': `--cer-scale-x:0;--cer-scale-y:0;transform:${TRANSFORM_COMPOSE};`,
-    'scale-50': `--cer-scale-x:.5;--cer-scale-y:.5;transform:${TRANSFORM_COMPOSE};`,
-    'scale-75': `--cer-scale-x:.75;--cer-scale-y:.75;transform:${TRANSFORM_COMPOSE};`,
-    'scale-90': `--cer-scale-x:.9;--cer-scale-y:.9;transform:${TRANSFORM_COMPOSE};`,
-    'scale-95': `--cer-scale-x:.95;--cer-scale-y:.95;transform:${TRANSFORM_COMPOSE};`,
-    'scale-100': `--cer-scale-x:1;--cer-scale-y:1;transform:${TRANSFORM_COMPOSE};`,
-    'scale-105': `--cer-scale-x:1.05;--cer-scale-y:1.05;transform:${TRANSFORM_COMPOSE};`,
-    'scale-110': `--cer-scale-x:1.1;--cer-scale-y:1.1;transform:${TRANSFORM_COMPOSE};`,
-    'scale-125': `--cer-scale-x:1.25;--cer-scale-y:1.25;transform:${TRANSFORM_COMPOSE};`,
-    'scale-150': `--cer-scale-x:1.5;--cer-scale-y:1.5;transform:${TRANSFORM_COMPOSE};`,
-    // Scale X axis only
-    'scale-x-0': `--cer-scale-x:0;transform:${TRANSFORM_COMPOSE};`,
-    'scale-x-50': `--cer-scale-x:.5;transform:${TRANSFORM_COMPOSE};`,
-    'scale-x-75': `--cer-scale-x:.75;transform:${TRANSFORM_COMPOSE};`,
-    'scale-x-90': `--cer-scale-x:.9;transform:${TRANSFORM_COMPOSE};`,
-    'scale-x-95': `--cer-scale-x:.95;transform:${TRANSFORM_COMPOSE};`,
-    'scale-x-100': `--cer-scale-x:1;transform:${TRANSFORM_COMPOSE};`,
-    'scale-x-105': `--cer-scale-x:1.05;transform:${TRANSFORM_COMPOSE};`,
-    'scale-x-110': `--cer-scale-x:1.1;transform:${TRANSFORM_COMPOSE};`,
-    'scale-x-125': `--cer-scale-x:1.25;transform:${TRANSFORM_COMPOSE};`,
-    'scale-x-150': `--cer-scale-x:1.5;transform:${TRANSFORM_COMPOSE};`,
-    // Scale Y axis only
-    'scale-y-0': `--cer-scale-y:0;transform:${TRANSFORM_COMPOSE};`,
-    'scale-y-50': `--cer-scale-y:.5;transform:${TRANSFORM_COMPOSE};`,
-    'scale-y-75': `--cer-scale-y:.75;transform:${TRANSFORM_COMPOSE};`,
-    'scale-y-90': `--cer-scale-y:.9;transform:${TRANSFORM_COMPOSE};`,
-    'scale-y-95': `--cer-scale-y:.95;transform:${TRANSFORM_COMPOSE};`,
-    'scale-y-100': `--cer-scale-y:1;transform:${TRANSFORM_COMPOSE};`,
-    'scale-y-105': `--cer-scale-y:1.05;transform:${TRANSFORM_COMPOSE};`,
-    'scale-y-110': `--cer-scale-y:1.1;transform:${TRANSFORM_COMPOSE};`,
-    'scale-y-125': `--cer-scale-y:1.25;transform:${TRANSFORM_COMPOSE};`,
-    'scale-y-150': `--cer-scale-y:1.5;transform:${TRANSFORM_COMPOSE};`,
-    // Rotate
-    'rotate-0': `--cer-rotate:0deg;transform:${TRANSFORM_COMPOSE};`,
-    'rotate-1': `--cer-rotate:1deg;transform:${TRANSFORM_COMPOSE};`,
-    'rotate-2': `--cer-rotate:2deg;transform:${TRANSFORM_COMPOSE};`,
-    'rotate-3': `--cer-rotate:3deg;transform:${TRANSFORM_COMPOSE};`,
-    'rotate-6': `--cer-rotate:6deg;transform:${TRANSFORM_COMPOSE};`,
-    'rotate-12': `--cer-rotate:12deg;transform:${TRANSFORM_COMPOSE};`,
-    'rotate-45': `--cer-rotate:45deg;transform:${TRANSFORM_COMPOSE};`,
-    'rotate-90': `--cer-rotate:90deg;transform:${TRANSFORM_COMPOSE};`,
-    'rotate-180': `--cer-rotate:180deg;transform:${TRANSFORM_COMPOSE};`,
-    '-rotate-1': `--cer-rotate:-1deg;transform:${TRANSFORM_COMPOSE};`,
-    '-rotate-2': `--cer-rotate:-2deg;transform:${TRANSFORM_COMPOSE};`,
-    '-rotate-3': `--cer-rotate:-3deg;transform:${TRANSFORM_COMPOSE};`,
-    '-rotate-6': `--cer-rotate:-6deg;transform:${TRANSFORM_COMPOSE};`,
-    '-rotate-12': `--cer-rotate:-12deg;transform:${TRANSFORM_COMPOSE};`,
-    '-rotate-45': `--cer-rotate:-45deg;transform:${TRANSFORM_COMPOSE};`,
-    '-rotate-90': `--cer-rotate:-90deg;transform:${TRANSFORM_COMPOSE};`,
-    '-rotate-180': `--cer-rotate:-180deg;transform:${TRANSFORM_COMPOSE};`,
-    // Translate X
-    'translate-x-0': tx('0px'),
-    'translate-x-px': tx('1px'),
-    'translate-x-0.5': tx('0.125rem'),
-    'translate-x-1': tx('0.25rem'),
-    'translate-x-1.5': tx('0.375rem'),
-    'translate-x-2': tx('0.5rem'),
-    'translate-x-2.5': tx('0.625rem'),
-    'translate-x-3': tx('0.75rem'),
-    'translate-x-4': tx('1rem'),
-    'translate-x-5': tx('1.25rem'),
-    'translate-x-6': tx('1.5rem'),
-    'translate-x-8': tx('2rem'),
-    'translate-x-10': tx('2.5rem'),
-    'translate-x-12': tx('3rem'),
-    'translate-x-16': tx('4rem'),
-    'translate-x-20': tx('5rem'),
-    'translate-x-24': tx('6rem'),
-    'translate-x-32': tx('8rem'),
-    'translate-x-1/2': tx('50%'),
-    'translate-x-1/3': tx('33.333333%'),
-    'translate-x-2/3': tx('66.666667%'),
-    'translate-x-1/4': tx('25%'),
-    'translate-x-3/4': tx('75%'),
-    'translate-x-full': tx('100%'),
-    '-translate-x-px': tx('-1px'),
-    '-translate-x-0.5': tx('-0.125rem'),
-    '-translate-x-1': tx('-0.25rem'),
-    '-translate-x-1.5': tx('-0.375rem'),
-    '-translate-x-2': tx('-0.5rem'),
-    '-translate-x-2.5': tx('-0.625rem'),
-    '-translate-x-3': tx('-0.75rem'),
-    '-translate-x-4': tx('-1rem'),
-    '-translate-x-1/2': tx('-50%'),
-    '-translate-x-full': tx('-100%'),
-    // Translate Y
-    'translate-y-0': ty('0px'),
-    'translate-y-px': ty('1px'),
-    'translate-y-0.5': ty('0.125rem'),
-    'translate-y-1': ty('0.25rem'),
-    'translate-y-1.5': ty('0.375rem'),
-    'translate-y-2': ty('0.5rem'),
-    'translate-y-2.5': ty('0.625rem'),
-    'translate-y-3': ty('0.75rem'),
-    'translate-y-4': ty('1rem'),
-    'translate-y-5': ty('1.25rem'),
-    'translate-y-6': ty('1.5rem'),
-    'translate-y-8': ty('2rem'),
-    'translate-y-10': ty('2.5rem'),
-    'translate-y-12': ty('3rem'),
-    'translate-y-16': ty('4rem'),
-    'translate-y-20': ty('5rem'),
-    'translate-y-24': ty('6rem'),
-    'translate-y-32': ty('8rem'),
-    'translate-y-1/2': ty('50%'),
-    'translate-y-full': ty('100%'),
-    '-translate-y-px': ty('-1px'),
-    '-translate-y-0.5': ty('-0.125rem'),
-    '-translate-y-1': ty('-0.25rem'),
-    '-translate-y-2': ty('-0.5rem'),
-    '-translate-y-4': ty('-1rem'),
-    '-translate-y-1/2': ty('-50%'),
-    '-translate-y-full': ty('-100%'),
-    // Skew X
-    'skew-x-0': `--cer-skew-x:0deg;transform:${TRANSFORM_COMPOSE};`,
-    'skew-x-1': `--cer-skew-x:1deg;transform:${TRANSFORM_COMPOSE};`,
-    'skew-x-2': `--cer-skew-x:2deg;transform:${TRANSFORM_COMPOSE};`,
-    'skew-x-3': `--cer-skew-x:3deg;transform:${TRANSFORM_COMPOSE};`,
-    'skew-x-6': `--cer-skew-x:6deg;transform:${TRANSFORM_COMPOSE};`,
-    'skew-x-12': `--cer-skew-x:12deg;transform:${TRANSFORM_COMPOSE};`,
-    '-skew-x-1': `--cer-skew-x:-1deg;transform:${TRANSFORM_COMPOSE};`,
-    '-skew-x-2': `--cer-skew-x:-2deg;transform:${TRANSFORM_COMPOSE};`,
-    '-skew-x-3': `--cer-skew-x:-3deg;transform:${TRANSFORM_COMPOSE};`,
-    '-skew-x-6': `--cer-skew-x:-6deg;transform:${TRANSFORM_COMPOSE};`,
-    '-skew-x-12': `--cer-skew-x:-12deg;transform:${TRANSFORM_COMPOSE};`,
-    // Skew Y
-    'skew-y-0': `--cer-skew-y:0deg;transform:${TRANSFORM_COMPOSE};`,
-    'skew-y-1': `--cer-skew-y:1deg;transform:${TRANSFORM_COMPOSE};`,
-    'skew-y-2': `--cer-skew-y:2deg;transform:${TRANSFORM_COMPOSE};`,
-    'skew-y-3': `--cer-skew-y:3deg;transform:${TRANSFORM_COMPOSE};`,
-    'skew-y-6': `--cer-skew-y:6deg;transform:${TRANSFORM_COMPOSE};`,
-    'skew-y-12': `--cer-skew-y:12deg;transform:${TRANSFORM_COMPOSE};`,
-    '-skew-y-1': `--cer-skew-y:-1deg;transform:${TRANSFORM_COMPOSE};`,
-    '-skew-y-2': `--cer-skew-y:-2deg;transform:${TRANSFORM_COMPOSE};`,
-    '-skew-y-3': `--cer-skew-y:-3deg;transform:${TRANSFORM_COMPOSE};`,
-    '-skew-y-6': `--cer-skew-y:-6deg;transform:${TRANSFORM_COMPOSE};`,
-    '-skew-y-12': `--cer-skew-y:-12deg;transform:${TRANSFORM_COMPOSE};`,
-  });
+  const addTransform = (utility: string, variable: string, value: string) => {
+    utils[utility] =
+      `--cer-${variable}:${value};transform:${TRANSFORM_COMPOSE};`;
+  };
+  const scaleValues = {
+    0: '0',
+    50: '.5',
+    75: '.75',
+    90: '.9',
+    95: '.95',
+    100: '1',
+    105: '1.05',
+    110: '1.1',
+    125: '1.25',
+    150: '1.5',
+  };
+  for (const [name, value] of Object.entries(scaleValues)) {
+    utils[`scale-${name}`] =
+      `--cer-scale-x:${value};--cer-scale-y:${value};transform:${TRANSFORM_COMPOSE};`;
+    addTransform(`scale-x-${name}`, 'scale-x', value);
+    addTransform(`scale-y-${name}`, 'scale-y', value);
+  }
+  for (const angle of [0, 1, 2, 3, 6, 12, 45, 90, 180]) {
+    addTransform(`rotate-${angle}`, 'rotate', `${angle}deg`);
+    if (angle) addTransform(`-rotate-${angle}`, 'rotate', `-${angle}deg`);
+  }
+  const translateValues: Record<string, string> = {
+    0: '0px',
+    px: '1px',
+    0.5: '0.125rem',
+    1: '0.25rem',
+    1.5: '0.375rem',
+    2: '0.5rem',
+    2.5: '0.625rem',
+    3: '0.75rem',
+    4: '1rem',
+    5: '1.25rem',
+    6: '1.5rem',
+    8: '2rem',
+    10: '2.5rem',
+    12: '3rem',
+    16: '4rem',
+    20: '5rem',
+    24: '6rem',
+    32: '8rem',
+    '1/2': '50%',
+    '1/3': '33.333333%',
+    '2/3': '66.666667%',
+    '1/4': '25%',
+    '3/4': '75%',
+    full: '100%',
+  };
+  for (const axis of ['x', 'y']) {
+    for (const [name, value] of Object.entries(translateValues)) {
+      addTransform(`translate-${axis}-${name}`, `translate-${axis}`, value);
+      if (name !== '0')
+        addTransform(
+          `-translate-${axis}-${name}`,
+          `translate-${axis}`,
+          `-${value}`,
+        );
+    }
+  }
+  for (const axis of ['x', 'y']) {
+    for (const angle of [0, 1, 2, 3, 6, 12]) {
+      addTransform(`skew-${axis}-${angle}`, `skew-${axis}`, `${angle}deg`);
+      if (angle)
+        addTransform(`-skew-${axis}-${angle}`, `skew-${axis}`, `-${angle}deg`);
+    }
+  }
 
   // Ring utilities — drawn via box-shadow, color set via --cer-ring-color
-  Object.assign(utils, {
-    ring: `box-shadow:0 0 0 3px var(--cer-ring-color,rgb(59 130 246/0.5));`,
-    'ring-0': `box-shadow:0 0 0 0px var(--cer-ring-color,rgb(59 130 246/0.5));`,
-    'ring-1': `box-shadow:0 0 0 1px var(--cer-ring-color,rgb(59 130 246/0.5));`,
-    'ring-2': `box-shadow:0 0 0 2px var(--cer-ring-color,rgb(59 130 246/0.5));`,
-    'ring-4': `box-shadow:0 0 0 4px var(--cer-ring-color,rgb(59 130 246/0.5));`,
-    'ring-8': `box-shadow:0 0 0 8px var(--cer-ring-color,rgb(59 130 246/0.5));`,
-    'ring-inset': `box-shadow:inset 0 0 0 3px var(--cer-ring-color,rgb(59 130 246/0.5));`,
-    'ring-offset-0': `--cer-ring-offset-width:0px;box-shadow:0 0 0 0px var(--cer-ring-offset-color,#fff),0 0 0 3px var(--cer-ring-color,rgb(59 130 246/0.5));`,
-    'ring-offset-1': `--cer-ring-offset-width:1px;box-shadow:0 0 0 1px var(--cer-ring-offset-color,#fff),0 0 0 calc(3px + 1px) var(--cer-ring-color,rgb(59 130 246/0.5));`,
-    'ring-offset-2': `--cer-ring-offset-width:2px;box-shadow:0 0 0 2px var(--cer-ring-offset-color,#fff),0 0 0 calc(3px + 2px) var(--cer-ring-color,rgb(59 130 246/0.5));`,
-    'ring-offset-4': `--cer-ring-offset-width:4px;box-shadow:0 0 0 4px var(--cer-ring-offset-color,#fff),0 0 0 calc(3px + 4px) var(--cer-ring-color,rgb(59 130 246/0.5));`,
-    'ring-offset-8': `--cer-ring-offset-width:8px;box-shadow:0 0 0 8px var(--cer-ring-offset-color,#fff),0 0 0 calc(3px + 8px) var(--cer-ring-color,rgb(59 130 246/0.5));`,
-  });
+  const ringColor = 'var(--cer-ring-color,rgb(59 130 246/0.5))';
+  utils.ring = `box-shadow:0 0 0 3px ${ringColor};`;
+  utils['ring-inset'] = `box-shadow:inset 0 0 0 3px ${ringColor};`;
+  for (const width of [0, 1, 2, 4, 8]) {
+    utils[`ring-${width}`] = `box-shadow:0 0 0 ${width}px ${ringColor};`;
+    const outer = width ? `calc(3px + ${width}px)` : '3px';
+    utils[`ring-offset-${width}`] =
+      `--cer-ring-offset-width:${width}px;box-shadow:0 0 0 ${width}px var(--cer-ring-offset-color,#fff),0 0 0 ${outer} ${ringColor};`;
+  }
 
   // Filter utilities — CSS-variable–composed
   const FILTER_COMPOSE =
     'var(--cer-blur) var(--cer-brightness) var(--cer-contrast) var(--cer-grayscale) var(--cer-hue-rotate) var(--cer-invert) var(--cer-saturate) var(--cer-sepia) var(--cer-drop-shadow)';
   const BACKDROP_FILTER_COMPOSE =
     'var(--cer-backdrop-blur) var(--cer-backdrop-brightness) var(--cer-backdrop-contrast) var(--cer-backdrop-grayscale) var(--cer-backdrop-hue-rotate) var(--cer-backdrop-invert) var(--cer-backdrop-saturate) var(--cer-backdrop-sepia)';
-  Object.assign(utils, {
-    // Blur
-    'blur-none': `--cer-blur:;filter:${FILTER_COMPOSE};`,
-    'blur-sm': `--cer-blur:blur(4px);filter:${FILTER_COMPOSE};`,
-    blur: `--cer-blur:blur(8px);filter:${FILTER_COMPOSE};`,
-    'blur-md': `--cer-blur:blur(12px);filter:${FILTER_COMPOSE};`,
-    'blur-lg': `--cer-blur:blur(16px);filter:${FILTER_COMPOSE};`,
-    'blur-xl': `--cer-blur:blur(24px);filter:${FILTER_COMPOSE};`,
-    'blur-2xl': `--cer-blur:blur(40px);filter:${FILTER_COMPOSE};`,
-    'blur-3xl': `--cer-blur:blur(64px);filter:${FILTER_COMPOSE};`,
-    // Brightness
-    'brightness-0': `--cer-brightness:brightness(0);filter:${FILTER_COMPOSE};`,
-    'brightness-50': `--cer-brightness:brightness(.5);filter:${FILTER_COMPOSE};`,
-    'brightness-75': `--cer-brightness:brightness(.75);filter:${FILTER_COMPOSE};`,
-    'brightness-90': `--cer-brightness:brightness(.9);filter:${FILTER_COMPOSE};`,
-    'brightness-95': `--cer-brightness:brightness(.95);filter:${FILTER_COMPOSE};`,
-    'brightness-100': `--cer-brightness:brightness(1);filter:${FILTER_COMPOSE};`,
-    'brightness-105': `--cer-brightness:brightness(1.05);filter:${FILTER_COMPOSE};`,
-    'brightness-110': `--cer-brightness:brightness(1.1);filter:${FILTER_COMPOSE};`,
-    'brightness-125': `--cer-brightness:brightness(1.25);filter:${FILTER_COMPOSE};`,
-    'brightness-150': `--cer-brightness:brightness(1.5);filter:${FILTER_COMPOSE};`,
-    'brightness-200': `--cer-brightness:brightness(2);filter:${FILTER_COMPOSE};`,
-    // Contrast
-    'contrast-0': `--cer-contrast:contrast(0);filter:${FILTER_COMPOSE};`,
-    'contrast-50': `--cer-contrast:contrast(.5);filter:${FILTER_COMPOSE};`,
-    'contrast-75': `--cer-contrast:contrast(.75);filter:${FILTER_COMPOSE};`,
-    'contrast-100': `--cer-contrast:contrast(1);filter:${FILTER_COMPOSE};`,
-    'contrast-125': `--cer-contrast:contrast(1.25);filter:${FILTER_COMPOSE};`,
-    'contrast-150': `--cer-contrast:contrast(1.5);filter:${FILTER_COMPOSE};`,
-    'contrast-200': `--cer-contrast:contrast(2);filter:${FILTER_COMPOSE};`,
-    // Grayscale
-    grayscale: `--cer-grayscale:grayscale(100%);filter:${FILTER_COMPOSE};`,
-    'grayscale-0': `--cer-grayscale:grayscale(0);filter:${FILTER_COMPOSE};`,
-    // Hue rotate
-    'hue-rotate-0': `--cer-hue-rotate:hue-rotate(0deg);filter:${FILTER_COMPOSE};`,
-    'hue-rotate-15': `--cer-hue-rotate:hue-rotate(15deg);filter:${FILTER_COMPOSE};`,
-    'hue-rotate-30': `--cer-hue-rotate:hue-rotate(30deg);filter:${FILTER_COMPOSE};`,
-    'hue-rotate-60': `--cer-hue-rotate:hue-rotate(60deg);filter:${FILTER_COMPOSE};`,
-    'hue-rotate-90': `--cer-hue-rotate:hue-rotate(90deg);filter:${FILTER_COMPOSE};`,
-    'hue-rotate-180': `--cer-hue-rotate:hue-rotate(180deg);filter:${FILTER_COMPOSE};`,
-    '-hue-rotate-180': `--cer-hue-rotate:hue-rotate(-180deg);filter:${FILTER_COMPOSE};`,
-    '-hue-rotate-90': `--cer-hue-rotate:hue-rotate(-90deg);filter:${FILTER_COMPOSE};`,
-    '-hue-rotate-60': `--cer-hue-rotate:hue-rotate(-60deg);filter:${FILTER_COMPOSE};`,
-    '-hue-rotate-30': `--cer-hue-rotate:hue-rotate(-30deg);filter:${FILTER_COMPOSE};`,
-    '-hue-rotate-15': `--cer-hue-rotate:hue-rotate(-15deg);filter:${FILTER_COMPOSE};`,
-    // Invert
-    invert: `--cer-invert:invert(100%);filter:${FILTER_COMPOSE};`,
-    'invert-0': `--cer-invert:invert(0);filter:${FILTER_COMPOSE};`,
-    // Saturate
-    'saturate-0': `--cer-saturate:saturate(0);filter:${FILTER_COMPOSE};`,
-    'saturate-50': `--cer-saturate:saturate(.5);filter:${FILTER_COMPOSE};`,
-    'saturate-100': `--cer-saturate:saturate(1);filter:${FILTER_COMPOSE};`,
-    'saturate-150': `--cer-saturate:saturate(1.5);filter:${FILTER_COMPOSE};`,
-    'saturate-200': `--cer-saturate:saturate(2);filter:${FILTER_COMPOSE};`,
-    // Sepia
-    sepia: `--cer-sepia:sepia(100%);filter:${FILTER_COMPOSE};`,
-    'sepia-0': `--cer-sepia:sepia(0);filter:${FILTER_COMPOSE};`,
-    // Drop shadow (filter, not box-shadow)
-    'drop-shadow-sm': `--cer-drop-shadow:drop-shadow(0 1px 1px rgb(0 0 0/.05));filter:${FILTER_COMPOSE};`,
-    'drop-shadow': `--cer-drop-shadow:drop-shadow(0 1px 2px rgb(0 0 0/.1)) drop-shadow(0 1px 1px rgb(0 0 0/.06));filter:${FILTER_COMPOSE};`,
-    'drop-shadow-md': `--cer-drop-shadow:drop-shadow(0 4px 3px rgb(0 0 0/.07)) drop-shadow(0 2px 2px rgb(0 0 0/.06));filter:${FILTER_COMPOSE};`,
-    'drop-shadow-lg': `--cer-drop-shadow:drop-shadow(0 10px 8px rgb(0 0 0/.04)) drop-shadow(0 4px 3px rgb(0 0 0/.1));filter:${FILTER_COMPOSE};`,
-    'drop-shadow-xl': `--cer-drop-shadow:drop-shadow(0 20px 13px rgb(0 0 0/.03)) drop-shadow(0 8px 5px rgb(0 0 0/.08));filter:${FILTER_COMPOSE};`,
-    'drop-shadow-2xl': `--cer-drop-shadow:drop-shadow(0 25px 25px rgb(0 0 0/.15));filter:${FILTER_COMPOSE};`,
-    'drop-shadow-none': `--cer-drop-shadow:drop-shadow(0 0 #0000);filter:${FILTER_COMPOSE};`,
-    // Backdrop blur
-    'backdrop-blur-none': `--cer-backdrop-blur:;backdrop-filter:${BACKDROP_FILTER_COMPOSE};-webkit-backdrop-filter:${BACKDROP_FILTER_COMPOSE};`,
-    'backdrop-blur-sm': `--cer-backdrop-blur:blur(4px);backdrop-filter:${BACKDROP_FILTER_COMPOSE};-webkit-backdrop-filter:${BACKDROP_FILTER_COMPOSE};`,
-    'backdrop-blur': `--cer-backdrop-blur:blur(8px);backdrop-filter:${BACKDROP_FILTER_COMPOSE};-webkit-backdrop-filter:${BACKDROP_FILTER_COMPOSE};`,
-    'backdrop-blur-md': `--cer-backdrop-blur:blur(12px);backdrop-filter:${BACKDROP_FILTER_COMPOSE};-webkit-backdrop-filter:${BACKDROP_FILTER_COMPOSE};`,
-    'backdrop-blur-lg': `--cer-backdrop-blur:blur(16px);backdrop-filter:${BACKDROP_FILTER_COMPOSE};-webkit-backdrop-filter:${BACKDROP_FILTER_COMPOSE};`,
-    'backdrop-blur-xl': `--cer-backdrop-blur:blur(24px);backdrop-filter:${BACKDROP_FILTER_COMPOSE};-webkit-backdrop-filter:${BACKDROP_FILTER_COMPOSE};`,
-    'backdrop-blur-2xl': `--cer-backdrop-blur:blur(40px);backdrop-filter:${BACKDROP_FILTER_COMPOSE};-webkit-backdrop-filter:${BACKDROP_FILTER_COMPOSE};`,
-    'backdrop-blur-3xl': `--cer-backdrop-blur:blur(64px);backdrop-filter:${BACKDROP_FILTER_COMPOSE};-webkit-backdrop-filter:${BACKDROP_FILTER_COMPOSE};`,
+  const addFilter = (
+    utility: string,
+    variable: string,
+    filter: string,
+    value: string,
+  ) => {
+    utils[utility] =
+      `--cer-${variable}:${value ? `${filter}(${value})` : ''};filter:${FILTER_COMPOSE};`;
+  };
+  const addFilterScale = (
+    utility: string,
+    filter: string,
+    values: Record<string, string>,
+  ) => {
+    for (const [name, value] of Object.entries(values)) {
+      addFilter(
+        name === 'DEFAULT' ? utility : `${utility}-${name}`,
+        utility,
+        filter,
+        value,
+      );
+    }
+  };
+  const blurValues = {
+    none: '',
+    sm: '4px',
+    DEFAULT: '8px',
+    md: '12px',
+    lg: '16px',
+    xl: '24px',
+    '2xl': '40px',
+    '3xl': '64px',
+  };
+  addFilterScale('blur', 'blur', blurValues);
+  addFilterScale('brightness', 'brightness', {
+    0: '0',
+    50: '.5',
+    75: '.75',
+    90: '.9',
+    95: '.95',
+    100: '1',
+    105: '1.05',
+    110: '1.1',
+    125: '1.25',
+    150: '1.5',
+    200: '2',
   });
+  addFilterScale('contrast', 'contrast', {
+    0: '0',
+    50: '.5',
+    75: '.75',
+    100: '1',
+    125: '1.25',
+    150: '1.5',
+    200: '2',
+  });
+  addFilterScale('grayscale', 'grayscale', { DEFAULT: '100%', 0: '0' });
+  for (const angle of [0, 15, 30, 60, 90, 180]) {
+    addFilter(`hue-rotate-${angle}`, 'hue-rotate', 'hue-rotate', `${angle}deg`);
+    if (angle)
+      addFilter(
+        `-hue-rotate-${angle}`,
+        'hue-rotate',
+        'hue-rotate',
+        `-${angle}deg`,
+      );
+  }
+  addFilterScale('invert', 'invert', { DEFAULT: '100%', 0: '0' });
+  addFilterScale('saturate', 'saturate', {
+    0: '0',
+    50: '.5',
+    100: '1',
+    150: '1.5',
+    200: '2',
+  });
+  addFilterScale('sepia', 'sepia', { DEFAULT: '100%', 0: '0' });
+  Object.assign(utils, {
+    // Drop shadow (filter, not box-shadow)
+    'drop-shadow-sm': `--cer-drop-shadow:drop-shadow(0 1px 1px var(--cer-drop-shadow-color,rgb(0 0 0/.05)));filter:${FILTER_COMPOSE};`,
+    'drop-shadow': `--cer-drop-shadow:drop-shadow(0 1px 2px var(--cer-drop-shadow-color,rgb(0 0 0/.1))) drop-shadow(0 1px 1px var(--cer-drop-shadow-color,rgb(0 0 0/.06)));filter:${FILTER_COMPOSE};`,
+    'drop-shadow-md': `--cer-drop-shadow:drop-shadow(0 4px 3px var(--cer-drop-shadow-color,rgb(0 0 0/.07))) drop-shadow(0 2px 2px var(--cer-drop-shadow-color,rgb(0 0 0/.06)));filter:${FILTER_COMPOSE};`,
+    'drop-shadow-lg': `--cer-drop-shadow:drop-shadow(0 10px 8px var(--cer-drop-shadow-color,rgb(0 0 0/.04))) drop-shadow(0 4px 3px var(--cer-drop-shadow-color,rgb(0 0 0/.1)));filter:${FILTER_COMPOSE};`,
+    'drop-shadow-xl': `--cer-drop-shadow:drop-shadow(0 20px 13px var(--cer-drop-shadow-color,rgb(0 0 0/.03))) drop-shadow(0 8px 5px var(--cer-drop-shadow-color,rgb(0 0 0/.08)));filter:${FILTER_COMPOSE};`,
+    'drop-shadow-2xl': `--cer-drop-shadow:drop-shadow(0 25px 25px var(--cer-drop-shadow-color,rgb(0 0 0/.15)));filter:${FILTER_COMPOSE};`,
+    'drop-shadow-none': `--cer-drop-shadow:drop-shadow(0 0 #0000);filter:${FILTER_COMPOSE};`,
+  });
+  for (const [name, value] of Object.entries(blurValues)) {
+    const utility =
+      name === 'DEFAULT' ? 'backdrop-blur' : `backdrop-blur-${name}`;
+    const filter = value ? `blur(${value})` : '';
+    utils[utility] =
+      `--cer-backdrop-blur:${filter};backdrop-filter:${BACKDROP_FILTER_COMPOSE};-webkit-backdrop-filter:${BACKDROP_FILTER_COMPOSE};`;
+  }
 
   // Aspect ratio utilities
   Object.assign(utils, {
@@ -1325,22 +1337,27 @@ const generateUtilities = (): CSSMap => {
   });
 
   // Object utilities
-  Object.assign(utils, {
-    'object-contain': 'object-fit:contain;',
-    'object-cover': 'object-fit:cover;',
-    'object-fill': 'object-fit:fill;',
-    'object-none': 'object-fit:none;',
-    'object-scale-down': 'object-fit:scale-down;',
-    'object-bottom': 'object-position:bottom;',
-    'object-center': 'object-position:center;',
-    'object-left': 'object-position:left;',
-    'object-left-bottom': 'object-position:left bottom;',
-    'object-left-top': 'object-position:left top;',
-    'object-right': 'object-position:right;',
-    'object-right-bottom': 'object-position:right bottom;',
-    'object-right-top': 'object-position:right top;',
-    'object-top': 'object-position:top;',
-  });
+  addValues('object', 'object-fit', [
+    'contain',
+    'cover',
+    'fill',
+    'none',
+    'scale-down',
+  ]);
+  for (const position of [
+    'bottom',
+    'center',
+    'left',
+    'left-bottom',
+    'left-top',
+    'right',
+    'right-bottom',
+    'right-top',
+    'top',
+  ]) {
+    utils[`object-${position}`] =
+      `object-position:${position.replace('-', ' ')};`;
+  }
 
   // Line clamp utilities
   for (let i = 1; i <= 6; i++) {
@@ -1366,83 +1383,32 @@ const generateUtilities = (): CSSMap => {
   }
 
   // Gradient background utilities
-  Object.assign(utils, {
-    // Linear gradients
-    'bg-linear-to-t':
-      'background-image:linear-gradient(to top, var(--cer-gradient-stops));',
-    'bg-linear-to-tr':
-      'background-image:linear-gradient(to top right, var(--cer-gradient-stops));',
-    'bg-linear-to-r':
-      'background-image:linear-gradient(to right, var(--cer-gradient-stops));',
-    'bg-linear-to-br':
-      'background-image:linear-gradient(to bottom right, var(--cer-gradient-stops));',
-    'bg-linear-to-b':
-      'background-image:linear-gradient(to bottom, var(--cer-gradient-stops));',
-    'bg-linear-to-bl':
-      'background-image:linear-gradient(to bottom left, var(--cer-gradient-stops));',
-    'bg-linear-to-l':
-      'background-image:linear-gradient(to left, var(--cer-gradient-stops));',
-    'bg-linear-to-tl':
-      'background-image:linear-gradient(to top left, var(--cer-gradient-stops));',
-
-    // Radial gradients
-    'bg-radial':
-      'background-image:radial-gradient(ellipse at center, var(--cer-gradient-stops));',
-    'bg-radial-at-t':
-      'background-image:radial-gradient(ellipse at top, var(--cer-gradient-stops));',
-    'bg-radial-at-tr':
-      'background-image:radial-gradient(ellipse at top right, var(--cer-gradient-stops));',
-    'bg-radial-at-r':
-      'background-image:radial-gradient(ellipse at right, var(--cer-gradient-stops));',
-    'bg-radial-at-br':
-      'background-image:radial-gradient(ellipse at bottom right, var(--cer-gradient-stops));',
-    'bg-radial-at-b':
-      'background-image:radial-gradient(ellipse at bottom, var(--cer-gradient-stops));',
-    'bg-radial-at-bl':
-      'background-image:radial-gradient(ellipse at bottom left, var(--cer-gradient-stops));',
-    'bg-radial-at-l':
-      'background-image:radial-gradient(ellipse at left, var(--cer-gradient-stops));',
-    'bg-radial-at-tl':
-      'background-image:radial-gradient(ellipse at top left, var(--cer-gradient-stops));',
-    'bg-radial-circle':
-      'background-image:radial-gradient(circle at center, var(--cer-gradient-stops));',
-    'bg-radial-circle-at-t':
-      'background-image:radial-gradient(circle at top, var(--cer-gradient-stops));',
-    'bg-radial-circle-at-tr':
-      'background-image:radial-gradient(circle at top right, var(--cer-gradient-stops));',
-    'bg-radial-circle-at-r':
-      'background-image:radial-gradient(circle at right, var(--cer-gradient-stops));',
-    'bg-radial-circle-at-br':
-      'background-image:radial-gradient(circle at bottom right, var(--cer-gradient-stops));',
-    'bg-radial-circle-at-b':
-      'background-image:radial-gradient(circle at bottom, var(--cer-gradient-stops));',
-    'bg-radial-circle-at-bl':
-      'background-image:radial-gradient(circle at bottom left, var(--cer-gradient-stops));',
-    'bg-radial-circle-at-l':
-      'background-image:radial-gradient(circle at left, var(--cer-gradient-stops));',
-    'bg-radial-circle-at-tl':
-      'background-image:radial-gradient(circle at top left, var(--cer-gradient-stops));',
-
-    // Conic gradients
-    'bg-conic':
-      'background-image:conic-gradient(from 0deg at center, var(--cer-gradient-stops));',
-    'bg-conic-at-t':
-      'background-image:conic-gradient(from 0deg at top, var(--cer-gradient-stops));',
-    'bg-conic-at-tr':
-      'background-image:conic-gradient(from 0deg at top right, var(--cer-gradient-stops));',
-    'bg-conic-at-r':
-      'background-image:conic-gradient(from 0deg at right, var(--cer-gradient-stops));',
-    'bg-conic-at-br':
-      'background-image:conic-gradient(from 0deg at bottom right, var(--cer-gradient-stops));',
-    'bg-conic-at-b':
-      'background-image:conic-gradient(from 0deg at bottom, var(--cer-gradient-stops));',
-    'bg-conic-at-bl':
-      'background-image:conic-gradient(from 0deg at bottom left, var(--cer-gradient-stops));',
-    'bg-conic-at-l':
-      'background-image:conic-gradient(from 0deg at left, var(--cer-gradient-stops));',
-    'bg-conic-at-tl':
-      'background-image:conic-gradient(from 0deg at top left, var(--cer-gradient-stops));',
-  });
+  const gradientPositions = {
+    t: 'top',
+    tr: 'top right',
+    r: 'right',
+    br: 'bottom right',
+    b: 'bottom',
+    bl: 'bottom left',
+    l: 'left',
+    tl: 'top left',
+  };
+  for (const [name, position] of Object.entries(gradientPositions)) {
+    utils[`bg-linear-to-${name}`] =
+      `background-image:linear-gradient(to ${position}, var(--cer-gradient-stops));`;
+    utils[`bg-radial-at-${name}`] =
+      `background-image:radial-gradient(ellipse at ${position}, var(--cer-gradient-stops));`;
+    utils[`bg-radial-circle-at-${name}`] =
+      `background-image:radial-gradient(circle at ${position}, var(--cer-gradient-stops));`;
+    utils[`bg-conic-at-${name}`] =
+      `background-image:conic-gradient(from 0deg at ${position}, var(--cer-gradient-stops));`;
+  }
+  utils['bg-radial'] =
+    'background-image:radial-gradient(ellipse at center, var(--cer-gradient-stops));';
+  utils['bg-radial-circle'] =
+    'background-image:radial-gradient(circle at center, var(--cer-gradient-stops));';
+  utils['bg-conic'] =
+    'background-image:conic-gradient(from 0deg at center, var(--cer-gradient-stops));';
 
   // Prose utilities
   Object.assign(utils, {
@@ -1471,55 +1437,18 @@ const generateUtilities = (): CSSMap => {
       --cer-prose-links:var(--cer-prose-invert-links,var(--cer-color-neutral-300));
       --cer-prose-links-hover:var(--cer-prose-invert-links-hover,var(--cer-color-neutral-100));
     `.replace(/\s+/g, ''),
-
-    // prose-primary: primary color scheme (sets invert variables)
-    'prose-primary': `
-      --cer-prose-links:var(--cer-color-primary-700);
-      --cer-prose-links-hover:var(--cer-color-primary-500);
-      --cer-prose-invert-links:var(--cer-color-primary-300);
-      --cer-prose-invert-links-hover:var(--cer-color-primary-100);
-    `.replace(/\s+/g, ''),
-
-    // prose-secondary: secondary color scheme (sets invert variables)
-    'prose-secondary': `
-      --cer-prose-links:var(--cer-color-secondary-700);
-      --cer-prose-links-hover:var(--cer-color-secondary-500);
-      --cer-prose-invert-links:var(--cer-color-secondary-300);
-      --cer-prose-invert-links-hover:var(--cer-color-secondary-100);
-    `.replace(/\s+/g, ''),
-
-    // prose-success: success color scheme (sets invert variables)
-    'prose-success': `
-      --cer-prose-links:var(--cer-color-success-700);
-      --cer-prose-links-hover:var(--cer-color-success-500);
-      --cer-prose-invert-links:var(--cer-color-success-300);
-      --cer-prose-invert-links-hover:var(--cer-color-success-100);
-    `.replace(/\s+/g, ''),
-
-    // prose-warning: warning color scheme (sets invert variables)
-    'prose-warning': `
-      --cer-prose-links:var(--cer-color-warning-700);
-      --cer-prose-links-hover:var(--cer-color-warning-500);
-      --cer-prose-invert-links:var(--cer-color-warning-300);
-      --cer-prose-invert-links-hover:var(--cer-color-warning-100);
-    `.replace(/\s+/g, ''),
-
-    // prose-error: error color scheme (sets invert variables)
-    'prose-error': `
-      --cer-prose-links:var(--cer-color-error-700);
-      --cer-prose-links-hover:var(--cer-color-error-500);
-      --cer-prose-invert-links:var(--cer-color-error-300);
-      --cer-prose-invert-links-hover:var(--cer-color-error-100);
-    `.replace(/\s+/g, ''),
-
-    // prose-info: info color scheme (sets invert variables)
-    'prose-info': `
-      --cer-prose-links:var(--cer-color-info-700);
-      --cer-prose-links-hover:var(--cer-color-info-500);
-      --cer-prose-invert-links:var(--cer-color-info-300);
-      --cer-prose-invert-links-hover:var(--cer-color-info-100);
-    `.replace(/\s+/g, ''),
   });
+  for (const color of [
+    'primary',
+    'secondary',
+    'success',
+    'warning',
+    'error',
+    'info',
+  ]) {
+    utils[`prose-${color}`] =
+      `--cer-prose-links:var(--cer-color-${color}-700);--cer-prose-links-hover:var(--cer-color-${color}-500);--cer-prose-invert-links:var(--cer-color-${color}-300);--cer-prose-invert-links-hover:var(--cer-color-${color}-100);`;
+  }
 
   // --- Tailwind CSS 4 parity additions ---
 
@@ -1535,42 +1464,27 @@ const generateUtilities = (): CSSMap => {
   utils['grid-rows-subgrid'] = 'grid-template-rows:subgrid;';
 
   // text-shadow utilities
-  Object.assign(utils, {
-    'text-shadow-xs':
-      '--cer-text-shadow-color:rgb(0 0 0 / 0.05);text-shadow:0 1px 1px var(--cer-text-shadow-color, rgb(0 0 0 / 0.05));',
-    'text-shadow-sm':
-      '--cer-text-shadow-color:rgb(0 0 0 / 0.15);text-shadow:0 1px 2px var(--cer-text-shadow-color, rgb(0 0 0 / 0.15));',
-    'text-shadow':
-      '--cer-text-shadow-color:rgb(0 0 0 / 0.3);text-shadow:0 1px 3px var(--cer-text-shadow-color, rgb(0 0 0 / 0.3));',
-    'text-shadow-md':
-      '--cer-text-shadow-color:rgb(0 0 0 / 0.3);text-shadow:0 2px 4px var(--cer-text-shadow-color, rgb(0 0 0 / 0.3));',
-    'text-shadow-lg':
-      '--cer-text-shadow-color:rgb(0 0 0 / 0.3);text-shadow:0 4px 8px var(--cer-text-shadow-color, rgb(0 0 0 / 0.3));',
-    'text-shadow-xl':
-      '--cer-text-shadow-color:rgb(0 0 0 / 0.3);text-shadow:0 6px 16px var(--cer-text-shadow-color, rgb(0 0 0 / 0.3));',
-    'text-shadow-2xl':
-      '--cer-text-shadow-color:rgb(0 0 0 / 0.3);text-shadow:0 8px 24px var(--cer-text-shadow-color, rgb(0 0 0 / 0.3));',
-    'text-shadow-none': 'text-shadow:none;',
-  });
+  const textShadows: Record<string, string> = {
+    '2xs': '0 1px|0.05',
+    xs: '0 1px 1px|0.05',
+    sm: '0 1px 2px|0.15',
+    DEFAULT: '0 1px 3px|0.3',
+    md: '0 2px 4px|0.3',
+    lg: '0 4px 8px|0.3',
+    xl: '0 6px 16px|0.3',
+    '2xl': '0 8px 24px|0.3',
+  };
+  for (const [name, shadow] of Object.entries(textShadows)) {
+    const [value, opacity] = shadow.split('|');
+    const utility = name === 'DEFAULT' ? 'text-shadow' : `text-shadow-${name}`;
+    utils[utility] =
+      `text-shadow:${value} var(--cer-text-shadow-color, rgb(0 0 0 / ${opacity}));`;
+  }
+  utils['text-shadow-none'] = 'text-shadow:none;';
 
   // mask utilities
   Object.assign(utils, {
     'mask-none': 'mask-image:none;',
-    'mask-linear-to-t': 'mask-image:linear-gradient(to top,black,transparent);',
-    'mask-linear-to-tr':
-      'mask-image:linear-gradient(to top right,black,transparent);',
-    'mask-linear-to-r':
-      'mask-image:linear-gradient(to right,black,transparent);',
-    'mask-linear-to-br':
-      'mask-image:linear-gradient(to bottom right,black,transparent);',
-    'mask-linear-to-b':
-      'mask-image:linear-gradient(to bottom,black,transparent);',
-    'mask-linear-to-bl':
-      'mask-image:linear-gradient(to bottom left,black,transparent);',
-    'mask-linear-to-l':
-      'mask-image:linear-gradient(to left,black,transparent);',
-    'mask-linear-to-tl':
-      'mask-image:linear-gradient(to top left,black,transparent);',
     'mask-radial':
       'mask-image:radial-gradient(ellipse at center,black,transparent);',
     'mask-radial-from-center':
@@ -1582,106 +1496,104 @@ const generateUtilities = (): CSSMap => {
     'mask-alpha': 'mask-mode:alpha;',
     'mask-luminance': 'mask-mode:luminance;',
   });
+  for (const [name, position] of Object.entries(gradientPositions)) {
+    utils[`mask-linear-to-${name}`] =
+      `mask-image:linear-gradient(to ${position},black,transparent);`;
+  }
 
   // field-sizing utilities (auto-resizing inputs/textareas)
   utils['field-sizing-content'] = 'field-sizing:content;';
   utils['field-sizing-fixed'] = 'field-sizing:fixed;';
 
   // color-scheme utilities
-  Object.assign(utils, {
-    'scheme-light': 'color-scheme:light;',
-    'scheme-dark': 'color-scheme:dark;',
-    'scheme-both': 'color-scheme:light dark;',
-    'scheme-only-light': 'color-scheme:only light;',
-    'scheme-only-dark': 'color-scheme:only dark;',
-    'scheme-normal': 'color-scheme:normal;',
-  });
+  addValues('scheme', 'color-scheme', ['light', 'dark', 'normal']);
+  utils['scheme-both'] = utils['scheme-light-dark'] =
+    'color-scheme:light dark;';
+  for (const value of ['light', 'dark']) {
+    utils[`scheme-only-${value}`] = `color-scheme:only ${value};`;
+  }
 
   // font-stretch utilities
-  Object.assign(utils, {
-    'font-stretch-ultra-condensed': 'font-stretch:ultra-condensed;',
-    'font-stretch-extra-condensed': 'font-stretch:extra-condensed;',
-    'font-stretch-condensed': 'font-stretch:condensed;',
-    'font-stretch-semi-condensed': 'font-stretch:semi-condensed;',
-    'font-stretch-normal': 'font-stretch:normal;',
-    'font-stretch-semi-expanded': 'font-stretch:semi-expanded;',
-    'font-stretch-expanded': 'font-stretch:expanded;',
-    'font-stretch-extra-expanded': 'font-stretch:extra-expanded;',
-    'font-stretch-ultra-expanded': 'font-stretch:ultra-expanded;',
-  });
+  for (const value of [
+    'ultra-condensed',
+    'extra-condensed',
+    'condensed',
+    'semi-condensed',
+    'normal',
+    'semi-expanded',
+    'expanded',
+    'extra-expanded',
+    'ultra-expanded',
+  ]) {
+    utils[`font-stretch-${value}`] = `font-stretch:${value};`;
+  }
 
   // Extended cursor utilities (Tailwind 4)
-  Object.assign(utils, {
-    'cursor-zoom-in': 'cursor:zoom-in;',
-    'cursor-zoom-out': 'cursor:zoom-out;',
-    'cursor-cell': 'cursor:cell;',
-    'cursor-crosshair': 'cursor:crosshair;',
-    'cursor-copy': 'cursor:copy;',
-    'cursor-alias': 'cursor:alias;',
-    'cursor-context-menu': 'cursor:context-menu;',
-    'cursor-vertical-text': 'cursor:vertical-text;',
-    'cursor-no-drop': 'cursor:no-drop;',
-    'cursor-progress': 'cursor:progress;',
-    'cursor-col-resize': 'cursor:col-resize;',
-    'cursor-row-resize': 'cursor:row-resize;',
-    'cursor-ew-resize': 'cursor:ew-resize;',
-    'cursor-ns-resize': 'cursor:ns-resize;',
-    'cursor-nesw-resize': 'cursor:nesw-resize;',
-    'cursor-nwse-resize': 'cursor:nwse-resize;',
-    'cursor-all-scroll': 'cursor:all-scroll;',
-  });
+  for (const value of [
+    'zoom-in',
+    'zoom-out',
+    'cell',
+    'crosshair',
+    'copy',
+    'alias',
+    'context-menu',
+    'vertical-text',
+    'no-drop',
+    'progress',
+    'col-resize',
+    'row-resize',
+    'ew-resize',
+    'ns-resize',
+    'nesw-resize',
+    'nwse-resize',
+    'all-scroll',
+  ]) {
+    utils[`cursor-${value}`] = `cursor:${value};`;
+  }
 
-  // Logical border utilities
+  // Tailwind 4.3 platform utilities. Functional values remain intentionally
+  // tiny: common cases are generated here and arbitrary values use the shared
+  // parser instead of carrying a second compiler.
   Object.assign(utils, {
-    // border-inline-start / border-inline-end widths
-    'border-s': 'border-inline-start-width:1px;',
-    'border-e': 'border-inline-end-width:1px;',
-    'border-s-0': 'border-inline-start-width:0px;',
-    'border-e-0': 'border-inline-end-width:0px;',
-    'border-s-2': 'border-inline-start-width:2px;',
-    'border-e-2': 'border-inline-end-width:2px;',
-    'border-s-4': 'border-inline-start-width:4px;',
-    'border-e-4': 'border-inline-end-width:4px;',
-    'border-s-8': 'border-inline-start-width:8px;',
-    'border-e-8': 'border-inline-end-width:8px;',
+    '@container-size': 'container-type:size;',
+    'scrollbar-auto': 'scrollbar-width:auto;',
+    'scrollbar-thin': 'scrollbar-width:thin;',
+    'scrollbar-none': 'scrollbar-width:none;',
+    'scrollbar-gutter-auto': 'scrollbar-gutter:auto;',
+    'scrollbar-gutter-stable': 'scrollbar-gutter:stable;',
+    'scrollbar-gutter-both': 'scrollbar-gutter:stable both-edges;',
+    tab: 'tab-size:4;',
+    'transform-3d': 'transform-style:preserve-3d;',
+    'transform-flat': 'transform-style:flat;',
+    'backface-visible': 'backface-visibility:visible;',
+    'backface-hidden': 'backface-visibility:hidden;',
+    'font-features-normal': 'font-feature-settings:normal;',
   });
+  for (const value of [0, 2, 4, 8])
+    utils[`tab-${value}`] = `tab-size:${value};`;
+  for (const value of [0, 50, 75, 90, 95, 100, 105, 110, 125, 150, 200]) {
+    utils[`zoom-${value}`] = `zoom:${value}%;`;
+  }
 
   // Logical border-radius utilities
-  Object.assign(utils, {
-    'rounded-s-none': 'border-start-start-radius:0;border-end-start-radius:0;',
-    'rounded-e-none': 'border-start-end-radius:0;border-end-end-radius:0;',
-    'rounded-s-sm':
-      'border-start-start-radius:0.125rem;border-end-start-radius:0.125rem;',
-    'rounded-e-sm':
-      'border-start-end-radius:0.125rem;border-end-end-radius:0.125rem;',
-    'rounded-s':
-      'border-start-start-radius:0.25rem;border-end-start-radius:0.25rem;',
-    'rounded-e':
-      'border-start-end-radius:0.25rem;border-end-end-radius:0.25rem;',
-    'rounded-s-md':
-      'border-start-start-radius:0.375rem;border-end-start-radius:0.375rem;',
-    'rounded-e-md':
-      'border-start-end-radius:0.375rem;border-end-end-radius:0.375rem;',
-    'rounded-s-lg':
-      'border-start-start-radius:0.5rem;border-end-start-radius:0.5rem;',
-    'rounded-e-lg':
-      'border-start-end-radius:0.5rem;border-end-end-radius:0.5rem;',
-    'rounded-s-xl':
-      'border-start-start-radius:0.75rem;border-end-start-radius:0.75rem;',
-    'rounded-e-xl':
-      'border-start-end-radius:0.75rem;border-end-end-radius:0.75rem;',
-    'rounded-s-2xl':
-      'border-start-start-radius:1rem;border-end-start-radius:1rem;',
-    'rounded-e-2xl': 'border-start-end-radius:1rem;border-end-end-radius:1rem;',
-    'rounded-s-3xl':
-      'border-start-start-radius:1.5rem;border-end-start-radius:1.5rem;',
-    'rounded-e-3xl':
-      'border-start-end-radius:1.5rem;border-end-end-radius:1.5rem;',
-    'rounded-s-full':
-      'border-start-start-radius:9999px;border-end-start-radius:9999px;',
-    'rounded-e-full':
-      'border-start-end-radius:9999px;border-end-end-radius:9999px;',
-  });
+  const logicalRadius: Record<string, string> = {
+    none: '0',
+    sm: '0.125rem',
+    DEFAULT: '0.25rem',
+    md: '0.375rem',
+    lg: '0.5rem',
+    xl: '0.75rem',
+    '2xl': '1rem',
+    '3xl': '1.5rem',
+    full: '9999px',
+  };
+  for (const [name, value] of Object.entries(logicalRadius)) {
+    const suffix = name === 'DEFAULT' ? '' : `-${name}`;
+    utils[`rounded-s${suffix}`] =
+      `border-start-start-radius:${value};border-end-start-radius:${value};`;
+    utils[`rounded-e${suffix}`] =
+      `border-start-end-radius:${value};border-end-end-radius:${value};`;
+  }
 
   return utils;
 };
@@ -1744,55 +1656,58 @@ function insertPseudoBeforeCombinator(sel: string, pseudo: string): string {
   return sel + pseudo;
 }
 
-export const selectorVariants: SelectorVariantMap = {
-  before: (sel, body) => `${sel}::before{${body}}`,
-  after: (sel, body) => `${sel}::after{${body}}`,
-  hover: (sel, body) =>
-    `${insertPseudoBeforeCombinator(sel, ':hover')}{${body}}`,
-  focus: (sel, body) =>
-    `${insertPseudoBeforeCombinator(sel, ':focus')}{${body}}`,
-  active: (sel, body) =>
-    `${insertPseudoBeforeCombinator(sel, ':active')}{${body}}`,
-  disabled: (sel, body) =>
-    `${insertPseudoBeforeCombinator(sel, ':disabled')}{${body}}`,
-  visited: (sel, body) =>
-    `${insertPseudoBeforeCombinator(sel, ':visited')}{${body}}`,
-  checked: (sel, body) =>
-    `${insertPseudoBeforeCombinator(sel, ':checked')}{${body}}`,
-  first: (sel, body) =>
-    `${insertPseudoBeforeCombinator(sel, ':first-child')}{${body}}`,
-  last: (sel, body) =>
-    `${insertPseudoBeforeCombinator(sel, ':last-child')}{${body}}`,
-  odd: (sel, body) =>
-    `${insertPseudoBeforeCombinator(sel, ':nth-child(odd)')}{${body}}`,
-  even: (sel, body) =>
-    `${insertPseudoBeforeCombinator(sel, ':nth-child(even)')}{${body}}`,
-  'focus-within': (sel, body) =>
-    `${insertPseudoBeforeCombinator(sel, ':focus-within')}{${body}}`,
-  'focus-visible': (sel, body) =>
-    `${insertPseudoBeforeCombinator(sel, ':focus-visible')}{${body}}`,
-  'group-hover': (sel, body) => `.group:hover ${sel}{${body}}`,
-  'group-focus': (sel, body) => `.group:focus ${sel}{${body}}`,
-  'group-active': (sel, body) => `.group:active ${sel}{${body}}`,
-  'group-disabled': (sel, body) => `.group:disabled ${sel}{${body}}`,
-  'peer-hover': (sel, body) => `.peer:hover ~ ${sel}{${body}}`,
-  'peer-focus': (sel, body) => `.peer:focus ~ ${sel}{${body}}`,
-  'peer-checked': (sel, body) => `.peer:checked ~ ${sel}{${body}}`,
-  'peer-disabled': (sel, body) => `.peer:disabled ~ ${sel}{${body}}`,
+const stateVariantSelectors: Record<string, string> = Object.fromEntries(
+  'hover focus active disabled visited checked focus-within focus-visible target target-within first-of-type last-of-type only-of-type empty enabled indeterminate default optional required valid invalid user-valid user-invalid in-range out-of-range placeholder-shown autofill read-only'
+    .split(' ')
+    .map((name) => [name, `:${name}`]),
+);
+Object.assign(stateVariantSelectors, {
+  first: ':first-child',
+  last: ':last-child',
+  only: ':only-child',
+  odd: ':nth-child(odd)',
+  even: ':nth-child(even)',
+  open: ':is([open],:popover-open,:open)',
+  inert: '[inert]',
+});
+
+export const selectorVariants: SelectorVariantMap = Object.fromEntries(
+  Object.entries(stateVariantSelectors).map(([name, pseudo]) => [
+    name,
+    (sel: string, body: string) =>
+      `${insertPseudoBeforeCombinator(sel, pseudo)}{${body}}`,
+  ]),
+);
+
+Object.assign(selectorVariants, {
   'dark-class': (sel, body) => `:host(.dark) ${sel}{${body}}`,
   rtl: (sel, body) => `[dir=rtl] ${sel}{${body}}`,
   ltr: (sel, body) => `[dir=ltr] ${sel}{${body}}`,
-  // Pseudo-element variants
-  placeholder: (sel, body) => `${sel}::placeholder{${body}}`,
-  file: (sel, body) => `${sel}::file-selector-button{${body}}`,
-  marker: (sel, body) => `${sel}::marker{${body}}`,
-  selection: (sel, body) => `${sel}::selection{${body}}`,
-  // State variants
-  open: (sel, body) =>
-    `${insertPseudoBeforeCombinator(sel, '[open]')}{${body}}`,
-  inert: (sel, body) =>
-    `${insertPseudoBeforeCombinator(sel, '[inert]')}{${body}}`,
-};
+  '*': (sel, body) => `${sel}>*{${body}}`,
+  '**': (sel, body) => `${sel} *{${body}}`,
+} satisfies SelectorVariantMap);
+for (const state of ['hover', 'focus', 'active', 'disabled']) {
+  selectorVariants[`group-${state}`] = (sel, body) =>
+    `.group:${state} ${sel}{${body}}`;
+}
+for (const state of ['hover', 'focus', 'checked', 'disabled']) {
+  selectorVariants[`peer-${state}`] = (sel, body) =>
+    `.peer:${state} ~ ${sel}{${body}}`;
+}
+for (const [name, pseudo] of Object.entries({
+  before: 'before',
+  after: 'after',
+  placeholder: 'placeholder',
+  file: 'file-selector-button',
+  marker: 'marker',
+  selection: 'selection',
+  'first-letter': 'first-letter',
+  'first-line': 'first-line',
+  backdrop: 'backdrop',
+  'details-content': 'details-content',
+})) {
+  selectorVariants[name] = (sel, body) => `${sel}::${pseudo}{${body}}`;
+}
 
 export const mediaVariants: MediaVariantMap = {
   sm: '(min-width:640px)',
@@ -1805,46 +1720,68 @@ export const mediaVariants: MediaVariantMap = {
   'motion-safe': '(prefers-reduced-motion: no-preference)',
   print: 'print',
   'forced-colors': '(forced-colors: active)',
+  'contrast-more': '(prefers-contrast: more)',
+  'contrast-less': '(prefers-contrast: less)',
+  'inverted-colors': '(inverted-colors: inverted)',
+  portrait: '(orientation: portrait)',
+  landscape: '(orientation: landscape)',
+  noscript: '(scripting: none)',
+};
+for (const pointer of ['pointer', 'any-pointer']) {
+  for (const value of ['fine', 'coarse', 'none']) {
+    mediaVariants[`${pointer}-${value}`] = `(${pointer}: ${value})`;
+  }
+}
+
+export const containerVariants: MediaVariantMap = Object.fromEntries(
+  '3xs:16 2xs:18 xs:20 sm:24 md:28 lg:32 xl:36 2xl:42 3xl:48 4xl:56 5xl:64 6xl:72 7xl:80'
+    .split(' ')
+    .map((entry) => {
+      const [name, rem] = entry.split(':');
+      return [name, `(min-width:${rem}rem)`];
+    }),
+);
+
+export const responsiveOrder = Object.keys(mediaVariants).filter(
+  (name) => name !== 'dark',
+);
+export const containerOrder = Object.keys(containerVariants);
+
+const viewportBreakpointRem: Record<string, number> = {
+  sm: 40,
+  md: 48,
+  lg: 64,
+  xl: 80,
+  '2xl': 96,
 };
 
-export const containerVariants: MediaVariantMap = {
-  xs: '(min-width:20rem)',
-  sm: '(min-width:24rem)',
-  md: '(min-width:28rem)',
-  lg: '(min-width:32rem)',
-  xl: '(min-width:36rem)',
-  '2xl': '(min-width:42rem)',
-  '3xl': '(min-width:48rem)',
-  '4xl': '(min-width:56rem)',
-  '5xl': '(min-width:64rem)',
-  '6xl': '(min-width:72rem)',
-  '7xl': '(min-width:80rem)',
-};
+function resolveMediaVariant(token: string): string | undefined {
+  if (mediaVariants[token]) return mediaVariants[token];
+  const range = /^(min|max)-(.+)$/.exec(token);
+  const value = range && viewportBreakpointRem[range[2]];
+  return value
+    ? `(width ${range[1] === 'max' ? '<' : '>='} ${value}rem)`
+    : undefined;
+}
 
-export const responsiveOrder = [
-  'sm',
-  'md',
-  'lg',
-  'xl',
-  '2xl',
-  'motion-reduce',
-  'motion-safe',
-  'print',
-  'forced-colors',
-];
-export const containerOrder = [
-  'xs',
-  'sm',
-  'md',
-  'lg',
-  'xl',
-  '2xl',
-  '3xl',
-  '4xl',
-  '5xl',
-  '6xl',
-  '7xl',
-];
+function isResponsiveVariant(token: string): boolean {
+  return token !== 'dark' && resolveMediaVariant(token) !== undefined;
+}
+
+function resolveContainerVariant(token: string): string | undefined {
+  if (containerVariants[token]) return containerVariants[token];
+  const range = /^max-(.+)$/.exec(token);
+  const minQuery = range && containerVariants[range[1]];
+  return minQuery?.replace('min-width:', 'width < ');
+}
+
+function isContainerVariantToken(token: string): boolean {
+  return (
+    token.startsWith('@') &&
+    (resolveContainerVariant(token.slice(1)) !== undefined ||
+      /^@\[.+\]$/.test(token))
+  );
+}
 
 // Optimized parsing functions
 export function parseSpacing(className: string): string | null {
@@ -1954,7 +1891,7 @@ export function hexToRgb(hex: string): string {
 
 // Optimized color parsing with lookup tables
 const colorRegex =
-  /^(text-shadow|bg|text|border|decoration|shadow|outline|caret|accent|fill|stroke|ring|divide)-([a-z]+)-?(\d{2,3}|DEFAULT)?$/;
+  /^(drop-shadow|scrollbar-thumb|scrollbar-track|text-shadow|bg|text|border|decoration|shadow|outline|caret|accent|fill|stroke|ring|divide)-([a-z]+)-?(\d{2,3}|DEFAULT)?$/;
 const propMap: Record<string, string> = {
   bg: 'background-color',
   decoration: 'text-decoration-color',
@@ -1979,6 +1916,13 @@ export function parseColorClass(className: string): string | null {
   if (type === 'ring') return `--cer-ring-color:${colorValue};`;
   if (type === 'divide') return `border-color:${colorValue};`;
   if (type === 'text-shadow') return `--cer-text-shadow-color:${colorValue};`;
+  if (type === 'drop-shadow') return `--cer-drop-shadow-color:${colorValue};`;
+  if (type === 'scrollbar-thumb') {
+    return `--cer-scrollbar-thumb:${colorValue};scrollbar-color:var(--cer-scrollbar-thumb) var(--cer-scrollbar-track,transparent);`;
+  }
+  if (type === 'scrollbar-track') {
+    return `--cer-scrollbar-track:${colorValue};scrollbar-color:var(--cer-scrollbar-thumb,currentColor) var(--cer-scrollbar-track);`;
+  }
   const prop = propMap[type];
   return prop ? `${prop}:${colorValue};` : null;
 }
@@ -1999,6 +1943,19 @@ export function parseOpacityModifier(className: string): {
     : { base, opacity: opacity / 100 };
 }
 
+function extractVarExpression(value: string): string | null {
+  const start = value.indexOf('var(');
+  if (start < 0) return null;
+  let depth = 0;
+  for (let index = start; index < value.length; index++) {
+    if (value[index] === '(') depth++;
+    else if (value[index] === ')' && --depth === 0) {
+      return value.slice(start, index + 1);
+    }
+  }
+  return null;
+}
+
 export function parseColorWithOpacity(className: string): string | null {
   const { base, opacity } = parseOpacityModifier(className);
 
@@ -2010,9 +1967,8 @@ export function parseColorWithOpacity(className: string): string | null {
       // the requested alpha (otherwise a defined custom property would override
       // a rgb(...) fallback and lose the alpha).
       if (paletteRule.includes('var(')) {
-        const varMatch = /var\([^)]*\)/.exec(paletteRule);
-        if (varMatch) {
-          const varExpr = varMatch[0];
+        const varExpr = extractVarExpression(paletteRule);
+        if (varExpr) {
           const pct = opacity * 100;
           const mix = `color-mix(in srgb, ${varExpr} ${pct}%, rgba(0 0 0 / 0) ${100 - pct}%)`;
           // If the var(...) includes a hex fallback, extract it to emit a
@@ -2021,7 +1977,7 @@ export function parseColorWithOpacity(className: string): string | null {
           // allowing the variable-based color to be used (with alpha) in
           // browsers that support color-mix.
           const fallbackHexMatch = /#([0-9a-f]{6}|[0-9a-f]{3})/i.exec(varExpr);
-          const propMatch = /^([a-z-]+):/.exec(paletteRule);
+          const propMatch = /^((?:--)?[a-z][a-z-]*):/.exec(paletteRule);
           const prop = propMatch ? propMatch[1] : 'background-color';
           if (fallbackHexMatch) {
             const rgb = hexToRgb(fallbackHexMatch[0]);
@@ -2183,6 +2139,10 @@ export function parseArbitrary(className: string): string | null {
   const prop = className.slice(0, bracketStart);
   const value = className.slice(bracketStart + 2, -1).replace(/_/g, ' ');
 
+  if (spacingProps[prop]) {
+    return spacingProps[prop].map((name) => `${name}:${value};`).join('');
+  }
+
   // Enhanced property mappings
   const propMappings: Record<string, string> = {
     bg: 'background-color',
@@ -2223,6 +2183,15 @@ export function parseArbitrary(className: string): string | null {
     leading: 'line-height',
     z: 'z-index',
     opacity: 'opacity',
+    'font-features': 'font-feature-settings',
+    tab: 'tab-size',
+    zoom: 'zoom',
+    inline: 'inline-size',
+    block: 'block-size',
+    'min-inline': 'min-inline-size',
+    'max-inline': 'max-inline-size',
+    'min-block': 'min-block-size',
+    'max-block': 'max-block-size',
   };
 
   // Special handling for text properties
@@ -2242,6 +2211,40 @@ export function parseArbitrary(className: string): string | null {
 
   const cssProp = propMappings[prop] ?? prop.replace(/_/g, '-');
   return cssProp && value ? `${cssProp}:${value};` : null;
+}
+
+/** Parse small functional utility families added in Tailwind 4.2/4.3. */
+export function parseFunctionalUtility(className: string): string | null {
+  const namedContainer = /^@(container(?:-size)?)\/([a-z_][\w-]*)$/i.exec(
+    className,
+  );
+  if (namedContainer) {
+    const type =
+      namedContainer[1] === 'container-size' ? 'size' : 'inline-size';
+    return `container-type:${type};container-name:${namedContainer[2]};`;
+  }
+
+  const tab = /^tab-(\d+)$/.exec(className);
+  if (tab) return `tab-size:${tab[1]};`;
+
+  const zoom = /^zoom-(\d+(?:\.\d+)?)$/.exec(className);
+  if (zoom) return `zoom:${zoom[1]}%;`;
+
+  return null;
+}
+
+function parseUtilityBody(className: string): string | null {
+  return (
+    utilityMap[className] ??
+    parseSpacing(className) ??
+    parseSpaceUtility(className) ??
+    parseOpacity(className) ??
+    parseZIndex(className) ??
+    parseColorWithOpacity(className) ??
+    parseGradientColorStop(className) ??
+    parseFunctionalUtility(className) ??
+    parseArbitrary(className)
+  );
 }
 
 export function parseArbitraryVariant(token: string): string | null {
@@ -2279,63 +2282,93 @@ export function extractClassesFromHTML(html: string): string[] {
 // extractClassesFromHTML(). lastIndex must be reset before each use.
 const _classAttrRegex = /class\s*=\s*(['"])([\s\S]*?)\1/g;
 
-// Module-level lookup tables used by the sort-by-breakpoint comparator.
-// Defined here so they are allocated once, not recreated on every comparison.
-const _responsiveSizePx: Record<string, number> = {
-  sm: 640,
-  md: 768,
-  lg: 1024,
-  xl: 1280,
-  '2xl': 1536,
-};
-const _containerSizePx: Record<string, number> = {
-  xs: 320,
-  sm: 384,
-  md: 448,
-  lg: 512,
-  xl: 576,
-  '2xl': 672,
-  '3xl': 768,
-  '4xl': 896,
-  '5xl': 1024,
-  '6xl': 1152,
-  '7xl': 1280,
-};
+// Only conflicting shorthand families need an explicit order. Deriving their
+// broad/axis/side rank is smaller and faster to initialize than shipping a
+// framework-sized global property table.
+const cascadeFamilies: Array<[string, number]> = [
+  ['inset', 10],
+  ['margin', 20],
+  ['scroll-margin', 30],
+  ['padding', 100],
+  ['scroll-padding', 110],
+];
 
-function _getResponsivePixels(rule: string): number {
-  for (const [key, px] of Object.entries(_responsiveSizePx)) {
-    if (rule.includes(`@media ${mediaVariants[key]}`)) return px;
-  }
-  return -1;
-}
+function cascadePropertyRank(property: string): number {
+  if (property === 'z-index') return 0;
+  if (property === 'box-shadow') return 1000;
+  if (/^(top|right|bottom|left)$/.test(property)) return 13;
 
-function _getContainerPixels(rule: string): number {
-  for (const [key, px] of Object.entries(_containerSizePx)) {
-    if (rule.includes(`@container ${containerVariants[key]}`)) return px;
+  for (const [family, order] of cascadeFamilies) {
+    if (property === family) return order;
+    if (!property.startsWith(`${family}-`)) continue;
+    const suffix = property.slice(family.length + 1);
+    const specificity = /^(block|inline)$/.test(suffix)
+      ? 1
+      : /^(block|inline)-(start|end)$/.test(suffix)
+        ? 2
+        : 3;
+    return order + specificity;
   }
-  if (rule.includes('@container (min-width:')) {
-    const match = /@container \(min-width:(\d+(?:\.\d+)?)(px|rem|em)/.exec(
-      rule,
-    );
-    if (match) {
-      const value = parseFloat(match[1]);
-      const unit = match[2];
-      return unit === 'rem' || unit === 'em' ? value * 16 : value;
+
+  if (property === 'border') return 60;
+  if (property === 'border-radius') return 61;
+  if (property.endsWith('-radius')) return 64;
+  for (const [index, kind] of ['style', 'width', 'color'].entries()) {
+    if (property === `border-${kind}`) return 70 + index * 10;
+    if (property.startsWith('border-') && property.endsWith(`-${kind}`)) {
+      const middle = property.slice(7, -(kind.length + 1));
+      const specificity = /^(block|inline)$/.test(middle)
+        ? 1
+        : /^(block|inline)-(start|end)$/.test(middle)
+          ? 2
+          : 3;
+      return 70 + index * 10 + specificity;
     }
   }
-  return -1;
+  return 500;
+}
+
+function _getCascadeSortKey(rule: string): [number, number] {
+  if (rule.startsWith(':where(')) return [-1, 0];
+  let first = Number.MAX_SAFE_INTEGER;
+  let count = 0;
+  const declarations = /(?:^|[;{])([\w-]+):[^;{}]*;/g;
+  let match: RegExpExecArray | null;
+  while ((match = declarations.exec(rule))) {
+    if (match[1].startsWith('--')) continue;
+    count++;
+    const index = cascadePropertyRank(match[1]);
+    if (index < first) first = index;
+  }
+  return [first, count];
+}
+
+function getQueryPixels(rule: string, atRule: '@media' | '@container'): number {
+  const start = rule.indexOf(atRule);
+  if (start < 0) return Number.NaN;
+  const end = rule.indexOf('{', start);
+  const match =
+    /(?:min-width:|width\s*([<>])=?\s*)(\d+(?:\.\d+)?)(px|rem|em)/.exec(
+      rule.slice(start, end),
+    );
+  if (!match) return Number.NaN;
+  const pixels = Number(match[2]) * (match[3] === 'px' ? 1 : 16);
+  return match[1] === '<' ? -pixels : pixels;
 }
 
 // Enhanced JIT CSS generation with better performance
 export const jitCssCache = new Map<string, string>();
+const jitRuleCache = new Map<string, string | null>();
 export const JIT_CSS_THROTTLE_MS = 16;
 const MAX_CACHE_SIZE = 1000;
+const MAX_RULE_CACHE_SIZE = 4096;
 
 // HMR: Clear all caches on hot update to prevent stale CSS
 // Wrapped in function to avoid side effects at module load time
 if (typeof import.meta !== 'undefined' && import.meta.hot) {
   import.meta.hot.dispose(() => {
     jitCssCache.clear();
+    jitRuleCache.clear();
     detectedProseSizes.clear();
     proseSheet = null;
     proseCSSCache = '';
@@ -2346,6 +2379,7 @@ if (typeof import.meta !== 'undefined' && import.meta.hot) {
   // Also clear on accept to force regeneration
   import.meta.hot.accept(() => {
     jitCssCache.clear();
+    jitRuleCache.clear();
     detectedProseSizes.clear();
     proseSheet = null;
     proseCSSCache = '';
@@ -2382,7 +2416,6 @@ export function jitCSS(html: string): string {
   // responsive rules (bucket 2) so dark-mode overrides are deterministic
   // regardless of the order classes appear in the HTML.
   const buckets: string[][] = [[], [], [], [], []];
-  const ruleCache: Record<string, string | null> = {};
   const compositionClasses = {
     transform: new Set<string>(),
     filter: new Set<string>(),
@@ -2402,7 +2435,10 @@ export function jitCSS(html: string): string {
     if (/(?:^|;)backdrop-filter:/.test(body) && body.includes('--cer-')) {
       compositionClasses.backdropFilter.add(selector);
     }
-    if (body.includes('--cer-ring-color') || body.includes('var(--cer-ring-color')) {
+    if (
+      body.includes('--cer-ring-color') ||
+      body.includes('var(--cer-ring-color')
+    ) {
       compositionClasses.ring.add(selector);
     }
     if (
@@ -2417,20 +2453,23 @@ export function jitCSS(html: string): string {
     cls: string,
     stripDark = false,
   ): string | null => {
-    const cacheKey = stripDark ? `dark|${cls}` : cls;
-    if (cacheKey in ruleCache) return ruleCache[cacheKey];
+    const cacheKey = stripDark ? `dark\x00${cls}` : cls;
+    if (jitRuleCache.has(cacheKey)) return jitRuleCache.get(cacheKey) ?? null;
     const result = generateRule(cls, stripDark);
-    ruleCache[cacheKey] = result;
+    if (jitRuleCache.size >= MAX_RULE_CACHE_SIZE) {
+      let evictCount = MAX_RULE_CACHE_SIZE / 2;
+      for (const key of jitRuleCache.keys()) {
+        if (evictCount-- === 0) break;
+        jitRuleCache.delete(key);
+      }
+    }
+    jitRuleCache.set(cacheKey, result);
     return result;
   };
 
   const classify = (variants: string[]): number => {
-    const hasResponsive = variants.some((t) => responsiveOrder.includes(t));
-    const hasContainer = variants.some(
-      (t) =>
-        t.startsWith('@') &&
-        (containerOrder.includes(t.slice(1)) || t.match(/^@\[.+\]$/)),
-    );
+    const hasResponsive = variants.some(isResponsiveVariant);
+    const hasContainer = variants.some(isContainerVariantToken);
     const hasDark = variants.includes('dark');
     if (!variants.length) return 0;
     if (!hasResponsive && !hasDark && !hasContainer) return 1;
@@ -2460,89 +2499,36 @@ export function jitCSS(html: string): string {
     return parts;
   };
 
-  const pseudoMap: Record<string, string> = {
-    hover: ':hover',
-    focus: ':focus',
-    active: ':active',
-    visited: ':visited',
-    disabled: ':disabled',
-    checked: ':checked',
-    first: ':first-child',
-    last: ':last-child',
-    odd: ':nth-child(odd)',
-    even: ':nth-child(even)',
-    'focus-within': ':focus-within',
-    'focus-visible': ':focus-visible',
-  };
+  const pseudoMap = stateVariantSelectors;
 
   const generateRule = (cls: string, stripDark = false): string | null => {
     const parts = splitVariants(cls);
-    let basePart = '';
+    const basePart = parts[parts.length - 1] ?? '';
     let important = false;
 
-    // Find the base utility. Accept '!' as an important marker either
-    // before or after the base token (e.g. `!text-xl` or `text-xl!`).
-    for (const part of parts) {
-      let checkPart = part;
-      // Leading or trailing '!' marks importance
-      if (checkPart.startsWith('!')) {
-        important = true;
-        checkPart = checkPart.slice(1);
-      }
-      if (checkPart.endsWith('!')) {
-        important = true;
-        checkPart = checkPart.slice(0, -1);
-      }
-
-      // Skip tokens that are dynamic variant prefixes — they are NOT base
-      // utilities and must not be consumed by parseArbitrary() (which otherwise
-      // treats e.g. `data-[key]` as the CSS rule `data:key;`).
-      if (
-        (checkPart.startsWith('data-[') && checkPart.endsWith(']')) ||
-        (checkPart.startsWith('has-[') && checkPart.endsWith(']')) ||
-        (checkPart.startsWith('not-[') && checkPart.endsWith(']')) ||
-        (checkPart.startsWith('in-[') && checkPart.endsWith(']')) ||
-        (checkPart.startsWith('supports-[') && checkPart.endsWith(']')) ||
-        checkPart === 'starting'
-      ) {
-        continue;
-      }
-
-      if (
-        utilityMap[checkPart] ||
-        parseSpacing(checkPart) ||
-        parseSpaceUtility(checkPart) ||
-        parseOpacity(checkPart) ||
-        parseZIndex(checkPart) ||
-        parseColorWithOpacity(checkPart) ||
-        parseGradientColorStop(checkPart) ||
-        parseArbitrary(checkPart)
-      ) {
-        basePart = part;
-        break;
-      }
+    // A utility is always the final top-level segment. Resolving only that
+    // segment prevents unknown variants such as `typo:block` from silently
+    // degrading into unconditional CSS.
+    let checkPart = basePart;
+    if (checkPart.startsWith('!')) {
+      important = true;
+      checkPart = checkPart.slice(1);
     }
-
-    if (!basePart) return null;
+    if (checkPart.endsWith('!')) {
+      important = true;
+      checkPart = checkPart.slice(0, -1);
+    }
+    if (!checkPart || !parseUtilityBody(checkPart)) return null;
 
     // Prose element modifiers are handled separately by parseProseElementModifier
     // This is checked in parseClassName() before reaching here
 
     const cleanBase = basePart.replace(/^!/, '').replace(/!$/, '');
-    const baseRule =
-      utilityMap[cleanBase] ??
-      parseSpacing(cleanBase) ??
-      parseSpaceUtility(cleanBase) ??
-      parseOpacity(cleanBase) ??
-      parseZIndex(cleanBase) ??
-      parseColorWithOpacity(cleanBase) ??
-      parseGradientColorStop(cleanBase) ??
-      parseArbitrary(cleanBase);
+    const baseRule = parseUtilityBody(cleanBase);
 
     if (!baseRule) return null;
 
-    const baseIndex = parts.indexOf(basePart);
-    let variants = baseIndex >= 0 ? parts.slice(0, baseIndex) : [];
+    let variants = parts.slice(0, -1);
     if (stripDark) variants = variants.filter((t) => t !== 'dark');
 
     // Build escaped class name from the original class token so any
@@ -2556,13 +2542,16 @@ export function jitCSS(html: string): string {
     const structural: string[] = [];
     for (const token of variants) {
       if (token.startsWith('group-')) {
-        selector = `.group:${token.slice(6)} ${selector}`;
+        const state = token.slice(6);
+        const pseudo = pseudoMap[state];
+        if (!pseudo) return null;
+        selector = `.group${pseudo} ${selector}`;
         structural.push(token);
       } else if (token.startsWith('peer-')) {
-        selector = selector.replace(
-          SUBJECT,
-          `.peer:${token.slice(5)}~${SUBJECT}`,
-        );
+        const state = token.slice(5);
+        const pseudo = pseudoMap[state];
+        if (!pseudo) return null;
+        selector = selector.replace(SUBJECT, `.peer${pseudo}~${SUBJECT}`);
         structural.push(token);
       }
     }
@@ -2578,9 +2567,8 @@ export function jitCSS(html: string): string {
     for (const token of variants) {
       if (
         token === 'dark' ||
-        responsiveOrder.includes(token) ||
-        (token.startsWith('@') &&
-          (containerOrder.includes(token.slice(1)) || token.match(/^@\[.+\]$/)))
+        isResponsiveVariant(token) ||
+        isContainerVariantToken(token)
       )
         continue;
 
@@ -2591,6 +2579,39 @@ export function jitCSS(html: string): string {
           ? '[data-' + inner.replace(/^([^=]+)=(.+)$/, '$1="$2"') + ']'
           : '[data-' + inner + ']';
         subjectPseudos.push(attrSel);
+        continue;
+      }
+
+      // Boolean ARIA/data variants and arbitrary ARIA attribute values.
+      if (token.startsWith('aria-[') && token.endsWith(']')) {
+        const inner = token.slice(6, -1);
+        const attrSel = inner.includes('=')
+          ? '[aria-' + inner.replace(/^([^=]+)=(.+)$/, '$1="$2"') + ']'
+          : '[aria-' + inner + ']';
+        subjectPseudos.push(attrSel);
+        continue;
+      }
+      if (/^aria-[a-z][\w-]*$/.test(token)) {
+        subjectPseudos.push(`[${token}="true"]`);
+        continue;
+      }
+      if (/^data-[a-z][\w-]*$/.test(token)) {
+        subjectPseudos.push(`[${token}]`);
+        continue;
+      }
+
+      // Functional child-position variants.
+      const nth = /^(nth|nth-last|nth-of-type|nth-last-of-type)-\[(.+)\]$/.exec(
+        token,
+      );
+      if (nth) {
+        const name: Record<string, string> = {
+          nth: 'nth-child',
+          'nth-last': 'nth-last-child',
+          'nth-of-type': 'nth-of-type',
+          'nth-last-of-type': 'nth-last-of-type',
+        };
+        subjectPseudos.push(`:${name[nth[1]]}(${nth[2].replace(/_/g, ' ')})`);
         continue;
       }
 
@@ -2646,7 +2667,12 @@ export function jitCSS(html: string): string {
       const fn = selectorVariants[token];
       if (typeof fn === 'function') {
         selector = fn(selector, body).split('{')[0];
+        continue;
       }
+
+      // Unsupported variants fail closed. Dropping an unknown condition and
+      // emitting the utility unconditionally is surprising and unsafe.
+      return null;
     }
 
     const subjectPseudoStr = subjectPseudos.join('');
@@ -2757,14 +2783,8 @@ export function jitCSS(html: string): string {
       : [`${selector}{${body}}`];
 
     // Apply media queries and container queries
-    const responsiveTokens = variants.filter((t) =>
-      responsiveOrder.includes(t),
-    );
-    const containerTokens = variants.filter(
-      (t) =>
-        t.startsWith('@') &&
-        (containerOrder.includes(t.slice(1)) || t.match(/^@\[.+\]$/)),
-    );
+    const responsiveTokens = variants.filter(isResponsiveVariant);
+    const containerTokens = variants.filter(isContainerVariantToken);
     const lastResponsive = responsiveTokens.length
       ? responsiveTokens[responsiveTokens.length - 1]
       : null;
@@ -2796,11 +2816,11 @@ export function jitCSS(html: string): string {
 
     // Build media query
     if (hasDark && lastResponsive) {
-      mediaQuery = `@media (prefers-color-scheme: dark) and ${mediaVariants[lastResponsive]}`;
+      mediaQuery = `@media (prefers-color-scheme: dark) and ${resolveMediaVariant(lastResponsive)}`;
     } else if (hasDark) {
       mediaQuery = `@media (prefers-color-scheme: dark)`;
     } else if (lastResponsive) {
-      mediaQuery = `@media ${mediaVariants[lastResponsive]}`;
+      mediaQuery = `@media ${resolveMediaVariant(lastResponsive)}`;
     }
 
     // Build container query
@@ -2819,7 +2839,8 @@ export function jitCSS(html: string): string {
         // Named container query like @md
         const containerKey = lastContainer.slice(1);
         const queryValue =
-          containerVariants[containerKey] || `(min-width:${containerKey})`;
+          resolveContainerVariant(containerKey) ||
+          `(min-width:${containerKey})`;
         containerQuery = `@container ${queryValue}`;
       }
     }
@@ -2886,13 +2907,11 @@ export function jitCSS(html: string): string {
         );
 
         // Apply responsive variants (wrap in media query)
-        const responsiveVariants = variants.filter((v) =>
-          responsiveOrder.includes(v),
-        );
+        const responsiveVariants = variants.filter(isResponsiveVariant);
         if (responsiveVariants.length > 0) {
           const lastResponsive =
             responsiveVariants[responsiveVariants.length - 1];
-          const mediaQuery = `@media ${mediaVariants[lastResponsive]}`;
+          const mediaQuery = `@media ${resolveMediaVariant(lastResponsive)}`;
           variantCSS = `${mediaQuery}{${variantCSS}}`;
         }
 
@@ -2991,12 +3010,9 @@ export function jitCSS(html: string): string {
           structuralVariants.push(v);
         } else if (v === 'dark' || v === 'dark-class') {
           hasDark = true;
-        } else if (responsiveOrder.includes(v)) {
+        } else if (isResponsiveVariant(v)) {
           responsiveVariants.push(v);
-        } else if (
-          v.startsWith('@') &&
-          (containerOrder.includes(v.slice(1)) || v.match(/^@\[.+\]$/))
-        ) {
+        } else if (isContainerVariantToken(v)) {
           containerVariants.push(v);
         } else if (v.startsWith('[') && v.endsWith(']')) {
           arbitraryVariants.push(v);
@@ -3095,7 +3111,7 @@ export function jitCSS(html: string): string {
         if (responsiveVariants.length > 0) {
           const lastResponsive =
             responsiveVariants[responsiveVariants.length - 1];
-          const mediaQuery = `@media ${mediaVariants[lastResponsive]}`;
+          const mediaQuery = `@media ${resolveMediaVariant(lastResponsive)}`;
           wrappedCSS = `${mediaQuery}{${wrappedCSS}}`;
         }
 
@@ -3104,39 +3120,19 @@ export function jitCSS(html: string): string {
       continue;
     }
 
-    // Regular utilities - already have parts, variants, base from above
-    const basePart = parts.find((p) => {
-      const cleaned = p.replace(/^!/, '').replace(/!$/, '');
-      return (
-        utilityMap[cleaned] ||
-        parseSpacing(cleaned) ||
-        parseSpaceUtility(cleaned) ||
-        parseOpacity(cleaned) ||
-        parseZIndex(cleaned) ||
-        parseColorWithOpacity(cleaned) ||
-        parseGradientColorStop(cleaned) ||
-        parseArbitrary(cleaned)
-      );
-    });
+    // Regular utilities always occupy the final top-level segment.
+    const basePart = parts[parts.length - 1];
     if (!basePart) continue;
+    const cleanBase = basePart.replace(/^!/, '').replace(/!$/, '');
+    const baseRule = parseUtilityBody(cleanBase);
+    if (!baseRule) continue;
 
-    const baseIndex = parts.indexOf(basePart);
-    const variantsForBucket = baseIndex >= 0 ? parts.slice(0, baseIndex) : [];
+    const variantsForBucket = parts.slice(0, -1);
     const bucketNum = classify(variantsForBucket);
 
     const rule = generateRuleCached(cls);
     if (rule) {
-      const cleanBase = basePart.replace(/^!/, '').replace(/!$/, '');
-      const baseRule =
-        utilityMap[cleanBase] ??
-        parseSpacing(cleanBase) ??
-        parseSpaceUtility(cleanBase) ??
-        parseOpacity(cleanBase) ??
-        parseZIndex(cleanBase) ??
-        parseColorWithOpacity(cleanBase) ??
-        parseGradientColorStop(cleanBase) ??
-        parseArbitrary(cleanBase);
-      if (baseRule) registerCompositionClass(cls, baseRule);
+      registerCompositionClass(cls, baseRule);
       buckets[bucketNum].push(rule);
     }
   }
@@ -3193,32 +3189,46 @@ export function jitCSS(html: string): string {
     '--cer-translate-x:0px;--cer-translate-y:0px;--cer-rotate:0deg;--cer-skew-x:0deg;--cer-skew-y:0deg;--cer-scale-x:1;--cer-scale-y:1;',
   );
 
-  // Sort rules within buckets to ensure proper CSS cascade order.
-  // Larger breakpoints must come after smaller ones for correct precedence.
-  // Uses module-level _getResponsivePixels / _getContainerPixels helpers so
-  // the lookup tables are not re-allocated on every sort comparison.
-  const sortRulesByBreakpoint = (rules: string[]): string[] => {
-    return rules.sort((a, b) => {
-      const aRespPx = _getResponsivePixels(a);
-      const bRespPx = _getResponsivePixels(b);
-      const aContPx = _getContainerPixels(a);
-      const bContPx = _getContainerPixels(b);
-
-      if (aRespPx >= 0 && bRespPx >= 0 && aRespPx !== bRespPx)
-        return aRespPx - bRespPx;
-
-      if (aContPx >= 0 && bContPx >= 0 && aContPx !== bContPx)
-        return aContPx - bContPx;
-
-      return 0;
+  // Sort every bucket in canonical property order. Breakpoint order remains
+  // the primary key inside responsive buckets; declaration count is the tie
+  // breaker Tailwind uses to place multi-side utilities before single sides.
+  const sortRules = (rules: string[]): string[] => {
+    if (rules.length < 2) return rules;
+    const decorated = rules.map((rule) => {
+      const [property, count] = _getCascadeSortKey(rule);
+      return {
+        rule,
+        property,
+        count,
+        responsive: getQueryPixels(rule, '@media'),
+        container: getQueryPixels(rule, '@container'),
+      };
     });
+    decorated.sort((a, b) => {
+      if (
+        !Number.isNaN(a.responsive) &&
+        !Number.isNaN(b.responsive) &&
+        a.responsive !== b.responsive
+      ) {
+        return a.responsive - b.responsive;
+      }
+      if (
+        !Number.isNaN(a.container) &&
+        !Number.isNaN(b.container) &&
+        a.container !== b.container
+      ) {
+        return a.container - b.container;
+      }
+      if (a.property !== b.property) return a.property - b.property;
+      if (a.count !== b.count) return b.count - a.count;
+      return a.rule < b.rule ? -1 : a.rule > b.rule ? 1 : 0;
+    });
+    return decorated.map(({ rule }) => rule);
   };
 
-  // Sort buckets 2 and 4 which contain responsive/container queries.
-  // Bucket 3 (dark-only) needs no sort — all its rules share the same
-  // @media (prefers-color-scheme: dark) wrapper with no breakpoint dimension.
-  buckets[2] = sortRulesByBreakpoint(buckets[2]);
-  buckets[4] = sortRulesByBreakpoint(buckets[4]);
+  for (let index = 0; index < buckets.length; index++) {
+    buckets[index] = sortRules(buckets[index]);
+  }
 
   const css = buckets.flat().join('');
 

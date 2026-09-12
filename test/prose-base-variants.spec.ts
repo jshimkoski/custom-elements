@@ -164,11 +164,21 @@ describe('Prose Base Class Variants', () => {
       const css = jitCSS(html);
 
       // Check that prose element selectors are present (with hex-escaped leading digit and :not() selectors)
-      expect(css).toMatch(/\\32 xl\\:prose-2xl\s+p:not\(\.not-prose\)/); // paragraphs
-      expect(css).toMatch(/\\32 xl\\:prose-2xl\s+h1:not\(\.not-prose\)/); // headings
-      expect(css).toMatch(/\\32 xl\\:prose-2xl\s+a:not\(\.not-prose\)/); // links
-      expect(css).toMatch(/\\32 xl\\:prose-2xl\s+code:not\(\.not-prose\)/); // code
-      expect(css).toMatch(/\\32 xl\\:prose-2xl\s+pre:not\(\.not-prose\)/); // pre blocks
+      expect(css).toMatch(
+        /\\32 xl\\:prose-2xl\s+p:not\(\.not-prose,\.not-prose \*\)/,
+      ); // paragraphs
+      expect(css).toMatch(
+        /\\32 xl\\:prose-2xl\s+h1:not\(\.not-prose,\.not-prose \*\)/,
+      ); // headings
+      expect(css).toMatch(
+        /\\32 xl\\:prose-2xl\s+a:not\(\.not-prose,\.not-prose \*\)/,
+      ); // links
+      expect(css).toMatch(
+        /\\32 xl\\:prose-2xl\s+code:not\(\.not-prose,\.not-prose \*\)/,
+      ); // code
+      expect(css).toMatch(
+        /\\32 xl\\:prose-2xl\s+pre:not\(\.not-prose,\.not-prose \*\)/,
+      ); // pre blocks
     });
 
     it('should apply variant class to all prose rules', () => {
@@ -180,9 +190,13 @@ describe('Prose Base Class Variants', () => {
       expect(css).toMatch(/\.md\\:prose\s/); // Should have variant class
 
       // Check multiple element types with :not() selectors
-      expect(css).toMatch(/\.md\\:prose\s+p:not\(\.not-prose\)/);
-      expect(css).toMatch(/\.md\\:prose\s+ul:not\(\.not-prose\)/);
-      expect(css).toMatch(/\.md\\:prose\s+ol:not\(\.not-prose\)/);
+      expect(css).toMatch(/\.md\\:prose\s+p:not\(\.not-prose,\.not-prose \*\)/);
+      expect(css).toMatch(
+        /\.md\\:prose\s+ul:not\(\.not-prose,\.not-prose \*\)/,
+      );
+      expect(css).toMatch(
+        /\.md\\:prose\s+ol:not\(\.not-prose,\.not-prose \*\)/,
+      );
     });
   });
 });

@@ -19,11 +19,11 @@ y.value = 20;
 
 `scheduleWithPriority(fn, priority)` controls when a callback runs relative to other pending work:
 
-| Priority | Behaviour | Use case |
-|----------|-----------|----------|
-| `'immediate'` | Runs synchronously before the next microtask flush | Critical UI feedback (e.g., hiding a modal on keydown) |
-| `'normal'` | Default — runs in the next microtask batch | Typical state-driven re-renders |
-| `'idle'` | Runs via `requestIdleCallback` (falls back to `setTimeout(fn, 5)`) | Low-priority background work (analytics, prefetch) |
+| Priority      | Behaviour                                                          | Use case                                               |
+| ------------- | ------------------------------------------------------------------ | ------------------------------------------------------ |
+| `'immediate'` | Runs synchronously before the next microtask flush                 | Critical UI feedback (e.g., hiding a modal on keydown) |
+| `'normal'`    | Default — runs in the next microtask batch                         | Typical state-driven re-renders                        |
+| `'idle'`      | Runs via `requestIdleCallback` (falls back to `setTimeout(fn, 5)`) | Low-priority background work (analytics, prefetch)     |
 
 ```ts
 import { scheduleWithPriority } from '@jasonshimmy/custom-elements-runtime';
@@ -110,12 +110,12 @@ The runtime emits a dev warning when it detects state mutation during render (th
 
 ## `watch` vs `watchEffect`
 
-| | `watch` | `watchEffect` |
-|--|---------|---------------|
-| Explicit source | Yes — pass a `ReactiveState` or getter | No — auto-tracks all reactive reads inside `fn` |
-| Runs immediately | Optional (`{ immediate: true }`) | Always runs immediately |
-| Receives old value | Yes | No |
-| Best for | Reacting to a specific value change | Side effects that depend on multiple reactive sources |
+|                    | `watch`                                | `watchEffect`                                         |
+| ------------------ | -------------------------------------- | ----------------------------------------------------- |
+| Explicit source    | Yes — pass a `ReactiveState` or getter | No — auto-tracks all reactive reads inside `fn`       |
+| Runs immediately   | Optional (`{ immediate: true }`)       | Always runs immediately                               |
+| Receives old value | Yes                                    | No                                                    |
+| Best for           | Reacting to a specific value change    | Side effects that depend on multiple reactive sources |
 
 ```ts
 // watch: precise, explicit
@@ -208,13 +208,17 @@ Because each Custom Element has its own **Shadow DOM**, styles must be injected 
 
 ### Reducing JIT CSS work per render
 
-The engine is incremental: it tracks which class names have already been processed for each shadow root and only generates CSS for new classes seen since the last render. In practice, most re-renders add no new classes and the `replaceSync()` call is skipped entirely.
+The engine caches both parsed rules and complete sorted class sets. Unchanged component markup skips JIT processing entirely; text-only updates hit the class-set cache and skip `replaceSync()` when the resulting stylesheet is unchanged. The light-DOM scanner observes only class/child mutations and never rescans the full document.
+
+When a new class is discovered, the compact class set is emitted again in canonical property order. This makes shorthand/side precedence deterministic across later mutations while reusing every already-parsed rule.
+
+Run `npm run validate:jit-css` after a production build to enforce the recursive CDN payload budget, zero-runtime-dependency rule, cold compilation limits, hot-cache latency, and a growing-class-set benchmark.
 
 ---
 
 ## Extended Colors
 
-The extended color palette (21 color families × 11 shades) is opt-in. Only include it when you actively use non-semantic colors, as it increases the number of utility classes the JIT engine must process.
+The extended color palette (25 color families × 11 shades) is opt-in. Only include it when you actively use non-semantic colors, as it increases the number of utility classes the JIT engine may match and the generated CSS your app chooses to use.
 
 ```ts
 // Only pay for extended colors when you need them

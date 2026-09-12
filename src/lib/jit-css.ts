@@ -31,6 +31,7 @@ export {
   parseSpacing,
   parseZIndex,
   parseArbitrary,
+  parseFunctionalUtility,
   utilityMap,
   selectorVariants,
   mediaVariants,

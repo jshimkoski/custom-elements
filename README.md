@@ -346,6 +346,7 @@ Opt-in JIT CSS engine with hooks, global control, and the `cls()` helper for IDE
 | `parseGradientColorStop` | Parse a gradient color stop utility (`from-*`, `via-*`, `to-*`) to its CSS declaration.                             |
 | `parseSpacing`           | Parse a spacing utility class name to its CSS declaration.                                                          |
 | `parseArbitrary`         | Parse an arbitrary value utility class name.                                                                        |
+| `parseFunctionalUtility` | Parse named containers and Tailwind 4.2/4.3 tab/zoom functional utilities.                                          |
 | `utilityMap`             | Complete mapping of all static utility class names to their CSS declarations.                                       |
 | `selectorVariants`       | State and pseudo-class variant selector map (`hover:`, `focus:`, `disabled:`, `inert:`, etc.).                      |
 | `mediaVariants`          | Responsive breakpoint media query map (`sm:`, `md:`, `lg:`, `xl:`, `2xl:`, `dark:`).                                |
@@ -425,9 +426,12 @@ export default defineConfig({
       componentsDir: '/absolute/path/to/app/components',
       appRoot: '/absolute/path/to/app',
       // Optional package-level, tree-shakable component registrations.
-      resolvers: [tag => tag === 'design-button'
-        ? '@acme/design-system/components/button'
-        : undefined],
+      resolvers: [
+        (tag) =>
+          tag === 'design-button'
+            ? '@acme/design-system/components/button'
+            : undefined,
+      ],
     }),
   ],
 });

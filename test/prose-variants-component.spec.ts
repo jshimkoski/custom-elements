@@ -95,9 +95,13 @@ describe('Prose Variants - Component Context Integration', () => {
       // Should contain prose font size for 2xl
       expect(css).toContain('font-size:1.5rem');
 
-      // Should contain prose-specific rules with :not(.not-prose) selectors
-      expect(css).toMatch(/\\32 xl\\:prose-2xl.*?p:not\(\.not-prose\)/);
-      expect(css).toMatch(/\\32 xl\\:prose-2xl.*?h1:not\(\.not-prose\)/);
+      // Should contain prose-specific rules excluding .not-prose subtrees.
+      expect(css).toMatch(
+        /\\32 xl\\:prose-2xl.*?p:not\(\.not-prose,\.not-prose \*\)/,
+      );
+      expect(css).toMatch(
+        /\\32 xl\\:prose-2xl.*?h1:not\(\.not-prose,\.not-prose \*\)/,
+      );
     });
 
     it('should apply md:prose-lg with media query', async () => {

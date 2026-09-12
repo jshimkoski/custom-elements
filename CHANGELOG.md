@@ -173,12 +173,10 @@ All notable changes to this project will be documented in this file.
 - feat: inline attribute interpolation (4d67cef)
 - feat: update readme (e1f4cd0)
 
-
 ## [v2.5.5] - 2026-03-08
 
 - feat: update readme (e1f4cd0)
 - feat: update readme (0af8106)
-
 
 ## [v2.5.4] - 2026-03-08
 
@@ -198,7 +196,6 @@ All notable changes to this project will be documented in this file.
 - add more jit css classes, useSlot, useExpose, keep alive, scheduling, error boundary, suspense (9dd836c)
 - additional improvements (66a1044)
 - watchEffect, vdom split, nextTick, keep alive, teleport, more (a5bfc7b)
-
 
 ## [v2.5.3] - 2026-03-08
 
@@ -222,7 +219,6 @@ All notable changes to this project will be documented in this file.
 - fix: improve router implementation (187c894)
 - improve router (d601dcc)
 
-
 ## [v2.5.2] - 2025-11-23
 
 - fix: update vitest dependency (946bb29)
@@ -230,8 +226,6 @@ All notable changes to this project will be documented in this file.
 - fix: improve router implementation (187c894)
 - improve router (d601dcc)
 - fix: improve router initialization to resolve active router lazily (952672e)
-
-
 
 ## [v2.5.1] - 2025-11-09
 

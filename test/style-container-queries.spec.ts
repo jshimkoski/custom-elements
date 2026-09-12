@@ -22,7 +22,9 @@ describe('🔧 Container Queries', () => {
 
   describe('📏 Container Variants', () => {
     it('should have correct container variant breakpoints', () => {
-      expect(containerVariants).toEqual({
+      expect(containerVariants).toMatchObject({
+        '3xs': '(min-width:16rem)',
+        '2xs': '(min-width:18rem)',
         xs: '(min-width:20rem)',
         sm: '(min-width:24rem)',
         md: '(min-width:28rem)',
@@ -39,6 +41,8 @@ describe('🔧 Container Queries', () => {
 
     it('should have correct container order', () => {
       expect(containerOrder).toEqual([
+        '3xs',
+        '2xs',
         'xs',
         'sm',
         'md',

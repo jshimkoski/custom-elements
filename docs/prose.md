@@ -267,6 +267,8 @@ function hello() {
 </article>
 ```
 
+Standalone images, videos, pictures, and figures use the same vertical rhythm as paragraphs. For the base `prose` size that is `1.25em` above and below; each prose size scales the value with its paragraph spacing. Media inside a `<figure>` has zero margins so the figure owns the spacing and the caption stays grouped with it. Use an element modifier such as `prose-img:my-2` when a specific document needs tighter spacing.
+
 ### Horizontal Rules
 
 ```html

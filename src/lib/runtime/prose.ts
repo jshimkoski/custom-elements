@@ -20,7 +20,6 @@ const proseSizes = {
     h3: '1.25em',
     h4: '1em',
     blockquote: '1.6em',
-    figure: '2em',
     code: '0.875em',
     pre: '0.875em',
     ol: '1.25em',
@@ -39,7 +38,6 @@ const proseSizes = {
     h3: '1.2857143em',
     h4: '1em',
     blockquote: '1.4285714em',
-    figure: '1.7142857em',
     code: '0.8571429em',
     pre: '0.8571429em',
     ol: '1.1428571em',
@@ -58,7 +56,6 @@ const proseSizes = {
     h3: '1.5555556em',
     h4: '1.1111111em',
     blockquote: '1.7777778em',
-    figure: '2.2222222em',
     code: '0.8888889em',
     pre: '0.8888889em',
     ol: '1.3333333em',
@@ -77,7 +74,6 @@ const proseSizes = {
     h3: '1.6em',
     h4: '1.2em',
     blockquote: '1.8em',
-    figure: '2.4em',
     code: '0.9em',
     pre: '0.9em',
     ol: '1.4em',
@@ -96,7 +92,6 @@ const proseSizes = {
     h3: '1.5555556em',
     h4: '1.2222222em',
     blockquote: '1.7777778em',
-    figure: '2.2222222em',
     code: '0.8333333em',
     pre: '0.8333333em',
     ol: '1.3333333em',
@@ -117,10 +112,13 @@ export function generateProseCSS(className: string): string | null {
 
   const variant = match[1] || 'base';
   const size = proseSizes[variant as keyof typeof proseSizes];
-  const selector = `.${className}`; // Use actual className as selector
-
-  // Generate CSS on-demand with size-specific values
+  const selector = `.${className}`;
+  const excluded = ':not(.not-prose,.not-prose *)';
   const rules: string[] = [];
+  const scoped = (target: string): string => `${selector} ${target}${excluded}`;
+  const add = (targets: string, body: string): void => {
+    rules.push(`${targets.split(',').map(scoped).join(',')}{${body}}`);
+  };
 
   // Base prose container styles with CSS variables
   rules.push(
@@ -128,167 +126,162 @@ export function generateProseCSS(className: string): string | null {
   );
 
   // Paragraphs
-  rules.push(
-    `${selector} p:not(.not-prose):not(.not-prose *){margin:${size.p} 0;}`,
-  );
+  add('p', `margin:${size.p} 0;`);
 
   // Lead text
-  rules.push(
-    `${selector} .lead:not(.not-prose):not(.not-prose *),${selector} [class~="lead"]:not(.not-prose):not(.not-prose *){font-size:1.25em;line-height:1.6;margin-top:${size.lead};margin-bottom:${size.lead};color:var(--cer-prose-lead);}`,
+  add(
+    '.lead,[class~="lead"]',
+    `font-size:1.25em;line-height:1.6;margin-top:${size.lead};margin-bottom:${size.lead};color:var(--cer-prose-lead);`,
   );
 
   // Headings
-  rules.push(
-    `${selector} h1:not(.not-prose):not(.not-prose *),${selector} h2:not(.not-prose):not(.not-prose *),${selector} h3:not(.not-prose):not(.not-prose *),${selector} h4:not(.not-prose):not(.not-prose *),${selector} h5:not(.not-prose):not(.not-prose *),${selector} h6:not(.not-prose):not(.not-prose *){color:var(--cer-prose-headings);font-weight:700;line-height:1.25;}`,
+  add(
+    'h1,h2,h3,h4,h5,h6',
+    'color:var(--cer-prose-headings);font-weight:700;line-height:1.25;',
   );
-  rules.push(
-    `${selector} h1:not(.not-prose):not(.not-prose *){font-size:${size.h1};margin-top:0;margin-bottom:0.8888889em;line-height:1.1111111;}`,
+  add(
+    'h1',
+    `font-size:${size.h1};margin-top:0;margin-bottom:0.8888889em;line-height:1.1111111;`,
   );
-  rules.push(
-    `${selector} h2:not(.not-prose):not(.not-prose *){font-size:${size.h2};margin-top:2em;margin-bottom:1em;line-height:1.3333333;}`,
+  add(
+    'h2',
+    `font-size:${size.h2};margin-top:2em;margin-bottom:1em;line-height:1.3333333;`,
   );
-  rules.push(
-    `${selector} h3:not(.not-prose):not(.not-prose *){font-size:${size.h3};margin-top:1.6em;margin-bottom:0.6em;line-height:1.6;}`,
+  add(
+    'h3',
+    `font-size:${size.h3};margin-top:1.6em;margin-bottom:0.6em;line-height:1.6;`,
   );
-  rules.push(
-    `${selector} h4:not(.not-prose):not(.not-prose *){font-size:${size.h4};margin-top:1.5em;margin-bottom:0.5em;line-height:1.5;}`,
+  add(
+    'h4',
+    `font-size:${size.h4};margin-top:1.5em;margin-bottom:0.5em;line-height:1.5;`,
   );
-  rules.push(
-    `${selector} h5:not(.not-prose):not(.not-prose *){margin-top:1.5em;margin-bottom:0.5em;}`,
-  );
-  rules.push(
-    `${selector} h6:not(.not-prose):not(.not-prose *){margin-top:1.5em;margin-bottom:0.5em;}`,
-  );
+  add('h5,h6', 'margin-top:1.5em;margin-bottom:0.5em;');
 
   // Links
-  rules.push(
-    `${selector} a:not(.not-prose):not(.not-prose *){color:var(--cer-prose-links);text-decoration:underline;text-decoration-thickness:.08em;text-underline-offset:.15em;font-weight:500;}`,
+  add(
+    'a',
+    'color:var(--cer-prose-links);text-decoration:underline;text-decoration-thickness:.08em;text-underline-offset:.15em;font-weight:500;',
   );
-  rules.push(
-    `${selector} a:not(.not-prose):not(.not-prose *):hover,${selector} a:not(.not-prose):not(.not-prose *):focus{color:var(--cer-prose-links-hover);}`,
-  );
+  add('a:hover,a:focus', 'color:var(--cer-prose-links-hover);');
 
   // Strong and emphasis
-  rules.push(
-    `${selector} strong:not(.not-prose):not(.not-prose *){color:var(--cer-prose-bold);font-weight:600;}`,
-  );
-  rules.push(
-    `${selector} em:not(.not-prose):not(.not-prose *){font-style:italic;}`,
-  );
+  add('strong', 'color:var(--cer-prose-bold);font-weight:600;');
+  add('em', 'font-style:italic;');
 
   // Ordered lists
+  const ol = scoped('ol');
+  const ul = scoped('ul');
+  const li = `li${excluded}`;
+  const paragraph = `p${excluded}`;
   rules.push(
-    `${selector} ol:not(.not-prose):not(.not-prose *){list-style-type:decimal;margin-top:${size.ol};margin-bottom:${size.ol};padding-left:1.625em;}`,
+    `${ol}{list-style-type:decimal;margin-top:${size.ol};margin-bottom:${size.ol};padding-left:1.625em;}`,
   );
+  for (const [type, style] of [
+    ['A', 'upper-alpha'],
+    ['a', 'lower-alpha'],
+    ['I', 'upper-roman'],
+    ['i', 'lower-roman'],
+  ]) {
+    rules.push(`${ol}[type="${type}"]{list-style-type:${style};}`);
+  }
+  rules.push(`${ol}>${li}{position:relative;padding-left:${size.li};}`);
   rules.push(
-    `${selector} ol:not(.not-prose):not(.not-prose *)[type="A"]{list-style-type:upper-alpha;}`,
-  );
-  rules.push(
-    `${selector} ol:not(.not-prose):not(.not-prose *)[type="a"]{list-style-type:lower-alpha;}`,
-  );
-  rules.push(
-    `${selector} ol:not(.not-prose):not(.not-prose *)[type="I"]{list-style-type:upper-roman;}`,
-  );
-  rules.push(
-    `${selector} ol:not(.not-prose):not(.not-prose *)[type="i"]{list-style-type:lower-roman;}`,
-  );
-  rules.push(
-    `${selector} ol:not(.not-prose):not(.not-prose *)>li:not(.not-prose):not(.not-prose *){position:relative;padding-left:${size.li};}`,
-  );
-  rules.push(
-    `${selector} ol:not(.not-prose):not(.not-prose *)>li:not(.not-prose):not(.not-prose *)::marker{color:var(--cer-prose-counters);font-weight:400;}`,
+    `${ol}>${li}::marker{color:var(--cer-prose-counters);font-weight:400;}`,
   );
 
   // Unordered lists
   rules.push(
-    `${selector} ul:not(.not-prose):not(.not-prose *){list-style-type:disc;margin-top:${size.ul};margin-bottom:${size.ul};padding-left:1.625em;}`,
+    `${ul}{list-style-type:disc;margin-top:${size.ul};margin-bottom:${size.ul};padding-left:1.625em;}`,
   );
-  rules.push(
-    `${selector} ul:not(.not-prose):not(.not-prose *)>li:not(.not-prose):not(.not-prose *){position:relative;padding-left:${size.li};}`,
-  );
-  rules.push(
-    `${selector} ul:not(.not-prose):not(.not-prose *)>li:not(.not-prose):not(.not-prose *)::marker{color:var(--cer-prose-bullets);}`,
-  );
+  rules.push(`${ul}>${li}{position:relative;padding-left:${size.li};}`);
+  rules.push(`${ul}>${li}::marker{color:var(--cer-prose-bullets);}`);
 
   // Nested lists and list item content
   rules.push(
-    `${selector} ol:not(.not-prose):not(.not-prose *)>li:not(.not-prose):not(.not-prose *)>*:first-child,${selector} ul:not(.not-prose):not(.not-prose *)>li:not(.not-prose):not(.not-prose *)>*:first-child{margin-top:${size.ol};}`,
+    `${ol}>${li}>*:first-child,${ul}>${li}>*:first-child{margin-top:${size.ol};}`,
   );
   rules.push(
-    `${selector} ol:not(.not-prose):not(.not-prose *)>li:not(.not-prose):not(.not-prose *)>*:last-child,${selector} ul:not(.not-prose):not(.not-prose *)>li:not(.not-prose):not(.not-prose *)>*:last-child{margin-bottom:${size.ol};}`,
+    `${ol}>${li}>*:last-child,${ul}>${li}>*:last-child{margin-bottom:${size.ol};}`,
   );
   rules.push(
-    `${selector} ul:not(.not-prose):not(.not-prose *) ul:not(.not-prose):not(.not-prose *),${selector} ul:not(.not-prose):not(.not-prose *) ol:not(.not-prose):not(.not-prose *),${selector} ol:not(.not-prose):not(.not-prose *) ul:not(.not-prose):not(.not-prose *),${selector} ol:not(.not-prose):not(.not-prose *) ol:not(.not-prose):not(.not-prose *){margin-top:0.75em;margin-bottom:0.75em;}`,
+    `${ul} ul${excluded},${ul} ol${excluded},${ol} ul${excluded},${ol} ol${excluded}{margin-top:0.75em;margin-bottom:0.75em;}`,
   );
-  // Multiple paragraphs in list items need proper spacing
   rules.push(
-    `${selector} li:not(.not-prose):not(.not-prose *)>p:not(.not-prose):not(.not-prose *){margin-top:${size.ol};margin-bottom:${size.ol};}`,
+    `${scoped('li')}>${paragraph}{margin-top:${size.ol};margin-bottom:${size.ol};}`,
   );
 
   // Inline code
-  rules.push(
-    `${selector} code:not(.not-prose):not(.not-prose *){color:var(--cer-prose-code);background-color:var(--cer-prose-code-bg);border-radius:0.25rem;padding:0.125rem 0.25rem;font-size:${size.code};font-weight:600;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;}`,
+  add(
+    'code',
+    `color:var(--cer-prose-code);background-color:var(--cer-prose-code-bg);border-radius:0.25rem;padding:0.125rem 0.25rem;font-size:${size.code};font-weight:600;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;`,
   );
 
   // Code blocks
+  const pre = scoped('pre');
   rules.push(
-    `${selector} pre:not(.not-prose):not(.not-prose *){color:var(--cer-prose-pre-code);background-color:var(--cer-prose-pre-bg);border:1px solid var(--cer-prose-pre-border);overflow-x:auto;font-size:${size.pre};line-height:1.7142857;margin-top:1.7142857em;margin-bottom:1.7142857em;border-radius:0.375rem;padding:0.8571429em 1.1428571em;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;white-space:pre;overflow-wrap:normal;}`,
+    `${pre}{color:var(--cer-prose-pre-code);background-color:var(--cer-prose-pre-bg);border:1px solid var(--cer-prose-pre-border);overflow-x:auto;font-size:${size.pre};line-height:1.7142857;margin-top:1.7142857em;margin-bottom:1.7142857em;border-radius:0.375rem;padding:0.8571429em 1.1428571em;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;white-space:pre;overflow-wrap:normal;}`,
   );
   rules.push(
-    `${selector} pre:not(.not-prose):not(.not-prose *) code:not(.not-prose):not(.not-prose *){background-color:transparent;border-width:0;border-radius:0;padding:0;font-weight:inherit;color:inherit;font-size:inherit;line-height:inherit;}`,
+    `${pre} code${excluded}{background-color:transparent;border-width:0;border-radius:0;padding:0;font-weight:inherit;color:inherit;font-size:inherit;line-height:inherit;}`,
   );
 
   // Blockquotes
+  const blockquote = scoped('blockquote');
   rules.push(
-    `${selector} blockquote:not(.not-prose):not(.not-prose *){font-weight:500;font-style:italic;color:var(--cer-prose-quotes);border-left-width:0.25rem;border-left-color:var(--cer-prose-quote-border);quotes:"\\201C""\\201D""\\2018""\\2019";margin-top:${size.blockquote};margin-bottom:${size.blockquote};padding-left:1em;}`,
+    `${blockquote}{font-weight:500;font-style:italic;color:var(--cer-prose-quotes);border-left-width:0.25rem;border-left-color:var(--cer-prose-quote-border);quotes:"\\201C""\\201D""\\2018""\\2019";margin-top:${size.blockquote};margin-bottom:${size.blockquote};padding-left:1em;}`,
   );
   rules.push(
-    `${selector} blockquote:not(.not-prose):not(.not-prose *) p:not(.not-prose):not(.not-prose *):first-of-type::before{content:open-quote;}`,
+    `${blockquote} ${paragraph}:first-of-type::before{content:open-quote;}`,
   );
   rules.push(
-    `${selector} blockquote:not(.not-prose):not(.not-prose *) p:not(.not-prose):not(.not-prose *):last-of-type::after{content:close-quote;}`,
+    `${blockquote} ${paragraph}:last-of-type::after{content:close-quote;}`,
   );
 
   // Horizontal rules
-  rules.push(
-    `${selector} hr:not(.not-prose):not(.not-prose *){border-color:var(--cer-prose-hr);border-top-width:1px;margin-top:${size.hr};margin-bottom:${size.hr};}`,
+  add(
+    'hr',
+    `border-color:var(--cer-prose-hr);border-top-width:1px;margin-top:${size.hr};margin-bottom:${size.hr};`,
   );
 
-  // Figures and images
+  // Figures and standalone media use paragraph rhythm. The previous figure
+  // scale added roughly twice the surrounding text gap above and below.
+  const figure = scoped('figure');
+  rules.push(`${figure}{margin-top:${size.p};margin-bottom:${size.p};}`);
+  rules.push(`${figure}>*{margin-top:0;margin-bottom:0;}`);
+  add(
+    'figcaption',
+    'color:var(--cer-prose-img-caption);font-size:0.875em;line-height:1.4285714;margin-top:0.75em;',
+  );
+  const media = ['img', 'video', 'picture'].map(scoped).join(',');
   rules.push(
-    `${selector} figure:not(.not-prose):not(.not-prose *){margin-top:${size.figure};margin-bottom:${size.figure};}`,
+    `${media}{margin-top:${size.p};margin-bottom:${size.p};max-width:100%;height:auto;}`,
   );
   rules.push(
-    `${selector} figure:not(.not-prose):not(.not-prose *)>*{margin-top:0;margin-bottom:0;}`,
-  );
-  rules.push(
-    `${selector} figcaption:not(.not-prose):not(.not-prose *){color:var(--cer-prose-img-caption);font-size:0.875em;line-height:1.4285714;margin-top:0.75em;}`,
-  );
-  rules.push(
-    `${selector} img:not(.not-prose):not(.not-prose *),${selector} video:not(.not-prose):not(.not-prose *),${selector} picture:not(.not-prose):not(.not-prose *){margin-top:${size.figure};margin-bottom:${size.figure};max-width:100%;height:auto;}`,
-  );
-  rules.push(
-    `${selector} figure:not(.not-prose):not(.not-prose *)>img:not(.not-prose):not(.not-prose *),${selector} figure:not(.not-prose):not(.not-prose *)>video:not(.not-prose):not(.not-prose *),${selector} figure:not(.not-prose):not(.not-prose *)>picture:not(.not-prose):not(.not-prose *){margin-top:0;margin-bottom:0;}`,
+    `${['img', 'video', 'picture']
+      .map((target) => `${figure}>${target}${excluded}`)
+      .join(',')}{margin-top:0;margin-bottom:0;}`,
   );
 
   // Tables
+  const table = scoped('table');
+  const thead = scoped('thead');
+  const tbody = scoped('tbody');
+  const row = `tr${excluded}`;
   rules.push(
-    `${selector} table:not(.not-prose):not(.not-prose *){width:100%;table-layout:auto;text-align:left;margin-top:${size.table};margin-bottom:${size.table};font-size:0.875em;line-height:1.7142857;}`,
+    `${table}{width:100%;table-layout:auto;text-align:left;margin-top:${size.table};margin-bottom:${size.table};font-size:0.875em;line-height:1.7142857;}`,
   );
   rules.push(
-    `${selector} thead:not(.not-prose):not(.not-prose *){border-bottom-width:1px;border-bottom-color:var(--cer-prose-table-border);}`,
+    `${thead}{border-bottom-width:1px;border-bottom-color:var(--cer-prose-table-border);}`,
   );
   rules.push(
-    `${selector} thead:not(.not-prose):not(.not-prose *) th:not(.not-prose):not(.not-prose *){color:var(--cer-prose-table-head);font-weight:600;vertical-align:bottom;padding-right:0.5714286em;padding-bottom:0.5714286em;padding-left:0.5714286em;}`,
+    `${thead} th${excluded}{color:var(--cer-prose-table-head);font-weight:600;vertical-align:bottom;padding-right:0.5714286em;padding-bottom:0.5714286em;padding-left:0.5714286em;}`,
   );
   rules.push(
-    `${selector} tbody:not(.not-prose):not(.not-prose *) tr:not(.not-prose):not(.not-prose *){border-bottom-width:1px;border-bottom-color:var(--cer-prose-table-border);}`,
+    `${tbody} ${row}{border-bottom-width:1px;border-bottom-color:var(--cer-prose-table-border);}`,
   );
+  rules.push(`${tbody} ${row}:last-child{border-bottom-width:0;}`);
   rules.push(
-    `${selector} tbody:not(.not-prose):not(.not-prose *) tr:not(.not-prose):not(.not-prose *):last-child{border-bottom-width:0;}`,
-  );
-  rules.push(
-    `${selector} tbody:not(.not-prose):not(.not-prose *) td:not(.not-prose):not(.not-prose *){vertical-align:baseline;padding:0.5714286em;}`,
+    `${tbody} td${excluded}{vertical-align:baseline;padding:0.5714286em;}`,
   );
 
   return rules.join('');

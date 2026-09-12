@@ -2,6 +2,8 @@
 
 Custom Elements Runtime provides a high-performance, zero-dependency JIT CSS engine for custom elements. It enables utility-first, variant-rich, and arbitrary-value styling directly from your Shadow DOM.
 
+The utility vocabulary tracks the high-value runtime features in Tailwind CSS 4.3.3, but this is an independent compatibility layer: Tailwind, PostCSS, and their compiler are not embedded or installed as runtime dependencies. The design goal is useful familiarity with a compact real-time processor, not byte-for-byte Tailwind output.
+
 ## 🔌 Opt-in Architecture
 
 JIT CSS is **opt-in** — it is disabled by default and only runs for components that request it. The JIT engine (~20 KB gzip) lives in its own dedicated entry (`@jasonshimmy/custom-elements-runtime/jit-css`) and is **entirely absent** from the main bundle (`@jasonshimmy/custom-elements-runtime`). Importing from the root entry never pulls in the JIT engine.
@@ -43,7 +45,7 @@ Both `useJITCSS()` and `enableJITCSS()` accept an optional options object:
 interface JITCSSOptions {
   /**
    * Include extended Tailwind color families.
-   * - `true` — all 21 families (slate, gray, zinc, stone, red, orange, amber, yellow,
+   * - `true` — all 25 families (including mauve, olive, mist, taupe, slate, gray,
    *   lime, green, emerald, teal, cyan, sky, blue, indigo, violet, purple, fuchsia, pink, rose)
    * - `string[]` — only the listed families, e.g. `['slate', 'blue', 'rose']`
    */
@@ -64,7 +66,7 @@ Extend the built-in semantic palette with additional Tailwind-compatible color f
 Accepts a **boolean** or an **array of family names**:
 
 ```ts
-// Include all 21 extended families
+// Include all 25 extended families
 enableJITCSS({ extendedColors: true });
 // Now bg-blue-500, text-violet-700, border-rose-300, etc. all generate CSS
 
@@ -72,17 +74,17 @@ enableJITCSS({ extendedColors: true });
 enableJITCSS({ extendedColors: ['slate', 'blue', 'rose'] });
 ```
 
-Available families: `slate`, `gray`, `zinc`, `stone`, `red`, `orange`, `amber`, `yellow`, `lime`, `green`, `emerald`, `teal`, `cyan`, `sky`, `blue`, `indigo`, `violet`, `purple`, `fuchsia`, `pink`, `rose`.
+Available families: `slate`, `gray`, `zinc`, `stone`, `mauve`, `olive`, `mist`, `taupe`, `red`, `orange`, `amber`, `yellow`, `lime`, `green`, `emerald`, `teal`, `cyan`, `sky`, `blue`, `indigo`, `violet`, `purple`, `fuchsia`, `pink`, `rose`.
 
 > **Why are extended colors disabled by default? Performance.**
 >
-> On each render the JIT engine calls `CSSStyleSheet.replaceSync()` to replace the component's entire accumulated stylesheet in one shot. Every `replaceSync()` call triggers the browser to re-run style matching for all elements in that shadow root — this is called a **style recalculation**. In Shadow DOM, style recalculations are scoped to each component's shadow root, but they still cost CPU time, especially during initial render when many classes are encountered at once.
+> CER memoizes generated class sets and skips `CSSStyleSheet.replaceSync()` when a render has the same utilities. A genuinely new class still replaces the component's accumulated stylesheet in one shot so the rules remain in canonical cascade order. That replacement triggers style matching within the shadow root, so initial renders with many distinct classes still deserve care.
 >
-> The extended palette contains **21 families × 11 shades = 231 color tokens**. Each token can appear as `bg-`, `text-`, `border-`, `ring-`, `shadow-`, `outline-`, `from-`, `to-`, or `via-`, giving a theoretical maximum of ~2,000 CSS rules. In a real app the JIT engine only generates rules for classes it actually encounters, but a large component tree with varied color usage can accumulate a substantial stylesheet on that first `replaceSync()` pass.
+> The extended palette contains **25 families × 11 shades = 275 color tokens**. Each token can appear in several color utility families. In a real app the JIT engine only generates rules for classes it actually encounters, but a large component tree with varied color usage can still accumulate a substantial stylesheet.
 >
 > Each component's shadow root also gets its **own scoped stylesheet**. The rule for `bg-blue-500` inside `<my-card>` is a separate stylesheet from the one inside `<my-button>`. CSS rules are not shared across shadow boundaries. More active color families means more generated CSS per component, multiplied by the number of components using them.
 >
-> The JIT engine's memoization cache also grows with the number of unique class/shade combinations it has seen. Enabling all 21 families in a large app puts real pressure on that cache and increases memory usage over the lifetime of the page.
+> The JIT engine's bounded memoization cache also grows with the number of unique class/shade combinations it has seen. Enabling every family in a large app uses more of that cache and can increase generated stylesheet size.
 >
 > **The practical guidance:** leave extended colors off (the default) unless you need them. If you need specific families, use `string[]` — e.g. `extendedColors: ['slate', 'blue', 'rose']` — to expose only the tokens you actually use. This keeps the potential rule count small and style recalculations fast.
 >
@@ -146,6 +148,17 @@ These are importable from `@jasonshimmy/custom-elements-runtime/jit-css`.
 4. **Minification:** Strips whitespace and comments for fast, small payloads.
 5. **Memoization & Throttling:** Caches CSS output for repeated HTML inputs and throttles regeneration for performance.
 
+### Deterministic cascade order
+
+Generated rules use canonical property order instead of source class order. Broad shorthands are emitted before axis and side properties, so the targeted class wins in either spelling:
+
+```html
+<div class="m-0 mt-4"></div>
+<div class="mt-4 m-0"></div>
+```
+
+Both produce the same ordered CSS. The guarantee applies to margin, padding, inset, scroll spacing, border width, and border radius, including matching variant contexts such as `hover:m-0 hover:mt-4`. `!important` utilities remain an intentional exception.
+
 ## 🧩 Built-in Utilities
 
 ### **Layout & Display**
@@ -177,6 +190,8 @@ The `size-*` shorthand sets both `width` and `height` in a single utility — id
 
 **Semantic Sizes:**
 `w-3xs` to `w-7xl`, `h-3xs` to `h-7xl`, `max-w-3xs` to `max-w-7xl`, `max-h-3xs` to `max-h-7xl`, `min-w-3xs` to `min-w-7xl`, `min-h-3xs` to `min-h-7xl`
+
+**Logical Sizes (Tailwind 4.2):** `inline-*`, `block-*`, `min-inline-*`, `max-inline-*`, `min-block-*`, `max-block-*`, including numeric, arbitrary, semantic, `auto`, `full`, `screen`, `min`, `max`, and `fit` values.
 
 ### **Spacing (Margin/Padding/Gap/Inset):**
 
@@ -458,6 +473,8 @@ Examples: `from-primary-500`, `to-secondary-600`, `via-neutral-300`
 ### **Container Queries**
 
 `@container` - Sets `container-type: inline-size`
+`@container/{name}` - Creates a named inline-size container
+`@container-size` / `@container-size/{name}` - Creates an optional named size container (Tailwind 4.3)
 
 ### **Colors**
 
@@ -569,7 +586,7 @@ Apply filter effects to the area **behind** an element (e.g., frosted glass). Us
 
 **Scroll Behavior:** `scroll-smooth`, `scroll-auto`
 
-**Scroll Margin / Padding:** `scroll-m-0`, `scroll-p-0`
+**Scroll Margin / Padding:** every broad, axis, logical-side, and physical-side form, including `scroll-m-*`, `scroll-mx-*`, `scroll-mbs-*`, `scroll-mt-*`, `scroll-p-*`, `scroll-px-*`, `scroll-pbe-*`, and `scroll-pb-*`.
 
 **Snap Type:** `snap-none`, `snap-x`, `snap-y`, `snap-both`, `snap-mandatory`, `snap-proximity`
 
@@ -616,7 +633,7 @@ Apply filter effects to the area **behind** an element (e.g., frosted glass). Us
 ```
 
 **Color Scheme (Tailwind 4):**
-`scheme-light`, `scheme-dark`, `scheme-both`, `scheme-only-light`, `scheme-only-dark` — control browser-native UI elements (scrollbars, form controls) to match the active color scheme.
+`scheme-light`, `scheme-dark`, `scheme-light-dark` (`scheme-both` alias), `scheme-only-light`, `scheme-only-dark` — control browser-native UI elements (scrollbars, form controls) to match the active color scheme.
 
 ```html
 <html class="scheme-dark">
@@ -638,10 +655,15 @@ Logical properties improve RTL and vertical writing-mode support by using flow-r
 | ------------------ | ------------------------------------------------------- |
 | `ms-4`, `me-4`     | `margin-inline-start`, `margin-inline-end`              |
 | `ps-4`, `pe-4`     | `padding-inline-start`, `padding-inline-end`            |
-| `bs-4`, `be-4`     | `border-block-start-width`, `border-block-end-width`    |
+| `mbs-4`, `mbe-4`   | `margin-block-start`, `margin-block-end`                |
+| `pbs-4`, `pbe-4`   | `padding-block-start`, `padding-block-end`              |
 | `start-4`, `end-4` | `inset-inline-start`, `inset-inline-end`                |
+| `inset-bs-*`       | `inset-block-start`                                     |
+| `inset-be-*`       | `inset-block-end`                                       |
 | `border-s-*`       | `border-inline-start-width`                             |
 | `border-e-*`       | `border-inline-end-width`                               |
+| `border-bs-*`      | `border-block-start-width`                              |
+| `border-be-*`      | `border-block-end-width`                                |
 | `rounded-s-*`      | `border-start-start-radius` + `border-end-start-radius` |
 | `rounded-e-*`      | `border-start-end-radius` + `border-end-end-radius`     |
 | `text-start`       | `text-align: start`                                     |
@@ -657,9 +679,16 @@ Logical properties improve RTL and vertical writing-mode support by using flow-r
 
 All logical spacing utilities accept the same numeric, fraction, and negative values as their physical equivalents.
 
+**Tailwind 4.3 platform utilities:**
+
+- Scrollbars: `scrollbar-auto`, `scrollbar-thin`, `scrollbar-none`, `scrollbar-thumb-{color}`, `scrollbar-track-{color}`, `scrollbar-gutter-auto`, `scrollbar-gutter-stable`, `scrollbar-gutter-both`
+- Zoom: `zoom-*`, `zoom-[value]`, `zoom-(--variable)`
+- Tabs: `tab` (defaults to 4), `tab-*`, `tab-[value]`, `tab-(--variable)`
+- Font features: `font-features-normal`, `font-features-[value]`, `font-features-(--variable)`
+
 **Text Shadow (Tailwind 4):**
 
-`text-shadow-xs`, `text-shadow-sm`, `text-shadow`, `text-shadow-md`, `text-shadow-lg`, `text-shadow-xl`, `text-shadow-2xl`, `text-shadow-none`
+`text-shadow-2xs`, `text-shadow-xs`, `text-shadow-sm`, `text-shadow`, `text-shadow-md`, `text-shadow-lg`, `text-shadow-xl`, `text-shadow-2xl`, `text-shadow-none`
 
 Pair with a color utility to tint the shadow:
 
@@ -712,9 +741,9 @@ Used exclusively with the `before:` and `after:` variants to add decorative cont
 
 ## 🧑‍💻 Variants
 
-**State:** `hover:`, `focus:`, `active:`, `disabled:`, `visited:`, `checked:`, `first:`, `last:`, `odd:`, `even:`, `before:`, `after:`, `focus-within:`, `focus-visible:`
+**State:** `hover:`, `focus:`, `active:`, `disabled:`, `visited:`, `checked:`, `first:`, `last:`, `only:`, `odd:`, `even:`, `first-of-type:`, `last-of-type:`, `only-of-type:`, `empty:`, `target:`, `enabled:`, `indeterminate:`, `default:`, `optional:`, `required:`, `valid:`, `invalid:`, `user-valid:`, `user-invalid:`, `in-range:`, `out-of-range:`, `placeholder-shown:`, `autofill:`, `read-only:`, `focus-within:`, `focus-visible:`
 
-**Pseudo-Element:** `placeholder:`, `file:`, `marker:`, `selection:`, `open:`
+**Pseudo-Element and child:** `before:`, `after:`, `placeholder:`, `file:`, `marker:`, `selection:`, `first-letter:`, `first-line:`, `backdrop:`, `details-content:`, `*:`, `**:`
 
 | Variant        | CSS Selector Applied         | Use Case                                                |
 | -------------- | ---------------------------- | ------------------------------------------------------- |
@@ -747,9 +776,9 @@ Used exclusively with the `before:` and `after:` variants to add decorative cont
 
 **Peer:** `peer-hover:`, `peer-focus:`, `peer-checked:`, `peer-disabled:`
 
-**Responsive:** `sm:`, `md:`, `lg:`, `xl:`, `2xl:`
+**Responsive:** `sm:`, `md:`, `lg:`, `xl:`, `2xl:`, plus explicit `min-*:` and `max-*:` ranges.
 
-**Container Queries:** `@xs:`, `@sm:`, `@md:`, `@lg:`, `@xl:`, `@2xl:`, `@3xl:`, `@4xl:`, `@5xl:`, `@6xl:`, `@7xl:`
+**Container Queries:** `@3xs:`, `@2xs:`, `@xs:` through `@7xl:`, plus `@max-3xs:` through `@max-7xl:`.
 
 **Arbitrary Container Queries:** `@[value]:` (e.g., `@[300px]:`, `@[20rem]:`, `@[50%]:`)
 
@@ -764,6 +793,8 @@ Used exclusively with the `before:` and `after:` variants to add decorative cont
 **Print:** `print:` (applies inside a `@media print` context)
 
 **Accessibility:** `forced-colors:` (applies inside `@media (forced-colors: active)` — targets Windows High Contrast mode and other accessibility color-forcing displays)
+
+**Environment:** `contrast-more:`, `contrast-less:`, `inverted-colors:`, `portrait:`, `landscape:`, `noscript:`, `pointer-fine:`, `pointer-coarse:`, `pointer-none:`, `any-pointer-fine:`, `any-pointer-coarse:`, `any-pointer-none:`
 
 ```html
 <!-- Hide decorative elements in high contrast mode -->
@@ -787,6 +818,9 @@ Used exclusively with the `before:` and `after:` variants to add decorative cont
 | Variant                             | CSS Output                                   | Use Case                                                           |
 | ----------------------------------- | -------------------------------------------- | ------------------------------------------------------------------ |
 | `data-[attr]:` / `data-[attr=val]:` | `[data-attr]` / `[data-attr="val"]` selector | Style based on `data-*` attribute state (headless UI, Radix, etc.) |
+| `data-name:`                        | `[data-name]` selector                       | Boolean data attribute shorthand                                   |
+| `aria-name:` / `aria-[name=val]:`   | ARIA boolean / value selector                | Accessible widget state                                            |
+| `nth-[formula]:`                    | `:nth-child(formula)`                        | Functional child-position state                                    |
 | `has-[selector]:`                   | `:has(selector)` on the element              | Parent-conditional styling when a descendant matches               |
 | `not-[selector]:`                   | `:not(selector)` on the element              | Style when the element does NOT match the selector                 |
 | `in-[selector]:`                    | Ancestor `selector` scope                    | Style when inside an ancestor matching the selector                |
@@ -868,9 +902,12 @@ Based on the enhanced property mappings in the implementation:
 - `z-[value]` → `z-index`
 - `p-[value]`, `px-[value]`, `py-[value]` → padding variants
 - `m-[value]`, `mx-[value]`, `my-[value]` → margin variants
+- All physical/logical spacing and scroll-spacing prefixes, including `pt`, `pr`, `pb`, `pl`, `ps`, `pe`, `pbs`, `pbe`, `mt`, `mr`, `mb`, `ml`, `ms`, `me`, `mbs`, `mbe`, `scroll-mbs`, and `scroll-pbe`
 - `w-[value]`, `h-[value]` → width, height
 - `size-[value]` → width **and** height simultaneously (e.g. `size-[40px]`)
 - `min-w-[value]`, `max-w-[value]`, `min-h-[value]`, `max-h-[value]` → size constraints
+- `inline-[value]`, `block-[value]` and their `min-` / `max-` forms → logical sizing
+- `font-features-[value]`, `tab-[value]`, `zoom-[value]` → Tailwind 4.2/4.3 platform properties
 - `content-[value]` → CSS `content` property for `::before`/`::after` pseudo-elements (e.g. `before:content-['→']`)
 - `border-t-[value]`, `border-r-[value]`, `border-b-[value]`, `border-l-[value]` → directional borders
 - `border-x-[value]`, `border-y-[value]` → axis borders
@@ -940,7 +977,9 @@ Multi-segment variable names (e.g. `--md-sys-color-primary`) work without any ex
 Variants compose with the shorthand normally:
 
 ```html
-<button class="hover:bg-(--color-interactive) focus:outline-(--color-focus-ring)">
+<button
+  class="hover:bg-(--color-interactive) focus:outline-(--color-focus-ring)"
+>
   Themed button
 </button>
 <div class="dark:text-(--on-dark-surface) sm:p-(--layout-gutter)">
@@ -979,6 +1018,7 @@ Arbitrary variants allow you to target custom selectors, attributes, or states d
 - Arbitrary variants are parsed before the base utility.
 - The variant is prepended to the generated CSS selector.
 - You can combine arbitrary variants with built-in variants (e.g., `hover:`, `md:`, `dark:`).
+- Unknown variants fail closed and emit no rule; a misspelled condition is never applied unconditionally.
 
 **Supported Patterns:**
 
@@ -1016,7 +1056,7 @@ JIT CSS provides a rich set of built-in color palettes, all accessible via utili
 
 **Extended Color Palette (opt-in):**
 
-For a full Tailwind-compatible color palette (`slate`, `gray`, `zinc`, `stone`, `red`, `orange`, `amber`, `yellow`, `lime`, `green`, `emerald`, `teal`, `cyan`, `sky`, `blue`, `indigo`, `violet`, `purple`, `fuchsia`, `pink`, `rose`), import the opt-in module:
+For the extended Tailwind-compatible color palette (`slate`, `gray`, `zinc`, `stone`, `mauve`, `olive`, `mist`, `taupe`, `red`, `orange`, `amber`, `yellow`, `lime`, `green`, `emerald`, `teal`, `cyan`, `sky`, `blue`, `indigo`, `violet`, `purple`, `fuchsia`, `pink`, `rose`), import the opt-in module:
 
 ```ts
 import { extendedColors } from '@jasonshimmy/custom-elements-runtime/css/colors';
@@ -1326,17 +1366,21 @@ component('hybrid-button', () => {
   return html`
     <button
       class="btn-custom px-4 py-2 rounded-lg font-medium transition-colors
-                   ${props.variant === 'primary'
-        ? 'bg-primary-500 hover:bg-primary-600 text-white'
-        : props.variant === 'secondary'
-          ? 'bg-secondary-500 hover:bg-secondary-600 text-white'
-          : 'bg-neutral-200 hover:bg-neutral-300 text-neutral-800'}"
+                   ${
+                     props.variant === 'primary'
+                       ? 'bg-primary-500 hover:bg-primary-600 text-white'
+                       : props.variant === 'secondary'
+                         ? 'bg-secondary-500 hover:bg-secondary-600 text-white'
+                         : 'bg-neutral-200 hover:bg-neutral-300 text-neutral-800'
+                   }"
     >
-      ${props.loading
-        ? html`<span
-            class="loading-spinner inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full"
-          ></span>`
-        : ''}
+      ${
+        props.loading
+          ? html`<span
+              class="loading-spinner inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full"
+            ></span>`
+          : ''
+      }
       <slot></slot>
     </button>
   `;
@@ -1708,12 +1752,13 @@ All of the following are exported from `@jasonshimmy/custom-elements-runtime/jit
 - `parseColorWithOpacity(className: string): string | null` — Parses a color class with an optional `/opacity` modifier
 - `parseGradientColorStop(className: string): string | null` — Parses gradient color stop utilities (`from-*`, `via-*`, `to-*`)
 - `parseArbitrary(className: string): string | null` — Parses arbitrary value utilities (`w-[200px]`, `bg-[#ff0000]`, `bg-(--my-var)`, etc.). CSS variable shorthand (`prop-(--x)`) is normalized to `prop-[var(--x)]` before parsing.
+- `parseFunctionalUtility(className: string): string | null` — Parses named container, `tab-*`, and `zoom-*` functional utilities.
 
 ### **Configuration Objects**
 
 - `selectorVariants: SelectorVariantMap` — State and pseudo-class variants (`hover:`, `focus:`, `disabled:`, `inert:`, etc.)
 - `mediaVariants: MediaVariantMap` — Responsive breakpoint media queries (`sm:`, `md:`, `lg:`, `xl:`, `2xl:`, `dark:`)
-- `containerVariants: MediaVariantMap` — Container query breakpoints (`@sm:`, `@md:`, `@lg:`, `@xl:`, `@2xl:`)
+- `containerVariants: MediaVariantMap` — Container query breakpoints (`@3xs:`, `@2xs:`, `@xs:`, `@sm:`, `@md:`, `@lg:`, `@xl:`, `@2xl:`)
 
 > **Note:** Lower-level helpers such as `spacingProps`, `parseOpacityModifier`, and `parseArbitraryVariant` are available from `src/lib/runtime/style.ts` for library authors but are not re-exported from any public entry point. Pure CSS utilities (`minifyCSS`, `sanitizeCSS`, `baseReset`, `cssEscape`, `escapeClassName`, `css`) live in `src/lib/runtime/css-utils.ts`; `css` is re-exported from the root package entry.
 
@@ -1726,10 +1771,10 @@ All of the following are exported from `@jasonshimmy/custom-elements-runtime/jit
 
 ## Known Limitations
 
-- **No arbitrary value syntax for all properties.** Classes like `w-[42px]` or `mt-[1.5rem]` are supported for spacing and a subset of layout properties, but not every CSS property has arbitrary-value support. If you need a value not covered by a static utility, use `useStyle()` with the `css` tag instead.
-- **CSS is regenerated on every render.** The JIT engine scans the rendered HTML for class names and rebuilds the component's stylesheet on each render pass. There is no render-to-render diffing of generated CSS rules. For components that re-render frequently with a large, stable set of classes, the overhead is minimal in practice (the generated CSS string is the same and browser style application is idempotent), but it is not zero. If this is a bottleneck, measure with `updateHealthMetric('averageRenderTime', …)` and consider moving stable base styles to `useStyle()`.
+- **Compatibility layer, not the Tailwind compiler.** CER does not implement Tailwind's plugin API, CSS theme/configuration DSL, or every specialized utility and compound variant. Use arbitrary values/selectors, `customColors`, or `useStyle()` for project-specific cases. This boundary is intentional so the runtime remains dependency-free and CDN-friendly.
+- **Canonical replacement when the class set grows.** Parsed rules and complete class sets are cached, unchanged output skips stylesheet replacement, and the DOM scanner never rescans the full DOM. When a genuinely new class appears, CER replaces the compact generated sheet in canonical order. This small amount of work is what guarantees that side utilities keep precedence even when classes arrive in separate mutations.
 - **No design-time Intellisense.** Because classes are resolved at runtime from string literals, editor autocomplete for class names (like Tailwind's VS Code extension) does not work out of the box. Use the `cls()` helper or configure your editor's Tailwind plugin to scan the relevant file patterns.
 - **Shadow DOM isolation applies.** JIT CSS rules are injected into each component's shadow root, not into the global document stylesheet. Classes set on elements outside the shadow root (e.g., on the host element itself via `:host`) must be handled with `useDesignTokens()` or explicit `:host` rules in `useStyle()`.
-- **`dark:` variant requires a `prefers-color-scheme` media query.** The JIT engine's `dark:` variant is implemented via `@media (prefers-color-scheme: dark)`. Class-based dark mode toggling (e.g., `document.documentElement.classList.add('dark')`) is not supported out of the box.
+- **Dark mode has two explicit forms.** `dark:` follows `prefers-color-scheme`; use `dark-class:` when the component host carries a `.dark` class.
 
 For complete implementation details, see [`src/lib/runtime/style.ts`](../src/lib/runtime/style.ts).

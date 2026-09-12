@@ -82,16 +82,27 @@ describe('Prose Typography Integration', () => {
       // Generate prose CSS directly
       const proseCSS = generateProseCSS('prose');
 
-      // Prose styles should use :not(.not-prose):not(.not-prose *) selectors
+      // A selector-list :not() excludes both the opt-out element and its subtree
+      // with less generated CSS than two separate :not() clauses.
       expect(proseCSS).toBeTruthy();
       expect(proseCSS).toContain('.prose');
-      expect(proseCSS).toContain(':not(.not-prose)');
-      expect(proseCSS).toContain(':not(.not-prose *)');
+      expect(proseCSS).toContain(':not(.not-prose,.not-prose *)');
 
       // Check that multiple elements use the selector
-      expect(proseCSS).toContain('p:not(.not-prose):not(.not-prose *)');
-      expect(proseCSS).toContain('a:not(.not-prose):not(.not-prose *)');
-      expect(proseCSS).toContain('h1:not(.not-prose):not(.not-prose *)');
+      expect(proseCSS).toContain('p:not(.not-prose,.not-prose *)');
+      expect(proseCSS).toContain('a:not(.not-prose,.not-prose *)');
+      expect(proseCSS).toContain('h1:not(.not-prose,.not-prose *)');
+    });
+
+    it('uses paragraph rhythm for standalone images and figures', () => {
+      const proseCSS = generateProseCSS('prose');
+
+      expect(proseCSS).toContain(
+        '.prose figure:not(.not-prose,.not-prose *){margin-top:1.25em;margin-bottom:1.25em;}',
+      );
+      expect(proseCSS).toContain(
+        '.prose img:not(.not-prose,.not-prose *),.prose video:not(.not-prose,.not-prose *),.prose picture:not(.not-prose,.not-prose *){margin-top:1.25em;margin-bottom:1.25em;',
+      );
     });
   });
 
