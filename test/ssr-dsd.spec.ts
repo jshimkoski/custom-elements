@@ -80,7 +80,7 @@ describe('buildShadowStyleBlock prose CSS inlining', () => {
       /<template shadowrootmode="open">([\s\S]*?)<\/template>/,
     )?.[1] ?? '';
     const baseProseIndex = shadowContent.indexOf(
-      '.prose{--cer-prose-body:var(--cer-color-neutral-900)',
+      '.prose{color:var(--cer-prose-body,var(--cer-color-neutral-900))',
     );
     const darkProseIndex = shadowContent.indexOf('.dark\\:prose-invert{');
 

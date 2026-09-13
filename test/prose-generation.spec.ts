@@ -26,16 +26,18 @@ describe('Prose CSS Generation Verification', () => {
     const proseSheet = getProseSheet();
     const css = proseSheet ? proseSheet.toString() : '';
 
-    // Container and variables
+    // Container and inherited token fallbacks
     expect(css).toContain('.prose{');
-    expect(css).toContain('--cer-prose-body:');
-    expect(css).toContain('--cer-prose-headings:');
-    expect(css).toContain('--cer-prose-links:');
-    expect(css).toContain('--cer-prose-code:');
-    expect(css).toContain('--cer-prose-pre-code:');
-    expect(css).toContain('--cer-prose-list-marker:');
-    expect(css).toContain('--cer-prose-counters:');
-    expect(css).toContain('--cer-prose-bullets:');
+    expect(css).toContain(
+      'color:var(--cer-prose-body,var(--cer-color-neutral-900))',
+    );
+    expect(css).toContain(
+      'color:var(--cer-prose-headings,var(--cer-color-neutral-900))',
+    );
+    expect(css).toContain(
+      'color:var(--cer-prose-links,var(--cer-color-neutral-700))',
+    );
+    expect(css).not.toContain('.prose{--cer-prose-body:');
 
     // Typography elements exclude .not-prose subtrees with a compact selector list.
     expect(css).toContain('.prose p:not(.not-prose,.not-prose *)');
@@ -66,8 +68,12 @@ describe('Prose CSS Generation Verification', () => {
     expect(css).toContain(
       '.prose pre:not(.not-prose,.not-prose *) code:not(.not-prose,.not-prose *)',
     );
-    expect(css).toContain('background-color:var(--cer-prose-code-bg)');
-    expect(css).toContain('background-color:var(--cer-prose-pre-bg)');
+    expect(css).toContain(
+      'background-color:var(--cer-prose-code-bg,var(--cer-color-neutral-100))',
+    );
+    expect(css).toContain(
+      'background-color:var(--cer-prose-pre-bg,var(--cer-color-neutral-100))',
+    );
     expect(css).toContain('font-family:ui-monospace');
 
     // Blockquotes (now with :not(.not-prose) selectors)

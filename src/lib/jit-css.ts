@@ -32,6 +32,7 @@ export {
   parseZIndex,
   parseArbitrary,
   parseFunctionalUtility,
+  parseProseAccent,
   utilityMap,
   selectorVariants,
   mediaVariants,

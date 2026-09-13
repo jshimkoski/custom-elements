@@ -1165,7 +1165,8 @@ The Prose typography system provides beautiful, professional typography defaults
 
 **Color Schemes:**
 
-Apply semantic color schemes with automatic dark mode support:
+Apply semantic or enabled extended color schemes with automatic dark mode
+support, use one exact palette step, or consume an inherited custom property:
 
 ```html
 <!-- Primary colored links (adapts to light/dark) -->
@@ -1173,9 +1174,26 @@ Apply semantic color schemes with automatic dark mode support:
   <p><a href="#">Primary colored link</a></p>
 </article>
 
+<article class="prose prose-violet">
+  <p><a href="#">Violet family link</a></p>
+</article>
+
+<article class="prose prose-rose-600">
+  <p><a href="#">Exact rose-600 link</a></p>
+</article>
+
+<article class="prose prose-(--md-sys-color-primary)">
+  <p><a href="#">Material semantic link</a></p>
+</article>
+
 <!-- Available: prose-primary, prose-secondary, prose-success, 
      prose-info, prose-warning, prose-error -->
 ```
+
+`prose-violet` requires `extendedColors: ['violet']` (or `true`). Arbitrary
+custom-property accents require no color registration. Prose accent utilities
+change link roles only; all other prose colors are controlled by inherited
+`--cer-prose-*` theme tokens.
 
 **Element Modifiers:**
 

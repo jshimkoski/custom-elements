@@ -1639,6 +1639,47 @@ export function parseProseElementModifier(className: string): string | null {
   );
 }
 
+/**
+ * Parse prose accent utilities.
+ *
+ * - `prose-blue` uses the active color family's accessible light/dark steps.
+ * - `prose-blue-600` uses one exact palette value for every color scheme.
+ * - `prose-(--brand-color)` consumes an inherited CSS custom property directly.
+ *
+ * A prose accent intentionally controls links only. Body, surface, and border
+ * colors require separate semantic roles and remain available through the
+ * public inherited `--cer-prose-*` token contract.
+ */
+export function parseProseAccent(className: string): string | null {
+  if (!className.startsWith('prose-')) return null;
+
+  const token = className.slice(6);
+  const variable = /^\((--[a-zA-Z_][\w-]*)\)$/.exec(token);
+  if (variable) {
+    const value = `var(${variable[1]})`;
+    return `--cer-prose-links:${value};--cer-prose-links-hover:${value};--cer-prose-invert-links:${value};--cer-prose-invert-links-hover:${value};`;
+  }
+
+  const family = _activeColors[token];
+  if (family) {
+    const links = family['700'] ?? family.DEFAULT;
+    if (!links) return null;
+    const hover = family['500'] ?? links;
+    const invert = family['300'] ?? links;
+    const invertHover = family['100'] ?? invert;
+    return `--cer-prose-links:${links};--cer-prose-links-hover:${hover};--cer-prose-invert-links:${invert};--cer-prose-invert-links-hover:${invertHover};`;
+  }
+
+  const separator = token.lastIndexOf('-');
+  if (separator <= 0) return null;
+  const exact = _activeColors[token.slice(0, separator)]?.[
+    token.slice(separator + 1)
+  ];
+  return exact
+    ? `--cer-prose-links:${exact};--cer-prose-links-hover:${exact};--cer-prose-invert-links:${exact};--cer-prose-invert-links-hover:${exact};`
+    : null;
+}
+
 // Optimized parsing functions with better performance
 function insertPseudoBeforeCombinator(sel: string, pseudo: string): string {
   let depth = 0;
@@ -2240,6 +2281,7 @@ function parseUtilityBody(className: string): string | null {
     parseSpaceUtility(className) ??
     parseOpacity(className) ??
     parseZIndex(className) ??
+    parseProseAccent(className) ??
     parseColorWithOpacity(className) ??
     parseGradientColorStop(className) ??
     parseFunctionalUtility(className) ??

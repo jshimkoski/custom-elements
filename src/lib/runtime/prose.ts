@@ -120,9 +120,13 @@ export function generateProseCSS(className: string): string | null {
     rules.push(`${targets.split(',').map(scoped).join(',')}{${body}}`);
   };
 
-  // Base prose container styles with CSS variables
+  // Base prose container styles. Each public --cer-prose-* token is consumed
+  // with a standalone fallback instead of being assigned on the container.
+  // This lets document-level design systems provide inherited prose tokens
+  // through shadow boundaries while preserving the existing CER palette when
+  // no integration is present.
   rules.push(
-    `${selector}{--cer-prose-body:var(--cer-color-neutral-900);--cer-prose-headings:var(--cer-color-neutral-900);--cer-prose-lead:var(--cer-color-neutral-700);--cer-prose-links:var(--cer-color-neutral-700);--cer-prose-links-hover:var(--cer-color-neutral-500);--cer-prose-bold:var(--cer-color-neutral-900);--cer-prose-quotes:var(--cer-color-neutral-700);--cer-prose-quote-border:var(--cer-color-neutral-200);--cer-prose-code:var(--cer-color-neutral-800);--cer-prose-code-bg:var(--cer-color-neutral-100);--cer-prose-pre-code:var(--cer-color-neutral-800);--cer-prose-pre-bg:var(--cer-color-neutral-100);--cer-prose-pre-border:var(--cer-color-neutral-200);--cer-prose-hr:var(--cer-color-neutral-200);--cer-prose-caps:var(--cer-color-neutral-600);--cer-prose-list-marker:var(--cer-color-neutral-600);--cer-prose-list-marker-strong:var(--cer-color-neutral-700);--cer-prose-counters:var(--cer-color-neutral-600);--cer-prose-bullets:var(--cer-color-neutral-400);--cer-prose-img-caption:var(--cer-color-neutral-600);--cer-prose-table-border:var(--cer-color-neutral-200);--cer-prose-table-head:var(--cer-color-neutral-700);color:var(--cer-prose-body);font-size:${size.fontSize};line-height:${size.lineHeight};max-width:65ch;}`,
+    `${selector}{color:var(--cer-prose-body,var(--cer-color-neutral-900));font-size:${size.fontSize};line-height:${size.lineHeight};max-width:65ch;}`,
   );
 
   // Paragraphs
@@ -131,13 +135,13 @@ export function generateProseCSS(className: string): string | null {
   // Lead text
   add(
     '.lead,[class~="lead"]',
-    `font-size:1.25em;line-height:1.6;margin-top:${size.lead};margin-bottom:${size.lead};color:var(--cer-prose-lead);`,
+    `font-size:1.25em;line-height:1.6;margin-top:${size.lead};margin-bottom:${size.lead};color:var(--cer-prose-lead,var(--cer-color-neutral-700));`,
   );
 
   // Headings
   add(
     'h1,h2,h3,h4,h5,h6',
-    'color:var(--cer-prose-headings);font-weight:700;line-height:1.25;',
+    'color:var(--cer-prose-headings,var(--cer-color-neutral-900));font-weight:700;line-height:1.25;',
   );
   add(
     'h1',
@@ -160,12 +164,18 @@ export function generateProseCSS(className: string): string | null {
   // Links
   add(
     'a',
-    'color:var(--cer-prose-links);text-decoration:underline;text-decoration-thickness:.08em;text-underline-offset:.15em;font-weight:500;',
+    'color:var(--cer-prose-links,var(--cer-color-neutral-700));text-decoration:underline;text-decoration-thickness:.08em;text-underline-offset:.15em;font-weight:500;',
   );
-  add('a:hover,a:focus', 'color:var(--cer-prose-links-hover);');
+  add(
+    'a:hover,a:focus',
+    'color:var(--cer-prose-links-hover,var(--cer-color-neutral-500));',
+  );
 
   // Strong and emphasis
-  add('strong', 'color:var(--cer-prose-bold);font-weight:600;');
+  add(
+    'strong',
+    'color:var(--cer-prose-bold,var(--cer-color-neutral-900));font-weight:600;',
+  );
   add('em', 'font-style:italic;');
 
   // Ordered lists
@@ -186,7 +196,7 @@ export function generateProseCSS(className: string): string | null {
   }
   rules.push(`${ol}>${li}{position:relative;padding-left:${size.li};}`);
   rules.push(
-    `${ol}>${li}::marker{color:var(--cer-prose-counters);font-weight:400;}`,
+    `${ol}>${li}::marker{color:var(--cer-prose-counters,var(--cer-color-neutral-600));font-weight:400;}`,
   );
 
   // Unordered lists
@@ -194,7 +204,9 @@ export function generateProseCSS(className: string): string | null {
     `${ul}{list-style-type:disc;margin-top:${size.ul};margin-bottom:${size.ul};padding-left:1.625em;}`,
   );
   rules.push(`${ul}>${li}{position:relative;padding-left:${size.li};}`);
-  rules.push(`${ul}>${li}::marker{color:var(--cer-prose-bullets);}`);
+  rules.push(
+    `${ul}>${li}::marker{color:var(--cer-prose-bullets,var(--cer-color-neutral-400));}`,
+  );
 
   // Nested lists and list item content
   rules.push(
@@ -213,13 +225,13 @@ export function generateProseCSS(className: string): string | null {
   // Inline code
   add(
     'code',
-    `color:var(--cer-prose-code);background-color:var(--cer-prose-code-bg);border-radius:0.25rem;padding:0.125rem 0.25rem;font-size:${size.code};font-weight:600;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;`,
+    `color:var(--cer-prose-code,var(--cer-color-neutral-800));background-color:var(--cer-prose-code-bg,var(--cer-color-neutral-100));border-radius:0.25rem;padding:0.125rem 0.25rem;font-size:${size.code};font-weight:600;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;`,
   );
 
   // Code blocks
   const pre = scoped('pre');
   rules.push(
-    `${pre}{color:var(--cer-prose-pre-code);background-color:var(--cer-prose-pre-bg);border:1px solid var(--cer-prose-pre-border);overflow-x:auto;font-size:${size.pre};line-height:1.7142857;margin-top:1.7142857em;margin-bottom:1.7142857em;border-radius:0.375rem;padding:0.8571429em 1.1428571em;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;white-space:pre;overflow-wrap:normal;}`,
+    `${pre}{color:var(--cer-prose-pre-code,var(--cer-color-neutral-800));background-color:var(--cer-prose-pre-bg,var(--cer-color-neutral-100));border:1px solid var(--cer-prose-pre-border,var(--cer-color-neutral-200));overflow-x:auto;font-size:${size.pre};line-height:1.7142857;margin-top:1.7142857em;margin-bottom:1.7142857em;border-radius:0.375rem;padding:0.8571429em 1.1428571em;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;white-space:pre;overflow-wrap:normal;}`,
   );
   rules.push(
     `${pre} code${excluded}{background-color:transparent;border-width:0;border-radius:0;padding:0;font-weight:inherit;color:inherit;font-size:inherit;line-height:inherit;}`,
@@ -228,7 +240,7 @@ export function generateProseCSS(className: string): string | null {
   // Blockquotes
   const blockquote = scoped('blockquote');
   rules.push(
-    `${blockquote}{font-weight:500;font-style:italic;color:var(--cer-prose-quotes);border-left-width:0.25rem;border-left-color:var(--cer-prose-quote-border);quotes:"\\201C""\\201D""\\2018""\\2019";margin-top:${size.blockquote};margin-bottom:${size.blockquote};padding-left:1em;}`,
+    `${blockquote}{font-weight:500;font-style:italic;color:var(--cer-prose-quotes,var(--cer-color-neutral-700));border-left-width:0.25rem;border-left-color:var(--cer-prose-quote-border,var(--cer-color-neutral-200));quotes:"\\201C""\\201D""\\2018""\\2019";margin-top:${size.blockquote};margin-bottom:${size.blockquote};padding-left:1em;}`,
   );
   rules.push(
     `${blockquote} ${paragraph}:first-of-type::before{content:open-quote;}`,
@@ -240,7 +252,7 @@ export function generateProseCSS(className: string): string | null {
   // Horizontal rules
   add(
     'hr',
-    `border-color:var(--cer-prose-hr);border-top-width:1px;margin-top:${size.hr};margin-bottom:${size.hr};`,
+    `border-color:var(--cer-prose-hr,var(--cer-color-neutral-200));border-top-width:1px;margin-top:${size.hr};margin-bottom:${size.hr};`,
   );
 
   // Figures and standalone media use paragraph rhythm. The previous figure
@@ -250,7 +262,7 @@ export function generateProseCSS(className: string): string | null {
   rules.push(`${figure}>*{margin-top:0;margin-bottom:0;}`);
   add(
     'figcaption',
-    'color:var(--cer-prose-img-caption);font-size:0.875em;line-height:1.4285714;margin-top:0.75em;',
+    'color:var(--cer-prose-img-caption,var(--cer-color-neutral-600));font-size:0.875em;line-height:1.4285714;margin-top:0.75em;',
   );
   const media = ['img', 'video', 'picture'].map(scoped).join(',');
   rules.push(
@@ -271,13 +283,13 @@ export function generateProseCSS(className: string): string | null {
     `${table}{width:100%;table-layout:auto;text-align:left;margin-top:${size.table};margin-bottom:${size.table};font-size:0.875em;line-height:1.7142857;}`,
   );
   rules.push(
-    `${thead}{border-bottom-width:1px;border-bottom-color:var(--cer-prose-table-border);}`,
+    `${thead}{border-bottom-width:1px;border-bottom-color:var(--cer-prose-table-border,var(--cer-color-neutral-200));}`,
   );
   rules.push(
-    `${thead} th${excluded}{color:var(--cer-prose-table-head);font-weight:600;vertical-align:bottom;padding-right:0.5714286em;padding-bottom:0.5714286em;padding-left:0.5714286em;}`,
+    `${thead} th${excluded}{color:var(--cer-prose-table-head,var(--cer-color-neutral-700));font-weight:600;vertical-align:bottom;padding-right:0.5714286em;padding-bottom:0.5714286em;padding-left:0.5714286em;}`,
   );
   rules.push(
-    `${tbody} ${row}{border-bottom-width:1px;border-bottom-color:var(--cer-prose-table-border);}`,
+    `${tbody} ${row}{border-bottom-width:1px;border-bottom-color:var(--cer-prose-table-border,var(--cer-color-neutral-200));}`,
   );
   rules.push(`${tbody} ${row}:last-child{border-bottom-width:0;}`);
   rules.push(

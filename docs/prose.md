@@ -116,6 +116,35 @@ Prose includes semantic color schemes for links with automatic dark mode support
 </article>
 ```
 
+Any enabled extended color family can also be used as a prose accent. A family
+name selects accessible light and inverted steps, while an exact step uses that
+value in both schemes:
+
+```html
+<article class="prose prose-violet">Adaptive violet links</article>
+<article class="prose prose-rose-600">Exact rose-600 links</article>
+```
+
+Enable only the families the application uses to keep the active JIT palette
+small:
+
+```ts
+enableJITCSS({ extendedColors: ['violet', 'rose'] });
+```
+
+CSS custom properties require no palette registration. This is particularly
+useful with semantic tokens from another CER package:
+
+```html
+<article class="prose prose-(--md-sys-color-primary)">
+  <a href="#">Material primary link</a>
+</article>
+```
+
+These accent utilities intentionally affect links only. Set the inherited
+`--cer-prose-*` tokens when body, heading, surface, or border roles also need to
+change.
+
 ### Responsive Typography
 
 Combine prose sizes with responsive variants for adaptive typography:
@@ -407,7 +436,10 @@ The `.not-prose` class gives you complete control when you need to break out of 
 
 ## 🎨 Theming with CSS Variables
 
-Prose uses CSS variables for all colors, making it easy to create custom themes:
+Prose uses inherited CSS variables for all colors, making it easy to create
+custom themes at `:root`, on a component host, or on an individual prose
+container. Defaults are applied as property-level fallbacks, so a value defined
+outside a shadow root is not masked by the generated `.prose` rule:
 
 ```typescript
 component('themed-article', () => {
@@ -441,6 +473,9 @@ component('themed-article', () => {
 ```
 
 ### Available CSS Variables
+
+All variables in this table are public, inherited theme inputs. The default is
+used only when the variable is not defined by the application or an integration.
 
 | Variable                         | Default                        | Description                    |
 | -------------------------------- | ------------------------------ | ------------------------------ |
