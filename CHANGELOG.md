@@ -1,6 +1,10 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v3.11.0] - 2026-09-13
+
+- feat: Support prose accent palettes and inherited tokens (6d60946)
+
 ## [v3.10.1] - 2026-09-12
 
 - test: Add JIT CSS validation and compatibility tests (fa0d536)
