@@ -116,20 +116,16 @@ Prose includes semantic color schemes for links with automatic dark mode support
 </article>
 ```
 
-Any enabled extended color family can also be used as a prose accent. A family
-name selects accessible light and inverted steps, while an exact step uses that
-value in both schemes:
+Use an exact step from any enabled extended color family as a prose accent:
 
 ```html
-<article class="prose prose-violet">Adaptive violet links</article>
 <article class="prose prose-rose-600">Exact rose-600 links</article>
 ```
 
-Enable only the families the application uses to keep the active JIT palette
-small:
+Enable only the exact families the application uses:
 
 ```ts
-enableJITCSS({ extendedColors: ['violet', 'rose'] });
+enableJITCSS({ extendedColors: ['rose'] });
 ```
 
 CSS custom properties require no palette registration. This is particularly
@@ -143,7 +139,9 @@ useful with semantic tokens from another CER package:
 
 These accent utilities intentionally affect links only. Set the inherited
 `--cer-prose-*` tokens when body, heading, surface, or border roles also need to
-change.
+change. Integrations can provide a default through `--cer-prose-accent`; a
+`prose-(--token)` utility on the prose container overrides that inherited
+default without registering a runtime color palette.
 
 ### Responsive Typography
 
@@ -482,6 +480,7 @@ used only when the variable is not defined by the application or an integration.
 | `--cer-prose-body`               | `var(--cer-color-neutral-900)` | Body text color                |
 | `--cer-prose-headings`           | `var(--cer-color-neutral-900)` | Heading text color             |
 | `--cer-prose-lead`               | `var(--cer-color-neutral-700)` | Lead paragraph color           |
+| `--cer-prose-accent`             | unset                          | Shared link and hover fallback |
 | `--cer-prose-links`              | `var(--cer-color-neutral-700)` | Link text color                |
 | `--cer-prose-links-hover`        | `var(--cer-color-neutral-500)` | Link hover color               |
 | `--cer-prose-bold`               | `var(--cer-color-neutral-900)` | Bold text color                |

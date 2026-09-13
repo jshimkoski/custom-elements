@@ -347,7 +347,7 @@ Opt-in JIT CSS engine with hooks, global control, and the `cls()` helper for IDE
 | `parseSpacing`           | Parse a spacing utility class name to its CSS declaration.                                                          |
 | `parseArbitrary`         | Parse an arbitrary value utility class name.                                                                        |
 | `parseFunctionalUtility` | Parse named containers and Tailwind 4.2/4.3 tab/zoom functional utilities.                                          |
-| `parseProseAccent`       | Parse semantic, extended-family, exact-step, or custom-property prose link accents.                                 |
+| `parseProseAccent`       | Parse semantic, exact-step, or custom-property prose accents through the shared parsers.                            |
 | `utilityMap`             | Complete mapping of all static utility class names to their CSS declarations.                                       |
 | `selectorVariants`       | State and pseudo-class variant selector map (`hover:`, `focus:`, `disabled:`, `inert:`, etc.).                      |
 | `mediaVariants`          | Responsive breakpoint media query map (`sm:`, `md:`, `lg:`, `xl:`, `2xl:`, `dark:`).                                |

@@ -8,7 +8,9 @@ const DIST_ENTRY = new URL(
   import.meta.url,
 );
 const PACKAGE_JSON = new URL('../package.json', import.meta.url);
-const MAX_RECURSIVE_GZIP_BYTES = 40 * 1024;
+// Keep new utilities within the pre-prose-accent v3.10.1 payload envelope
+// (38,208 B on the release toolchain), with a small allowance for zlib drift.
+const MAX_RECURSIVE_GZIP_BYTES = 38_250;
 const MAX_IMPORT_MS = 50;
 const MAX_TYPICAL_COLD_MS = 15;
 const MAX_FULL_COLD_MS = 75;

@@ -1,6 +1,10 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## Unreleased
+
+- fix: Reuse existing color and arbitrary-value parsing for prose accents to avoid an always-loaded parser.
+
 ## [v3.11.0] - 2026-09-13
 
 - feat: Support prose accent palettes and inherited tokens (6d60946)

@@ -164,11 +164,11 @@ export function generateProseCSS(className: string): string | null {
   // Links
   add(
     'a',
-    'color:var(--cer-prose-links,var(--cer-color-neutral-700));text-decoration:underline;text-decoration-thickness:.08em;text-underline-offset:.15em;font-weight:500;',
+    'color:var(--cer-prose-links,var(--cer-prose-accent,var(--cer-color-neutral-700)));text-decoration:underline;text-decoration-thickness:.08em;text-underline-offset:.15em;font-weight:500;',
   );
   add(
     'a:hover,a:focus',
-    'color:var(--cer-prose-links-hover,var(--cer-color-neutral-500));',
+    'color:var(--cer-prose-links-hover,var(--cer-prose-accent,var(--cer-color-neutral-500)));',
   );
 
   // Strong and emphasis

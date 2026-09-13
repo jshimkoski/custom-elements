@@ -35,7 +35,7 @@ describe('Prose CSS Generation Verification', () => {
       'color:var(--cer-prose-headings,var(--cer-color-neutral-900))',
     );
     expect(css).toContain(
-      'color:var(--cer-prose-links,var(--cer-color-neutral-700))',
+      'color:var(--cer-prose-links,var(--cer-prose-accent,var(--cer-color-neutral-700)))',
     );
     expect(css).not.toContain('.prose{--cer-prose-body:');
 
@@ -217,7 +217,7 @@ describe('Prose CSS Generation Verification', () => {
 
     // Verify dark:prose-invert uses the invert variables with fallback
     expect(css).toContain('.dark\\:prose-invert{');
-    expect(css).toContain('--cer-prose-links:var(--cer-prose-invert-links');
+    expect(css).toContain('--cer-prose-links:var(--cer-prose-accent');
 
     console.log(
       '✓ Semantic colors work with dark:prose-invert via CSS variable fallback',

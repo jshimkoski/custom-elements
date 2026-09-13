@@ -1434,8 +1434,8 @@ const generateUtilities = (): CSSMap => {
       --cer-prose-img-caption:var(--cer-color-neutral-400);
       --cer-prose-table-border:var(--cer-color-neutral-700);
       --cer-prose-table-head:var(--cer-color-neutral-200);
-      --cer-prose-links:var(--cer-prose-invert-links,var(--cer-color-neutral-300));
-      --cer-prose-links-hover:var(--cer-prose-invert-links-hover,var(--cer-color-neutral-100));
+      --cer-prose-links:var(--cer-prose-accent,var(--cer-prose-invert-links,var(--cer-color-neutral-300)));
+      --cer-prose-links-hover:var(--cer-prose-accent,var(--cer-prose-invert-links-hover,var(--cer-color-neutral-100)));
     `.replace(/\s+/g, ''),
   });
   for (const color of [
@@ -1637,47 +1637,6 @@ export function parseProseElementModifier(className: string): string | null {
     parseGradientColorStop,
     parseArbitrary,
   );
-}
-
-/**
- * Parse prose accent utilities.
- *
- * - `prose-blue` uses the active color family's accessible light/dark steps.
- * - `prose-blue-600` uses one exact palette value for every color scheme.
- * - `prose-(--brand-color)` consumes an inherited CSS custom property directly.
- *
- * A prose accent intentionally controls links only. Body, surface, and border
- * colors require separate semantic roles and remain available through the
- * public inherited `--cer-prose-*` token contract.
- */
-export function parseProseAccent(className: string): string | null {
-  if (!className.startsWith('prose-')) return null;
-
-  const token = className.slice(6);
-  const variable = /^\((--[a-zA-Z_][\w-]*)\)$/.exec(token);
-  if (variable) {
-    const value = `var(${variable[1]})`;
-    return `--cer-prose-links:${value};--cer-prose-links-hover:${value};--cer-prose-invert-links:${value};--cer-prose-invert-links-hover:${value};`;
-  }
-
-  const family = _activeColors[token];
-  if (family) {
-    const links = family['700'] ?? family.DEFAULT;
-    if (!links) return null;
-    const hover = family['500'] ?? links;
-    const invert = family['300'] ?? links;
-    const invertHover = family['100'] ?? invert;
-    return `--cer-prose-links:${links};--cer-prose-links-hover:${hover};--cer-prose-invert-links:${invert};--cer-prose-invert-links-hover:${invertHover};`;
-  }
-
-  const separator = token.lastIndexOf('-');
-  if (separator <= 0) return null;
-  const exact = _activeColors[token.slice(0, separator)]?.[
-    token.slice(separator + 1)
-  ];
-  return exact
-    ? `--cer-prose-links:${exact};--cer-prose-links-hover:${exact};--cer-prose-invert-links:${exact};--cer-prose-invert-links-hover:${exact};`
-    : null;
 }
 
 // Optimized parsing functions with better performance
@@ -1932,7 +1891,7 @@ export function hexToRgb(hex: string): string {
 
 // Optimized color parsing with lookup tables
 const colorRegex =
-  /^(drop-shadow|scrollbar-thumb|scrollbar-track|text-shadow|bg|text|border|decoration|shadow|outline|caret|accent|fill|stroke|ring|divide)-([a-z]+)-?(\d{2,3}|DEFAULT)?$/;
+  /^(drop-shadow|scrollbar-thumb|scrollbar-track|text-shadow|bg|text|border|decoration|shadow|outline|caret|accent|fill|stroke|ring|divide|prose)-([a-z]+)-?(\d{2,3}|DEFAULT)?$/;
 const propMap: Record<string, string> = {
   bg: 'background-color',
   decoration: 'text-decoration-color',
@@ -1943,6 +1902,7 @@ const propMap: Record<string, string> = {
   accent: 'accent-color',
   fill: 'fill',
   stroke: 'stroke',
+  prose: '--cer-prose-accent',
 };
 
 export function parseColorClass(className: string): string | null {
@@ -2147,6 +2107,7 @@ export function parseArbitrary(className: string): string | null {
   const parenVarStart = className.indexOf('-(--');
   if (parenVarStart > 0 && className.endsWith(')')) {
     const varName = className.slice(parenVarStart + 2, -1); // --my-color
+    if (!/^--[a-zA-Z_][\w-]*$/.test(varName)) return null;
     className = `${className.slice(0, parenVarStart)}-[var(${varName})]`;
   }
 
@@ -2224,6 +2185,7 @@ export function parseArbitrary(className: string): string | null {
     leading: 'line-height',
     z: 'z-index',
     opacity: 'opacity',
+    prose: '--cer-prose-accent',
     'font-features': 'font-feature-settings',
     tab: 'tab-size',
     zoom: 'zoom',
@@ -2254,6 +2216,18 @@ export function parseArbitrary(className: string): string | null {
   return cssProp && value ? `${cssProp}:${value};` : null;
 }
 
+/**
+ * Low-level compatibility parser for prose accents.
+ *
+ * JIT compilation calls the shared color and arbitrary-value parsers directly
+ * so applications do not pay for a separate prose parsing branch.
+ */
+export function parseProseAccent(className: string): string | null {
+  return className.startsWith('prose-')
+    ? (utilityMap[className] ?? parseColorWithOpacity(className))
+    : null;
+}
+
 /** Parse small functional utility families added in Tailwind 4.2/4.3. */
 export function parseFunctionalUtility(className: string): string | null {
   const namedContainer = /^@(container(?:-size)?)\/([a-z_][\w-]*)$/i.exec(
@@ -2281,7 +2255,6 @@ function parseUtilityBody(className: string): string | null {
     parseSpaceUtility(className) ??
     parseOpacity(className) ??
     parseZIndex(className) ??
-    parseProseAccent(className) ??
     parseColorWithOpacity(className) ??
     parseGradientColorStop(className) ??
     parseFunctionalUtility(className) ??

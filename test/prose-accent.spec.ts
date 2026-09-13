@@ -3,6 +3,7 @@ import {
   _resetJITCSS,
   enableJITCSS,
   jitCSS,
+  parseArbitrary,
   parseProseAccent,
 } from '../src/lib/runtime/style';
 
@@ -16,27 +17,12 @@ describe('prose accent utilities', () => {
 
     expect(css).toContain('.prose-\\(--md-sys-color-primary\\)');
     expect(css).toContain(
-      '--cer-prose-links:var(--md-sys-color-primary)',
-    );
-    expect(css).toContain(
-      '--cer-prose-invert-links:var(--md-sys-color-primary)',
+      '--cer-prose-accent:var(--md-sys-color-primary)',
     );
     expect(css).not.toContain('prose:var(');
   });
 
-  it('uses the active extended family steps for light and inverted prose', () => {
-    enableJITCSS({ extendedColors: ['violet'] });
-    const css = jitCSS('<article class="prose prose-violet"></article>');
-
-    expect(css).toContain(
-      '--cer-prose-links:var(--cer-color-violet-700, #6d28d9)',
-    );
-    expect(css).toContain(
-      '--cer-prose-invert-links:var(--cer-color-violet-300, #c4b5fd)',
-    );
-  });
-
-  it('supports an exact palette step and variants', () => {
+  it('reuses the color parser for exact palette steps and variants', () => {
     enableJITCSS({ extendedColors: ['rose'] });
     const css = jitCSS(
       '<article class="hover:prose-rose-600 prose"></article>',
@@ -44,11 +30,22 @@ describe('prose accent utilities', () => {
 
     expect(css).toContain('.hover\\:prose-rose-600:hover');
     expect(css).toContain(
-      '--cer-prose-links:var(--cer-color-rose-600, #e11d48)',
+      '--cer-prose-accent:var(--cer-color-rose-600, #e11d48)',
     );
   });
 
   it('rejects malformed CSS custom-property names', () => {
+    expect(parseArbitrary('prose-(--brand;color:red)')).toBeNull();
     expect(parseProseAccent('prose-(--brand;color:red)')).toBeNull();
+    expect(
+      jitCSS('<article class="prose prose-(--brand;color:red)"></article>'),
+    ).not.toContain('--cer-prose-accent');
+  });
+
+  it('keeps the low-level parser API as a shared-parser compatibility wrapper', () => {
+    expect(parseProseAccent('prose-primary')).toContain('--cer-prose-links:');
+    expect(parseProseAccent('prose-(--brand-color)')).toBe(
+      '--cer-prose-accent:var(--brand-color);',
+    );
   });
 });
