@@ -1,6 +1,10 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v3.11.1] - 2026-09-13
+
+- fix: Reuse shared parsers for prose accents (e93ca0b)
+
 ## Unreleased
 
 - fix: Reuse existing color and arbitrary-value parsing for prose accents to avoid an always-loaded parser.
