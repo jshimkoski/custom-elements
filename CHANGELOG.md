@@ -1,6 +1,10 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v3.11.2] - 2026-10-04
+
+- fix: update dependencies (9f0b5c6)
+
 ## [v3.11.1] - 2026-09-13
 
 - fix: Reuse shared parsers for prose accents (e93ca0b)
