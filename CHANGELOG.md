@@ -1,6 +1,10 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [v3.12.0] - 2026-10-07
+
+- feat: enhance form association and lazy content features (500aa13)
+
 ## [v3.11.2] - 2026-10-04
 
 - fix: update dependencies (9f0b5c6)
