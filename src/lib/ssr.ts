@@ -116,10 +116,10 @@ export const DSD_STYLE_SHARING_SCRIPT =
   "var p=document.currentScript&&document.currentScript.previousElementSibling,m=new Map(),r=[],q=[document],t=[];" +
   "try{m=new Map(Object.entries(JSON.parse(p&&p.textContent||'{}')))}catch(_){}if(p)p.remove();" +
   "function c(n){n.querySelectorAll('template[shadowrootmode]').forEach(function(e){t.push(e.content);c(e.content)})}c(document);" +
-  "function f(e){e.textContent=m.get(e.getAttribute('data-cer-style-ref'))||'';e.removeAttribute('data-cer-style-ref')}" +
+  "function f(e){if(!e.hasAttribute('data-cer-style-ref'))return;e.textContent=m.get(e.getAttribute('data-cer-style-ref'))||'';e.removeAttribute('data-cer-style-ref')}" +
   "if(t.length){t.forEach(function(n){n.querySelectorAll('style[data-cer-style-ref]').forEach(f)});return}" +
   "while(q.length){var n=q.pop();n.querySelectorAll('*').forEach(function(e){if(e.shadowRoot){r.push(e.shadowRoot);q.push(e.shadowRoot)}})}" +
-  "if(typeof CSSStyleSheet==='function'&&CSSStyleSheet.prototype.replaceSync){var s=new Map();m.forEach(function(v,k){try{var x=new CSSStyleSheet();x.replaceSync(v);s.set(k,x)}catch(_){}});r.forEach(function(n){var e=Array.from(n.querySelectorAll('style[data-cer-style-ref]')),z=e.map(function(e){return s.get(e.getAttribute('data-cer-style-ref'))});try{if(z.some(function(x){return!x}))throw 0;n.adoptedStyleSheets=[].concat(Array.from(n.adoptedStyleSheets||[]),z);e.forEach(function(e){e.remove()})}catch(_){e.forEach(f)}})}else{r.forEach(function(n){n.querySelectorAll('style[data-cer-style-ref]').forEach(f)})}" +
+  "if(typeof CSSStyleSheet==='function'&&CSSStyleSheet.prototype.replaceSync){var s=new Map();m.forEach(function(v,k){try{var x=new CSSStyleSheet();x.replaceSync(v);s.set(k,x)}catch(_){}});r.forEach(function(n){var e=Array.from(n.querySelectorAll('style')),z=e.map(function(e){var k=e.getAttribute('data-cer-style-ref'),v=k!==null?m.get(k):e.textContent||'';if(Array.from(e.attributes).some(function(a){return a.name!=='data-cer-style-ref'})||/@import\\b/i.test(v))return null;if(k!==null)return s.get(k);try{var x=new CSSStyleSheet();x.replaceSync(v);return x}catch(_){return null}});try{if(z.some(function(x){return!x}))throw 0;n.adoptedStyleSheets=[].concat(Array.from(n.adoptedStyleSheets||[]),z);e.forEach(function(e){e.remove()})}catch(_){e.forEach(f)}})}else{r.forEach(function(n){n.querySelectorAll('style[data-cer-style-ref]').forEach(f)})}" +
   '})()</script>';
 
 // Tokenize template boundaries and style blocks so every generated stylesheet
@@ -361,6 +361,9 @@ export function renderToStream(
   options?: RenderOptions & DSDRenderOptions & { jit?: JITCSSOptions; asyncTimeout?: number },
 ): ReadableStream<string> {
   const timeoutMs = options?.asyncTimeout ?? 30_000;
+  let cancelled = false;
+  let stop!: () => void;
+  const cancellation = new Promise<void>((resolve) => { stop = resolve; });
 
   return new ReadableStream<string>({
     async start(controller) {
@@ -381,11 +384,13 @@ export function renderToStream(
       // Each resolved component replaces its placeholder via an inline script.
       // A per-entry timeout prevents hung async components from blocking the stream.
       for (const entry of asyncEntries) {
+        let timer: ReturnType<typeof setTimeout> | undefined;
         try {
-          const timeout = new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error(`[cer] async component timed out after ${timeoutMs}ms`)), timeoutMs),
-          );
-          const resolvedVNodes = await Promise.race([entry.promise, timeout]);
+          const timeout = new Promise<never>((_, reject) => {
+            if (Number.isFinite(timeoutMs)) timer = setTimeout(() => reject(new Error(`[cer] async component timed out after ${timeoutMs}ms`)), timeoutMs);
+          });
+          const resolvedVNodes = await Promise.race([entry.promise, timeout, cancellation]);
+          if (cancelled) return;
           const shadowHTML = Array.isArray(resolvedVNodes)
             ? `<div>${(resolvedVNodes as VNode[]).map((n) => renderToDSD(n, entry.opts)).join('')}</div>`
             : renderToDSD(resolvedVNodes as VNode, entry.opts);
@@ -405,11 +410,14 @@ export function renderToStream(
           );
         } catch {
           // Async render failed — leave placeholder for client hydration.
+        } finally {
+          if (timer !== undefined) clearTimeout(timer);
         }
       }
 
-      controller.close();
+      if (!cancelled) controller.close();
     },
+    cancel() { cancelled = true; stop(); },
   });
 }
 

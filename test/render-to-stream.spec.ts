@@ -148,3 +148,45 @@ describe('renderToStream — sync render error', () => {
     await expect(reader.read()).rejects.toThrow();
   });
 });
+
+describe('renderToStream — cancellation and timers', () => {
+  async function inject(promise: AsyncStreamEntry['promise'], asyncTimeout = 30_000) {
+    const module = await import('../src/lib/runtime/vdom-ssr-dsd');
+    const original = module.beginStreamingCollection;
+    const spy = vi.spyOn(module, 'beginStreamingCollection').mockImplementationOnce((entries) => {
+      original(entries);
+      entries.push({ id: 'cancel-test', tag: 'async-test', attrsString: '', hydrateAttr: '', useStyleCSS: '', lightDOM: '', opts: { dsd: true }, promise });
+    });
+    return { stream: renderToStream(SIMPLE_VNODE, { asyncTimeout }), spy };
+  }
+  it('cancels a hung async render and clears its capture timer', async () => {
+    vi.useFakeTimers();
+    const { stream, spy } = await inject(new Promise(() => {}));
+    try {
+      const reader = stream.getReader();
+      expect((await reader.read()).value).toContain('hello');
+      await reader.cancel();
+      await Promise.resolve();
+      expect(vi.getTimerCount()).toBe(0);
+      expect((await reader.read()).done).toBe(true);
+    } finally { spy.mockRestore(); }
+  });
+  it('clears the timeout after an async component resolves normally', async () => {
+    vi.useFakeTimers();
+    const { stream, spy } = await inject(Promise.resolve(SIMPLE_VNODE));
+    try {
+      expect(await drainStream(stream)).toContain('<script>');
+      expect(vi.getTimerCount()).toBe(0);
+    } finally { spy.mockRestore(); }
+  });
+  it('disables the timeout with Infinity and remains cancelable', async () => {
+    vi.useFakeTimers();
+    const { stream, spy } = await inject(new Promise(() => {}), Infinity);
+    try {
+      const reader = stream.getReader();
+      await reader.read();
+      expect(vi.getTimerCount()).toBe(0);
+      await reader.cancel();
+    } finally { spy.mockRestore(); }
+  });
+});

@@ -417,7 +417,7 @@ When `renderToStream` encounters an async `render` function, it:
 
 ### Async component timeout
 
-By default each async component Promise is raced against a **30-second timeout**. If a component's render Promise does not settle within that window (network failure, infinite loop in setup), the timeout fires and the placeholder element is left in the DOM for client-side hydration — the stream is not blocked. The timeout fires per-entry, not globally, so one slow component does not delay others.
+By default each async component Promise is raced against a **30-second timeout**. If a component's render Promise does not settle within that window (network failure, infinite loop in setup), the timeout fires and the placeholder element is left in the DOM for client-side hydration — the stream is not blocked. The timeout applies per entry, not globally. Async entries are processed in registration order, so a slow earlier entry can delay later swap scripts. Completed entries clear their timers; canceling the stream releases pending capture waits, but does not abort work inside an independent component Promise.
 
 Configure the timeout with the `asyncTimeout` option (milliseconds):
 
@@ -514,6 +514,7 @@ app.listen(3000);
 
 ```ts
 import Fastify from 'fastify';
+import { html } from '@jasonshimmy/custom-elements-runtime';
 import { renderToStringWithJITCSSDSD } from '@jasonshimmy/custom-elements-runtime/ssr';
 import './components';
 
@@ -536,6 +537,7 @@ app.listen({ port: 3000 });
 
 ```ts
 import { Hono } from 'hono';
+import { html } from '@jasonshimmy/custom-elements-runtime';
 import { renderToStringWithJITCSSDSD } from '@jasonshimmy/custom-elements-runtime/ssr';
 import './components';
 
@@ -557,6 +559,7 @@ export default app;
 For even less boilerplate, use `createSSRHandler` from the dedicated middleware package:
 
 ```ts
+import { html } from '@jasonshimmy/custom-elements-runtime';
 import { createSSRHandler } from '@jasonshimmy/custom-elements-runtime/ssr-middleware';
 import './components';
 
@@ -894,12 +897,12 @@ No `<template shadowrootmode="open">` is emitted because the renderer does not k
 
 ## SSR Best Practices
 
-- **Use `renderToStreamWithJITCSSDSD`** for all new applications — it is the zero-FOUC, DSD-enabled, hydration-ready, incrementally-streamed path. Use `renderToStringWithJITCSSDSD` only if your framework or deployment environment cannot consume a `ReadableStream`.
+- **Choose rendering for the transport** — `renderToStreamWithJITCSSDSD` provides DSD and progressive async updates when the transport consumes a `ReadableStream`. `renderToStringWithJITCSSDSD` is appropriate for synchronous components, generated static documents and buffered responses.
 - **Register components before rendering** — the DSD renderer consults the registry to know which tags need shadow DOM wrapping.
-- **Pass a single root VNode to all render functions** — `html` produces a fragment (undefined tag) when given multiple root elements, which the SSR renderer cannot process. Wrap multi-element output in a single container:
+- **Pass a single root VNode to the public render functions** — `html` returns a `VNode[]` when given multiple root elements. The public render functions accept one VNode, so wrap top-level siblings in a container. A registered component's render function may return multiple roots; CER normalizes those to its client-compatible wrapper:
 
   ```ts
-  // ❌ Multiple roots — produces an unrenderable fragment
+  // ❌ Multiple roots — returns an array, not the required root VNode
   renderToStringWithJITCSSDSD(
     html`<my-header></my-header>
       <main>…</main>`,
@@ -920,7 +923,7 @@ No `<template shadowrootmode="open">` is emitted because the renderer does not k
 - **`component()` is safe to call in bare Node.js** — it registers the component in the SSR registry without touching browser APIs. No DOM polyfill (`jsdom`, `happy-dom`) is required on your server.
 - **Use `renderToStreamWithJITCSSDSD()` or `renderToStream()` for async render functions** — `renderToStringWithJITCSS` / `renderToStringDSD` render async components as empty shells. The streaming variants resolve them progressively and stream swap scripts. Keep render functions synchronous when streaming is not needed.
 - **Match prop values between server and client** — `useStyle` callbacks are executed with the same prop values on both server and client, producing identical CSS.
-- **Use `hydrate: 'none'` for static content** — display-only components that never need interactivity can opt out of JS entirely.
+- **Use `hydrate: 'none'` for static content** — display-only components keep their server-rendered DOM without running a client render. This strategy alone does not remove their JavaScript imports; use a build integration's download policy to avoid downloading implementations on initial load.
 - **Avoid DOM APIs in render** — render functions must be pure and safe to call in a Node.js environment without a DOM.
 
 ---
@@ -931,10 +934,10 @@ No `<template shadowrootmode="open">` is emitted because the renderer does not k
 A: Yes. Slotted children in `vnode.children` are rendered outside the `<template>` element as light DOM siblings, exactly where the browser expects them.
 
 **Q: Does the runtime preserve server-rendered DOM during hydration?**
-A: The existing shadow DOM from DSD parsing is preserved at first paint and styled by the SSR-injected `<style>` block. When the component's first reactive render runs, it replaces the shadow DOM content. To avoid a visible transition, ensure `useStyle` output and class names are identical between server and client renders (they are, given the same props).
+A: DSD supplies styled shadow DOM at first paint. The first client render hydrates compatible existing nodes and attaches bindings/events; mismatched nodes can be replaced. Keep props, structure and styles consistent between server and client to avoid visible changes. Static `hydrate: 'none'` components retain their DSD content without a client render.
 
 **Q: What happens if a component isn't in the registry during SSR?**
-A: An empty `<template shadowrootmode="open"></template>` shell is emitted, and the client hydrates normally when JS loads.
+A: The tag and its light-DOM children are serialized without a DSD template. CER cannot render an unregistered component's shadow content. Register it before rendering if that content must be present in SSR; registering it later in the browser performs a client render.
 
 **Q: Can I use `watch`, `useOnConnected`, etc. during SSR?**
 A: These hooks register harmlessly to arrays that are never invoked in the SSR pass. They fire normally on the client after hydration.
@@ -943,7 +946,7 @@ A: These hooks register harmlessly to arrays that are never invoked in the SSR p
 A: Yes. The polyfill's first line is a feature detection check that returns immediately on browsers with native DSD support.
 
 **Q: Can I pass a VNode with multiple root elements to `renderToStringWithJITCSSDSD`?**
-A: No. The renderer requires a single root VNode. The `html` tag produces a fragment with an undefined tag when a template has multiple top-level elements, and the renderer cannot process an undefined tag. Always wrap in a single root — a `<div>`, a `<body>`, or a top-level custom element like `<my-app />`.
+A: The public function accepts one root VNode, not a `VNode[]`. Top-level siblings from `html` return an array, so wrap them in a single root such as a `<div>`, `<body>` or `<my-app />`. Registered components may return arrays internally; CER normalizes those during rendering.
 
 **Q: Do I need `jsdom` or `happy-dom` on my Node.js SSR server?**
 A: No. `component()`, `registerBuiltinComponents()`, and all SSR render functions are safe to call in bare Node.js — they do not require browser globals. Only avoid calling DOM APIs (`document`, `window`, etc.) inside component render functions themselves.

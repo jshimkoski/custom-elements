@@ -156,6 +156,13 @@ export function createElementClass<
     };
   }
   return class extends HTMLElement {
+    static formAssociated = config.formAssociated === true;
+    formResetCallback() { this.dispatchEvent(new CustomEvent('cer:form-reset')); }
+    formDisabledCallback(disabled: boolean) { this.dispatchEvent(new CustomEvent('cer:form-disabled', { detail: disabled })); }
+    formStateRestoreCallback(state: string | File | FormData | null, mode: string) {
+      this.dispatchEvent(new CustomEvent('cer:form-restore', { detail: { state, mode } }));
+    }
+
     public context!: ComponentContext<S, C, P, T>;
     private _refs: Refs['refs'] = {};
     private _listeners: Array<() => void> = [];

@@ -1,3 +1,5 @@
+import { NATIVE_PROMOTE_MAP } from './native-properties';
+import type { VNode } from './types';
 /**
  * Shared utilities for SSR renderers.
  * Imported by vdom-ssr.ts and vdom-ssr-dsd.ts to avoid duplication.
@@ -71,4 +73,42 @@ export function buildRawAttrs(attrs: Record<string, unknown>): string {
         : ` ${k}="${escapeHTML(String(v))}"`,
     )
     .join('');
+}
+
+/** Include only reflected native properties; never serialize runtime objects/events. */
+export function collectNativeAttrs(vnode: VNode): Record<string, unknown> {
+  const attrs: Record<string, unknown> = { ...vnode.props?.attrs };
+  const names = [...(NATIVE_PROMOTE_MAP[vnode.tag] ?? []), 'disabled'];
+  for (const name of names) {
+    const value = vnode.props?.props?.[name];
+    if (!(name in attrs) && (value == null || ['string', 'number', 'boolean'].includes(typeof value))) {
+      if (value !== undefined) attrs[name] = value;
+    }
+  }
+  if (vnode.tag === 'textarea' || vnode.tag === 'select') delete attrs.value;
+  return attrs;
+}
+
+/** HTML represents textarea values as text and select values on their options. */
+export function collectNativeChildren(vnode: VNode): VNode['children'] {
+  const value = vnode.props?.props?.value ?? vnode.props?.attrs?.value;
+  if (value == null) return vnode.children;
+  // HTML parsing removes one leading newline immediately after <textarea>.
+  if (vnode.tag === 'textarea') return String(value).startsWith('\n') ? '\n' + String(value) : String(value);
+  if (vnode.tag !== 'select' || !Array.isArray(vnode.children)) return vnode.children;
+  const selectedValues = new Set((Array.isArray(value) ? value : [value]).map(String));
+  const multipleValue = vnode.props?.props?.multiple ?? vnode.props?.attrs?.multiple;
+  const multiple = multipleValue != null && multipleValue !== false;
+  let matched = false;
+  const text = (node: VNode): string => typeof node.children === 'string' ? node.children : (node.children ?? []).map(text).join('');
+  const visit = (node: VNode): VNode => {
+    if (node.tag === 'option') {
+      const optionValue = node.props?.props?.value ?? node.props?.attrs?.value ?? text(node).trim();
+      const selected = selectedValues.has(String(optionValue)) && (multiple || !matched);
+      matched ||= selected;
+      return { ...node, props: { ...node.props, attrs: { ...node.props?.attrs, selected }, props: { ...node.props?.props, selected } } };
+    }
+    return node.tag === 'optgroup' && Array.isArray(node.children) ? { ...node, children: node.children.map(visit) } : node;
+  };
+  return vnode.children.map(visit);
 }

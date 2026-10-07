@@ -1,5 +1,5 @@
 /**
- * SSR middleware helpers for Express, Fastify, Hono, and other Node.js HTTP frameworks.
+ * SSR middleware helpers for Express and other Node.js HTTP transports. Web frameworks need an adapter.
  *
  * Provides two handler factories that wrap the SSR rendering pipeline and
  * emit a complete HTML document response. Both accept a static VNode **or**
@@ -58,7 +58,7 @@ export type VnodeFactoryResult = VNode | { vnode: VNode; router?: unknown; head?
 // ---------------------------------------------------------------------------
 
 /**
- * Minimal request interface compatible with Express, Fastify, Hono, and the
+ * Minimal request interface compatible with Express and the
  * raw Node.js `IncomingMessage`. Extend or replace with your framework's
  * request type via the generic parameter on `createSSRHandler`.
  */
@@ -69,7 +69,7 @@ export interface MinimalRequest {
 }
 
 /**
- * Minimal response interface compatible with Express, Fastify, Hono, and the
+ * Minimal response interface compatible with Express and the
  * raw Node.js `ServerResponse`. `write` is optional — handlers fall back to
  * buffering when it is absent.
  */
@@ -147,7 +147,7 @@ function wrapInDocument(
  * Create a request handler that SSR-renders a VNode tree and sends the full
  * HTML document as the response.
  *
- * Compatible with Express, Fastify, Hono, and any framework that uses an
+ * Compatible with Express and any framework that uses an
  * `(req, res)` handler signature. The generic `Req` parameter lets you use
  * your framework's typed request object.
  *

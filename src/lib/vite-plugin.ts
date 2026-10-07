@@ -91,6 +91,7 @@ import { readFileSync, writeFileSync, mkdirSync, globSync, existsSync } from 'no
 import { resolve, relative, dirname } from 'node:path';
 import {
   jitCSS,
+  getProseSheet,
   enableJITCSS,
   extractClassesFromHTML,
   type JITCSSOptions,
@@ -120,6 +121,8 @@ export interface CerJITCSSPluginOptions extends JITCSSOptions {
    * the generated CSS text. Defaults to `true`.
    */
   virtualModule?: boolean;
+  /** Complete dynamic class names to include in static utility CSS. */
+  safelist?: string[];
 }
 
 const VIRTUAL_ID = 'virtual:cer-jit-css';
@@ -128,6 +131,7 @@ const RESOLVED_VIRTUAL_ID = '\0virtual:cer-jit-css';
 function generateFromFiles(
   contentPatterns: string[],
   jitOptions: JITCSSOptions,
+  safelist: string[] = [],
 ): string {
   if (jitOptions && Object.keys(jitOptions).length > 0) {
     enableJITCSS(jitOptions);
@@ -145,7 +149,7 @@ function generateFromFiles(
   const uniqueFiles = [...new Set(files)];
 
   // Aggregate all class names across all files
-  const allClasses = new Set<string>();
+  const allClasses = new Set<string>(safelist);
 
   for (const file of uniqueFiles) {
     try {
@@ -162,7 +166,8 @@ function generateFromFiles(
   // Build a fake HTML string containing all discovered classes so jitCSS()
   // can process the full set in one pass.
   const fakeHTML = `<div class="${[...allClasses].join(' ')}"></div>`;
-  return jitCSS(fakeHTML);
+  const utilities = jitCSS(fakeHTML);
+  return utilities + (getProseSheet()?.toString() ?? '');
 }
 
 // ---------------------------------------------------------------------------
@@ -312,7 +317,7 @@ export function cerJITCSS(options: CerJITCSSPluginOptions): Plugin {
       }
       watchedFiles = resolved;
 
-      generatedCSS = generateFromFiles(content, jitOptions);
+      generatedCSS = generateFromFiles(content, jitOptions, options.safelist);
 
       if (output) {
         const outputPath = resolve(process.cwd(), output);
@@ -342,7 +347,7 @@ export function cerJITCSS(options: CerJITCSSPluginOptions): Plugin {
 
       if (!isWatched) return;
 
-      generatedCSS = generateFromFiles(content, jitOptions);
+      generatedCSS = generateFromFiles(content, jitOptions, options.safelist);
 
       if (output) {
         const outputPath = resolve(process.cwd(), output);

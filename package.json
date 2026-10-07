@@ -49,8 +49,8 @@
     "jsdom": "^30.1.2",
     "prettier": "^3.9.9",
     "typescript": "npm:@typescript/typescript6@^6.0.2",
-    "typescript-eslint": "^8.71.0",
-    "vite": "^8.3.2",
+    "typescript-eslint": "^8.71.1",
+    "vite": "^8.3.3",
     "vitest": "^5.0.0"
   },
   "main": "dist/custom-elements-runtime.cjs",
@@ -97,6 +97,12 @@
       ],
       "vite-plugin": [
         "./dist/vite-plugin.d.ts"
+      ],
+      "static-css": [
+        "./dist/static-css.d.ts"
+      ],
+      "ssr-middleware": [
+        "./dist/ssr-middleware.d.ts"
       ]
     }
   },
@@ -170,6 +176,11 @@
       "types": "./dist/ssr-middleware.d.ts",
       "import": "./dist/custom-elements-runtime.ssr-middleware.es.js",
       "require": "./dist/custom-elements-runtime.ssr-middleware.cjs"
+    },
+    "./static-css": {
+      "types": "./dist/static-css.d.ts",
+      "import": "./dist/custom-elements-runtime.static-css.es.js",
+      "require": "./dist/custom-elements-runtime.static-css.cjs"
     }
   },
   "publishConfig": {

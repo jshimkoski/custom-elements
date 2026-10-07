@@ -25,6 +25,7 @@ export default defineConfig({
         // Extended color palette (opt-in)
         colors: resolve(import.meta.dirname, 'src/lib/css/colors.ts'),
         // JIT CSS engine (opt-in separate entry)
+        'static-css': resolve(import.meta.dirname, 'src/lib/static-css.ts'),
         'jit-css': resolve(import.meta.dirname, 'src/lib/jit-css.ts'),
         // Non-Shadow DOM runtime scanner
         'dom-jit-css': resolve(import.meta.dirname, 'src/lib/dom-jit-css.ts'),

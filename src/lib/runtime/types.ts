@@ -174,6 +174,8 @@ export type ComponentConfig<
    * @default 'load'
    */
   hydrate?: HydrateStrategy;
+  /** Enable native ElementInternals form association for this host. */
+  formAssociated?: boolean;
   render: (
     context: ComponentContext<S, C, P, T>,
   ) => VNode | VNode[] | Promise<VNode | VNode[]>;

@@ -1,6 +1,6 @@
 # 🌐 SSR Middleware
 
-Framework-agnostic SSR handler factories for Express, Fastify, Hono, raw Node.js, and any HTTP framework that uses `(req, res)` handler signatures.
+SSR handler factories for Node-style `(req, res)` transports. Express and raw Node responses work directly; Fastify needs its raw response, and Hono uses the Web render-function recipe below.
 
 **Package:** `@jasonshimmy/custom-elements-runtime/ssr-middleware`
 
@@ -202,13 +202,13 @@ import './components';
 
 const app = Fastify();
 
-// Fastify's reply object is compatible with MinimalResponse
-app.get(
-  '*',
-  createSSRHandler((req) => html`<my-app url="${req.url}" />`, {
-    render: { dsd: true },
-  }),
-);
+const render = createSSRHandler((req) => html`<my-app url="${req.url}" />`, {
+  render: { dsd: true },
+});
+app.get('*', async (req, reply) => {
+  reply.hijack();
+  await render(req.raw, reply.raw);
+});
 
 app.listen({ port: 3000 });
 ```

@@ -445,6 +445,8 @@ export interface ComponentOptions {
    *                 component may explicitly opt back in with its own strategy.
    */
   hydrate?: HydrateStrategy;
+  /** Enable native ElementInternals form association for this host. */
+  formAssociated?: boolean;
 }
 
 // Overload: No parameters - use useProps() hook for props access
@@ -471,6 +473,7 @@ export function component(
     // Props are accessed via useProps() hook
     props: {},
     hydrate: options?.hydrate,
+    formAssociated: options?.formAssociated,
 
     // Add lifecycle hooks from the stored functions
     onConnected: (context) => {

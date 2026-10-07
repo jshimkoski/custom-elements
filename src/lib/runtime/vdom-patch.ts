@@ -1,3 +1,4 @@
+import { NATIVE_PROMOTE_MAP, NATIVE_PROPERTY_NAMES } from './native-properties';
 /**
  * vdom-patch.ts
  *
@@ -429,9 +430,10 @@ export function patchProps(
         // the vnode props when a tag is a custom element.
         const elIsCustom =
           newProps?.isCustomElement ?? oldProps?.isCustomElement ?? false;
-        if (elIsCustom || key in el) {
+        const propertyKey = elIsCustom ? key : NATIVE_PROPERTY_NAMES[key] ?? key;
+        if (elIsCustom || propertyKey in el) {
           try {
-            (el as unknown as Record<string, unknown>)[key] = newVal;
+            (el as unknown as Record<string, unknown>)[propertyKey] = newVal;
             // For native form controls, also remove the disabled attribute when setting disabled=false
             // The browser doesn't automatically sync the attribute when the property changes
             if (
@@ -587,6 +589,12 @@ export function patchProps(
     }
 
     if (oldUnwrapped !== newUnwrapped) {
+      // Hydration starts with reflected attributes from SSR. Promoted native
+      // properties have already been patched above; deleting their old attrs
+      // here would erase the freshly assigned src/alt/required value.
+      if (newUnwrapped === undefined && !elIsCustom &&
+          NATIVE_PROMOTE_MAP[(el as Element).localName]?.includes(key) &&
+          newPropProps[key] != null) continue;
       if (
         newUnwrapped === undefined &&
         RUNTIME_OWNED_ATTRIBUTES.has(key)

@@ -336,6 +336,7 @@ export function useRouter(config: RouterConfig): Router {
     path: string,
     replace = false,
     isPopState = false,
+    preserveScroll = false,
   ): Promise<void> => {
     const previous = activeNavigation;
     const run = (async () => {
@@ -350,7 +351,7 @@ export function useRouter(config: RouterConfig): Router {
       redirectDepth = 0;
       redirectTracker.clear();
       try {
-        await performNavigation(path, replace, isPopState);
+        await performNavigation(path, replace, isPopState, preserveScroll);
       } finally {
         redirectDepth = 0;
         redirectTracker.clear();
@@ -399,6 +400,7 @@ export function useRouter(config: RouterConfig): Router {
     path: string,
     replace = false,
     isPopState = false,
+    preserveScroll = false,
   ): Promise<void> => {
     try {
       const loc = parseNavigationPath(path);
@@ -467,7 +469,7 @@ export function useRouter(config: RouterConfig): Router {
               _scrollConfig.offset,
               _scrollConfig.timeoutMs,
             ).catch(() => {});
-          } else if (_scrollConfig.enabled && !isPopState) {
+          } else if (_scrollConfig.enabled && !isPopState && !preserveScroll) {
             // Regular navigation without a fragment: scroll to top.
             // isPopState navigations (back/forward) are skipped so the browser
             // can restore the previous scroll position via its history stack.
@@ -623,7 +625,7 @@ export function useRouter(config: RouterConfig): Router {
     // would otherwise move the user back after their navigation resolves.
     queueMicrotask(() => {
       if (activeNavigation) return;
-      navigate(serializeNavigationLocation(initial), true).catch((err) => {
+      navigate(serializeNavigationLocation(initial), true, false, true).catch((err) => {
         devError('Initial navigation error:', err);
       });
     });

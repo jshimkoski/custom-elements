@@ -1,3 +1,4 @@
+import { collectNativeAttrs, collectNativeChildren } from './ssr-utils';
 import type { VNode } from './types';
 import { escapeHTML } from './helpers';
 import {
@@ -53,9 +54,7 @@ function renderToStringImpl(vnode: VNode, opts?: RenderOptions): string {
   // but ensure SVG nodes behave like client-side: if this is an <svg>
   // and no xmlns was provided, inject the standard SVG namespace so
   // server markup matches client-created DOM namespace.
-  const attrsObj: Record<string, unknown> = vnode.props?.attrs
-    ? { ...vnode.props.attrs }
-    : {};
+  const attrsObj = collectNativeAttrs(vnode);
 
   // Process :class and :style directives so computed classes/styles appear in
   // the SSR output. Without this, elements using :class (e.g. md-app-bar's
@@ -82,15 +81,16 @@ function renderToStringImpl(vnode: VNode, opts?: RenderOptions): string {
     return `<${vnode.tag}${attrsString}>`;
   }
 
-  const children = Array.isArray(vnode.children)
-    ? vnode.children
+  const nativeChildren = collectNativeChildren(vnode);
+  const children = Array.isArray(nativeChildren)
+    ? nativeChildren
         .filter((c) => c !== null && c !== undefined)
         .map((c) => renderToStringImpl(c, opts))
         .join('')
-    : typeof vnode.children === 'string'
-      ? escapeHTML(vnode.children)
-      : vnode.children
-        ? renderToStringImpl(vnode.children, opts)
+    : typeof nativeChildren === 'string'
+      ? escapeHTML(nativeChildren)
+      : nativeChildren
+        ? renderToStringImpl(nativeChildren, opts)
         : '';
 
   return `<${vnode.tag}${attrsString}>${children}</${vnode.tag}>`;

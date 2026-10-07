@@ -1,3 +1,4 @@
+import { collectNativeAttrs, collectNativeChildren } from './ssr-utils';
 /**
  * Declarative Shadow DOM (DSD) SSR renderer.
  *
@@ -254,9 +255,7 @@ export function renderToDSD(vnode: VNode, opts: DSDRenderOptions): string {
   }
 
   // Regular element — recurse with DSD mode on
-  const attrsObj: Record<string, unknown> = vnode.props?.attrs
-    ? { ...vnode.props.attrs }
-    : {};
+  const attrsObj = collectNativeAttrs(vnode);
 
   // Process :class and :style directives so computed classes/styles appear
   // in DSD output — same fix as vdom-ssr.ts renderToStringImpl.
@@ -278,7 +277,7 @@ export function renderToDSD(vnode: VNode, opts: DSDRenderOptions): string {
     return `<${tag}${attrsString}>`;
   }
 
-  const children = renderChildrenDSD(vnode.children, opts);
+  const children = renderChildrenDSD(collectNativeChildren(vnode), opts);
   return `<${tag}${attrsString}>${children}</${tag}>`;
 }
 

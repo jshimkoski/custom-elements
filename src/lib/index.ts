@@ -97,3 +97,7 @@ export { useTeleport } from './teleport';
 
 // KeepAlive (Priority 3)
 export { registerKeepAlive } from './keep-alive';
+
+export { useFormInternals } from './runtime/form-internals';
+export type { FormCallbacks } from './runtime/form-internals';
+export { useLazyContent } from './runtime/lazy-content';

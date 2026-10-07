@@ -257,7 +257,7 @@ Below is the **complete list of public symbols** exported by the runtime and its
 
 **Package:** `@jasonshimmy/custom-elements-runtime/ssr-middleware`
 
-Framework-agnostic handler factories for Express, Fastify, Hono, and raw Node.js.
+Handler factories for Express and raw Node.js, with documented Fastify raw-response and Hono render-function recipes.
 
 | Export                        | Description                                                                                               |
 | ----------------------------- | --------------------------------------------------------------------------------------------------------- |
@@ -556,3 +556,5 @@ For examples and implementation details, explore the source code in `src/lib/`.
 Custom Elements Runtime is a labor of love built to make modern web development faster and more expressive. If it's helping you build better components, [learn more about me](https://jasonshimmy.com) or consider [supporting me on Patreon](https://patreon.com/jshimkoski) to help keep the momentum going.
 
 Your support helps fund continued development, documentation, and community engagement. Every bit helps—thank you!
+
+Production forms, lazy content and build-generated CSS are documented in [production primitives](docs/production-primitives.md).
